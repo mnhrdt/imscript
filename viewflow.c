@@ -5,7 +5,6 @@
 #include <math.h>
 
 #include "iio.h"
-#include "marching_squares.h"
 
 
 
@@ -20,6 +19,7 @@
 
 
 #include "fragments.c"
+#include "marching_squares.c"
 
 static void viewflow_pd(uint8_t (**y)[3], float (**x)[2], int w, int h, float m)
 {

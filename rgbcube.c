@@ -341,7 +341,7 @@ static void fill_histogram(float ***h, int bins, uint8_t (*x)[3], int nx)
 
 }
 
-static void inplace_naive_smoothing(float ***h, int w, int h, int d)
+static void inplace_naive_smoothing(float ***x, int w, int h, int d)
 {
 	float ***th = matrix_build_3d(w, h, d, sizeof(float));
 	FORK(d) FORJ(h) FORI(w)
@@ -356,15 +356,15 @@ static void inplace_naive_smoothing(float ***h, int w, int h, int d)
 			if (dj >= 0 && dj < h)
 			if (dk >= 0 && dk < d)
 			{
-				m += h[dk][dj][di];
+				m += x[dk][dj][di];
 				c += 1;
 			}
 		}
 		th[k][j][i] = m;
 	}
 	FORK(d) FORJ(h) FORI(w)
-		h[k][j][i] = th[k][j][i];
-	xfree(nh);
+		x[k][j][i] = th[k][j][i];
+	xfree(th);
 }
 
 static void beautify_histogram(float ***h, int bins)

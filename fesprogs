@@ -1,12 +1,14 @@
 CC="colorgcc -std=c99 -pedantic-errors -Wall -Wextra -Wshadow"
 FLGS="-Wno-unused -g"
 LIBS="iio.o -ltiff -lpng"
+OUTDIR="bin/"
 
-$CC $FLGS synflow.c $LIBS -o synflow
-$CC $FLGS viewflow.c $LIBS marching_squares.o -o viewflow
-$CC $FLGS faxpb.c $LIBS -o faxpb
-$CC $FLGS downsa.c $LIBS -o downsa
-$CC $FLGS component.c $LIBS -o component
-$CC $FLGS qeasy.c $LIBS -o qeasy
-$CC $FLGS vecstack.c $LIBS -o vecstack
-$CC $FLGS backflow.c $LIBS -o backflow
+$CC $FLGS synflow.c $LIBS -o ${OUTDIR}synflow
+$CC $FLGS viewflow.c $LIBS -o ${OUTDIR}viewflow
+$CC $FLGS faxpb.c $LIBS -o ${OUTDIR}faxpb
+$CC $FLGS downsa.c $LIBS -o ${OUTDIR}downsa
+$CC $FLGS component.c $LIBS -o ${OUTDIR}component
+$CC $FLGS qeasy.c $LIBS -o ${OUTDIR}qeasy
+$CC $FLGS vecstack.c $LIBS -o ${OUTDIR}vecstack
+$CC $FLGS backflow.c $LIBS -o ${OUTDIR}backflow
+$CC $FLGS rgbcube.c $LIBS -o ${OUTDIR}rgbcube
