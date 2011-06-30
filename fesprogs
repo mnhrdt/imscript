@@ -1,0 +1,12 @@
+CC="colorgcc -std=c99 -pedantic-errors -Wall -Wextra -Wshadow"
+FLGS="-Wno-unused -g"
+LIBS="iio.o -ltiff -lpng"
+
+$CC $FLGS synflow.c $LIBS -o synflow
+$CC $FLGS viewflow.c $LIBS marching_squares.o -o viewflow
+$CC $FLGS faxpb.c $LIBS -o faxpb
+$CC $FLGS downsa.c $LIBS -o downsa
+$CC $FLGS component.c $LIBS -o component
+$CC $FLGS qeasy.c $LIBS -o qeasy
+$CC $FLGS vecstack.c $LIBS -o vecstack
+$CC $FLGS backflow.c $LIBS -o backflow
