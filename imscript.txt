@@ -94,5 +94,26 @@ programming:
 
 
 
+SYNTAX OF THE LAMBDA FUNCTION
+-----------------------------
+
+The call
+
+	lambda "expression"
+
+pops n images from the stack, where n is the number of variables on
+the expression.  Each variable corresponds to an image (in
+alphabetical order) and the expression is evaluated pixel-wise to
+produce a single output image.  The variables admit two kind of
+modificators, to access a neighboring pixel, and to access a
+particular component of a pixel.
+
+Examples:
+
+	lambda "a*x + b" == faxpb
+	lambda "x(1,0) - x" == forward differences in horizontal direction
+	lambda "x - x(-1,0)" == backward differences in horizontal direction
+	lambda "0.3*x[0] + 0.6*x[1] + 0.1*x[2]" == color to gray
+
 
 # vim:set tw=69 filetype=text:
