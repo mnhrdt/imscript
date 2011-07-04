@@ -152,7 +152,7 @@ static void fill_homography(float (**x)[2], int w, int h, float p[9])
 // y' = y + y*(a*x*x + a*y*y)
 // X' = X + a*X*X*X
 
-#include <complex.h>
+//#include <complex.h>
 static double solvecubicspecial(double a, double b)
 {
 	long double x;
@@ -183,7 +183,8 @@ static double solvecubicspecial(double a, double b)
 // p = 1/a, q=b/a;
 		long double p = 1/a;
 		long double q = -b/a;
-		long double cosarg = acos((3*q)/(2*p)*sqrt(-3/p))/3-2*M_PI/3;
+		int k = 1;
+		long double cosarg = acos((3*q)/(2*p)*sqrt(-3/p))/3-k*2*M_PI/3;
 		r = 2*sqrt(-p/3) * cos(cosarg);
 		return r;
 	} else {
@@ -218,17 +219,17 @@ static void fill_radialpol(float (**x)[2], int w, int h, float *p)
 		error("bad parametric distortion np = %d\n", np);
 	float c[2] = {p[1], p[2]};
 	float *coef = p + 3;
+	float a = coef[0];
 	FORJ(h) FORI(w) {
-		float dx = i - c[0];
-		float dy = j - c[1];
-		float r, R = dx*dx + dy*dy;
-		switch(np) {
-		case 1: r = coef[0]*R; break;
-		case 2: r = (coef[0] + coef[1]*R)*R; break;
-		default: assert(false);
+		float r = hypot(i - c[0], j - c[1]);
+		float R = parabolicdistortion(a, r);
+		if (r > 0) {
+			x[j][i][0] = c[0] + (R/r)*(i - c[0]) - i;
+			x[j][i][1] = c[1] + (R/r)*(j - c[1]) - j;
+		} else {
+			x[j][i][0] = 0;
+			x[j][i][1] = 0;
 		}
-		x[j][i][0] = r*dx;
-		x[j][i][1] = r*dy;
 	}
 }
 
@@ -331,17 +332,27 @@ static void apply_homography(int pd, float (**y)[pd], float (**x)[pd],
 	}
 }
 
-//static void apply_radialpol(int pd, float (**y)[pd], float (**x)[pd],
-//		int w, int h, float *p)
-//{
-//	int np = *p;
-//	if (np != 4 && np != 5)
-//		error("bad parametric distortion np = %d\n", np);
-//	float c[2] = {p[1], p[2]};
-//	FORJ(h) FORI(w) {
-//		;
-//	}
-//}
+static void apply_radialpol(int pd, float (**y)[pd], float (**x)[pd],
+		int w, int h, float *param)
+{
+	int np = *param;
+	if (np != 4)
+		error("bad parametric distortion np = %d\n", np);
+	float c[2] = {param[1], param[2]};
+	float a = param[3];
+	FORJ(h) FORI(w) {
+		float p[2] = {i, j}, q[2];
+		float r = hypot(p[0]-c[0], p[1]-c[1]);
+		float ir = invertparabolicdistortion(a, r);
+		// q = c + ir*(p-c)
+		q[0] = c[0] + (ir/r) * (p[0] - c[0]);
+		q[1] = c[1] + (ir/r) * (p[1] - c[1]);
+		float val[pd];
+		general_interpolate(val, pd, x, w, h, q[0], q[1], 2);
+		FORL(pd)
+			y[j][i][l] = val[l];
+	}
+}
 
 static int parse_floats(float *t, int nmax, const char *s)
 {
@@ -365,6 +376,7 @@ static int parse_floats(float *t, int nmax, const char *s)
 // smooth SIGMA MU
 // cradial2 R
 // cradial4 A B
+// radial2 CX CY R
 int main_synflow(int c, char *v[])
 {
 	if (c != 6) {
@@ -388,14 +400,18 @@ int main_synflow(int c, char *v[])
 	int nparams = parse_floats(param, maxparam, v[2]);
 	if (false) { ;
 	} else if (0 == strcmp(v[1], "cradial2")) {
-		double a = -0.01;
-		FORI(11) {
-			double X = i/10.0;
-			double xp = parabolicdistortion(a, X);
-			double ixp = invertparabolicdistortion(a, xp);
-			printf("x=%g, xp=%g, ixp=%g\n", X, xp, ixp);
-		}
-		return EXIT_SUCCESS;
+		if (nparams != 1) error("\"cradial2\" expects one parameter");
+		float p[4] = {4, w/2.0, h/2.0, param[0]};
+		fill_radialpol(f, w, h, p);
+		apply_radialpol(pd, y, x, w, h, p);
+		//double a = -0.01;
+		//FORI(11) {
+		//	double X = i/10.0;
+		//	double xp = parabolicdistortion(a, X);
+		//	double ixp = invertparabolicdistortion(a, xp);
+		//	printf("x=%g, xp=%g, ixp=%g\n", X, xp, ixp);
+		//}
+		//return EXIT_SUCCESS;
 	} else if (0 == strcmp(v[1], "cid")) {
 		if (nparams != 1) error("\"cid\" expects one parameter");
 		//fill_cidentity(f, w, h, param);

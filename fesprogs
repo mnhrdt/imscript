@@ -3,7 +3,9 @@ FLGS="-Wno-unused -g"
 LIBS="iio.o -ltiff -lpng"
 OUTDIR="bin/"
 
-PROGS="flowdiv synflow viewflow faxpb downsa component qeasy vecstack backflow rgbcube iminfo fnorm"
+PROGS="flowdiv synflow viewflow faxpb downsa component qeasy vecstack backflow rgbcube iminfo fnorm faxpby"
+
+$CC $FLGS paraflow.c $LIBS -o ${OUTDIR}paraflow -lgsl -lgslcblas
 
 for i in $PROGS; do
 	$CC $FLGS $i.c $LIBS -o ${OUTDIR}$i

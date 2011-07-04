@@ -147,16 +147,11 @@ void traverse_segment(int px, int py, int qx, int qy,
 		traverse_segment(qx, qy, px, py, f, e);
 	else {
 		if (abs(qx - px) > qy - py) { // horitzontal
-			float slope = (qy - py); slope /= (qx - px);
-			assert(px < qx);
-			assert(fabs(slope) <= 1);
+			float slope = (qy - py)/(float)(qx - px);
 			for (int i = 0; i < qx-px; i++)
 				f(i+px, lrint(py + i*slope), e);
 		} else { // vertical
-			float slope = (qx - px); slope /= (qy - py);
-			assert(abs(qy - py) >= abs(qx - px));
-			assert(py < qy);
-			assert(fabs(slope) <= 1);
+			float slope = (qx - px)/(float)(qy - py);
 			for (int j = 0; j <= qy-py; j++)
 				f(lrint(px+j*slope), j+py, e);
 		}
