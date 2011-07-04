@@ -146,6 +146,91 @@ static void fill_homography(float (**x)[2], int w, int h, float p[9])
 	}
 }
 
+// (x,y) |-> (x+(a*R^2), y+(a*R^2))
+// R^2 = x*x + y*y
+// x' = x + x*(a*x*x + a*y*y)
+// y' = y + y*(a*x*x + a*y*y)
+// X' = X + a*X*X*X
+
+#include <complex.h>
+static double solvecubicspecial(double a, double b)
+{
+	long double x;
+	long double r;
+	if (a < 0) {
+		//double complex aa;
+		//((double *)&aa)[0] = a;
+		//((double *)&aa)[1] = 0;
+		//double complex bb;
+		//((double *)&bb)[0] = b;
+		//((double *)&bb)[1] = 0;
+		//printf("aa = %g + %g __I__\n", creal(aa), cimag(aa));
+		//printf("bb = %g + %g __I__\n", creal(bb), cimag(bb));
+		//double complex xx, rr;
+		//xx = cpow(csqrt((27*aa*bb*bb+4)/aa)/(2*sqrt(27)*aa)+bb/(2*aa),1.0/3);
+		//printf("xx = %g + %g __I__\n", creal(xx), cimag(xx));
+		//rr = xx-1/(3*aa*xx);
+		//printf("rr = %g + %g __I__\n", creal(rr), cimag(rr));
+		//return creal(rr);
+
+		//error("not yet inverted");
+		// the case a<0 corresponds to a cubic having three real roots,
+		// and Cardano's formula involves complex numbers.  To avoid
+		// complex numbers, the trigonometric representation of
+		// solutions should be used instead.
+// a*X*X*X + X - X' = 0
+// X*X*X + (1/a)*X - X'/a = 0
+// p = 1/a, q=b/a;
+		long double p = 1/a;
+		long double q = -b/a;
+		long double cosarg = acos((3*q)/(2*p)*sqrt(-3/p))/3-2*M_PI/3;
+		r = 2*sqrt(-p/3) * cos(cosarg);
+		return r;
+	} else {
+		x = cbrt(sqrt((27*a*b*b+4)/a)/(2*sqrt(27)*a)+b/(2*a));
+		r = x-1/(3*a*x);
+		return r;
+	}
+//	double x = sqrt((27*a*b + 4)/a) / (2*sqrt(27)*a) + b/(2*a);
+//	double y = pow(x, 1.0/3);
+//	//double r = y - 1/(3*a*y);
+//	double r = (3*a*y*y - 1)/(3*a*y);
+//	return r;
+}
+
+// X' = X + a*X*X*X
+// a*X*X*X + X - X' = 0
+static double invertparabolicdistortion(double a, double xp)
+{
+	return solvecubicspecial(a, xp);
+}
+
+// X' = X + a*X*X*X
+static double parabolicdistortion(double a, double x)
+{
+	return x + a*x*x*x;
+}
+
+static void fill_radialpol(float (**x)[2], int w, int h, float *p)
+{
+	int np = *p;
+	if (np != 4 && np != 5)
+		error("bad parametric distortion np = %d\n", np);
+	float c[2] = {p[1], p[2]};
+	float *coef = p + 3;
+	FORJ(h) FORI(w) {
+		float dx = i - c[0];
+		float dy = j - c[1];
+		float r, R = dx*dx + dy*dy;
+		switch(np) {
+		case 1: r = coef[0]*R; break;
+		case 2: r = (coef[0] + coef[1]*R)*R; break;
+		default: assert(false);
+		}
+		x[j][i][0] = r*dx;
+		x[j][i][1] = r*dy;
+	}
+}
 
 static void viewflow(uint8_t (**y)[3], float (**x)[2], int w, int h, float m)
 {
@@ -246,6 +331,18 @@ static void apply_homography(int pd, float (**y)[pd], float (**x)[pd],
 	}
 }
 
+//static void apply_radialpol(int pd, float (**y)[pd], float (**x)[pd],
+//		int w, int h, float *p)
+//{
+//	int np = *p;
+//	if (np != 4 && np != 5)
+//		error("bad parametric distortion np = %d\n", np);
+//	float c[2] = {p[1], p[2]};
+//	FORJ(h) FORI(w) {
+//		;
+//	}
+//}
+
 static int parse_floats(float *t, int nmax, const char *s)
 {
 	int i = 0, w;
@@ -266,7 +363,8 @@ static int parse_floats(float *t, int nmax, const char *s)
 // hom4p X1 Y1 X2 Y2 X3 Y3 X4 Y4 X1' Y1' X2' Y2' X3' Y3' X4' Y4'
 // hombord DX1 DY1 DX2 DY2 DX3 DY3 DX4 DY4
 // smooth SIGMA MU
-// parabolic R S
+// cradial2 R
+// cradial4 A B
 int main_synflow(int c, char *v[])
 {
 	if (c != 6) {
@@ -288,7 +386,17 @@ int main_synflow(int c, char *v[])
 	int maxparam = 10;
 	float param[maxparam];
 	int nparams = parse_floats(param, maxparam, v[2]);
-	if (0 == strcmp(v[1], "cid")) {
+	if (false) { ;
+	} else if (0 == strcmp(v[1], "cradial2")) {
+		double a = -0.01;
+		FORI(11) {
+			double X = i/10.0;
+			double xp = parabolicdistortion(a, X);
+			double ixp = invertparabolicdistortion(a, xp);
+			printf("x=%g, xp=%g, ixp=%g\n", X, xp, ixp);
+		}
+		return EXIT_SUCCESS;
+	} else if (0 == strcmp(v[1], "cid")) {
 		if (nparams != 1) error("\"cid\" expects one parameter");
 		//fill_cidentity(f, w, h, param);
 		float R = param[0];
