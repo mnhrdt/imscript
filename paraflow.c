@@ -290,7 +290,7 @@ static double objective_function_l2(const gsl_vector *v, void *pp)
 	return r;
 }
 
-SMART_PARAMETER(SIMPLEX_NEQ,5)
+//SMART_PARAMETER(SIMPLEX_NEQ,5)
 
 static bool are_equal(double a, double b)
 {
@@ -298,104 +298,104 @@ static bool are_equal(double a, double b)
 }
 
 // external interface to GSL code (for 4D vectors)
-static int minimize_objective_function(float *vmin, float *vzero, void *p)
-{
-	int dim = 4;
-	const gsl_multimin_fminimizer_type *T =
-		gsl_multimin_fminimizer_nmsimplex;
-	gsl_multimin_fminimizer *s = NULL;
-	gsl_multimin_function f = {.f=objective_function, .n=dim, .params=p};
-
-	gsl_vector *ss = gsl_vector_alloc(dim);
-	gsl_vector *x = gsl_vector_alloc(dim);
-
-	gsl_vector_set(ss, YOU_ANGLE, 1.0);
-	gsl_vector_set(ss, YOU_DIST, 0.05);
-	gsl_vector_set(ss, YOU_T, 0.05);
-	gsl_vector_set(ss, YOU_H, 0.05);
-
-	FORI(dim) gsl_vector_set(x, i, vzero[i]);
-
-	s = gsl_multimin_fminimizer_alloc(T, dim);
-	gsl_multimin_fminimizer_set(s, &f, x, ss);
-
-	int status, iter = 0;
-	int scount = 0; // counts the number of repeated values
-	double oldval = INFINITY;
-	do {
-		iter += 1;
-
-		status = gsl_multimin_fminimizer_iterate(s);
-		if (status) break;
-
-		double size = gsl_multimin_fminimizer_size(s);
-		status = gsl_multimin_test_size(size, 0.001);
-
-		if (status == GSL_SUCCESS)
-			fprintf(stderr, "converged to minimum!\n");
-
-		fprintf(stderr, "iter = %d (", iter);
-		FORI(dim) fprintf(stderr, "%g ", gsl_vector_get(s->x, i));
-		fprintf(stderr, ") f=%g size=%g\n", s->fval, size);
-
-		scount = are_equal(oldval, s->fval) ? scount+1 : 0;
-		if (scount > SIMPLEX_NEQ()) break;
-		oldval = s->fval;
-
-	} while (status == GSL_CONTINUE && iter < 50);
-
-	FORI(dim) vmin[i] = gsl_vector_get(s->x, i);
-
-	gsl_vector_free(x);
-	gsl_vector_free(ss);
-	gsl_multimin_fminimizer_free(s);
-
-	return status;
-}
-
+//static int minimize_objective_function(float *vmin, float *vzero, void *p)
+//{
+//	int dim = 4;
+//	const gsl_multimin_fminimizer_type *T =
+//		gsl_multimin_fminimizer_nmsimplex;
+//	gsl_multimin_fminimizer *s = NULL;
+//	gsl_multimin_function f = {.f=objective_function, .n=dim, .params=p};
 //
-// END OF GSL STUFF
+//	gsl_vector *ss = gsl_vector_alloc(dim);
+//	gsl_vector *x = gsl_vector_alloc(dim);
 //
-
-
-
-SMART_PARAMETER_INT(MULTISCALE_START,5)
-
-#define NSCALES 8 //should depend on the size of the frames
-typedef struct {
-	imatge t[NSCALES];
-} multiscale;
-
-static void find_grass(imatge_rgba *outie, imatge *grass)
-{
-	multiscale m[1];
-	compute_median_multiscales(m, grass);
-
-	you u[1]={{.v={0,0,0,0},.corner=false}};
-	find_best_you_exhaustively(u, m->t + MULTISCALE_START());
-
-	float bestu[4]; FORI(4) bestu[i] = u->v[i];
-
-	minimize_objective_function(bestu, bestu, m->t + 4);
-	minimize_objective_function(bestu, bestu, m->t + 3);
-	minimize_objective_function(bestu, bestu, m->t + 2);
-	minimize_objective_function(bestu, bestu, m->t + 1);
-	minimize_objective_function(bestu, bestu, m->t + 0);
-
-	FORI(4) u->v[i] = bestu[i];
-
-	//you un[1];
-	//quadratic_amelioration(un, u, m->t + 6);
-	//{
-	//	float l[2][3];
-	//	get_you_cornerlines(l[0], l[1], grass, u, true);
-	//}
-
-	colorize_u(outie, grass, u);
-
-	FORI(NSCALES)
-		allibera_imatge(m->t + i);
-}
+//	gsl_vector_set(ss, YOU_ANGLE, 1.0);
+//	gsl_vector_set(ss, YOU_DIST, 0.05);
+//	gsl_vector_set(ss, YOU_T, 0.05);
+//	gsl_vector_set(ss, YOU_H, 0.05);
+//
+//	FORI(dim) gsl_vector_set(x, i, vzero[i]);
+//
+//	s = gsl_multimin_fminimizer_alloc(T, dim);
+//	gsl_multimin_fminimizer_set(s, &f, x, ss);
+//
+//	int status, iter = 0;
+//	int scount = 0; // counts the number of repeated values
+//	double oldval = INFINITY;
+//	do {
+//		iter += 1;
+//
+//		status = gsl_multimin_fminimizer_iterate(s);
+//		if (status) break;
+//
+//		double size = gsl_multimin_fminimizer_size(s);
+//		status = gsl_multimin_test_size(size, 0.001);
+//
+//		if (status == GSL_SUCCESS)
+//			fprintf(stderr, "converged to minimum!\n");
+//
+//		fprintf(stderr, "iter = %d (", iter);
+//		FORI(dim) fprintf(stderr, "%g ", gsl_vector_get(s->x, i));
+//		fprintf(stderr, ") f=%g size=%g\n", s->fval, size);
+//
+//		scount = are_equal(oldval, s->fval) ? scount+1 : 0;
+//		if (scount > SIMPLEX_NEQ()) break;
+//		oldval = s->fval;
+//
+//	} while (status == GSL_CONTINUE && iter < 50);
+//
+//	FORI(dim) vmin[i] = gsl_vector_get(s->x, i);
+//
+//	gsl_vector_free(x);
+//	gsl_vector_free(ss);
+//	gsl_multimin_fminimizer_free(s);
+//
+//	return status;
+//}
+//
+////
+//// END OF GSL STUFF
+////
+//
+//
+//
+//SMART_PARAMETER_INT(MULTISCALE_START,5)
+//
+//#define NSCALES 8 //should depend on the size of the frames
+//typedef struct {
+//	imatge t[NSCALES];
+//} multiscale;
+//
+//static void find_grass(imatge_rgba *outie, imatge *grass)
+//{
+//	multiscale m[1];
+//	compute_median_multiscales(m, grass);
+//
+//	you u[1]={{.v={0,0,0,0},.corner=false}};
+//	find_best_you_exhaustively(u, m->t + MULTISCALE_START());
+//
+//	float bestu[4]; FORI(4) bestu[i] = u->v[i];
+//
+//	minimize_objective_function(bestu, bestu, m->t + 4);
+//	minimize_objective_function(bestu, bestu, m->t + 3);
+//	minimize_objective_function(bestu, bestu, m->t + 2);
+//	minimize_objective_function(bestu, bestu, m->t + 1);
+//	minimize_objective_function(bestu, bestu, m->t + 0);
+//
+//	FORI(4) u->v[i] = bestu[i];
+//
+//	//you un[1];
+//	//quadratic_amelioration(un, u, m->t + 6);
+//	//{
+//	//	float l[2][3];
+//	//	get_you_cornerlines(l[0], l[1], grass, u, true);
+//	//}
+//
+//	colorize_u(outie, grass, u);
+//
+//	FORI(NSCALES)
+//		allibera_imatge(m->t + i);
+//}
 
 static int parse_doubles(double *t, int nmax, const char *s)
 {
@@ -407,19 +407,26 @@ static int parse_doubles(double *t, int nmax, const char *s)
 	return i;
 }
 
-static double evaluate_error_between_images(float *x, float *y,
+static double evaluate_error_between_images(float *xx, float *yy,
 		int w, int h, int pd, char *error_id)
 {
-	// TODO: omit a passepartout for this evaluation
+	float (*x)[w] = (void*)xx;
+	float (*y)[w] = (void*)yy;
+	// TODO: omit a passepartout
+	int passepartout = 2;
 	double r;
 	int n = w*h*pd;
-	float *d = xmalloc(n*sizeof*d);
-	FORI(n) d[i] = fabs(x[i] - y[i]);
-	iio_save_image_float_vec("/tmp/diff.tiff", d, w, h, pd);
+	float (*d)[w] = xmalloc(n*sizeof*d);
+	FORI(n) d[0][i] = 0;//fabs(x[i] - y[i]);
+	for (int j = passepartout; j < h-passepartout; j++)
+	for (int i = passepartout; i < w-passepartout; i++)
+		d[j][i] = fabs(x[j][i] - y[j][i]);
+
+	iio_save_image_float_vec("/tmp/diff.tiff", d[0][0], w, h, pd);
 	if (0 == strcmp(error_id, "l2")) {
 		r = 0;
 		FORI(n)
-			r = hypot(r, d[i]);
+			r = hypot(r, d[0][i]);
 	} else error("bad error id \"%s\"", error_id);
 	//struct statistics_float s;
 	//statistics_getf(&s, d, n);

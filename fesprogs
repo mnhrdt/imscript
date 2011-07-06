@@ -5,7 +5,7 @@ OUTDIR="bin/"
 
 PROGS="plambda flowdiv synflow viewflow faxpb downsa component qeasy vecstack backflow rgbcube iminfo fnorm faxpby"
 
-$CC $FLGS paraflow.c $LIBS -o ${OUTDIR}paraflow -lgsl -lgslcblas
+#$CC $FLGS paraflow.c $LIBS -o ${OUTDIR}paraflow -lgsl -lgslcblas
 
 for i in $PROGS; do
 	$CC $FLGS $i.c $LIBS -o ${OUTDIR}$i
