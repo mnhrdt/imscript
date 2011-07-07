@@ -106,7 +106,10 @@ the expression.  Each variable corresponds to an image (in
 alphabetical order) and the expression is evaluated pixel-wise to
 produce a single output image.  The variables admit two kind of
 modificators, to access a neighboring pixel, and to access a
-particular component of a pixel.
+particular component of a pixel.  There are further variables ":w,
+:h, :n, :i, :j, :x, :y, :r, :t" contaning the width, height, number
+of pixels, and the coordinates of the current pixel in various
+coordinate systems.
 
 Examples:
 

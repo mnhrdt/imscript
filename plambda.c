@@ -1,3 +1,39 @@
+// NAME
+// 	plambda - a RPN calculator for image pixels
+//
+// SYNOPSIS
+// 	plambda a.pnb b.png c.png ... "lambda expression" > output.png
+//
+// DESCRIPTION
+// 	Plambda applies an expression to all the pixels of a collection of
+// 	images, and produces a single output image.  Each input image
+// 	corresponts to one of the variables of the expression (in alphabetical
+// 	order).  There are modifiers to the variables that allow access to the
+// 	values of neighboring pixels.
+//
+// EXAMPLES
+// 	Sum two images:
+//
+// 		plambda a.png b.png "a b +" > aplusb.png
+//
+//	Add a gaussian to half of lena:
+//
+//		plambda /tmp/lena.png "x 2 / :r :r * -1 * 40 * exp 200 * +"
+//
+//	Forward differences to compute the derivative in horizontal direction:
+//
+//		plambda lena.png "x(1,0) x -"
+//
+//	Sobel edge detector:
+//		plambda lena.png "x(1,0) 2 * x(1,1) x(1,-1) + + x(-1,0) 2 * x(-1,1) x(-1,-1) + + - x(0,1) 2 * x(1,1) x(-1,1) + + x(0,-1) 2 * x(1,-1) x(-1,-1) + + - hypot"
+//
+//
+//
+// TODO: complete support for color images (incomplete, yet not called)
+// TODO: implement support for nd images (easy, mostly fix i/o problems)
+// TODO: implement shunting-yard algorithm to admit infix notation
+
+
 #include <assert.h>
 #include <ctype.h>
 #include <stdbool.h>
@@ -9,6 +45,7 @@
 
 #define PLAMBDA_MAX_TOKENS 0x100
 #define PLAMBDA_MAX_VARLEN 0x100
+#define PLAMBDA_MAX_PIXELDIM 40
 
 
 
@@ -18,6 +55,9 @@
 #ifndef FORJ
 #define FORJ(n) for(int j=0;j<(n);j++)
 #endif
+#ifndef FORK
+#define FORK(n) for(int k=0;k<(n);k++)
+#endif
 
 #include "fragments.c"
 
@@ -26,6 +66,7 @@
 #define PLAMBDA_SCALAR 1     // pixel component
 #define PLAMBDA_VECTOR 2     // whole pixel
 #define PLAMBDA_OPERATOR 3   // function
+#define PLAMBDA_COLONVAR 4   // colon-type variable
 
 static double sum_two_doubles      (double a, double b) { return a + b; }
 static double substract_two_doubles(double a, double b) { return a - b; }
@@ -103,6 +144,7 @@ struct plambda_token {
 	                     // if type==operator, its index
 	int component;       // if type==variable, index of selected component
 	int displacement[2]; // if type==variable, relative displacement
+	int colonvar;        // if type==colon, the letter
 
 	char *tmphack;
 };
@@ -125,10 +167,26 @@ static float apply_function(struct predefined_function *f, float *v)
 	switch(f->nargs) {
 	case 0: return f->value;
 	case 1: return ((double(*)(double))(f->f))(v[0]);
-	case 2: return ((double(*)(double,double))f->f)(v[0], v[1]);
+	case 2: return ((double(*)(double,double))f->f)(v[1], v[0]);
 	case 3: error("bizarre");
 	}
 	return 0;
+}
+
+static float eval_colonvar(int w, int h, int i, int j, int c)
+{
+	switch(c) {
+	case 'i': return i;
+	case 'j': return j;
+	case 'w': return w;
+	case 'h': return h;
+	case 'n': return w*h;
+	case 'x': return (2.0/(w-1))*i - 1;
+	case 'y': return (2.0/(h-1))*j - 1;
+	case 'r': return hypot((2.0/(h-1))*j-1,(2.0/(w-1))*i-1);
+	case 't': return atan2((2.0/(h-1))*j-1,(2.0/(w-1))*i-1);
+	default: error("unrecognized colonvar \":%c\"", c);
+	}
 }
 
 
@@ -146,6 +204,13 @@ static bool token_is_number(float *x, const char *t)
 				"ignored "
 			       	"in numeric constant\n", endptr);
 	return true;
+}
+
+static int token_is_colonvar(const char *t)
+{
+	if (t[0] != ':') return 0;
+	if (isalpha(t[1]) && t[2]=='\0') return t[1];
+	return 0;
 }
 
 // if the token is a valid word, return its length
@@ -274,6 +339,14 @@ static void process_token(struct plambda_program *p, const char *tokke)
 		//fprintf(stderr, "TKN numeric constant: %g\n", x);
 		t->type = PLAMBDA_CONSTANT;
 		t->value = x;
+		goto endtok;
+	}
+
+	int colonvar = token_is_colonvar(tok);
+	if (colonvar)
+	{
+		t->type = PLAMBDA_COLONVAR;
+		t->colonvar = colonvar;
 		goto endtok;
 	}
 
@@ -450,6 +523,8 @@ static void print_compiled_program(struct plambda_program *p)
 		fprintf(stderr, "TOKEN[%d]: ", i);
 		if (t->type == PLAMBDA_CONSTANT)
 			fprintf(stderr, "constant %g", t->value);
+		if (t->type == PLAMBDA_COLONVAR)
+			fprintf(stderr, "colonvar \"%c\"", t->colonvar);
 		if (t->type == PLAMBDA_VECTOR) {
 			fprintf(stderr, "variable vector %d \"%s\"",
 					t->index, p->var->t[t->index]);
@@ -480,11 +555,37 @@ struct value_stack {
 	float t[PLAMBDA_MAX_TOKENS];
 };
 
+struct value_vstack {
+	int n;
+	int d[PLAMBDA_MAX_TOKENS];
+	float t[PLAMBDA_MAX_TOKENS][PLAMBDA_MAX_PIXELDIM];
+};
+
 static float stack_pop(struct value_stack *s)
 {
 	if (s->n > 0) {
 		s->n -= 1;
 		return s->t[s->n];
+	} else error("popping from empty stack");
+}
+
+static int vstack_pop_vector(float *val, struct value_vstack *s)
+{
+	if (s->n > 0) {
+		s->n -= 1;
+		int d = s->d[s->n];
+		FORI(d) val[i] = s->t[s->n][i];
+		return d;
+	} else error("popping from empty stack");
+}
+
+static float vstack_pop_scalar(struct value_vstack *s)
+{
+	if (s->n > 0) {
+		s->n -= 1;
+		if (s->d[s->n] != 1)
+			error("trying to pop a scalar but found a vector");
+		return s->t[s->n][0];
 	} else error("popping from empty stack");
 }
 
@@ -496,13 +597,98 @@ static void stack_push(struct value_stack *s, float x)
 	} else error("full stack");
 }
 
+static void vstack_push_vector(struct value_vstack *s, float *v, int n)
+{
+	if (s->n+1 < PLAMBDA_MAX_TOKENS) {
+		FORI(n)
+			s->t[s->n][i] = v[i];
+		s->n += 1;
+	} else error("full stack");
+}
+
+static void vstack_push_scalar(struct value_vstack *s, float *v, int n)
+{
+	if (s->n+1 < PLAMBDA_MAX_TOKENS) {
+		FORI(n)
+			s->t[s->n][i] = v[i];
+		s->n += 1;
+	} else error("full stack");
+}
+
 static void stack_print(FILE *f, struct value_stack *s)
 {
 	FORI(s->n)
-		fprintf(f, "STACK[%d/%d]: %g\n", i, s->n, s->t[i]);
+		fprintf(f, "STACK[%d/%d]: %g\n", 1+i, s->n, s->t[i]);
 }
 
-static void run_program(struct plambda_program *p, float *val)
+static void vstack_print(FILE *f, struct value_vstack *s)
+{
+	FORI(s->n) {
+		fprintf(f, "STACK[%d/%d]: {%d}", 1+i, s->n, s->d[i]);
+		FORJ(s->d[i])
+			fprintf(f, " %g", s->t[i][j]);
+		fprintf(f, "\n");
+	}
+}
+
+
+#include "getpixel.c"
+
+static float run_program_at_pixel(struct plambda_program *p,
+		float **val, int w, int h, int ai, int aj)
+{
+	struct value_stack s[1];
+	s->n = 0;
+	FORI(p->n) {
+		struct plambda_token *t = p->t + i;
+		switch(t->type) {
+		case PLAMBDA_CONSTANT:
+			stack_push(s, t->value);
+			break;
+		case PLAMBDA_COLONVAR: {
+			float x = eval_colonvar(w, h, ai, aj, t->colonvar);
+			stack_push(s, x);
+			break;
+				       }
+		case PLAMBDA_SCALAR:
+		case PLAMBDA_VECTOR: {
+			float *img = val[t->index];
+			int dai = ai + t->displacement[0];
+			int daj = aj + t->displacement[1];
+			float x = getsample_0(img, w, h, 1, dai, daj, 0);
+			stack_push(s, x);
+			//stack_push(s, val[t->index]);
+				     }
+			break;
+		case PLAMBDA_OPERATOR: {
+			struct predefined_function *f =
+				global_table_of_predefined_functions+t->index;
+			float param[f->nargs];
+			FORJ(f->nargs)
+				param[j] = stack_pop(s);
+			float x = apply_function(f, param);
+			stack_push(s, x);
+				       }
+			break;
+		default:
+			error("unknown tag type %d", t->type);
+		}
+	}
+	return stack_pop(s);
+}
+
+static void run_program(float *out,
+		struct plambda_program *p, float **val, int w, int h)
+{
+	FORJ(h) FORI(w) {
+//static float run_program_at_pixel(struct plambda_program *p,
+//		float **val, int w, int h, int ai, int aj)
+		float r = run_program_at_pixel(p, val, w, h, i, j);
+		setsample_0(out, w, h, 1, i, j, 0, r);
+	}
+}
+
+static void run_program_numbers(struct plambda_program *p, float *val)
 {
 	struct value_stack s[1];
 	s->n = 0;
@@ -553,20 +739,23 @@ int main(int c, char *v[])
 	if (n != p->var->n)
 		error("the program expects %d variables but %d images "
 					"were given", p->var->n, n);
-	//int w[n], h[n], pd[n];
-	//float *x[n];
-	//FORI(n) x[i] = iio_read_image_float_vec(v[i], w + i, h + i, pd + i);
-	//FORI(n-1)
-	//	if (w[0] != w[i+1] || h[0] != h[i+1] || pd[0] != pd[i+1])
-	//		error("input images size mismatch");
-	float vars[n];
-	FORI(n) vars[i] = atof(v[i+1]);
+	int w[n], h[n], pd[n];
+	float *x[n];
+	FORI(n) x[i] = iio_read_image_float_vec(v[i+1], w + i, h + i, pd + i);
+	FORI(n-1)
+		if (pd[i] != 1)
+			error("only gray images supported so far");
+	FORI(n-1)
+		if (w[0] != w[i+1] || h[0] != h[i+1] || pd[0] != pd[i+1])
+			error("input images size mismatch");
 
 	FORI(n)
-		fprintf(stderr, "correspondence \"%s\" = %g\n",
-				p->var->t[i], vars[i]);
+		fprintf(stderr, "correspondence \"%s\" = \"%s\"\n",
+				p->var->t[i], v[i+1]);
 
-	run_program(p, vars);
+	float *out = xmalloc(*w * *h * 1 * sizeof*out);
+	run_program(out, p, x, *w, *h);
+	iio_save_image_float_vec("-", out, *w, *h, 1);
 
 
 	//FORI(n) free(x[i]);
