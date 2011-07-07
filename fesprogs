@@ -1,11 +1,12 @@
 CC="colorgcc -std=c99 -pedantic-errors -Wall -Wextra -Wshadow"
 FLGS="-Wno-unused -g"
-LIBS="iio.o -ltiff -lpng"
+LIBS="iio.o -ltiff -lpng -lfftw3f"
 OUTDIR="bin/"
 
 PROGS="plambda flowdiv synflow viewflow faxpb downsa component qeasy vecstack backflow rgbcube iminfo fnorm faxpby"
+PROGS="gblur plambda"
 
-#$CC $FLGS paraflow.c $LIBS -o ${OUTDIR}paraflow -lgsl -lgslcblas
+$CC $FLGS paraflow.c $LIBS -o ${OUTDIR}paraflow -lgsl -lgslcblas
 
 for i in $PROGS; do
 	$CC $FLGS $i.c $LIBS -o ${OUTDIR}$i
