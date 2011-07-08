@@ -27,10 +27,12 @@
 //	Sobel edge detector:
 //		plambda lena.png "x(1,0) 2 * x(1,1) x(1,-1) + + x(-1,0) 2 * x(-1,1) x(-1,-1) + + - x(0,1) 2 * x(1,1) x(-1,1) + + x(0,-1) 2 * x(1,-1) x(-1,-1) + + - hypot"
 //
+//	Color to gray:
+//		plambda lena.png "x[0] x[1] x[2] + + 3 /"
 //
 //
-// TODO: complete support for color images (incomplete, yet not called)
-// TODO: implement support for nd images (easy, mostly fix i/o problems)
+//
+// TODO: admit images of different number of channels
 // TODO: implement shunting-yard algorithm to admit infix notation
 
 
@@ -58,6 +60,9 @@
 #ifndef FORK
 #define FORK(n) for(int k=0;k<(n);k++)
 #endif
+#ifndef FORL
+#define FORL(n) for(int l=0;l<(n);l++)
+#endif
 
 #include "fragments.c"
 
@@ -67,11 +72,19 @@
 #define PLAMBDA_VECTOR 2     // whole pixel
 #define PLAMBDA_OPERATOR 3   // function
 #define PLAMBDA_COLONVAR 4   // colon-type variable
+#define PLAMBDA_STACKOP 5    // stack operator [
 
 static double sum_two_doubles      (double a, double b) { return a + b; }
 static double substract_two_doubles(double a, double b) { return a - b; }
 static double multiply_two_doubles (double a, double b) { return a * b; }
 static double divide_two_doubles   (double a, double b) { return a / b; }
+static double quantize_255 (double x)
+{
+	int ix = x;
+	if (ix < 0) return 0;
+	if (ix > 255) return 255;
+	return ix;
+}
 
 struct predefined_function {
 	void (*f)(void);
@@ -127,6 +140,7 @@ struct predefined_function {
 	REGISTER_FUNCTION(nexttoward,2),
 	REGISTER_FUNCTION(pow,2),
 	REGISTER_FUNCTION(remainder,2),
+	REGISTER_FUNCTIONN(quantize_255,"q255",1),
 	REGISTER_FUNCTIONN(pow,"^",2),
 	REGISTER_FUNCTIONN(sum_two_doubles,"+",2),
 	REGISTER_FUNCTIONN(divide_two_doubles,"/",2),
@@ -550,15 +564,10 @@ static void print_compiled_program(struct plambda_program *p)
 		fprintf(stderr, "VARIABLE[%d] = \"%s\"\n", i, p->var->t[i]);
 }
 
+
 struct value_stack {
 	int n;
 	float t[PLAMBDA_MAX_TOKENS];
-};
-
-struct value_vstack {
-	int n;
-	int d[PLAMBDA_MAX_TOKENS];
-	float t[PLAMBDA_MAX_TOKENS][PLAMBDA_MAX_PIXELDIM];
 };
 
 static float stack_pop(struct value_stack *s)
@@ -566,26 +575,6 @@ static float stack_pop(struct value_stack *s)
 	if (s->n > 0) {
 		s->n -= 1;
 		return s->t[s->n];
-	} else error("popping from empty stack");
-}
-
-static int vstack_pop_vector(float *val, struct value_vstack *s)
-{
-	if (s->n > 0) {
-		s->n -= 1;
-		int d = s->d[s->n];
-		FORI(d) val[i] = s->t[s->n][i];
-		return d;
-	} else error("popping from empty stack");
-}
-
-static float vstack_pop_scalar(struct value_vstack *s)
-{
-	if (s->n > 0) {
-		s->n -= 1;
-		if (s->d[s->n] != 1)
-			error("trying to pop a scalar but found a vector");
-		return s->t[s->n][0];
 	} else error("popping from empty stack");
 }
 
@@ -597,28 +586,56 @@ static void stack_push(struct value_stack *s, float x)
 	} else error("full stack");
 }
 
-static void vstack_push_vector(struct value_vstack *s, float *v, int n)
-{
-	if (s->n+1 < PLAMBDA_MAX_TOKENS) {
-		FORI(n)
-			s->t[s->n][i] = v[i];
-		s->n += 1;
-	} else error("full stack");
-}
-
-static void vstack_push_scalar(struct value_vstack *s, float *v, int n)
-{
-	if (s->n+1 < PLAMBDA_MAX_TOKENS) {
-		FORI(n)
-			s->t[s->n][i] = v[i];
-		s->n += 1;
-	} else error("full stack");
-}
-
 static void stack_print(FILE *f, struct value_stack *s)
 {
 	FORI(s->n)
 		fprintf(f, "STACK[%d/%d]: %g\n", 1+i, s->n, s->t[i]);
+}
+
+// stack of vectorial (or possibly scalar) values
+struct value_vstack {
+	int n;
+	int d[PLAMBDA_MAX_TOKENS];
+	float t[PLAMBDA_MAX_TOKENS][PLAMBDA_MAX_PIXELDIM];
+};
+
+static int vstack_pop_vector(float *val, struct value_vstack *s)
+{
+	if (s->n > 0) {
+		s->n -= 1;
+		int d = s->d[s->n];
+		FORI(d) val[i] = s->t[s->n][i];
+		return d;
+	} else error("popping from empty stack");
+}
+
+//static float vstack_pop_scalar(struct value_vstack *s)
+//{
+//	if (s->n > 0) {
+//		s->n -= 1;
+//		if (s->d[s->n] != 1)
+//			error("trying to pop a scalar but found a vector");
+//		return s->t[s->n][0];
+//	} else error("popping from empty stack");
+//}
+
+static void vstack_push_vector(struct value_vstack *s, float *v, int n)
+{
+	if (s->n+1 < PLAMBDA_MAX_TOKENS) {
+		s->d[s->n] = n;
+		FORI(n)
+			s->t[s->n][i] = v[i];
+		s->n += 1;
+	} else error("full stack");
+}
+
+static void vstack_push_scalar(struct value_vstack *s, float x)
+{
+	if (s->n+1 < PLAMBDA_MAX_TOKENS) {
+		s->d[s->n] = 1;
+		s->t[s->n][0] = x;
+		s->n += 1;
+	} else error("full stack");
 }
 
 static void vstack_print(FILE *f, struct value_vstack *s)
@@ -629,6 +646,47 @@ static void vstack_print(FILE *f, struct value_vstack *s)
 			fprintf(f, " %g", s->t[i][j]);
 		fprintf(f, "\n");
 	}
+}
+
+static void vstack_apply_function(struct value_vstack *s,
+					struct predefined_function *f)
+{
+	int d[f->nargs], rd = 1;
+	float v[f->nargs][PLAMBDA_MAX_PIXELDIM];
+	float r[PLAMBDA_MAX_PIXELDIM];
+	FORI(f->nargs)
+		d[i] = vstack_pop_vector(v[i], s);
+	FORI(f->nargs)
+		if (d[i] != rd) {
+			if (rd > 1)
+				error("can not mix %d- and %d-vectors\n",
+					rd, d[i]);
+			else
+				rd = d[i];
+		}
+	if (rd > 1)
+		FORI(f->nargs)
+			if (d[i] == 1)
+				FORL(rd)
+					v[i][l] = v[i][0];
+	FORL(rd) {
+		float a[f->nargs];
+		FORI(f->nargs)
+			a[i] = v[i][l];
+		r[l] = apply_function(f, a);
+	}
+
+	vstack_push_vector(s, r, rd);
+}
+
+static void stack_process_op(struct value_stack *s, int opid)
+{
+	error("stack ops not yet implemented");
+}
+
+static void vstack_process_op(struct value_vstack *s, int opid)
+{
+	error("stack ops not yet implemented");
 }
 
 
@@ -642,6 +700,9 @@ static float run_program_at_pixel(struct plambda_program *p,
 	FORI(p->n) {
 		struct plambda_token *t = p->t + i;
 		switch(t->type) {
+		case PLAMBDA_STACKOP:
+			stack_process_op(s, t->index);
+			break;
 		case PLAMBDA_CONSTANT:
 			stack_push(s, t->value);
 			break;
@@ -675,6 +736,83 @@ static float run_program_at_pixel(struct plambda_program *p,
 		}
 	}
 	return stack_pop(s);
+}
+
+static int run_program_vectorially_at(float *out, struct plambda_program *p,
+		float **val, int w, int h, int *pd, int ai, int aj)
+{
+	bool deb = !(ai || aj);
+	struct value_vstack s[1];
+	s->n = 0;
+	FORI(p->n) {
+		struct plambda_token *t = p->t + i;
+		if(deb)fprintf(stderr, "t->typ = %d\n", t->type);
+		switch(t->type) {
+		case PLAMBDA_STACKOP:
+			vstack_process_op(s, t->index);
+			break;
+		case PLAMBDA_CONSTANT:
+			vstack_push_scalar(s, t->value);
+			break;
+		case PLAMBDA_COLONVAR: {
+			float x = eval_colonvar(w, h, ai, aj, t->colonvar);
+			vstack_push_scalar(s, x);
+			break;
+				       }
+		case PLAMBDA_SCALAR: {
+			float *img = val[t->index];
+			int dai = ai + t->displacement[0];
+			int daj = aj + t->displacement[1];
+			int cmp = t->component;
+			int pdv = pd[t->index];
+			float x = getsample_0(img, w, h, pdv, dai, daj, cmp);
+			if(deb)fprintf(stderr,"x=%g\n",x);
+			vstack_push_scalar(s, x);
+			if(deb)fprintf(stderr,"ss->d[s->n-1] = %d\n", s->d[s->n-1]);
+			break;
+				     }
+		case PLAMBDA_VECTOR: {
+			float *img = val[t->index];
+			int dai = ai + t->displacement[0];
+			int daj = aj + t->displacement[1];
+			int pdv = pd[t->index];
+			if(deb)fprintf(stderr, "dai, daj, pdv = %d %d %d\n", dai,dai,pdv);
+			float x[pdv];
+			FORL(pdv)
+				x[l] = getsample_0(img, w, h, pdv, dai, daj, l);
+			vstack_push_vector(s, x, pdv);
+				     }
+			break;
+		case PLAMBDA_OPERATOR: {
+			struct predefined_function *f =
+				global_table_of_predefined_functions+t->index;
+			vstack_apply_function(s, f);
+				       }
+			break;
+		default:
+			error("unknown tag type %d", t->type);
+		}
+	}
+	if(deb)fprintf(stderr,"s->n = %d\n", s->n);
+	if(deb)fprintf(stderr,"s->d[s->n-1] = %d\n", s->d[s->n-1]);
+	return vstack_pop_vector(out, s);
+}
+
+// returns the dimension of the output
+static int run_program_vectorially(float *out, int pdmax,
+		struct plambda_program *p,
+		float **val, int w, int h, int *pd)
+{
+	int r;
+	FORJ(h) FORI(w) {
+		float result[pdmax];
+		r = run_program_vectorially_at(result, p,val, w,h,pd, i,j);
+		assert(r <= pdmax);
+		FORL(r) {
+			setsample_0(out, w, h, pdmax, i, j, l, result[l]);
+		}
+	}
+	return r;
 }
 
 static void run_program(float *out,
@@ -722,6 +860,14 @@ static void run_program_numbers(struct plambda_program *p, float *val)
 	stack_print(stderr, s);
 }
 
+static void shrink_components(float *y, float *x, int n, int ypd, int xpd)
+{
+	assert(ypd <= xpd);
+	FORI(n)
+		FORL(ypd)
+			y[ypd*i + l] = x[xpd*i + l];
+}
+
 int main(int c, char *v[])
 {
 	if (c < 2) {
@@ -742,9 +888,9 @@ int main(int c, char *v[])
 	int w[n], h[n], pd[n];
 	float *x[n];
 	FORI(n) x[i] = iio_read_image_float_vec(v[i+1], w + i, h + i, pd + i);
-	FORI(n-1)
-		if (pd[i] != 1)
-			error("only gray images supported so far");
+	//FORI(n-1)
+	//	if (pd[i] != 1)
+	//		error("only gray images supported so far");
 	FORI(n-1)
 		if (w[0] != w[i+1] || h[0] != h[i+1] || pd[0] != pd[i+1])
 			error("input images size mismatch");
@@ -753,12 +899,21 @@ int main(int c, char *v[])
 		fprintf(stderr, "correspondence \"%s\" = \"%s\"\n",
 				p->var->t[i], v[i+1]);
 
-	float *out = xmalloc(*w * *h * 1 * sizeof*out);
-	run_program(out, p, x, *w, *h);
-	iio_save_image_float_vec("-", out, *w, *h, 1);
+	int pdmax = PLAMBDA_MAX_PIXELDIM;
+	float *out = xmalloc(*w * *h * pdmax * sizeof*out);
+	//fprintf(stderr, "w h pd = %d %d %d\n", *w, *h, *pd);
+	int opd = run_program_vectorially(out, pdmax, p, x, *w, *h, pd);
+	//fprintf(stderr, "opd = %d\n", opd);
+
+	float *rout = xmalloc(*w * *h *opd * sizeof*rout);
+	shrink_components(rout, out, *w * *h, opd, pdmax);
+
+	iio_save_image_float_vec("-", rout, *w, *h, opd);
 
 
-	//FORI(n) free(x[i]);
+	FORI(n) free(x[i]);
+	free(out);
+	free(rout);
 	collection_of_varnames_end(p->var);
 
 	return EXIT_SUCCESS;

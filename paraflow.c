@@ -273,20 +273,28 @@ struct problem_data {
 	char *error_id;
 };
 
-static double objective_function_l2(const gsl_vector *v, void *pp)
+static double eval_objective_function(struct problem_data *p, double *v, int nv)
+{
+	float *x = p->x;
+	float *y = p->y;
+	int w = p->w;
+	int h = p->w;
+	int pd = p->pd;
+	float *bp = xmalloc(w * h * pd * sizeof*bp);
+	apply_parametric_invflow(bp, y, w, h, pd, p->model_id, v, nv);
+	iio_save_image_float_vec("/tmp/merdota.tiff", bp, w, h, pd);
+	double r = evaluate_error_between_images(bp, x, w, h, pd, p->error_id);
+	free(bp);
+	return r;
+}
+
+static double objective_function(const gsl_vector *v, void *pp)
 {
 	struct problem_data *p = pp;
-	float *bp = xmalloc(p->w * p->h * p->pd * sizeof*bp);
 	double point[v->size];
 	FORI((int)v->size)
 		point[i] = gsl_vector_get(v, i);
-	apply_parametric_invflow(bp, p->x, p->w, p->h, p->pd, p->model_id,
-			point, v->size);
-	//apply_parametric_invflow(iy, y, w, h, pd, model_id, param, nparams);
-	iio_save_image_float_vec("/tmp/merdota.tiff", bp, p->w, p->h, p->pd);
-	double r =
-       	evaluate_error_between_images(bp, p->x, p->w, p->h, p->pd, p->error_id);
-	free(bp);
+	double r = eval_objective_function(p, point, v->size);
 	return r;
 }
 
@@ -410,23 +418,24 @@ static int parse_doubles(double *t, int nmax, const char *s)
 static double evaluate_error_between_images(float *xx, float *yy,
 		int w, int h, int pd, char *error_id)
 {
-	float (*x)[w] = (void*)xx;
-	float (*y)[w] = (void*)yy;
+	float (*x)[w][pd] = (void*)xx;
+	float (*y)[w][pd] = (void*)yy;
 	// TODO: omit a passepartout
-	int passepartout = 2;
+	int passepartout = 8;
 	double r;
 	int n = w*h*pd;
-	float (*d)[w] = xmalloc(n*sizeof*d);
-	FORI(n) d[0][i] = 0;//fabs(x[i] - y[i]);
+	float (*d)[w][pd] = xmalloc(n*sizeof(float));
+	FORI(n) d[0][0][i] = 0;//fabs(x[i] - y[i]);
 	for (int j = passepartout; j < h-passepartout; j++)
 	for (int i = passepartout; i < w-passepartout; i++)
-		d[j][i] = fabs(x[j][i] - y[j][i]);
+		FORL(pd)
+			d[j][i][l] = fabs(x[j][i][l] - y[j][i][l]);
 
 	iio_save_image_float_vec("/tmp/diff.tiff", d[0][0], w, h, pd);
 	if (0 == strcmp(error_id, "l2")) {
 		r = 0;
 		FORI(n)
-			r = hypot(r, d[0][i]);
+			r = hypot(r, d[0][0][i]);
 	} else error("bad error id \"%s\"", error_id);
 	//struct statistics_float s;
 	//statistics_getf(&s, d, n);
@@ -440,11 +449,17 @@ static void do_stuff(float *x, float *y, int w, int h, int pd,
 		char *model_id, char *error_id,
 		double *param, int nparams)
 {
-	float *iy = xmalloc(w*h*pd*sizeof*iy);
-	apply_parametric_invflow(iy, y, w, h, pd, model_id, param, nparams);
-	iio_save_image_float_vec("/tmp/merdota.tiff", iy, w, h, pd);
-	double r = evaluate_error_between_images(iy, x, w, h, pd, error_id);
-	free(iy);
+	struct problem_data p[1];
+	p->w = w;
+	p->h = h;
+	p->pd = pd;
+	p->x = x;
+	p->y = y;
+	p->model_id = model_id;
+	p->error_id = error_id;
+
+	double r = eval_objective_function(p, param, nparams);
+
 	fprintf(stderr, "r = %lf\n", r);
 }
 
