@@ -11,8 +11,8 @@ int main(int c, char *v[])
 		//                         0  1    2   3
 		return EXIT_FAILURE;
 	}
-	char *in = c > 3 ? v[3] : "-";
-	char *out = c > 4 ? v[4] : "-";
+	char *in = c > 2 ? v[2] : "-";
+	char *out = c > 3 ? v[3] : "-";
 	int w, h, pd;
 	void *data = iio_read_image_float_vec(in, &w, &h, &pd);
 	float (*x)[pd] = data;
@@ -25,6 +25,6 @@ int main(int c, char *v[])
 	float *y = xmalloc(w*h*sizeof*y);
 	for (int i = 0; i < w*h; i++)
 		y[i] = x[i][component];
-	iio_save_image_float("-", y, w, h);
+	iio_save_image_float(out, y, w, h);
 	return EXIT_SUCCESS;
 }
