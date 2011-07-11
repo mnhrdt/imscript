@@ -36,7 +36,7 @@ int main(int c, char *v[])
 	struct statistics_float s;
 	statistics_getf(&s, x, w*h*pd);
 	print_stats(stdout, &s, "samples");
-	for (int i = 0; i < pd; i++) {
+	if (pd > 1) for (int i = 0; i < pd; i++) {
 		char buf[100]; snprintf(buf, 100, "%dth component", i);
 		statistics_getf_stride(&s, x + i, w*h, pd);
 		print_stats(stdout, &s, buf);

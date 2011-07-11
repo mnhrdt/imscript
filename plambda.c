@@ -7,9 +7,64 @@
 // DESCRIPTION
 // 	Plambda applies an expression to all the pixels of a collection of
 // 	images, and produces a single output image.  Each input image
-// 	corresponts to one of the variables of the expression (in alphabetical
+// 	corresponds to one of the variables of the expression (in alphabetical
 // 	order).  There are modifiers to the variables that allow access to the
-// 	values of neighboring pixels.
+// 	values of neighboring pixels, or to particular components of a pixel.
+//
+// LANGUAGE
+// 	A "plambda" program is a sequence of tokens.  Tokens may be constants,
+// 	variables, or operators.  Constants and variables get their value
+// 	computed and pushed to the stack.  Operators pop values from the stack,
+// 	apply a function to them, and push back the results.
+//
+// 	CONSTANTS: numeric constants written in scientific notation, and "pi"
+// 	OPERATORS: +, -, *, ^, /, and all the functions from math.h
+// 	VARIABLES: anything not recognized as a constant or operator.  There
+// 	must be as many variables as input images, and they are assigned to
+// 	images in alphabetical order.
+//
+//	Some "sugar" is added to the language:
+//
+//	Predefined variables (always preceeded by a colon):
+//
+//		TOKEN	MEANING
+//
+//		:i	horizontal coordinate of the pixel
+//		:j	vertical coordinate of the pixel
+//		:w	width of the image
+//		:h	heigth of the image
+//		:n	number of pixels in the image
+//		:x	relative horizontal coordinate of the pixel
+//		:y	relative horizontal coordinate of the pixel
+//		:r	relative distance to the center of the image
+//		:t	relative angle from the center of the image
+//
+//	Variable modifiers acting on regular variables:
+//
+//		TOKEN	MEANING
+//
+//		x	value of pixel (i,j)
+//		x(0,0)	value of pixel (i,j)
+//		x(1,0)	value of pixel (i+1,j)
+//		x(0,-1)	value of pixel (i,j-1)
+//		...
+//
+//		x	value of pixel (i,j)
+//		x[0]	value of first component of pixel (i,j)
+//		x[1]	value of second component of pixel (i,j)
+//
+//		x(1,-1)[2] value of third component of pixel (i+1,j-1)
+//
+//	Stack operators (allow direct manipulation of the stack):
+//
+//		TOKEN	MEANING
+//
+//		del	remove the value at the top of the stack (ATTOTS)
+//		dup	duplicate the value ATTOTS
+//		rot	swap the two values ATTOTS
+//		split	split the vector ATTOTS into scalar components
+//		join	join the components of two vectors ATTOTS
+//		join3	join the components of three vectors ATTOTS
 //
 // EXAMPLES
 // 	Sum two images:
@@ -29,6 +84,24 @@
 //
 //	Color to gray:
 //		plambda lena.png "x[0] x[1] x[2] + + 3 /"
+//
+//	Pick the blue channel of a RGB image:
+//		plambda lena.png "x[2]"
+//
+//	Swap the blue an green channels of a RGB image (6 equivalent ways):
+//		plambda lena.png "x[0] x[2] x[1] join3"
+//		plambda lena.png "x[0] x[2] x[1] join join"
+//		plambda lena.png "x[0] x[1] x[2] rot join3"
+//		plambda lena.png "x[0] x[1] x[2] rot join join"
+//		plambda lena.png "x split rot join join"
+//		plambda lena.png "x split rot join3"
+//
+//
+//	Merge the two components of a vector field into a single file
+//		plambda x.tiff y.tiff "x y join" > xy.tiff
+//
+//	Set to 0 the green component of a RGB image
+//		plambda lena.png "x[0] 0 x[2] join3"
 //
 //
 //
@@ -72,7 +145,7 @@
 #define PLAMBDA_VECTOR 2     // whole pixel
 #define PLAMBDA_OPERATOR 3   // function
 #define PLAMBDA_COLONVAR 4   // colon-type variable
-#define PLAMBDA_STACKOP 5    // stack operator [
+#define PLAMBDA_STACKOP 5    // stack operator
 
 static double sum_two_doubles      (double a, double b) { return a + b; }
 static double substract_two_doubles(double a, double b) { return a - b; }
@@ -166,7 +239,6 @@ struct plambda_token {
 struct collection_of_varnames {
 	int n;
 	char *t[PLAMBDA_MAX_TOKENS];
-	//int count[PLAMBDA_MAX_TOKENS];
 };
 
 struct plambda_program {
@@ -224,6 +296,30 @@ static int token_is_colonvar(const char *t)
 {
 	if (t[0] != ':') return 0;
 	if (isalpha(t[1]) && t[2]=='\0') return t[1];
+	return 0;
+}
+
+#define PLAMBDA_STACKOP_NO 0
+#define PLAMBDA_STACKOP_DEL 1
+#define PLAMBDA_STACKOP_DUP 2
+#define PLAMBDA_STACKOP_VSPLIT 3
+#define PLAMBDA_STACKOP_VMERGE 4
+#define PLAMBDA_STACKOP_ROT 5
+#define PLAMBDA_STACKOP_VMERGE3 6
+#define PLAMBDA_STACKOP_VMERGEALL 7
+
+static int token_is_stackop(const char *t)
+{
+	if (0 == strcmp(t, "del")) return PLAMBDA_STACKOP_DEL;
+	if (0 == strcmp(t, "dup")) return PLAMBDA_STACKOP_DUP;
+	if (0 == strcmp(t, "rot")) return PLAMBDA_STACKOP_ROT;
+	if (0 == strcmp(t, "split")) return PLAMBDA_STACKOP_VSPLIT;
+	if (0 == strcmp(t, "merge")) return PLAMBDA_STACKOP_VMERGE;
+	if (0 == strcmp(t, "join")) return PLAMBDA_STACKOP_VMERGE;
+	if (0 == strcmp(t, "merge3")) return PLAMBDA_STACKOP_VMERGE3;
+	if (0 == strcmp(t, "join3")) return PLAMBDA_STACKOP_VMERGE3;
+	if (0 == strcmp(t, "mergeall")) return PLAMBDA_STACKOP_VMERGEALL;
+	if (0 == strcmp(t, "joinall")) return PLAMBDA_STACKOP_VMERGEALL;
 	return 0;
 }
 
@@ -350,7 +446,6 @@ static void process_token(struct plambda_program *p, const char *tokke)
 	float x;
 	if (token_is_number(&x, tok))
 	{
-		//fprintf(stderr, "TKN numeric constant: %g\n", x);
 		t->type = PLAMBDA_CONSTANT;
 		t->value = x;
 		goto endtok;
@@ -364,10 +459,17 @@ static void process_token(struct plambda_program *p, const char *tokke)
 		goto endtok;
 	}
 
+	int stackop = token_is_stackop(tok);
+	if (stackop)
+	{
+		t->type = PLAMBDA_STACKOP;
+		t->index = stackop;
+		goto endtok;
+	}
+
 	const char *endptr;
 	if (token_is_word(tok, &endptr))
 	{
-		//fprintf(stderr, "TKN word: \"%s\"\n", tok);
 		int idx = word_is_predefined(tok);
 		if (idx < 0) {
 			char varname[PLAMBDA_MAX_VARLEN+1];
@@ -377,14 +479,8 @@ static void process_token(struct plambda_program *p, const char *tokke)
 			FORI(varlen) varname[i] = tok[i];
 			varname[varlen] = '\0';
 			int comp, disp[2];
-			//fprintf(stderr, "TKN varname = %s\n", varname);
 			t->tmphack =collection_of_varnames_add(p->var, varname);
 			parse_modifiers(endptr, &comp, disp, disp+1);
-			//fprintf(stderr, "TKN modifiers (%d,%d)[%d]\n",
-			//		disp[0], disp[1], comp);
-			//fprintf(stderr, "TKN %s\n",
-			//		comp<0 ? "VECTOR VARIABLE"
-			//		: "SCALAR VARIABLE");
 			t->type = comp<0 ? PLAMBDA_VECTOR : PLAMBDA_SCALAR;
 			t->component = comp;
 			t->displacement[0] = disp[0];
@@ -392,8 +488,6 @@ static void process_token(struct plambda_program *p, const char *tokke)
 		} else {
 			struct predefined_function *f =
 				global_table_of_predefined_functions + idx;
-			//fprintf(stderr, "TKN predefined function: %s (%d)\n",
-			//		f->name, f->nargs);
 			t->type = PLAMBDA_OPERATOR;
 			t->index = idx;
 		}
@@ -404,6 +498,8 @@ endtok:
 	p->n += 1;
 }
 
+// this function updates the indexes of a
+// collection of variables which is sorted in alphabetical order
 static void unhack_varnames(struct plambda_program *p)
 {
 	FORI(p->n)
@@ -420,90 +516,6 @@ static void unhack_varnames(struct plambda_program *p)
 	}
 }
 
-//static void identify_token(struct collection_of_varnames *cv, const char *tokke)
-//{
-//	char tok[1+strlen(tokke)];
-//	strncpy(tok, tokke, 1+strlen(tokke));
-//
-//	if (false
-//			|| 0 == strcmp(tok, "+")
-//			|| 0 == strcmp(tok, "-")
-//			|| 0 == strcmp(tok, "/")
-//			|| 0 == strcmp(tok, "*")
-//			|| 0 == strcmp(tok, "^")
-//	   ) {
-//		fprintf(stderr, "TKN arithmetical operator '%c'\n", tok[0]);
-//		return;
-//	}
-//
-//	float x;
-//	if (token_is_number(&x, tok))
-//	{
-//		fprintf(stderr, "TKN numeric constant: %g\n", x);
-//		return;
-//	}
-//
-//	const char *endptr;
-//	if (token_is_word(tok, &endptr))
-//	{
-//		fprintf(stderr, "TKN word: \"%s\"\n", tok);
-//		struct predefined_function *p = word_is_predefined(tok);
-//		if (p)
-//			fprintf(stderr, "TKN predefined function: %s (%d)\n",
-//					p->name, p->nargs);
-//		else {
-//			char varname[PLAMBDA_MAX_VARLEN+1];
-//			int varlen = endptr-tok;
-//			if (varlen >= PLAMBDA_MAX_VARLEN)
-//				varlen = PLAMBDA_MAX_VARLEN;
-//			FORI(varlen) varname[i] = tok[i];
-//			varname[varlen] = '\0';
-//			int comp, disp[2];
-//			fprintf(stderr, "TKN varname = %s\n", varname);
-//			collection_of_varnames_add(cv, varname);
-//			parse_modifiers(endptr, &comp, disp, disp+1);
-//			fprintf(stderr, "TKN modifiers (%d,%d)[%d]\n",
-//					disp[0], disp[1], comp);
-//			fprintf(stderr, "TKN %s\n",
-//					comp<0 ? "VECTOR VARIABLE"
-//					: "SCALAR VARIABLE");
-//		}
-//		return;
-//	}
-//
-//	fprintf(stderr, "TKN unrecognized\n");
-//}
-
-//static int plambda_tokenize(struct plambda_token *t, const char *str)
-//{
-//	// strdupa
-//	int slen = 1 + strlen(str);
-//	char s[slen];
-//	strncpy(s, str, slen);
-//	char *spacing = " ";
-//
-//	struct collection_of_varnames cvars[1];
-//	collection_of_varnames_init(cvars);
-//
-//	int n = 0;
-//	char *tok = strtok(s, spacing);
-//	while (tok) {
-//		fprintf(stderr, "\nTOK[%d] = %s\n", n, tok);
-//		identify_token(cvars, tok);
-//		tok = strtok(NULL, spacing);
-//		n += 1;
-//	}
-//
-//	collection_of_varnames_sort(cvars);
-//	fprintf(stderr, "\nwe got %d variables:\n", cvars->n);
-//	FORI(cvars->n)
-//		fprintf(stderr, "\tVAR[%d] = \"%s\"\n", i, cvars->t[i]);
-//
-//	collection_of_varnames_end(cvars);
-//
-//	return n;
-//}
-
 static void plambda_compile_program(struct plambda_program *p, const char *str)
 {
 	char s[1+strlen(str)];
@@ -515,17 +527,15 @@ static void plambda_compile_program(struct plambda_program *p, const char *str)
 	int n = 0;
 	char *tok = strtok(s, spacing);
 	while (tok) {
-		//fprintf(stderr, "\nTOK[%d] = %s\n", n, tok);
 		process_token(p, tok);
 		tok = strtok(NULL, spacing);
 		n += 1;
 	}
 
 	collection_of_varnames_sort(p->var);
-	//fprintf(stderr, "\nwe got %d variables:\n", p->var->n);
-	//FORI(p->var->n)
-	//	fprintf(stderr, "\tVAR[%d] = \"%s\"\n", i, p->var->t[i]);
 
+	// the "sort" above does not update the variable indices
+	// the following function updates them
 	unhack_varnames(p);
 }
 
@@ -565,33 +575,6 @@ static void print_compiled_program(struct plambda_program *p)
 }
 
 
-struct value_stack {
-	int n;
-	float t[PLAMBDA_MAX_TOKENS];
-};
-
-static float stack_pop(struct value_stack *s)
-{
-	if (s->n > 0) {
-		s->n -= 1;
-		return s->t[s->n];
-	} else error("popping from empty stack");
-}
-
-static void stack_push(struct value_stack *s, float x)
-{
-	if (s->n+1 < PLAMBDA_MAX_TOKENS) {
-		s->t[s->n] = x;
-		s->n += 1;
-	} else error("full stack");
-}
-
-static void stack_print(FILE *f, struct value_stack *s)
-{
-	FORI(s->n)
-		fprintf(f, "STACK[%d/%d]: %g\n", 1+i, s->n, s->t[i]);
-}
-
 // stack of vectorial (or possibly scalar) values
 struct value_vstack {
 	int n;
@@ -604,20 +587,10 @@ static int vstack_pop_vector(float *val, struct value_vstack *s)
 	if (s->n > 0) {
 		s->n -= 1;
 		int d = s->d[s->n];
-		FORI(d) val[i] = s->t[s->n][i];
+		if (val) FORI(d) val[i] = s->t[s->n][i];
 		return d;
 	} else error("popping from empty stack");
 }
-
-//static float vstack_pop_scalar(struct value_vstack *s)
-//{
-//	if (s->n > 0) {
-//		s->n -= 1;
-//		if (s->d[s->n] != 1)
-//			error("trying to pop a scalar but found a vector");
-//		return s->t[s->n][0];
-//	} else error("popping from empty stack");
-//}
 
 static void vstack_push_vector(struct value_vstack *s, float *v, int n)
 {
@@ -648,6 +621,8 @@ static void vstack_print(FILE *f, struct value_vstack *s)
 	}
 }
 
+// this function is complicated because it contains the scalar+vector
+// semantics, which is complicated
 static void vstack_apply_function(struct value_vstack *s,
 					struct predefined_function *f)
 {
@@ -657,6 +632,7 @@ static void vstack_apply_function(struct value_vstack *s,
 	FORI(f->nargs)
 		d[i] = vstack_pop_vector(v[i], s);
 	FORI(f->nargs)
+		// TODO: solve commutativity issue here
 		if (d[i] != rd) {
 			if (rd > 1)
 				error("can not mix %d- and %d-vectors\n",
@@ -679,64 +655,71 @@ static void vstack_apply_function(struct value_vstack *s,
 	vstack_push_vector(s, r, rd);
 }
 
-static void stack_process_op(struct value_stack *s, int opid)
-{
-	error("stack ops not yet implemented");
-}
-
 static void vstack_process_op(struct value_vstack *s, int opid)
 {
-	error("stack ops not yet implemented");
+	switch(opid) {
+	case PLAMBDA_STACKOP_DEL:
+		vstack_pop_vector(NULL, s);
+		break;
+	case PLAMBDA_STACKOP_DUP: {
+		float x[PLAMBDA_MAX_PIXELDIM];
+		int n = vstack_pop_vector(x, s);
+		vstack_push_vector(s, x, n);
+		vstack_push_vector(s, x, n);
+				  }
+		break;
+	case PLAMBDA_STACKOP_VSPLIT: {
+		float x[PLAMBDA_MAX_PIXELDIM];
+		int n = vstack_pop_vector(x, s);
+		FORI(n)
+			vstack_push_scalar(s, x[i]);
+				     }
+		break;
+	case PLAMBDA_STACKOP_VMERGE: {
+		float x[PLAMBDA_MAX_PIXELDIM];
+		float y[PLAMBDA_MAX_PIXELDIM];
+		int m = vstack_pop_vector(y, s);
+		int n = vstack_pop_vector(x, s);
+		if (n+m >= PLAMBDA_MAX_PIXELDIM)
+			error("merging vectors results in large vector");
+		FORI(m)
+			x[n+i] = y[i];
+		vstack_push_vector(s, x, n+m);
+				     }
+		break;
+	case PLAMBDA_STACKOP_VMERGE3: {
+		float x[PLAMBDA_MAX_PIXELDIM];
+		float y[PLAMBDA_MAX_PIXELDIM];
+		float z[PLAMBDA_MAX_PIXELDIM];
+		int nz = vstack_pop_vector(z, s);
+		int ny = vstack_pop_vector(y, s);
+		int nx = vstack_pop_vector(x, s);
+		if (nx+ny+nz >= PLAMBDA_MAX_PIXELDIM)
+			error("merging vectors results in large vector");
+		FORI(ny) x[nx+i] = y[i];
+		FORI(nz) x[nx+ny+i] = z[i];
+		vstack_push_vector(s, x, nx+ny+nz);
+				     }
+		break;
+	case PLAMBDA_STACKOP_ROT: {
+		float x[PLAMBDA_MAX_PIXELDIM];
+		float y[PLAMBDA_MAX_PIXELDIM];
+		int n = vstack_pop_vector(x, s);
+		int m = vstack_pop_vector(y, s);
+		vstack_push_vector(s, x, n);
+		vstack_push_vector(s, y, m);
+		break;
+				  }
+	case PLAMBDA_STACKOP_VMERGEALL:
+		error("mergeall not implemented");
+		break;
+	default:
+		error("impossible condition");
+	}
 }
 
 
 #include "getpixel.c"
-
-static float run_program_at_pixel(struct plambda_program *p,
-		float **val, int w, int h, int ai, int aj)
-{
-	struct value_stack s[1];
-	s->n = 0;
-	FORI(p->n) {
-		struct plambda_token *t = p->t + i;
-		switch(t->type) {
-		case PLAMBDA_STACKOP:
-			stack_process_op(s, t->index);
-			break;
-		case PLAMBDA_CONSTANT:
-			stack_push(s, t->value);
-			break;
-		case PLAMBDA_COLONVAR: {
-			float x = eval_colonvar(w, h, ai, aj, t->colonvar);
-			stack_push(s, x);
-			break;
-				       }
-		case PLAMBDA_SCALAR:
-		case PLAMBDA_VECTOR: {
-			float *img = val[t->index];
-			int dai = ai + t->displacement[0];
-			int daj = aj + t->displacement[1];
-			float x = getsample_0(img, w, h, 1, dai, daj, 0);
-			stack_push(s, x);
-			//stack_push(s, val[t->index]);
-				     }
-			break;
-		case PLAMBDA_OPERATOR: {
-			struct predefined_function *f =
-				global_table_of_predefined_functions+t->index;
-			float param[f->nargs];
-			FORJ(f->nargs)
-				param[j] = stack_pop(s);
-			float x = apply_function(f, param);
-			stack_push(s, x);
-				       }
-			break;
-		default:
-			error("unknown tag type %d", t->type);
-		}
-	}
-	return stack_pop(s);
-}
 
 static int run_program_vectorially_at(float *out, struct plambda_program *p,
 		float **val, int w, int h, int *pd, int ai, int aj)
@@ -815,51 +798,6 @@ static int run_program_vectorially(float *out, int pdmax,
 	return r;
 }
 
-static void run_program(float *out,
-		struct plambda_program *p, float **val, int w, int h)
-{
-	FORJ(h) FORI(w) {
-//static float run_program_at_pixel(struct plambda_program *p,
-//		float **val, int w, int h, int ai, int aj)
-		float r = run_program_at_pixel(p, val, w, h, i, j);
-		setsample_0(out, w, h, 1, i, j, 0, r);
-	}
-}
-
-static void run_program_numbers(struct plambda_program *p, float *val)
-{
-	struct value_stack s[1];
-	s->n = 0;
-	FORI(p->n) {
-		fprintf(stderr, "\n\nstack before token %d (%d):\n", i, s->n);
-		stack_print(stderr, s);
-		struct plambda_token *t = p->t + i;
-		switch(t->type) {
-		case PLAMBDA_CONSTANT:
-			stack_push(s, t->value);
-			break;
-		case PLAMBDA_SCALAR:
-		case PLAMBDA_VECTOR:
-			stack_push(s, val[t->index]);
-			break;
-		case PLAMBDA_OPERATOR: {
-			struct predefined_function *f =
-				global_table_of_predefined_functions+t->index;
-			float param[f->nargs];
-			FORJ(f->nargs)
-				param[j] = stack_pop(s);
-			float x = apply_function(f, param);
-			stack_push(s, x);
-				       }
-			break;
-		default:
-			error("unknown tag type %d", t->type);
-		}
-	}
-	fprintf(stderr, "\n\nstack at the end (%d elements):\n", s->n);
-	stack_print(stderr, s);
-}
-
 static void shrink_components(float *y, float *x, int n, int ypd, int xpd)
 {
 	assert(ypd <= xpd);
@@ -888,9 +826,6 @@ int main(int c, char *v[])
 	int w[n], h[n], pd[n];
 	float *x[n];
 	FORI(n) x[i] = iio_read_image_float_vec(v[i+1], w + i, h + i, pd + i);
-	//FORI(n-1)
-	//	if (pd[i] != 1)
-	//		error("only gray images supported so far");
 	FORI(n-1)
 		if (w[0] != w[i+1] || h[0] != h[i+1] || pd[0] != pd[i+1])
 			error("input images size mismatch");
