@@ -278,29 +278,31 @@ static float interpolate_cell(float a, float b, float c, float d,
 }
 
 
+#include "getpixel.c"
+
 static void general_interpolate(float *result,
 		int pd, float (**x)[pd], int w, int h, float p, float q,
 		int m) // method
 {
-	if (p < 0 || q < 0 || p+1 >= w || q+1 >= h) {
-		FORL(pd) result[l] = 0;
-	} else {
+	//if (p < 0 || q < 0 || p+1 >= w || q+1 >= h) {
+	//	FORL(pd) result[l] = 0;
+	//} else {
 		int ip = floor(p);
 		int iq = floor(q);
 		FORL(pd) {
-			//float a = getsample(x, w, h, pd, ip  , iq  , l);
-			//float b = getsample(x, w, h, pd, ip  , iq+1, l);
-			//float c = getsample(x, w, h, pd, ip+1, iq  , l);
-			//float d = getsample(x, w, h, pd, ip+1, iq+1, l);
-			float a = x[iq][ip][l];
-			float b = x[iq+1][ip][l];
-			float c = x[iq][ip+1][l];
-			float d = x[iq+1][ip+1][l];
+			float a = getsample_0(x[0][0], w, h, pd, ip  , iq  , l);
+			float b = getsample_0(x[0][0], w, h, pd, ip  , iq+1, l);
+			float c = getsample_0(x[0][0], w, h, pd, ip+1, iq  , l);
+			float d = getsample_0(x[0][0], w, h, pd, ip+1, iq+1, l);
+			//float a = x[iq][ip][l];
+			//float b = x[iq+1][ip][l];
+			//float c = x[iq][ip+1][l];
+			//float d = x[iq+1][ip+1][l];
 			float v = interpolate_cell(a, b, c, d, p-ip, q-iq, m);
 			//fprintf(stderr, "p%g q%g ip%d iq%d a%g b%g c%g d%g l%d v%g\n", p, q, ip, iq, a, b, c, d, l, v);
 			result[l] = v;
 		}
-	}
+	//}
 }
 
 
@@ -364,6 +366,107 @@ static int parse_floats(float *t, int nmax, const char *s)
 	return i;
 }
 
+#include "cmphomod.c"
+
+static double produce_homography(double H[9], int w, int h,
+		char *homtype, double *v)
+{
+	if (0 == strcmp(homtype, "hom")) { // actual parameters
+		FORI(9) H[i] = v[i];
+	} else if (0 == strcmp(homtype, "hom4p")) {
+		// absolute displacement of the image corners
+		double corner[4][2] = {{0,0}, {w,0}, {0,h}, {w,h}};
+		double other[4][2] = {
+			{0 + v[0], 0 + v[1]},
+			{w + v[2], 0 + v[3]},
+			{0 + v[4], h + v[5]},
+			{w + v[6], h + v[7]}
+		};
+		double R[3][3];
+		homography_from_4corresp(
+				corner[0], corner[1], corner[2], corner[3],
+				other[0], other[1], other[2], other[3], R);
+		FORI(9) H[i] = R[0][i];
+	} else if (0 == strcmp(homtype, "hom4pr")) {
+		// absolute displacement of the image corners
+		double corner[4][2] = {{0,0}, {w,0}, {0,h}, {w,h}};
+		double other[4][2] = {
+			{0 + w*v[0], 0 + h*v[1]},
+			{w + w*v[2], 0 + h*v[3]},
+			{0 + w*v[4], h + h*v[5]},
+			{w + w*v[6], h + h*v[7]}
+		};
+		double R[3][3];
+		homography_from_4corresp(
+				corner[0], corner[1], corner[2], corner[3],
+				other[0], other[1], other[2], other[3], R);
+		FORI(9) H[i] = R[0][i];
+	} else if (0 == strcmp(homtype, "hom4prc")) {
+		// percentual relative displacement of the image corners
+		double corner[4][2] = {{0,0}, {w,0}, {0,h}, {w,h}};
+		double other[4][2] = {
+			{0 + w*v[0]/100, 0 + h*v[1]/100},
+			{w + w*v[2]/100, 0 + h*v[3]/100},
+			{0 + w*v[4]/100, h + h*v[5]/100},
+			{w + w*v[6]/100, h + h*v[7]/100}
+		};
+		double R[3][3];
+		homography_from_4corresp(
+				corner[0], corner[1], corner[2], corner[3],
+				other[0], other[1], other[2], other[3], R);
+		FORI(9) H[i] = R[0][i];
+	} else if (0 == strcmp(homtype, "hom16")) {
+		// absolute coordinates of 4 point pairs
+		double a[4][2] = {
+			{v[0],v[1]},{v[2],v[3]},{v[4],v[5]},{v[6],v[7]}
+		};
+		double b[4][2] = {
+			{v[8],v[9]},{v[10],v[11]},{v[12],v[13]},{v[14],v[15]}
+		};
+		double R[3][3];
+		homography_from_4corresp( a[0], a[1], a[2], a[3],
+				b[0], b[1], b[2], b[3], R);
+		FORI(9) H[i] = R[0][i];
+	} else if (0 == strcmp(homtype, "hom16r")) {
+		// relative coordinates of 4 point pairs
+		double a[4][2] = {
+			{w*v[0],h*v[1]},
+			{w*v[2],h*v[3]},
+			{w*v[4],h*v[5]},
+			{w*v[6],h*v[7]}
+		};
+		double b[4][2] = {
+			{w*v[8], h*v[9]},
+			{w*v[10],h*v[11]},
+			{w*v[12],h*v[13]},
+			{w*v[14],h*v[15]}
+		};
+		double R[3][3];
+		homography_from_4corresp( a[0], a[1], a[2], a[3],
+				b[0], b[1], b[2], b[3], R);
+		FORI(9) H[i] = R[0][i];
+	} else if (0 == strcmp(homtype, "hom16rc")) {
+		// percentual relative coordinates of 4 point pairs
+		double a[4][2] = {
+			{w*v[0]/100,h*v[1]/100},
+			{w*v[2]/100,h*v[3]/100},
+			{w*v[4]/100,h*v[5]/100},
+			{w*v[6]/100,h*v[7]/100}
+		};
+		double b[4][2] = {
+			{w*v[8] /100,h*v[9] /100},
+			{w*v[10]/100,h*v[11]/100},
+			{w*v[12]/100,h*v[13]/100},
+			{w*v[14]/100,h*v[15]/100}
+		};
+		double R[3][3];
+		homography_from_4corresp( a[0], a[1], a[2], a[3],
+				b[0], b[1], b[2], b[3], R);
+		FORI(9) H[i] = R[0][i];
+	} else error("unrecognized homography type \"%s\"", homtype);
+	return 0;
+}
+
 
 // cid ZOOM
 // cidb DISP
@@ -372,6 +475,11 @@ static int parse_floats(float *t, int nmax, const char *s)
 // aff3p X1 Y1 X2 Y2 X3 Y3 X1' Y1' X2' Y2' X3' Y3'
 // hom V1 ... V9
 // hom4p X1 Y1 X2 Y2 X3 Y3 X4 Y4 X1' Y1' X2' Y2' X3' Y3' X4' Y4'
+// hom4pr X1 Y1 X2 Y2 X3 Y3 X4 Y4 X1' Y1' X2' Y2' X3' Y3' X4' Y4'
+// hom4prc X1 Y1 X2 Y2 X3 Y3 X4 Y4 X1' Y1' X2' Y2' X3' Y3' X4' Y4'
+// hom16 p1 ... p16
+// hom16r p1 ... p16
+// hom16rc p1 ... p16
 // hombord DX1 DY1 DX2 DY2 DX3 DY3 DX4 DY4
 // smooth SIGMA MU
 // cradial2 R
@@ -395,9 +503,10 @@ int main_synflow(int c, char *v[])
 	float (**f)[2] = matrix_build(w, h, sizeof**f);
 	uint8_t (**vf)[3] = matrix_build(w, h, sizeof**vf);
 
-	int maxparam = 10;
+	int maxparam = 40;
 	float param[maxparam];
 	int nparams = parse_floats(param, maxparam, v[2]);
+	double dparam[maxparam]; FORI(nparams) dparam[i] = param[i];
 	if (false) { ;
 	} else if (0 == strcmp(v[1], "cradial2")) {
 		if (nparams != 1) error("\"cradial2\" expects one parameter");
@@ -429,15 +538,34 @@ int main_synflow(int c, char *v[])
 		if (nparams != 6) error("\"aff\" expects six parameters");
 		fill_affinity(f, w, h, param);
 		apply_affinity(pd, y, x, w, h, param);
-	} else if (0 == strcmp(v[1], "hom")) {
-		if (nparams != 9) error("\"hom\" expects nine parameters");
-		fprintf(stderr, "applying homography %g %g %g %g %g %g %g %g %g"
-				" \n",
-				param[0], param[1], param[2],
-				param[3], param[4], param[5],
-				param[6], param[7], param[8]);
-		fill_homography(f, w, h, param);
-		apply_homography(pd, y, x, w, h, param);
+	} else if
+		(v[1] == strstr(v[1], "hom")) {
+		double Hd[9];
+		float Hf[9];
+		produce_homography(Hd, w, h, v[1], dparam);
+		FORI(9) Hf[i] = Hd[i];
+		fill_homography(f, w, h, Hf);
+		apply_homography(pd, y, x, w, h, Hf);
+//		(0 == strcmp(v[1], "hom")) {
+//		if (nparams != 9) error("\"hom\" expects nine parameters");
+//		fprintf(stderr, "applying homography %g %g %g %g %g %g %g %g %g"
+//				" \n",
+//				param[0], param[1], param[2],
+//				param[3], param[4], param[5],
+//				param[6], param[7], param[8]);
+//		fill_homography(f, w, h, param);
+//		apply_homography(pd, y, x, w, h, param);
+//	} else if (0 == strcmp(v[1], "hom4pr")) {
+//		if (nparams != 9) error("\"hom4pr\" expects eight parameters");
+//		fprintf(stderr, "applying hom4pr %g %g %g %g %g %g %g %g"
+//				" \n",
+//				param[0], param[1], param[2],
+//				param[3], param[4], param[5],
+//				param[6], param[7]);
+//		float H[9];
+//		compute_h
+//		fill_homography(f, w, h, H);
+//		apply_homography(pd, y, x, w, h, param);
 	} else if (0 == strcmp(v[1], "smooth")) {
 		if (nparams != 2) error("\"smooth\" expects two parameters");
 		fill_random_flow(f, w, h, param[0], param[1]);

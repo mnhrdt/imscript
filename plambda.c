@@ -146,6 +146,7 @@
 #define PLAMBDA_OPERATOR 3   // function
 #define PLAMBDA_COLONVAR 4   // colon-type variable
 #define PLAMBDA_STACKOP 5    // stack operator
+#define PLAMBDA_VARDEF 6     // register variable definition (hacky)
 
 static double sum_two_doubles      (double a, double b) { return a + b; }
 static double substract_two_doubles(double a, double b) { return a - b; }
@@ -157,6 +158,11 @@ static double quantize_255 (double x)
 	if (ix < 0) return 0;
 	if (ix > 255) return 255;
 	return ix;
+}
+
+static double quantize_easy(double x, double a, double b)
+{
+	return quantize_255(255.0*(x-a)/(b-a));
 }
 
 struct predefined_function {
@@ -214,11 +220,14 @@ struct predefined_function {
 	REGISTER_FUNCTION(pow,2),
 	REGISTER_FUNCTION(remainder,2),
 	REGISTER_FUNCTIONN(quantize_255,"q255",1),
+	REGISTER_FUNCTIONN(quantize_easy,"qe",3),
 	REGISTER_FUNCTIONN(pow,"^",2),
 	REGISTER_FUNCTIONN(sum_two_doubles,"+",2),
 	REGISTER_FUNCTIONN(divide_two_doubles,"/",2),
 	REGISTER_FUNCTIONN(multiply_two_doubles,"*",2),
 	REGISTER_FUNCTIONN(substract_two_doubles,"-",2),
+	REGISTER_FUNCTIONN(random_uniform,"randu",-1),
+	REGISTER_FUNCTIONN(random_normal,"randn",-1),
 #undef REGISTER_FUNCTION
 	{NULL, "pi", 0, M_PI}
 };
@@ -233,7 +242,7 @@ struct plambda_token {
 	int displacement[2]; // if type==variable, relative displacement
 	int colonvar;        // if type==colon, the letter
 
-	char *tmphack;
+	char *tmphack;       // temporary place for storing the unsorted index
 };
 
 struct collection_of_varnames {
@@ -245,6 +254,8 @@ struct plambda_program {
 	int n;
 	struct plambda_token t[PLAMBDA_MAX_TOKENS];
 	struct collection_of_varnames var[1];
+	int regn[10];
+	float regv[10][PLAMBDA_MAX_PIXELDIM];
 };
 
 
@@ -254,7 +265,9 @@ static float apply_function(struct predefined_function *f, float *v)
 	case 0: return f->value;
 	case 1: return ((double(*)(double))(f->f))(v[0]);
 	case 2: return ((double(*)(double,double))f->f)(v[1], v[0]);
-	case 3: error("bizarre");
+	case 3: return ((double(*)(double,double,double))f->f)(v[2],v[1],v[0]);
+	case -1: return ((double(*)())(f->f))();
+	default: error("bizarre");
 	}
 	return 0;
 }
@@ -296,6 +309,15 @@ static int token_is_colonvar(const char *t)
 {
 	if (t[0] != ':') return 0;
 	if (isalpha(t[1]) && t[2]=='\0') return t[1];
+	return 0;
+}
+
+static int token_is_vardef(const char *t)
+{
+	if (t[0]=='>' && isdigit(t[1]) && t[1]>'0' && t[2]=='\0')
+		return t[1] - '0';
+	if (t[0]=='<' && isdigit(t[1]) && t[1]>'0' && t[2]=='\0')
+		return -(t[1] - '0');
 	return 0;
 }
 
@@ -437,6 +459,9 @@ static void collection_of_varnames_sort(struct collection_of_varnames *x)
 
 // this function takes a string which contains one token,
 // and compiles the corresponding info into p->t[p->n]
+//
+// TODO (maybe): split token identification from info gathering
+// (this will produce longer code but shorter functions)
 static void process_token(struct plambda_program *p, const char *tokke)
 {
 	char tok[1+strlen(tokke)];             // the string of the token
@@ -464,6 +489,14 @@ static void process_token(struct plambda_program *p, const char *tokke)
 	{
 		t->type = PLAMBDA_STACKOP;
 		t->index = stackop;
+		goto endtok;
+	}
+
+	int vardef = token_is_vardef(tok);
+	if (vardef)
+	{
+		t->type = PLAMBDA_VARDEF;
+		t->index = vardef;
 		goto endtok;
 	}
 
@@ -522,6 +555,8 @@ static void plambda_compile_program(struct plambda_program *p, const char *str)
 	strcpy(s, str);
 	char *spacing = " ";
 
+	FORI(10) p->regn[i] = 0;
+
 	collection_of_varnames_init(p->var);
 	p->n = 0;
 	int n = 0;
@@ -537,6 +572,17 @@ static void plambda_compile_program(struct plambda_program *p, const char *str)
 	// the "sort" above does not update the variable indices
 	// the following function updates them
 	unhack_varnames(p);
+}
+
+static const char *arity(struct predefined_function *f)
+{
+	switch(f->nargs) {
+	case 0: return "0-ary";
+	case 1: return "unary";
+	case 2: return "binary";
+	case 3: return "ternary";
+	default: return "unrecognized";
+	}
 }
 
 static void print_compiled_program(struct plambda_program *p)
@@ -565,7 +611,14 @@ static void print_compiled_program(struct plambda_program *p)
 		if (t->type == PLAMBDA_OPERATOR) {
 			struct predefined_function *f =
 				global_table_of_predefined_functions+t->index;
-			fprintf(stderr, "operator %s", f->name);
+			fprintf(stderr, "%s operator %s", arity(f), f->name);
+		}
+		if (t->type == PLAMBDA_STACKOP)
+			fprintf(stderr, "stack manipulation");
+		if (t->type == PLAMBDA_VARDEF) {
+			fprintf(stderr, "register variable %s %d",
+					t->index<0 ? "read" : "write",
+					abs(t->index));
 		}
 		fprintf(stderr, "\n");
 	}
@@ -724,12 +777,10 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 static int run_program_vectorially_at(float *out, struct plambda_program *p,
 		float **val, int w, int h, int *pd, int ai, int aj)
 {
-	bool deb = !(ai || aj);
 	struct value_vstack s[1];
 	s->n = 0;
 	FORI(p->n) {
 		struct plambda_token *t = p->t + i;
-		if(deb)fprintf(stderr, "t->typ = %d\n", t->type);
 		switch(t->type) {
 		case PLAMBDA_STACKOP:
 			vstack_process_op(s, t->index);
@@ -749,9 +800,7 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			int cmp = t->component;
 			int pdv = pd[t->index];
 			float x = getsample_0(img, w, h, pdv, dai, daj, cmp);
-			if(deb)fprintf(stderr,"x=%g\n",x);
 			vstack_push_scalar(s, x);
-			if(deb)fprintf(stderr,"ss->d[s->n-1] = %d\n", s->d[s->n-1]);
 			break;
 				     }
 		case PLAMBDA_VECTOR: {
@@ -759,7 +808,6 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			int dai = ai + t->displacement[0];
 			int daj = aj + t->displacement[1];
 			int pdv = pd[t->index];
-			if(deb)fprintf(stderr, "dai, daj, pdv = %d %d %d\n", dai,dai,pdv);
 			float x[pdv];
 			FORL(pdv)
 				x[l] = getsample_0(img, w, h, pdv, dai, daj, l);
@@ -772,12 +820,18 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			vstack_apply_function(s, f);
 				       }
 			break;
+		case PLAMBDA_VARDEF: {
+			int n = abs(t->index);
+			if (t->index > 0)
+				p->regn[n] = vstack_pop_vector(p->regv[n], s);
+			if (t->index < 0)
+				vstack_push_vector(s, p->regv[n], p->regn[n]);
+				     }
+			break;
 		default:
 			error("unknown tag type %d", t->type);
 		}
 	}
-	if(deb)fprintf(stderr,"s->n = %d\n", s->n);
-	if(deb)fprintf(stderr,"s->d[s->n-1] = %d\n", s->d[s->n-1]);
 	return vstack_pop_vector(out, s);
 }
 

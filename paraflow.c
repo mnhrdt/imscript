@@ -32,14 +32,16 @@ static float evaluate_bilinear_cell(float a, float b, float c, float d,
 	return r;
 }
 
-static float getsample(float *fx, int w, int h, int pd, int i, int j, int l)
-{
-	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
-		return 0;
-	float (*x)[w][pd] = (void*)fx;
-	return x[j][i][l];
-	//return x[(i+j*w)*pd + l];
-}
+//static float getsample(float *fx, int w, int h, int pd, int i, int j, int l)
+//{
+//	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
+//		return 0;
+//	float (*x)[w][pd] = (void*)fx;
+//	return x[j][i][l];
+//	//return x[(i+j*w)*pd + l];
+//}
+
+#include "getpixel.c"
 
 static void bilinear_interpolation_at(float *result,
 		float *x, int w, int h, int pd,
@@ -48,10 +50,10 @@ static void bilinear_interpolation_at(float *result,
 	int ip = p;
 	int iq = q;
 	FORL(pd) {
-		float a = getsample(x, w, h, pd, ip  , iq  , l);
-		float b = getsample(x, w, h, pd, ip+1, iq  , l);
-		float c = getsample(x, w, h, pd, ip  , iq+1, l);
-		float d = getsample(x, w, h, pd, ip+1, iq+1, l);
+		float a = getsample_0(x, w, h, pd, ip  , iq  , l);
+		float b = getsample_0(x, w, h, pd, ip+1, iq  , l);
+		float c = getsample_0(x, w, h, pd, ip  , iq+1, l);
+		float d = getsample_0(x, w, h, pd, ip+1, iq+1, l);
 		float r = evaluate_bilinear_cell(a, b, c, d, p-ip, q-iq);
 		result[l] = r;
 	}
@@ -269,10 +271,12 @@ struct problem_data {
 	float *x, *y;
 
 	// model metadata
+	int n;
 	char *model_id;
 	char *error_id;
 };
 
+// this function is independent of GSL
 static double eval_objective_function(struct problem_data *p, double *v, int nv)
 {
 	float *x = p->x;
@@ -282,15 +286,17 @@ static double eval_objective_function(struct problem_data *p, double *v, int nv)
 	int pd = p->pd;
 	float *bp = xmalloc(w * h * pd * sizeof*bp);
 	apply_parametric_invflow(bp, y, w, h, pd, p->model_id, v, nv);
-	iio_save_image_float_vec("/tmp/merdota.tiff", bp, w, h, pd);
+	//iio_save_image_float_vec("/tmp/merdota.tiff", bp, w, h, pd);
 	double r = evaluate_error_between_images(bp, x, w, h, pd, p->error_id);
 	free(bp);
 	return r;
 }
 
+// this function is actually called by the GSL minimzator
 static double objective_function(const gsl_vector *v, void *pp)
 {
 	struct problem_data *p = pp;
+	assert(p->n == (int)v->size);
 	double point[v->size];
 	FORI((int)v->size)
 		point[i] = gsl_vector_get(v, i);
@@ -299,6 +305,7 @@ static double objective_function(const gsl_vector *v, void *pp)
 }
 
 //SMART_PARAMETER(SIMPLEX_NEQ,5)
+#define SIMPLEX_NEQ 5
 
 static bool are_equal(double a, double b)
 {
@@ -306,64 +313,63 @@ static bool are_equal(double a, double b)
 }
 
 // external interface to GSL code (for 4D vectors)
-//static int minimize_objective_function(float *vmin, float *vzero, void *p)
-//{
-//	int dim = 4;
-//	const gsl_multimin_fminimizer_type *T =
-//		gsl_multimin_fminimizer_nmsimplex;
-//	gsl_multimin_fminimizer *s = NULL;
-//	gsl_multimin_function f = {.f=objective_function, .n=dim, .params=p};
+static int minimize_objective_function(void *pp,
+		float *result, float *starting_point, float *stepsize)
+{
+	struct problem_data *p = pp;
+	int dim = p->n;
+
+	gsl_vector *ss = gsl_vector_alloc(dim);
+	gsl_vector *x = gsl_vector_alloc(dim);
+
+	FORI(dim) gsl_vector_set(ss, i, stepsize[i]);
+	FORI(dim) gsl_vector_set(x, i, starting_point[i]);
+
+	const gsl_multimin_fminimizer_type *T =
+		gsl_multimin_fminimizer_nmsimplex2;
+	gsl_multimin_fminimizer *s = gsl_multimin_fminimizer_alloc(T, dim);
+
+	gsl_multimin_function f = {.f=objective_function, .n=dim, .params=pp};
+
+	gsl_multimin_fminimizer_set(s, &f, x, ss);
+
+	int status, iter = 0;
+	int scount = 0; // counts the number of repeated values
+	double oldval = INFINITY;
+	do {
+		iter += 1;
+
+		status = gsl_multimin_fminimizer_iterate(s);
+		if (status) break;
+
+		double size = gsl_multimin_fminimizer_size(s);
+		status = gsl_multimin_test_size(size, 0.00001);
+
+		if (status == GSL_SUCCESS)
+			fprintf(stderr, "converged to minimum!\n");
+
+		fprintf(stderr, "iter = %d (", iter);
+		FORI(dim) fprintf(stderr, "%g ", gsl_vector_get(s->x, i));
+		fprintf(stderr, ") f=%g size=%g\n", s->fval, size);
+
+		scount = are_equal(oldval, s->fval) ? scount+1 : 0;
+		if (scount > SIMPLEX_NEQ) break;
+		oldval = s->fval;
+
+	} while (status == GSL_CONTINUE && iter < 90);
+
+	FORI(dim) result[i] = gsl_vector_get(s->x, i);
+
+	gsl_vector_free(x);
+	gsl_vector_free(ss);
+	gsl_multimin_fminimizer_free(s);
+
+	return status;
+}
+
 //
-//	gsl_vector *ss = gsl_vector_alloc(dim);
-//	gsl_vector *x = gsl_vector_alloc(dim);
+// END OF GSL STUFF
 //
-//	gsl_vector_set(ss, YOU_ANGLE, 1.0);
-//	gsl_vector_set(ss, YOU_DIST, 0.05);
-//	gsl_vector_set(ss, YOU_T, 0.05);
-//	gsl_vector_set(ss, YOU_H, 0.05);
-//
-//	FORI(dim) gsl_vector_set(x, i, vzero[i]);
-//
-//	s = gsl_multimin_fminimizer_alloc(T, dim);
-//	gsl_multimin_fminimizer_set(s, &f, x, ss);
-//
-//	int status, iter = 0;
-//	int scount = 0; // counts the number of repeated values
-//	double oldval = INFINITY;
-//	do {
-//		iter += 1;
-//
-//		status = gsl_multimin_fminimizer_iterate(s);
-//		if (status) break;
-//
-//		double size = gsl_multimin_fminimizer_size(s);
-//		status = gsl_multimin_test_size(size, 0.001);
-//
-//		if (status == GSL_SUCCESS)
-//			fprintf(stderr, "converged to minimum!\n");
-//
-//		fprintf(stderr, "iter = %d (", iter);
-//		FORI(dim) fprintf(stderr, "%g ", gsl_vector_get(s->x, i));
-//		fprintf(stderr, ") f=%g size=%g\n", s->fval, size);
-//
-//		scount = are_equal(oldval, s->fval) ? scount+1 : 0;
-//		if (scount > SIMPLEX_NEQ()) break;
-//		oldval = s->fval;
-//
-//	} while (status == GSL_CONTINUE && iter < 50);
-//
-//	FORI(dim) vmin[i] = gsl_vector_get(s->x, i);
-//
-//	gsl_vector_free(x);
-//	gsl_vector_free(ss);
-//	gsl_multimin_fminimizer_free(s);
-//
-//	return status;
-//}
-//
-////
-//// END OF GSL STUFF
-////
 //
 //
 //
@@ -431,7 +437,7 @@ static double evaluate_error_between_images(float *xx, float *yy,
 		FORL(pd)
 			d[j][i][l] = fabs(x[j][i][l] - y[j][i][l]);
 
-	iio_save_image_float_vec("/tmp/diff.tiff", d[0][0], w, h, pd);
+	//iio_save_image_float_vec("/tmp/diff.tiff", d[0][0], w, h, pd);
 	if (0 == strcmp(error_id, "l2")) {
 		r = 0;
 		FORI(n)
@@ -455,12 +461,23 @@ static void do_stuff(float *x, float *y, int w, int h, int pd,
 	p->pd = pd;
 	p->x = x;
 	p->y = y;
+	p->n = nparams;
 	p->model_id = model_id;
 	p->error_id = error_id;
 
-	double r = eval_objective_function(p, param, nparams);
+//	double r = eval_objective_function(p, param, nparams);
+//static int minimize_objective_function(void *pp,
+//		float *result, float *starting_point, float *stepsize)
+	float result[nparams];
+	float starting_point[nparams];
+	float stepsize[nparams];
+	FORI(nparams) starting_point[i] = param[i];
+	FORI(nparams) stepsize[i] = 0.1;
+	int r= minimize_objective_function(p, result, starting_point, stepsize);
 
-	fprintf(stderr, "r = %lf\n", r);
+	FORI(nparams) fprintf(stderr, "result[%d] = %g\n", i, result[i]);
+
+	//fprintf(stderr, "r = %lf\n", r);
 }
 
 // paraflow A.PNG B.PNG model error
