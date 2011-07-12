@@ -1,4 +1,5 @@
-./bin
-iio.h$
-iio.o$
-iio.c$
+bin
+qnm
+iio.h
+iio.o
+iio.c

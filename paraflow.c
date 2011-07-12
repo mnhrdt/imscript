@@ -20,243 +20,11 @@
 #include "statistics.c"
 
 
-
-static float evaluate_bilinear_cell(float a, float b, float c, float d,
-							float x, float y)
-{
-	float r = 0;
-	r += a * (1-x) * (1-y);
-	r += b * ( x ) * (1-y);
-	r += c * (1-x) * ( y );
-	r += d * ( x ) * ( y );
-	return r;
-}
-
-//static float getsample(float *fx, int w, int h, int pd, int i, int j, int l)
-//{
-//	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
-//		return 0;
-//	float (*x)[w][pd] = (void*)fx;
-//	return x[j][i][l];
-//	//return x[(i+j*w)*pd + l];
-//}
-
-#include "getpixel.c"
-
-static void bilinear_interpolation_at(float *result,
-		float *x, int w, int h, int pd,
-		float p, float q)
-{
-	int ip = p;
-	int iq = q;
-	FORL(pd) {
-		float a = getsample_0(x, w, h, pd, ip  , iq  , l);
-		float b = getsample_0(x, w, h, pd, ip+1, iq  , l);
-		float c = getsample_0(x, w, h, pd, ip  , iq+1, l);
-		float d = getsample_0(x, w, h, pd, ip+1, iq+1, l);
-		float r = evaluate_bilinear_cell(a, b, c, d, p-ip, q-iq);
-		result[l] = r;
-	}
-}
-
-
-static void affine_map(double y[2], double A[6], double x[2])
-{
-	y[0] = A[0]*x[0] + A[1]*x[1] + A[2];
-	y[1] = A[3]*x[0] + A[4]*x[1] + A[5];
-}
-
-static float interpolate_bilinear(float a, float b, float c, float d,
-					float x, float y)
-{
-	float r = 0;
-	r += a*(1-x)*(1-y);
-	r += b*(1-x)*(y);
-	r += c*(x)*(1-y);
-	r += d*(x)*(y);
-	return r;
-}
-
-static float interpolate_cell(float a, float b, float c, float d,
-					float x, float y, int method)
-{
-	//fprintf(stderr, "icell %g %g %g %g (%g %g)\n", a,b,c,d,x,y);
-	switch(method) {
-	//case 0: return interpolate_nearest(a, b, c, d, x, y);
-	//case 1: return marchi(a, b, c, d, x, y);
-	case 2: return interpolate_bilinear(a, b, c, d, x, y);
-	default: error("caca de vaca");
-	}
-	return -1;
-}
-
-static void general_interpolate(float *result,
-		float *px, int w, int h, int pd, float p, float q,
-		int m) // method
-{
-	float (*x)[w][pd] = (void*)px;
-	if (p < 0 || q < 0 || p+1 >= w || q+1 >= h) {
-		FORL(pd) result[l] = 0;
-	} else {
-		int ip = floor(p);
-		int iq = floor(q);
-		FORL(pd) {
-			float a = x[iq][ip][l];
-			float b = x[iq+1][ip][l];
-			float c = x[iq][ip+1][l];
-			float d = x[iq+1][ip+1][l];
-			float v = interpolate_cell(a, b, c, d, p-ip, q-iq, m);
-			result[l] = v;
-		}
-	}
-}
-
-static void apply_affinity(float *py, float *x, int w, int h, int pd,
-		double A[6])
-{
-	float (*y)[w][pd] = (void*)py;
-	FORJ(h) FORI(w) {
-		double p[2] = {i, j}, q[2];
-		affine_map(q, A, p);
-		float val[pd];
-		general_interpolate(val, x, w, h, pd, q[0], q[1], 2);
-		FORL(pd)
-			y[j][i][l] = val[l];
-	}
-}
-
-static void projective_map(double y[2], double H[9], double x[2])
-{
-	double z = H[6]*x[0] + H[7]*x[1] + H[8];
-	y[0] = (H[0]*x[0] + H[1]*x[1] + H[2])/z;
-	y[1] = (H[3]*x[0] + H[4]*x[1] + H[5])/z;
-}
-
-static void apply_homography(float *py, float *x, int w, int h, int pd,
-			double H[9])
-{
-	float (*y)[w][pd] = (void*)py;
-	FORJ(h) FORI(w) {
-		double p[2] = {i, j}, q[2];
-		projective_map(q, H, p);
-		float val[pd];
-		general_interpolate(val, x, w, h, pd, q[0], q[1], 2);
-		FORL(pd)
-			y[j][i][l] = val[l];
-	}
-}
+#include "synflow_core.c"
 
 
 
-// X' = X + a*X*X*X
-static double parabolicdistortion(double a, double x)
-{
-	return x + a*x*x*x;
-}
 
-static void apply_radialpol(float *py, float *x, int w, int h, int pd,
-		double *param)
-{
-	float (*y)[w][pd] = (void*)py;
-	double c[2] = {param[0], param[1]};
-	double a = param[2];
-	fprintf(stderr, "radialpol (%g,%g)[%g]\n", c[0], c[1], a);
-	FORJ(h) FORI(w) {
-		double p[2] = {i, j}, q[2];
-		double r = hypot(p[0]-c[0], p[1]-c[1]);
-		double R = parabolicdistortion(a, r);
-		if (r > 0) {
-			q[0] = c[0] + (R/r)*(i - c[0]);
-			q[1] = c[1] + (R/r)*(j - c[1]);
-		} else {
-			q[0] = 0;
-			q[1] = 0;
-		}
-		float val[pd];
-		general_interpolate(val, x, w, h, pd, q[0], q[1], 2);
-		FORL(pd) {
-			y[j][i][l] = val[l];
-		}
-	}
-}
-
-static void apply_parametric_invflow(float *y, float *x, int w, int h, int pd,
-		char *model_id, double *param, int nparam)
-{
-	FORI(w*h*pd) y[i] = -42;
-	if (false) { ;
-	} else if (0 == strcmp(model_id, "traslation")) {
-		assert(nparam == 2);
-		double a[6] = {1, 0, param[0], 0, 1, param[1]};
-		apply_affinity(y, x, w, h, pd, a);
-	} else if (0 == strcmp(model_id, "traslation_s")) {
-		assert(nparam == 2);
-		double a[6] = {1, 0, w*param[0], 0, 1, h*param[1]};
-		apply_affinity(y, x, w, h, pd, a);
-	} else if (0 == strcmp(model_id, "euclidean")) {
-		assert(nparam == 3);
-		double a[6] = {cos(param[2]), sin(param[2]), param[0],
-			-sin(param[2]), cos(param[2]), param[1]};
-		apply_affinity(y, x, w, h, pd, a);
-	} else if (0 == strcmp(model_id, "euclidean_s")) {
-		assert(nparam == 3);
-		double a[6] = {cos(param[2]), sin(param[2]), w*param[0],
-			-sin(param[2]), cos(param[2]), h*param[1]};
-		apply_affinity(y, x, w, h, pd, a);
-	} else if (0 == strcmp(model_id, "similar")) {
-		assert(nparam == 4);
-		double r = param[3];
-		double a[6] = {r*cos(param[2]), r*sin(param[2]), param[0],
-			-r*sin(param[2]), r*cos(param[2]), param[1]};
-		apply_affinity(y, x, w, h, pd, a);
-	} else if (0 == strcmp(model_id, "similar_s")) {
-		assert(nparam == 4);
-		double r = param[3]/w;
-		double a[6] = {r*cos(param[2]), r*sin(param[2]), w*param[0],
-			-r*sin(param[2]), r*cos(param[2]), h*param[1]};
-		apply_affinity(y, x, w, h, pd, a);
-	} else if (0 == strcmp(model_id, "affine")) {
-		assert(nparam == 6);
-		double a[6]; FORI(6) a[i] = param[i];
-		apply_affinity(y, x, w, h, pd, a);
-	} else if (0 == strcmp(model_id, "affine_s")) {
-		error("not implemented");
-		assert(nparam == 6);
-		double a[6];
-		apply_affinity(y, x, w, h, pd, a);
-	} else if (0 == strcmp(model_id, "projective")) {
-		assert(nparam == 8);
-		double a[9]; FORI(8) a[i] = param[i];
-		a[8] = 1;
-		apply_homography(y, x, w, h, pd, a);
-	} else if (0 == strcmp(model_id, "projective_s")) {
-		error("not implemented");
-		assert(nparam == 8);
-		double a[9];
-		a[8] = 1;
-		apply_homography(y, x, w, h, pd, a);
-	} else if (0 == strcmp(model_id, "cparabolic")) {
-		assert(nparam == 1);
-		double a[3] = {w/2.0, h/2.0, param[0]};
-		apply_radialpol(y, x, w, h, pd, a);
-	} else if (0 == strcmp(model_id, "cparabolic_s")) {
-		assert(nparam == 1);
-		double a[3] = {w/2.0, h/2.0, w*param[0]};
-		apply_radialpol(y, x, w, h, pd, a);
-	} else if (0 == strcmp(model_id, "parabolic")) {
-		assert(nparam == 3);
-		double a[3] = {param[0], param[1], param[2]};
-		apply_radialpol(y, x, w, h, pd, a);
-	} else if (0 == strcmp(model_id, "parabolic_s")) {
-		assert(nparam == 3);
-		double a[3] = {w*param[0], h*param[1], w*param[2]};
-		apply_radialpol(y, x, w, h, pd, a);
-	} else if (0 == strcmp(model_id, "real1")) {
-		error("not yet implemented");
-	} else if (0 == strcmp(model_id, "real2")) {
-		error("not yet implemented");
-	} else error("unrecognized flow model %s", model_id);
-}
 
 static double evaluate_error_between_images(float *x, float *y,
 		int w, int h, int pd, char *error_id);
@@ -285,14 +53,17 @@ static double eval_objective_function(struct problem_data *p, double *v, int nv)
 	int h = p->w;
 	int pd = p->pd;
 	float *bp = xmalloc(w * h * pd * sizeof*bp);
-	apply_parametric_invflow(bp, y, w, h, pd, p->model_id, v, nv);
+	struct flow_model fm[1];
+	produce_flow_model(fm, v, nv, p->model_id, w, h);
+	transform_back(bp, fm, y, w, h, pd);
+	//apply_parametric_invflow(bp, y, w, h, pd, p->model_id, v, nv);
 	//iio_save_image_float_vec("/tmp/merdota.tiff", bp, w, h, pd);
 	double r = evaluate_error_between_images(bp, x, w, h, pd, p->error_id);
 	free(bp);
 	return r;
 }
 
-// this function is actually called by the GSL minimzator
+// this function is called by the GSL minimzator
 static double objective_function(const gsl_vector *v, void *pp)
 {
 	struct problem_data *p = pp;
@@ -421,6 +192,51 @@ static int parse_doubles(double *t, int nmax, const char *s)
 	return i;
 }
 
+static double corrf(float *x, float *y, int n)
+{
+	double mx = 0; FORI(n) mx += x[i]; mx /= n;
+	double my = 0; FORI(n) my += y[i]; my /= n;
+	double sx = 0; FORI(n) sx = hypot(sx, x[i] - mx); sx /= sqrt(n-1);
+	double sy = 0; FORI(n) sy = hypot(sy, y[i] - my); sy /= sqrt(n-1);
+	double cc = 0; FORI(n) cc += (x[i] - mx)*(y[i] - my);
+	cc /= (n-1)*sx*sy;
+	return cc;
+}
+
+static double kendall(float *x, float *y, int n)
+{
+	long double concordant = 0;
+	long double discordant = 0;
+	long double concordantp = 0;
+	long double discordantp = 0;
+	long long int np = 0;
+	for (int i = 0; i < n; i++)
+	for (int j = 0; j < i; j++)
+	{
+		if (x[i] > x[j] && y[i] > y[j]) concordant += 1;
+		if (x[i] < x[j] && y[i] < y[j]) concordantp += 1;
+		if (x[i] > x[j] && y[i] < y[j]) discordant += 1;
+		if (x[i] < x[j] && y[i] > y[j]) discordantp += 1;
+		np += 1;
+	}
+	long double npairs = n;
+	npairs = 0.5 * npairs * (npairs-1);
+	long double nonties = concordant+concordantp+discordant+discordantp;
+	fprintf(stderr, "n = %d\n", n);
+	fprintf(stderr, "np = %lld\n", np);
+	fprintf(stderr, "npairs = %Lf\n", npairs);
+	fprintf(stderr, "concordant = %Lf\n", concordant);
+	fprintf(stderr, "discordant = %Lf\n", discordant);
+	fprintf(stderr, "concordantp = %Lf\n", concordantp);
+	fprintf(stderr, "discordantp = %Lf\n", discordantp);
+	fprintf(stderr, "real concordant = %Lf\n", concordant+concordantp);
+	fprintf(stderr, "real discordant = %Lf\n", discordant+discordantp);
+	fprintf(stderr, "nonties = %Lf\n", nonties);
+	//double kk = (concordant +concordantp - discordant - discordantp) / npairs;
+	double kk = (concordant +concordantp - discordant - discordantp) / nonties;
+	return kk;
+}
+
 static double evaluate_error_between_images(float *xx, float *yy,
 		int w, int h, int pd, char *error_id)
 {
@@ -431,17 +247,40 @@ static double evaluate_error_between_images(float *xx, float *yy,
 	double r;
 	int n = w*h*pd;
 	float (*d)[w][pd] = xmalloc(n*sizeof(float));
+	int nvals = 0;
+	float *xvals = xmalloc(n*sizeof*xvals);
+	float *yvals = xmalloc(n*sizeof*yvals);
 	FORI(n) d[0][0][i] = 0;//fabs(x[i] - y[i]);
 	for (int j = passepartout; j < h-passepartout; j++)
 	for (int i = passepartout; i < w-passepartout; i++)
-		FORL(pd)
+		FORL(pd) {
 			d[j][i][l] = fabs(x[j][i][l] - y[j][i][l]);
+			xvals[nvals] = x[j][i][l];
+			yvals[nvals] = y[j][i][l];
+			if (xvals[nvals] && yvals[nvals])
+				nvals += 1;
+		}
 
 	//iio_save_image_float_vec("/tmp/diff.tiff", d[0][0], w, h, pd);
 	if (0 == strcmp(error_id, "l2")) {
 		r = 0;
 		FORI(n)
 			r = hypot(r, d[0][0][i]);
+	} else if (0 == strcmp(error_id, "l1")) {
+		r = 0;
+		FORI(n)
+			r = r + d[0][0][i];
+	} else if (0 == strcmp(error_id, "linf")) {
+		FORI(n)
+			if (d[0][0][i] > r)
+				r = d[0][0][i];
+	} else if (0 == strcmp(error_id, "corr")) {
+		r = corrf(xvals, yvals, nvals);
+		r = fabs(r);
+	} else if (0 == strcmp(error_id, "kendall")) {
+		error("kendall computation too slow!");
+		r = kendall(xvals, yvals, nvals);
+		r = fabs(r);
 	} else error("bad error id \"%s\"", error_id);
 	//struct statistics_float s;
 	//statistics_getf(&s, d, n);
@@ -473,6 +312,15 @@ static void do_stuff(float *x, float *y, int w, int h, int pd,
 	float stepsize[nparams];
 	FORI(nparams) starting_point[i] = param[i];
 	FORI(nparams) stepsize[i] = 0.1;
+	if (0 == strcmp(model_id, "affine")) {
+		assert(nparams == 6);
+		stepsize[0] = 0.0001;
+		stepsize[1] = 0.0001;
+		stepsize[2] = 0.1;
+		stepsize[3] = 0.0001;
+		stepsize[4] = 0.0001;
+		stepsize[5] = 0.1;
+	}
 	int r= minimize_objective_function(p, result, starting_point, stepsize);
 
 	FORI(nparams) fprintf(stderr, "result[%d] = %g\n", i, result[i]);

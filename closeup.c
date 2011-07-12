@@ -7,8 +7,8 @@
 #include <string.h>
 
 #include "iio.h"
-#include "marching_squares.h"
-#include "marching_interpolation.h"
+#include "marching_squares.c"
+#include "marching_interpolation.c"
 
 #define FORI(n) for(int i=0;i<(n);i++)
 #define FORJ(n) for(int j=0;j<(n);j++)
@@ -32,21 +32,21 @@ static void error(const char *fmt, ...)
 #endif//NDEBUG
 }
 
-// always returns a valid pointer
-static void *xmalloc(size_t size)
-{
-	if (size == 0)
-		error("xmalloc: zero size");
-	void *new = malloc(size);
-	if (!new)
-	{
-		double sm = size / (0x100000 * 1.0);
-		error("xmalloc: out of memory when requesting "
-				"%zu bytes (%gMB)",//:\"%s\"",
-				size, sm);//, strerror(errno));
-	}
-	return new;
-}
+//// always returns a valid pointer
+//static void *xmalloc(size_t size)
+//{
+//	if (size == 0)
+//		error("xmalloc: zero size");
+//	void *new = malloc(size);
+//	if (!new)
+//	{
+//		double sm = size / (0x100000 * 1.0);
+//		error("xmalloc: out of memory when requesting "
+//				"%zu bytes (%gMB)",//:\"%s\"",
+//				size, sm);//, strerror(errno));
+//	}
+//	return new;
+//}
 
 
 //// utility function: alloc a 2d matrix contiguously (wxh elements of size n)
@@ -244,7 +244,9 @@ static void setsample(float *x, int w, int h, int pd, int i, int j, int l,
 static float interpolate_nearest(float a, float b, float c, float d,
 					float x, float y)
 {
-	return a;
+	// return a;
+	if (x<0.5) return y<0.5 ? a : b;
+	else return y<0.5 ? c : d;
 }
 
 static float interpolate_bilinear(float a, float b, float c, float d,

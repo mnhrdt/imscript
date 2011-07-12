@@ -1,0 +1,685 @@
+#include "getpixel.c"
+
+static float interpolate_bilinear(float a, float b, float c, float d,
+					float x, float y)
+{
+	float r = 0;
+	r += a*(1-x)*(1-y);
+	r += b*(1-x)*(y);
+	r += c*(x)*(1-y);
+	r += d*(x)*(y);
+	return r;
+}
+
+static float interpolate_cell(float a, float b, float c, float d,
+					float x, float y, int method)
+{
+	//fprintf(stderr, "icell %g %g %g %g (%g %g)\n", a,b,c,d,x,y);
+	switch(method) {
+	//case 0: return interpolate_nearest(a, b, c, d, x, y);
+	//case 1: return marchi(a, b, c, d, x, y);
+	case 2: return interpolate_bilinear(a, b, c, d, x, y);
+	default: error("caca de vaca");
+	}
+	return -1;
+}
+
+static void general_interpolate(float *result,
+		float *x, int w, int h, int pd, float p, float q,
+		int m) // method
+{
+	//if (p < 0 || q < 0 || p+1 >= w || q+1 >= h) {
+	//	FORL(pd) result[l] = 0;
+	//} else {
+		int ip = floor(p);
+		int iq = floor(q);
+		FORL(pd) {
+			float a = getsample_0(x, w, h, pd, ip  , iq  , l);
+			float b = getsample_0(x, w, h, pd, ip  , iq+1, l);
+			float c = getsample_0(x, w, h, pd, ip+1, iq  , l);
+			float d = getsample_0(x, w, h, pd, ip+1, iq+1, l);
+			//float a = x[iq][ip][l];
+			//float b = x[iq+1][ip][l];
+			//float c = x[iq][ip+1][l];
+			//float d = x[iq+1][ip+1][l];
+			float v = interpolate_cell(a, b, c, d, p-ip, q-iq, m);
+			//fprintf(stderr, "p%g q%g ip%d iq%d a%g b%g c%g d%g l%d v%g\n", p, q, ip, iq, a, b, c, d, l, v);
+			result[l] = v;
+		}
+	//}
+}
+
+static void affine_map(double y[2], double A[6], double x[2])
+{
+	y[0] = A[0]*x[0] + A[1]*x[1] + A[2];
+	y[1] = A[3]*x[0] + A[4]*x[1] + A[5];
+}
+
+//static void apply_affinity(float *py, float *x, int w, int h, int pd,
+//		double A[6])
+//{
+//	float (*y)[w][pd] = (void*)py;
+//	FORJ(h) FORI(w) {
+//		double p[2] = {i, j}, q[2];
+//		affine_map(q, A, p);
+//		float val[pd];
+//		general_interpolate(val, x, w, h, pd, q[0], q[1], 2);
+//		FORL(pd)
+//			y[j][i][l] = val[l];
+//	}
+//}
+
+static void projective_map(double y[2], double H[9], double x[2])
+{
+	double z = H[6]*x[0] + H[7]*x[1] + H[8];
+	y[0] = (H[0]*x[0] + H[1]*x[1] + H[2])/z;
+	y[1] = (H[3]*x[0] + H[4]*x[1] + H[5])/z;
+}
+
+//static void apply_homography(float *py, float *x, int w, int h, int pd,
+//			double H[9])
+//{
+//	float (*y)[w][pd] = (void*)py;
+//	FORJ(h) FORI(w) {
+//		double p[2] = {i, j}, q[2];
+//		projective_map(q, H, p);
+//		float val[pd];
+//		general_interpolate(val, x, w, h, pd, q[0], q[1], 2);
+//		FORL(pd)
+//			y[j][i][l] = val[l];
+//	}
+//}
+
+
+// (x,y) |-> (x+(a*R^2), y+(a*R^2))
+// R^2 = x*x + y*y
+// x' = x + x*(a*x*x + a*y*y)
+// y' = y + y*(a*x*x + a*y*y)
+// X' = X + a*X*X*X
+
+//#include <complex.h>
+static double solvecubicspecial(double a, double b)
+{
+	long double x;
+	long double r;
+	if (a < 0) {
+		//double complex aa;
+		//((double *)&aa)[0] = a;
+		//((double *)&aa)[1] = 0;
+		//double complex bb;
+		//((double *)&bb)[0] = b;
+		//((double *)&bb)[1] = 0;
+		//printf("aa = %g + %g __I__\n", creal(aa), cimag(aa));
+		//printf("bb = %g + %g __I__\n", creal(bb), cimag(bb));
+		//double complex xx, rr;
+		//xx = cpow(csqrt((27*aa*bb*bb+4)/aa)/(2*sqrt(27)*aa)+bb/(2*aa),1.0/3);
+		//printf("xx = %g + %g __I__\n", creal(xx), cimag(xx));
+		//rr = xx-1/(3*aa*xx);
+		//printf("rr = %g + %g __I__\n", creal(rr), cimag(rr));
+		//return creal(rr);
+
+		//error("not yet inverted");
+		// the case a<0 corresponds to a cubic having three real roots,
+		// and Cardano's formula involves complex numbers.  To avoid
+		// complex numbers, the trigonometric representation of
+		// solutions should be used instead.
+// a*X*X*X + X - X' = 0
+// X*X*X + (1/a)*X - X'/a = 0
+// p = 1/a, q=b/a;
+		long double p = 1/a;
+		long double q = -b/a;
+		int k = 1;
+		long double cosarg = acos((3*q)/(2*p)*sqrt(-3/p))/3-k*2*M_PI/3;
+		r = 2*sqrt(-p/3) * cos(cosarg);
+		return r;
+	} else {
+		x = cbrt(sqrt((27*a*b*b+4)/a)/(2*sqrt(27)*a)+b/(2*a));
+		r = x-1/(3*a*x);
+		return r;
+	}
+//	double x = sqrt((27*a*b + 4)/a) / (2*sqrt(27)*a) + b/(2*a);
+//	double y = pow(x, 1.0/3);
+//	//double r = y - 1/(3*a*y);
+//	double r = (3*a*y*y - 1)/(3*a*y);
+//	return r;
+}
+
+// X' = X + a*X*X*X
+// a*X*X*X + X - X' = 0
+static double invertparabolicdistortion(double a, double xp)
+{
+	return solvecubicspecial(a, xp);
+}
+
+// X' = X + a*X*X*X
+static double parabolicdistortion(double a, double x)
+{
+	return x + a*x*x*x;
+}
+
+//static void apply_radialpol(float *py, float *x, int w, int h, int pd,
+//		double *param)
+//{
+//	float (*y)[w][pd] = (void*)py;
+//	double c[2] = {param[0], param[1]};
+//	double a = param[2];
+//	fprintf(stderr, "radialpol (%g,%g)[%g]\n", c[0], c[1], a);
+//	FORJ(h) FORI(w) {
+//		double p[2] = {i, j}, q[2];
+//		double r = hypot(p[0]-c[0], p[1]-c[1]);
+//		double R = parabolicdistortion(a, r);
+//		if (r > 0) {
+//			q[0] = c[0] + (R/r)*(i - c[0]);
+//			q[1] = c[1] + (R/r)*(j - c[1]);
+//		} else {
+//			q[0] = 0;
+//			q[1] = 0;
+//		}
+//		float val[pd];
+//		general_interpolate(val, x, w, h, pd, q[0], q[1], 2);
+//		FORL(pd) {
+//			y[j][i][l] = val[l];
+//		}
+//	}
+//}
+
+static void invert_affinity(double invA[6], double A[6])
+{
+	double a, b, c, d, p, q;
+	a=A[0]; b=A[1]; p=A[2];
+	c=A[3]; d=A[4]; q=A[5];
+	double det = a*d - b*c;
+	invA[0] = d;
+	invA[1] = -b;
+	invA[2] = b*q-d*p;
+	invA[3] = -c;
+	invA[4] = a;
+	invA[5] = c*p-a*q;
+	FORI(6) invA[i] /= det;
+}
+
+// computes the affinity sending [0,0], [1,0] and [0,1] to x, y and z
+static void affinity_from_3pt(double x[2], double y[2], double z[2],
+		double A[6])
+{
+	double a, b, c, d, p, q;
+	p = x[0];
+	q = x[1];
+	a = y[0] - p;
+	c = y[1] - q;
+	b = z[0] - p;
+	d = z[1] - q;
+	A[0]=a; A[1]=b; A[2]=p;
+	A[3]=c; A[4]=d; A[5]=q;
+}
+
+// computes the affinity sending a,b,c to x,y,z
+static void affinity_from_3corresp(double a[2], double b[2], double c[2],
+		double x[2], double y[2], double z[2], double R[6])
+{
+	double A[6], B[6], iA[6];
+	affinity_from_3pt(a, b, c, A);
+	affinity_from_3pt(x, y, z, B);
+	invert_affinity(iA, A);
+	R[0] = B[0]*iA[0] + B[1]*iA[3];
+	R[1] = B[0]*iA[1] + B[1]*iA[4];
+	R[2] = B[0]*iA[2] + B[1]*iA[5] + B[2];
+	R[3] = B[3]*iA[0] + B[4]*iA[3];
+	R[4] = B[3]*iA[1] + B[4]*iA[4];
+	R[5] = B[3]*iA[2] + B[4]*iA[5] + B[5];
+}
+
+#include "vvector.h"
+
+static void invert_homography(double invH[9], double H[9])
+{
+	double h[3][3] = { {H[0], H[1], H[2]},
+			{H[3], H[4], H[5]},
+			{H[6], H[7], H[8]}};
+	double det;
+	double ih[3][3];
+	INVERT_3X3(ih, det, h);
+	FORI(9) invH[i] = ih[0][i];
+}
+
+#include "cmphomod.c"
+
+static double produce_homography(double H[9], int w, int h,
+		char *homtype, double *v)
+{
+	if (0 == strcmp(homtype, "hom")) { // actual parameters
+		FORI(9) H[i] = v[i];
+	} else if (0 == strcmp(homtype, "hom4p")) {
+		// absolute displacement of the image corners
+		double corner[4][2] = {{0,0}, {w,0}, {0,h}, {w,h}};
+		double other[4][2] = {
+			{0 + v[0], 0 + v[1]},
+			{w + v[2], 0 + v[3]},
+			{0 + v[4], h + v[5]},
+			{w + v[6], h + v[7]}
+		};
+		double R[3][3];
+		homography_from_4corresp(
+				corner[0], corner[1], corner[2], corner[3],
+				other[0], other[1], other[2], other[3], R);
+		FORI(9) H[i] = R[0][i];
+	} else if (0 == strcmp(homtype, "hom4pr")) {
+		// absolute displacement of the image corners
+		double corner[4][2] = {{0,0}, {w,0}, {0,h}, {w,h}};
+		double other[4][2] = {
+			{0 + w*v[0], 0 + h*v[1]},
+			{w + w*v[2], 0 + h*v[3]},
+			{0 + w*v[4], h + h*v[5]},
+			{w + w*v[6], h + h*v[7]}
+		};
+		double R[3][3];
+		homography_from_4corresp(
+				corner[0], corner[1], corner[2], corner[3],
+				other[0], other[1], other[2], other[3], R);
+		FORI(9) H[i] = R[0][i];
+	} else if (0 == strcmp(homtype, "hom4prc")) {
+		// percentual relative displacement of the image corners
+		double corner[4][2] = {{0,0}, {w,0}, {0,h}, {w,h}};
+		double other[4][2] = {
+			{0 + w*v[0]/100, 0 + h*v[1]/100},
+			{w + w*v[2]/100, 0 + h*v[3]/100},
+			{0 + w*v[4]/100, h + h*v[5]/100},
+			{w + w*v[6]/100, h + h*v[7]/100}
+		};
+		double R[3][3];
+		homography_from_4corresp(
+				corner[0], corner[1], corner[2], corner[3],
+				other[0], other[1], other[2], other[3], R);
+		FORI(9) H[i] = R[0][i];
+	} else if (0 == strcmp(homtype, "hom16")) {
+		// absolute coordinates of 4 point pairs
+		double a[4][2] = {
+			{v[0],v[1]},{v[2],v[3]},{v[4],v[5]},{v[6],v[7]}
+		};
+		double b[4][2] = {
+			{v[8],v[9]},{v[10],v[11]},{v[12],v[13]},{v[14],v[15]}
+		};
+		double R[3][3];
+		homography_from_4corresp( a[0], a[1], a[2], a[3],
+				b[0], b[1], b[2], b[3], R);
+		FORI(9) H[i] = R[0][i];
+	} else if (0 == strcmp(homtype, "hom16r")) {
+		// relative coordinates of 4 point pairs
+		double a[4][2] = {
+			{w*v[0],h*v[1]},
+			{w*v[2],h*v[3]},
+			{w*v[4],h*v[5]},
+			{w*v[6],h*v[7]}
+		};
+		double b[4][2] = {
+			{w*v[8], h*v[9]},
+			{w*v[10],h*v[11]},
+			{w*v[12],h*v[13]},
+			{w*v[14],h*v[15]}
+		};
+		double R[3][3];
+		homography_from_4corresp( a[0], a[1], a[2], a[3],
+				b[0], b[1], b[2], b[3], R);
+		FORI(9) H[i] = R[0][i];
+	} else if (0 == strcmp(homtype, "hom16rc")) {
+		// percentual relative coordinates of 4 point pairs
+		double a[4][2] = {
+			{w*v[0]/100,h*v[1]/100},
+			{w*v[2]/100,h*v[3]/100},
+			{w*v[4]/100,h*v[5]/100},
+			{w*v[6]/100,h*v[7]/100}
+		};
+		double b[4][2] = {
+			{w*v[8] /100,h*v[9] /100},
+			{w*v[10]/100,h*v[11]/100},
+			{w*v[12]/100,h*v[13]/100},
+			{w*v[14]/100,h*v[15]/100}
+		};
+		double R[3][3];
+		homography_from_4corresp( a[0], a[1], a[2], a[3],
+				b[0], b[1], b[2], b[3], R);
+		FORI(9) H[i] = R[0][i];
+	} else error("unrecognized homography type \"%s\"", homtype);
+	return 0;
+}
+
+static double produce_affinity(double A[6], int w, int h,
+		char *afftype, double *v)
+{
+	if (0 == strcmp(afftype, "aff")) { // actual parameters
+		FORI(9) A[i] = v[i];
+	} else if (0 == strcmp(afftype, "aff3p")) {
+		// absolute displacement of the image corners
+		double corner[3][2] = {{0,0}, {w,0}, {0,h}};
+		double other[3][2] = {
+			{0 + v[0], 0 + v[1]},
+			{w + v[2], 0 + v[3]},
+			{0 + v[4], h + v[5]}
+		};
+		affinity_from_3corresp(corner[0], corner[1], corner[2],
+					other[0], other[1], other[2], A);
+	} else if (0 == strcmp(afftype, "aff3pr")) {
+		// relative displacement of the image corners
+		double corner[3][2] = {{0,0}, {w,0}, {0,h}};
+		double other[3][2] = {
+			{0 + w*v[0], 0 + h*v[1]},
+			{w + w*v[2], 0 + h*v[3]},
+			{0 + w*v[4], h + h*v[5]}
+		};
+		affinity_from_3corresp(corner[0], corner[1], corner[2],
+					other[0], other[1], other[2], A);
+	} else if (0 == strcmp(afftype, "aff3prc")) {
+		// percentual relative displacement of the image corners
+		double corner[3][2] = {{0,0}, {w,0}, {0,h}};
+		double other[3][2] = {
+			{0 + w*v[0]/100, 0 + h*v[1]/100},
+			{w + w*v[2]/100, 0 + h*v[3]/100},
+			{0 + w*v[4]/100, h + h*v[5]/100}
+		};
+		affinity_from_3corresp(corner[0], corner[1], corner[2],
+					other[0], other[1], other[2], A);
+	} else if (0 == strcmp(afftype, "aff12")) {
+		// absolute coordinates of 3 point pairs
+		double a[3][2] = { {v[0],v[1]},{v[2],v[3]},{v[4],v[5]} };
+		double b[4][2] = { {v[6],v[7]},{v[8],v[9]},{v[10],v[11]} };
+		affinity_from_3corresp(a[0], a[1], a[2], b[0], b[1], b[2], A);
+	} else if (0 == strcmp(afftype, "aff12r")) {
+		// relative coordinates of 3 point pairs
+		double a[3][2] = {
+			{w*v[0],h*v[1]},
+			{w*v[2],h*v[3]},
+			{w*v[4],h*v[5]}
+		};
+		double b[3][2] = {
+			{w*v[6], h*v[7]},
+			{w*v[8], h*v[9]},
+			{w*v[10],h*v[11]}
+		};
+		affinity_from_3corresp(a[0], a[1], a[2], b[0], b[1], b[2], A);
+	} else if (0 == strcmp(afftype, "aff12rc")) {
+		// percentual relative coordinates of 3 point pairs
+		double a[3][2] = {
+			{w*v[0]/100,h*v[1]/100},
+			{w*v[2]/100,h*v[3]/100},
+			{w*v[4]/100,h*v[5]/100}
+		};
+		double b[3][2] = {
+			{w*v[6] /100,h*v[7] /100},
+			{w*v[8] /100,h*v[9] /100},
+			{w*v[10]/100,h*v[11]/100}
+		};
+		affinity_from_3corresp(a[0], a[1], a[2], b[0], b[1], b[2], A);
+	} else error("unrecognized affinity type \"%s\"", afftype);
+	return 0;
+}
+
+#define SYNFLOW_MAXPARAM 40 // whatever
+
+
+#define FLOWMODEL_HIDDEN_AFFINE 1     // 6 parameters
+#define FLOWMODEL_HIDDEN_PROJECTIVE 2 // 9 parameters
+#define FLOWMODEL_HIDDEN_PRADIAL 3    // 3 parameter
+#define FLOWMODEL_HIDDEN_IPRADIAL 4   // 3 parameter
+#define FLOWMODEL_HIDDEN_COMBI1 5     // 12 parameters, H(pradial(x))
+#define FLOWMODEL_HIDDEN_COMBI2 6     // 12 parameters, ipradial(H(pradial(x)))
+#define FLOWMODEL_HIDDEN_COMBI3 7     // 15 parameters, ipradial'(H(pradial(x)))
+#define FLOWMODEL_HIDDEN_ICOMBI1 5    // 12 parameters, ipradial(H(x))
+#define FLOWMODEL_HIDDEN_ICOMBI2 6    // 12 parameters, pradial(H(ipradial(x)))
+#define FLOWMODEL_HIDDEN_ICOMBI3 7    // 15 parameters, pradial'(H(ipradial(x)))
+
+
+// data structure to store models for parametric (synthethic) movements
+// together with their inverses
+struct flow_model {
+	char *model_name; // only for reference
+
+	int n; // number of "visible" parameters
+	double p[SYNFLOW_MAXPARAM];  // "visible" parameters of forward model
+
+	int hidden_id;
+	int nh; // number of "hidden" parameters
+	double H[SYNFLOW_MAXPARAM];  // "hidden" parameters of forward model
+	double iH[SYNFLOW_MAXPARAM]; // "hidden" parameters of backward model
+
+	int w, h;
+};
+
+// returns the number of hidden parameters
+static int parse_flow_name(int *hidden_id, char *model_name)
+{
+	struct {
+		char *model_name;
+		int visible_params, hidden_params, hidden_id;
+	} name_data[] = {
+		{"traslation",    2, 6, FLOWMODEL_HIDDEN_AFFINE},
+//		{"traslation_r",  2, 6, FLOWMODEL_HIDDEN_AFFINE},
+		{"traslation_rc", 2, 6, FLOWMODEL_HIDDEN_AFFINE},
+		{"euclidean",     3, 6, FLOWMODEL_HIDDEN_AFFINE},
+//		{"euclidean_r",   3, 6, FLOWMODEL_HIDDEN_AFFINE},
+		{"euclidean_rc",  3, 6, FLOWMODEL_HIDDEN_AFFINE},
+		{"similar",       4, 6, FLOWMODEL_HIDDEN_AFFINE},
+//		{"similar_r",     4, 6, FLOWMODEL_HIDDEN_AFFINE},
+		{"similar_rc",    4, 6, FLOWMODEL_HIDDEN_AFFINE},
+		{"affine",        6, 6, FLOWMODEL_HIDDEN_AFFINE},
+		{"affine3p",      6, 6, FLOWMODEL_HIDDEN_AFFINE},
+//		{"affine3pr",     6, 6, FLOWMODEL_HIDDEN_AFFINE},
+		{"affine3prc",    6, 6, FLOWMODEL_HIDDEN_AFFINE},
+		{"affine12",      12, 6, FLOWMODEL_HIDDEN_AFFINE},
+//		{"affine12r",     12, 6, FLOWMODEL_HIDDEN_AFFINE},
+		{"affine12rc",    12, 6, FLOWMODEL_HIDDEN_AFFINE},
+		{"hom",           9, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
+		{"hom4p",         8, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
+//		{"hom4pr",        8, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
+		{"hom4prc",       8, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
+		{"hom16",         16, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
+//		{"hom16r",        16, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
+		{"hom16rc",       16, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
+		{"cpradial",      1, 3, FLOWMODEL_HIDDEN_PRADIAL},
+//		{"cpradialr",     1, 3, FLOWMODEL_HIDDEN_PRADIAL},
+		{"cpradialrc",    1, 3, FLOWMODEL_HIDDEN_PRADIAL},
+		{"pradial",       3, 3, FLOWMODEL_HIDDEN_PRADIAL},
+//		{"pradialr",      3, 3, FLOWMODEL_HIDDEN_PRADIAL},
+		{"pradialrc",     3, 3, FLOWMODEL_HIDDEN_PRADIAL},
+		{"cipradial",     1, 3, FLOWMODEL_HIDDEN_IPRADIAL},
+//		{"cipradialr",    1, 3, FLOWMODEL_HIDDEN_IPRADIAL},
+		{"cipradialrc",   1, 3, FLOWMODEL_HIDDEN_IPRADIAL},
+		{"ipradial",      3, 3, FLOWMODEL_HIDDEN_IPRADIAL},
+//		{"ipradialr",     3, 3, FLOWMODEL_HIDDEN_IPRADIAL},
+		{"ipradialrc",    3, 3, FLOWMODEL_HIDDEN_IPRADIAL},
+		// combined, etc
+		{"",0,0,0}
+	};
+	int i = 0;
+	while (name_data[i].visible_params) {
+		if (0 == strcmp(model_name, name_data[i].model_name)) {
+			*hidden_id = name_data[i].hidden_id;
+			return name_data[i].hidden_params;
+		}
+		i = i + 1;
+	}
+	error("unrecognized transform name %s", model_name);
+	return 0;
+}
+
+// fills H, iH and other fields
+static void produce_flow_model(struct flow_model *f,
+		double *p, int np, char *name, int w, int h)
+{
+	f->nh = parse_flow_name(&f->hidden_id, name);
+	f->model_name = name;
+	f->w = w;
+	f->h = h;
+	f->n = np;
+	FORI(np) f->p[i] = p[i];
+
+	if (f->hidden_id == FLOWMODEL_HIDDEN_PROJECTIVE) {
+		assert(f->nh == 9);
+		double H[9], invH[9];
+		produce_homography(H, w, h, f->model_name, f->p);
+		invert_homography(invH, H);
+		FORI(9) f->H[i] = H[i];
+		FORI(9) f->iH[i] = invH[i];
+	} else if (f->hidden_id == FLOWMODEL_HIDDEN_AFFINE) {
+		assert(f->nh == 6);
+		double H[6], invH[6];
+		produce_affinity(H, w, h, f->model_name, f->p);
+		invert_affinity(invH, H);
+		FORI(6) f->H[i] = H[i];
+		FORI(6) f->iH[i] = invH[i];
+	} else error("flow model \"%s\" not yet implemented", name);
+}
+
+// evaluate the flow vector at one given source point
+static void apply_flow(float y[2], struct flow_model *f, float x[2], bool inv)
+{
+	double *p = inv ? f->H : f->iH;
+	float F[3];
+	switch(f->hidden_id) {
+	case FLOWMODEL_HIDDEN_AFFINE:
+		assert(f->nh == 6);
+		F[0] = p[0]*x[0] + p[1]*x[1] + p[2];
+		F[1] = p[3]*x[0] + p[4]*x[1] + p[5];
+		y[0] = F[0] - x[0];
+		y[1] = F[1] - x[1];
+		break;
+	case FLOWMODEL_HIDDEN_PROJECTIVE:
+		assert(f->nh == 9);
+		F[0] = p[0]*x[0] + p[1]*x[1] + p[2];
+		F[1] = p[3]*x[0] + p[4]*x[1] + p[5];
+		F[2] = p[6]*x[0] + p[7]*x[1] + p[8];
+		y[0] = F[0]/F[2] - x[0];
+		y[1] = F[1]/F[2] - x[1];
+		break;
+	default: error("bizarre");
+	}
+}
+
+//// evaluate the inverse flow vector at one given target point
+//static void apply_invflow(float y[2], struct flow_model *f, float x[2])
+//{
+//}
+
+// fill a image with the vector field of the given flow
+static void fill_flow_field(float *xx, struct flow_model *f, int w, int h)
+{
+	assert(f->w == w);
+	assert(f->h == h);
+	float (*x)[w][2];
+	FORJ(h) FORI(w) {
+		float p[2] = {i, j}, q[2];
+		apply_flow(q, f, p, 0);
+	}
+}
+
+// morph an image according to a given flow model
+static void transform_back(float *yy, struct flow_model *f, float *xx,
+							int w, int h, int pd)
+{
+	float (*y)[w][pd] = (void *)yy;
+	assert(f->w == w);
+	assert(f->h == h);
+	FORJ(h) FORI(w) {
+		float p[2] = {i, j}, q[2];
+		apply_flow(q, f, p, 0);
+		float val[pd];
+		general_interpolate(val, xx, w, h, pd, q[0], q[1], 2);
+		FORL(pd)
+			y[j][i][l] = val[l];
+	}
+}
+
+static void transform_forward(float *yy, struct flow_model *f, float *xx,
+							int w, int h, int pd)
+
+{
+	float (*y)[w][pd] = (void *)yy;
+	assert(f->w == w);
+	assert(f->h == h);
+	FORJ(h) FORI(w) {
+		float p[2] = {i, j}, q[2];
+		apply_flow(q, f, p, 1);
+		float val[pd];
+		general_interpolate(val, xx, w, h, pd, q[0], q[1], 2);
+		FORL(pd)
+			y[j][i][l] = val[l];
+	}
+}
+
+
+//static void apply_parametric_invflow(float *y, float *x, int w, int h, int pd,
+//		char *model_id, double *param, int nparam)
+//{
+//	FORI(w*h*pd) y[i] = -42;
+//	if (false) { ;
+//	} else if (0 == strcmp(model_id, "traslation")) {
+//		assert(nparam == 2);
+//		double a[6] = {1, 0, param[0], 0, 1, param[1]};
+//		apply_affinity(y, x, w, h, pd, a);
+//	} else if (0 == strcmp(model_id, "traslation_s")) {
+//		assert(nparam == 2);
+//		double a[6] = {1, 0, w*param[0], 0, 1, h*param[1]};
+//		apply_affinity(y, x, w, h, pd, a);
+//	} else if (0 == strcmp(model_id, "euclidean")) {
+//		assert(nparam == 3);
+//		double a[6] = {cos(param[2]), sin(param[2]), param[0],
+//			-sin(param[2]), cos(param[2]), param[1]};
+//		apply_affinity(y, x, w, h, pd, a);
+//	} else if (0 == strcmp(model_id, "euclidean_s")) {
+//		assert(nparam == 3);
+//		double a[6] = {cos(param[2]), sin(param[2]), w*param[0],
+//			-sin(param[2]), cos(param[2]), h*param[1]};
+//		apply_affinity(y, x, w, h, pd, a);
+//	} else if (0 == strcmp(model_id, "similar")) {
+//		assert(nparam == 4);
+//		double r = param[3];
+//		double a[6] = {r*cos(param[2]), r*sin(param[2]), param[0],
+//			-r*sin(param[2]), r*cos(param[2]), param[1]};
+//		apply_affinity(y, x, w, h, pd, a);
+//	} else if (0 == strcmp(model_id, "similar_s")) {
+//		assert(nparam == 4);
+//		double r = param[3]/w;
+//		double a[6] = {r*cos(param[2]), r*sin(param[2]), w*param[0],
+//			-r*sin(param[2]), r*cos(param[2]), h*param[1]};
+//		apply_affinity(y, x, w, h, pd, a);
+//	} else if (0 == strcmp(model_id, "affine")) {
+//		assert(nparam == 6);
+//		double a[6]; FORI(6) a[i] = param[i];
+//		apply_affinity(y, x, w, h, pd, a);
+//	} else if (0 == strcmp(model_id, "affine_s")) {
+//		error("not implemented");
+//		assert(nparam == 6);
+//		double a[6];
+//		apply_affinity(y, x, w, h, pd, a);
+//	} else if (0 == strcmp(model_id, "projective")) {
+//		assert(nparam == 8);
+//		double a[9]; FORI(8) a[i] = param[i];
+//		a[8] = 1;
+//		apply_homography(y, x, w, h, pd, a);
+//	} else if (0 == strcmp(model_id, "projective_s")) {
+//		error("not implemented");
+//		assert(nparam == 8);
+//		double a[9];
+//		a[8] = 1;
+//		apply_homography(y, x, w, h, pd, a);
+//	} else if (0 == strcmp(model_id, "cparabolic")) {
+//		assert(nparam == 1);
+//		double a[3] = {w/2.0, h/2.0, param[0]};
+//		apply_radialpol(y, x, w, h, pd, a);
+//	} else if (0 == strcmp(model_id, "cparabolic_s")) {
+//		assert(nparam == 1);
+//		double a[3] = {w/2.0, h/2.0, w*param[0]};
+//		apply_radialpol(y, x, w, h, pd, a);
+//	} else if (0 == strcmp(model_id, "parabolic")) {
+//		assert(nparam == 3);
+//		double a[3] = {param[0], param[1], param[2]};
+//		apply_radialpol(y, x, w, h, pd, a);
+//	} else if (0 == strcmp(model_id, "parabolic_s")) {
+//		assert(nparam == 3);
+//		double a[3] = {w*param[0], h*param[1], w*param[2]};
+//		apply_radialpol(y, x, w, h, pd, a);
+//	} else if (0 == strcmp(model_id, "real1")) {
+//		error("not yet implemented");
+//	} else if (0 == strcmp(model_id, "real2")) {
+//		error("not yet implemented");
+//	} else error("unrecognized flow model %s", model_id);
+//}

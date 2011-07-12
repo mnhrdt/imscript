@@ -49,7 +49,7 @@ float march_cyclic(float a, float b, float c, float d, float x, float y)
 			assert(y0 >= 0); assert(y0 <= 1);
 			ix = d*y0 + c*(1 - y0);
 		}
-		return ix;;
+		return ix;
 	}
 
 	// quadrilater
