@@ -484,10 +484,12 @@ int main(int c, char *v[])
 
 	int w, h, pd;
 	float *x = iio_read_image_float_vec(v[11], &w, &h, &pd);
+	fprintf(stderr, "ipd = %d\n", pd);
 
 	int ow, od, opd;
 	float *y = closeup(x, w, h, pd, p, &ow, &od, &opd);
 
+	fprintf(stderr, "opd = %d\n", opd);
 	iio_save_image_float_vec(v[12], y, ow, od, opd);
 
 	free(x);

@@ -1,3 +1,7 @@
+// this is common code for the "synflow" and "paraflow" programs
+
+
+
 #include "getpixel.c"
 
 static float interpolate_bilinear(float a, float b, float c, float d,
@@ -409,6 +413,42 @@ static double produce_affinity(double A[6], int w, int h,
 			{w*v[10]/100,h*v[11]/100}
 		};
 		affinity_from_3corresp(a[0], a[1], a[2], b[0], b[1], b[2], A);
+	} else if (0 == strcmp(afftype, "traslation")) {
+		double R[6] = {1, 0, v[0], 0, 1, v[1]};
+		FORI(6) A[i] = R[i];
+	} else if (0 == strcmp(afftype, "traslation_rc")) {
+		double R[6] = {1, 0, w*v[0]/100, 0, 1, h*v[1]/100};
+		FORI(6) A[i] = R[i];
+	} else if (0 == strcmp(afftype, "euclidean")) {
+		double theta = v[0];
+		double R[6] = {cos(theta), sin(theta), v[1],
+			-sin(theta), cos(theta), v[2]};
+		FORI(6) A[i] = R[i];
+	} else if (0 == strcmp(afftype, "euclidean_rc")) {
+		double theta = M_PI*v[0]/180;
+		double c[2] = {w/2.0, h/2.0}, rc[2];
+		double R[6] = {cos(theta), sin(theta), 0,
+			-sin(theta), cos(theta), 0};
+		affine_map(rc, R, c);
+		R[2] = w*v[2]/100 - rc[0] + c[0];
+		R[5] = h*v[3]/100 - rc[1] + c[1];
+		FORI(6) A[i] = R[i];
+	} else if (0 == strcmp(afftype, "similar")) {
+		double theta = v[0];
+		double rho = v[1];
+		double R[6] = {rho*cos(theta), rho*sin(theta), v[2],
+			-rho*sin(theta), rho*cos(theta), v[3]};
+		FORI(6) A[i] = R[i];
+	} else if (0 == strcmp(afftype, "similar_rc")) {
+		double theta = M_PI*v[0]/180;
+		double rho = v[1];
+		double c[2] = {w/2.0, h/2.0}, rc[2];
+		double R[6] = {rho*cos(theta), rho*sin(theta), 0,
+			-rho*sin(theta), rho*cos(theta), 0};
+		affine_map(rc, R, c);
+		R[2] = w*v[2]/100 - rc[0] + c[0];
+		R[5] = h*v[3]/100 - rc[1] + c[1];
+		FORI(6) A[i] = R[i];
 	} else error("unrecognized affinity type \"%s\"", afftype);
 	return 0;
 }
@@ -445,7 +485,7 @@ struct flow_model {
 };
 
 // returns the number of hidden parameters
-static int parse_flow_name(int *hidden_id, char *model_name)
+static int parse_flow_name(int *vp, int *hidden_id, char *model_name)
 {
 	struct {
 		char *model_name;
@@ -460,13 +500,13 @@ static int parse_flow_name(int *hidden_id, char *model_name)
 		{"similar",       4, 6, FLOWMODEL_HIDDEN_AFFINE},
 //		{"similar_r",     4, 6, FLOWMODEL_HIDDEN_AFFINE},
 		{"similar_rc",    4, 6, FLOWMODEL_HIDDEN_AFFINE},
-		{"affine",        6, 6, FLOWMODEL_HIDDEN_AFFINE},
-		{"affine3p",      6, 6, FLOWMODEL_HIDDEN_AFFINE},
-//		{"affine3pr",     6, 6, FLOWMODEL_HIDDEN_AFFINE},
-		{"affine3prc",    6, 6, FLOWMODEL_HIDDEN_AFFINE},
-		{"affine12",      12, 6, FLOWMODEL_HIDDEN_AFFINE},
-//		{"affine12r",     12, 6, FLOWMODEL_HIDDEN_AFFINE},
-		{"affine12rc",    12, 6, FLOWMODEL_HIDDEN_AFFINE},
+		{"aff",           6, 6, FLOWMODEL_HIDDEN_AFFINE},
+		{"aff3p",         6, 6, FLOWMODEL_HIDDEN_AFFINE},
+//		{"aff3pr",        6, 6, FLOWMODEL_HIDDEN_AFFINE},
+		{"aff3prc",       6, 6, FLOWMODEL_HIDDEN_AFFINE},
+		{"aff12",         12, 6, FLOWMODEL_HIDDEN_AFFINE},
+//		{"aff12r",        12, 6, FLOWMODEL_HIDDEN_AFFINE},
+		{"aff12rc",       12, 6, FLOWMODEL_HIDDEN_AFFINE},
 		{"hom",           9, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
 		{"hom4p",         8, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
 //		{"hom4pr",        8, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
@@ -493,6 +533,7 @@ static int parse_flow_name(int *hidden_id, char *model_name)
 	while (name_data[i].visible_params) {
 		if (0 == strcmp(model_name, name_data[i].model_name)) {
 			*hidden_id = name_data[i].hidden_id;
+			*vp = name_data[i].visible_params;
 			return name_data[i].hidden_params;
 		}
 		i = i + 1;
@@ -505,7 +546,11 @@ static int parse_flow_name(int *hidden_id, char *model_name)
 static void produce_flow_model(struct flow_model *f,
 		double *p, int np, char *name, int w, int h)
 {
-	f->nh = parse_flow_name(&f->hidden_id, name);
+	int vp;
+	f->nh = parse_flow_name(&vp, &f->hidden_id, name);
+	if (vp != np)
+		error("flow model \"%s\" expects %d parameters but got %d",
+				name, vp, np);
 	f->model_name = name;
 	f->w = w;
 	f->h = h;
@@ -527,28 +572,35 @@ static void produce_flow_model(struct flow_model *f,
 		FORI(6) f->H[i] = H[i];
 		FORI(6) f->iH[i] = invH[i];
 	} else error("flow model \"%s\" not yet implemented", name);
+
+	FORI(np) fprintf(stderr, "pfm p[%d] = %g\n", i, f->p[i]);
+	FORI(f->nh) fprintf(stderr, "H[%d] = %g\n", i, f->H[i]);
+	FORI(f->nh) fprintf(stderr, "invH[%d] = %g\n", i, f->iH[i]);
 }
 
 // evaluate the flow vector at one given source point
 static void apply_flow(float y[2], struct flow_model *f, float x[2], bool inv)
 {
-	double *p = inv ? f->H : f->iH;
+	double *p = inv ? f->iH : f->H;
 	float F[3];
 	switch(f->hidden_id) {
 	case FLOWMODEL_HIDDEN_AFFINE:
 		assert(f->nh == 6);
 		F[0] = p[0]*x[0] + p[1]*x[1] + p[2];
 		F[1] = p[3]*x[0] + p[4]*x[1] + p[5];
-		y[0] = F[0] - x[0];
-		y[1] = F[1] - x[1];
+		y[0] = F[0];// - x[0];
+		y[1] = F[1];// - x[1];
+		//fprintf(stderr, "p = %g %g %g %g %g %g\n",
+		//		p[0], p[1], p[2], p[3], p[4], p[5]);
+		//fprintf(stderr, "(%g,%g) -> (%g,%g)\n", x[0], x[1], y[0], y[1]);
 		break;
 	case FLOWMODEL_HIDDEN_PROJECTIVE:
 		assert(f->nh == 9);
 		F[0] = p[0]*x[0] + p[1]*x[1] + p[2];
 		F[1] = p[3]*x[0] + p[4]*x[1] + p[5];
 		F[2] = p[6]*x[0] + p[7]*x[1] + p[8];
-		y[0] = F[0]/F[2] - x[0];
-		y[1] = F[1]/F[2] - x[1];
+		y[0] = F[0]/F[2];// - x[0];
+		y[1] = F[1]/F[2];// - x[1];
 		break;
 	default: error("bizarre");
 	}
@@ -564,10 +616,11 @@ static void fill_flow_field(float *xx, struct flow_model *f, int w, int h)
 {
 	assert(f->w == w);
 	assert(f->h == h);
-	float (*x)[w][2];
+	float (*x)[w][2] = (void*)xx;
 	FORJ(h) FORI(w) {
 		float p[2] = {i, j}, q[2];
 		apply_flow(q, f, p, 0);
+		FORL(2) x[j][i][l] = q[l] - p[l];
 	}
 }
 
