@@ -23,143 +23,143 @@
 
 #include "synflow_core.c"
 
-static float planar_gaussian(float cx, float cy, float s, float x, float y)
-{
-	float r = hypot(x-cx, y-cy);
-	return exp(-(r/s)*(r/s));
-}
-
-// sigma = average flow magnitude
-// mu = spatial smoothness
-static void fill_random_flow(float (**x)[2], int w, int h, float sgm, float mu)
-{
-	int nblobs = 1;
-	float p[2*nblobs][3];
-	FORI(2*nblobs) {
-		p[i][0] = w*random_uniform();
-		p[i][1] = h*random_uniform();
-		p[i][2] = mu*sqrt(w*h)*(0.5+0.5*random_uniform());
-	}
-	FORL(nblobs) {
-		float tsgm = sgm*(2*random_uniform()-1);
-		FORJ(h) FORI(w) {
-			float fx = 0;//sgm * random_normal();
-			float fy = 0;//sgm * random_normal();
-			int n = nblobs;
-			fx += planar_gaussian(p[l][0], p[l][1], p[l][2], i, j);
-			fy +=planar_gaussian(p[2*n-l-1][0],p[2*n-l-1][1],p[2*n-l-1][2],i,j);
-			x[j][i][0] = tsgm*fx;
-			x[j][i][1] = tsgm*fy;
-		}
-	}
-	double m = 0;
-	FORJ(h) FORI(w)
-		m += hypot(x[j][i][0], x[j][i][1]);
-	m /= w*h;
-	FORJ(h) FORI(w) FORL(2)
-		x[j][i][l] *= sgm/m;
-
-}
-
-static void fill_cidentity(float (**x)[2], int w, int h, float p[1])
-{
-	float r = *p;
-	float cx = w/2.0;
-	float cy = h/2.0;
-	FORJ(h) FORI(w) {
-		float fx = (i - cx)/r;
-		float fy = (j - cy)/r;
-		x[j][i][0] = fx;
-		x[j][i][1] = fy;
-	}
-}
-
-static void fill_traslation(float (**x)[2], int w, int h, float p[2])
-{
-	FORJ(h) FORI(w) FORL(2)
-		x[j][i][l] = p[l];
-}
-
-static void invert_traslation(float it[2], float t[2])
-{
-	FORL(2) it[l] = -t[l];
-}
-
-static void fill_affinity(float (**x)[2], int w, int h, float p[6])
-{
-	FORJ(h) FORI(w) {
-		float fx = p[0]*i + p[1]*j + p[2];
-		float fy = p[3]*i + p[4]*j + p[5];
-		x[j][i][0] = fx - i;
-		x[j][i][1] = fy - j;
-	}
-}
-
-static void affine_mapf(float y[2], float A[6], float x[2])
-{
-	y[0] = A[0]*x[0] + A[1]*x[1] + A[2];
-	y[1] = A[3]*x[0] + A[4]*x[1] + A[5];
-}
-
-static void projective_mapf(float y[2], float H[9], float x[2])
-{
-	float z = H[6]*x[0] + H[7]*x[1] + H[8];
-	y[0] = (H[0]*x[0] + H[1]*x[1] + H[2])/z;
-	y[1] = (H[3]*x[0] + H[4]*x[1] + H[5])/z;
-}
-
-static void fill_homography(float (**x)[2], int w, int h, float p[9])
-{
-	FORJ(h) FORI(w) {
-		float fx = p[0]*i + p[1]*j + p[2];
-		float fy = p[3]*i + p[4]*j + p[5];
-		float fz = p[6]*i + p[7]*j + p[8];
-		x[j][i][0] = fx/fz - i;
-		x[j][i][1] = fy/fz - j;
-	}
-}
-
-static void fill_radialpol(float (**x)[2], int w, int h, float *p)
-{
-	int np = *p;
-	if (np != 4 && np != 5)
-		error("bad parametric distortion np = %d\n", np);
-	float c[2] = {p[1], p[2]};
-	float *coef = p + 3;
-	float a = coef[0];
-	FORJ(h) FORI(w) {
-		float r = hypot(i - c[0], j - c[1]);
-		float R = parabolicdistortion(a, r);
-		if (r > 0) {
-			x[j][i][0] = c[0] + (R/r)*(i - c[0]) - i;
-			x[j][i][1] = c[1] + (R/r)*(j - c[1]) - j;
-		} else {
-			x[j][i][0] = 0;
-			x[j][i][1] = 0;
-		}
-	}
-}
-
-static void viewflow(uint8_t (**y)[3], float (**x)[2], int w, int h, float m)
-{
-	FORJ(h) FORI(w) {
-		float *v = x[j][i];
-		double r = hypot(v[0], v[1]);
-		r = r>m ? 1 : r/m;
-		double a = atan2(v[1], -v[0]);
-		a = (a+M_PI)*(180/M_PI);
-		a = fmod(a, 360);
-		double hsv[3], rgb[3];
-		hsv[0] = a;
-		hsv[1] = r;
-		hsv[2] = r;
-		void hsv_to_rgb_doubles(double*, double*);
-		hsv_to_rgb_doubles(rgb, hsv);
-		FORL(3)
-			y[j][i][l] = 255*rgb[l];
-
-	}
-}
+//static float planar_gaussian(float cx, float cy, float s, float x, float y)
+//{
+//	float r = hypot(x-cx, y-cy);
+//	return exp(-(r/s)*(r/s));
+//}
+//
+//// sigma = average flow magnitude
+//// mu = spatial smoothness
+//static void fill_random_flow(float (**x)[2], int w, int h, float sgm, float mu)
+//{
+//	int nblobs = 1;
+//	float p[2*nblobs][3];
+//	FORI(2*nblobs) {
+//		p[i][0] = w*random_uniform();
+//		p[i][1] = h*random_uniform();
+//		p[i][2] = mu*sqrt(w*h)*(0.5+0.5*random_uniform());
+//	}
+//	FORL(nblobs) {
+//		float tsgm = sgm*(2*random_uniform()-1);
+//		FORJ(h) FORI(w) {
+//			float fx = 0;//sgm * random_normal();
+//			float fy = 0;//sgm * random_normal();
+//			int n = nblobs;
+//			fx += planar_gaussian(p[l][0], p[l][1], p[l][2], i, j);
+//			fy +=planar_gaussian(p[2*n-l-1][0],p[2*n-l-1][1],p[2*n-l-1][2],i,j);
+//			x[j][i][0] = tsgm*fx;
+//			x[j][i][1] = tsgm*fy;
+//		}
+//	}
+//	double m = 0;
+//	FORJ(h) FORI(w)
+//		m += hypot(x[j][i][0], x[j][i][1]);
+//	m /= w*h;
+//	FORJ(h) FORI(w) FORL(2)
+//		x[j][i][l] *= sgm/m;
+//
+//}
+//
+//static void fill_cidentity(float (**x)[2], int w, int h, float p[1])
+//{
+//	float r = *p;
+//	float cx = w/2.0;
+//	float cy = h/2.0;
+//	FORJ(h) FORI(w) {
+//		float fx = (i - cx)/r;
+//		float fy = (j - cy)/r;
+//		x[j][i][0] = fx;
+//		x[j][i][1] = fy;
+//	}
+//}
+//
+//static void fill_traslation(float (**x)[2], int w, int h, float p[2])
+//{
+//	FORJ(h) FORI(w) FORL(2)
+//		x[j][i][l] = p[l];
+//}
+//
+//static void invert_traslation(float it[2], float t[2])
+//{
+//	FORL(2) it[l] = -t[l];
+//}
+//
+//static void fill_affinity(float (**x)[2], int w, int h, float p[6])
+//{
+//	FORJ(h) FORI(w) {
+//		float fx = p[0]*i + p[1]*j + p[2];
+//		float fy = p[3]*i + p[4]*j + p[5];
+//		x[j][i][0] = fx - i;
+//		x[j][i][1] = fy - j;
+//	}
+//}
+//
+//static void affine_mapf(float y[2], float A[6], float x[2])
+//{
+//	y[0] = A[0]*x[0] + A[1]*x[1] + A[2];
+//	y[1] = A[3]*x[0] + A[4]*x[1] + A[5];
+//}
+//
+//static void projective_mapf(float y[2], float H[9], float x[2])
+//{
+//	float z = H[6]*x[0] + H[7]*x[1] + H[8];
+//	y[0] = (H[0]*x[0] + H[1]*x[1] + H[2])/z;
+//	y[1] = (H[3]*x[0] + H[4]*x[1] + H[5])/z;
+//}
+//
+//static void fill_homography(float (**x)[2], int w, int h, float p[9])
+//{
+//	FORJ(h) FORI(w) {
+//		float fx = p[0]*i + p[1]*j + p[2];
+//		float fy = p[3]*i + p[4]*j + p[5];
+//		float fz = p[6]*i + p[7]*j + p[8];
+//		x[j][i][0] = fx/fz - i;
+//		x[j][i][1] = fy/fz - j;
+//	}
+//}
+//
+//static void fill_radialpol(float (**x)[2], int w, int h, float *p)
+//{
+//	int np = *p;
+//	if (np != 4 && np != 5)
+//		error("bad parametric distortion np = %d\n", np);
+//	float c[2] = {p[1], p[2]};
+//	float *coef = p + 3;
+//	float a = coef[0];
+//	FORJ(h) FORI(w) {
+//		float r = hypot(i - c[0], j - c[1]);
+//		float R = parabolicdistortion(a, r);
+//		if (r > 0) {
+//			x[j][i][0] = c[0] + (R/r)*(i - c[0]) - i;
+//			x[j][i][1] = c[1] + (R/r)*(j - c[1]) - j;
+//		} else {
+//			x[j][i][0] = 0;
+//			x[j][i][1] = 0;
+//		}
+//	}
+//}
+//
+//static void viewflow(uint8_t (**y)[3], float (**x)[2], int w, int h, float m)
+//{
+//	FORJ(h) FORI(w) {
+//		float *v = x[j][i];
+//		double r = hypot(v[0], v[1]);
+//		r = r>m ? 1 : r/m;
+//		double a = atan2(v[1], -v[0]);
+//		a = (a+M_PI)*(180/M_PI);
+//		a = fmod(a, 360);
+//		double hsv[3], rgb[3];
+//		hsv[0] = a;
+//		hsv[1] = r;
+//		hsv[2] = r;
+//		void hsv_to_rgb_doubles(double*, double*);
+//		hsv_to_rgb_doubles(rgb, hsv);
+//		FORL(3)
+//			y[j][i][l] = 255*rgb[l];
+//
+//	}
+//}
 
 
 

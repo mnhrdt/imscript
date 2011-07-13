@@ -1,6 +1,7 @@
 // gaussian blur of a 2D image
 
 #include <assert.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,7 +10,52 @@
 #include <fftw3.h>
 #include "iio.h"
 
-#include "fragments.c"
+
+
+
+#ifndef M_PI
+#define M_PI		3.14159265358979323846	/* pi */
+#endif
+
+// this function prints an error message and aborts the program
+static void error(const char *fmt, ...)
+{
+	va_list argp;
+	fprintf(stderr, "\nERROR: ");
+	va_start(argp, fmt);
+	vfprintf(stderr, fmt, argp);
+	va_end(argp);
+	fprintf(stderr, "\n\n");
+	fflush(NULL);
+#ifdef NDEBUG
+	exit(-1);
+#else
+	exit(*(int *)0x43);
+#endif
+}
+
+
+// this function always returns a valid pointer
+static void *xmalloc(size_t size)
+{
+	if (size == 0)
+		error("xmalloc: zero size");
+	void *new = malloc(size);
+	if (!new)
+	{
+		double sm = size / (0x100000 * 1.0);
+		error("xmalloc: out of memory when requesting "
+			"%zu bytes (%gMB)",//:\"%s\"",
+			size, sm);//, strerror(errno));
+	}
+	return new;
+}
+
+
+#define FORI(n) for(int i=0;i<(n);i++)
+#define FORJ(n) for(int j=0;j<(n);j++)
+#define FORL(n) for(int l=0;l<(n);l++)
+
 
 
 #ifndef USE_WISDOM
@@ -19,10 +65,6 @@ void bequeath_wisdom(void) {}
 #include "fftwisdom.c"
 #endif//USE_WISDOM
 
-
-#define FORI(n) for(int i=0;i<(n);i++)
-#define FORJ(n) for(int j=0;j<(n);j++)
-#define FORL(n) for(int l=0;l<(n);l++)
 
 
 // wrapper around FFTW3 that computes the complex-valued Fourier transform
@@ -169,9 +211,9 @@ int main(int c, char *v[])
 	int w, h, pd;
 	float *x = iio_read_image_float_vec(in, &w, &h, &pd);
 	float *y = xmalloc(w*h*pd*sizeof*y);
-	fprintf(stderr, "input samples average = %g\n", average(x,w*h*pd) );
+
 	gblur(y, x, w, h, pd, s);
-	fprintf(stderr, "output samples average = %g\n", average(y,w*h*pd) );
+
 	iio_save_image_float_vec(out, y, w, h, pd);
 	free(x);
 	free(y);

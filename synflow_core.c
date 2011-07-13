@@ -453,6 +453,46 @@ static double produce_affinity(double A[6], int w, int h,
 	return 0;
 }
 
+static double produce_radial_model(double A[3], double iA[3], int w, int h,
+		char *pradtype, double *v)
+{
+	if (0 == strcmp(pradtype, "pararaw")) { // actual parameters
+		FORI(3) A[i] = v[i];
+	} else if (0 == strcmp(pradtype, "pradial_pixelic")) {
+		FORI(2) A[i] = v[i];
+		A[2] = (8*v[2])/(1.0*w*w*w);
+	} else if (0 == strcmp(pradtype, "pradialrc")) {
+		FORI(2) A[i] = v[i];
+		//double rw = 100.0
+		double rw = w;
+		A[2] = (8*v[2])/(1.0*rw*rw*rw);
+	} else error("non-raw radial model not yet supported");
+	if (A[2] < 0) {
+		// TODO: some more fine-grained warnings about warping
+		double a = -A[2];
+		fprintf(stderr, "negative a = %g\n", a);
+		if (hypot(h,w)/2.0 > 1/sqrt(3*a))
+			fprintf(stderr, "WARNING: corner of image warped!\n");
+		if (w/2.0 > 1/sqrt(3*a))
+			fprintf(stderr, "WARNING: sides of image warped!\n");
+		if (h/2.0 > 1/sqrt(3*a))
+			fprintf(stderr, "WARNING: tops of image warped!\n");
+	}
+	return 0;
+}
+
+static double produce_iradial_model(double A[3], double iA[3], int w, int h,
+		char *pradtype, double *v)
+{
+	if (0 == strcmp(pradtype, "ipararaw")) { // actual parameters
+		FORI(3) iA[i] = A[i] = v[i];
+	} else if (0 == strcmp(pradtype, "ipradialrc")) {
+		FORI(2) A[i] = v[i];
+		A[2] = (8*v[2])/(1.0*w*w*w);
+	} else error("non-raw radial model not yet supported");
+	return 0;
+}
+
 #define SYNFLOW_MAXPARAM 40 // whatever
 
 
@@ -514,6 +554,8 @@ static int parse_flow_name(int *vp, int *hidden_id, char *model_name)
 		{"hom16",         16, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
 //		{"hom16r",        16, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
 		{"hom16rc",       16, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
+		{"pararaw",       3, 3, FLOWMODEL_HIDDEN_PRADIAL},
+		{"ipararaw",       3, 3, FLOWMODEL_HIDDEN_IPRADIAL},
 		{"cpradial",      1, 3, FLOWMODEL_HIDDEN_PRADIAL},
 //		{"cpradialr",     1, 3, FLOWMODEL_HIDDEN_PRADIAL},
 		{"cpradialrc",    1, 3, FLOWMODEL_HIDDEN_PRADIAL},
@@ -542,6 +584,7 @@ static int parse_flow_name(int *vp, int *hidden_id, char *model_name)
 	return 0;
 }
 
+// "API"
 // fills H, iH and other fields
 static void produce_flow_model(struct flow_model *f,
 		double *p, int np, char *name, int w, int h)
@@ -571,6 +614,18 @@ static void produce_flow_model(struct flow_model *f,
 		invert_affinity(invH, H);
 		FORI(6) f->H[i] = H[i];
 		FORI(6) f->iH[i] = invH[i];
+	} else if (f->hidden_id == FLOWMODEL_HIDDEN_PRADIAL) {
+		assert(f->nh == 3);
+		double H[3], invH[3];
+		produce_radial_model(H, invH, w, h, f->model_name, f->p);
+		FORI(6) f->H[i] = H[i];
+		FORI(6) f->iH[i] = invH[i];
+	} else if (f->hidden_id == FLOWMODEL_HIDDEN_IPRADIAL) {
+		assert(f->nh == 3);
+		double H[3], invH[3];
+		produce_iradial_model(H, invH, w, h, f->model_name, f->p);
+		FORI(6) f->H[i] = H[i];
+		FORI(6) f->iH[i] = invH[i];
 	} else error("flow model \"%s\" not yet implemented", name);
 
 	FORI(np) fprintf(stderr, "pfm p[%d] = %g\n", i, f->p[i]);
@@ -581,10 +636,10 @@ static void produce_flow_model(struct flow_model *f,
 // evaluate the flow vector at one given source point
 static void apply_flow(float y[2], struct flow_model *f, float x[2], bool inv)
 {
-	double *p = inv ? f->iH : f->H;
-	float F[3];
 	switch(f->hidden_id) {
-	case FLOWMODEL_HIDDEN_AFFINE:
+	case FLOWMODEL_HIDDEN_AFFINE: {
+		double *p = inv ? f->iH : f->H;
+		float F[3];
 		assert(f->nh == 6);
 		F[0] = p[0]*x[0] + p[1]*x[1] + p[2];
 		F[1] = p[3]*x[0] + p[4]*x[1] + p[5];
@@ -594,7 +649,10 @@ static void apply_flow(float y[2], struct flow_model *f, float x[2], bool inv)
 		//		p[0], p[1], p[2], p[3], p[4], p[5]);
 		//fprintf(stderr, "(%g,%g) -> (%g,%g)\n", x[0], x[1], y[0], y[1]);
 		break;
-	case FLOWMODEL_HIDDEN_PROJECTIVE:
+				      }
+	case FLOWMODEL_HIDDEN_PROJECTIVE: {
+		double *p = inv ? f->iH : f->H;
+		float F[3];
 		assert(f->nh == 9);
 		F[0] = p[0]*x[0] + p[1]*x[1] + p[2];
 		F[1] = p[3]*x[0] + p[4]*x[1] + p[5];
@@ -602,6 +660,34 @@ static void apply_flow(float y[2], struct flow_model *f, float x[2], bool inv)
 		y[0] = F[0]/F[2];// - x[0];
 		y[1] = F[1]/F[2];// - x[1];
 		break;
+					  }
+	case FLOWMODEL_HIDDEN_PRADIAL: {
+		assert(f->nh == 3);
+		double c[2] = {f->H[0], f->H[1]};
+		double a = f->H[2];
+		double r = hypot(x[0] - c[0], x[1] - c[1]);
+		double R = inv ? invertparabolicdistortion(a, r) :
+					parabolicdistortion(a, r);
+		if (r > 0.000001)
+			FORL(2) y[l] = c[l] + (R/r)*(x[l] - c[l]);
+		else
+			FORL(2) y[l] = 0;
+		break;
+				       }
+	case FLOWMODEL_HIDDEN_IPRADIAL: {
+		assert(f->nh == 3);
+		double c[2] = {f->H[0], f->H[1]};
+		double a = f->H[2];
+		double r = hypot(x[0] - c[0], x[1] - c[1]);
+		double R = inv ? parabolicdistortion(a, r) :
+					invertparabolicdistortion(a, r);
+		if (r > 0.000001)
+			FORL(2) y[l] = c[l] + (R/r)*(x[l] - c[l]);
+		else
+			FORL(2) y[l] = 0;
+		break;
+				       }
+
 	default: error("bizarre");
 	}
 }
@@ -611,6 +697,7 @@ static void apply_flow(float y[2], struct flow_model *f, float x[2], bool inv)
 //{
 //}
 
+// "API"
 // fill a image with the vector field of the given flow
 static void fill_flow_field(float *xx, struct flow_model *f, int w, int h)
 {
@@ -624,6 +711,7 @@ static void fill_flow_field(float *xx, struct flow_model *f, int w, int h)
 	}
 }
 
+// "API"
 // morph an image according to a given flow model
 static void transform_back(float *yy, struct flow_model *f, float *xx,
 							int w, int h, int pd)
@@ -641,6 +729,7 @@ static void transform_back(float *yy, struct flow_model *f, float *xx,
 	}
 }
 
+// "API"
 static void transform_forward(float *yy, struct flow_model *f, float *xx,
 							int w, int h, int pd)
 

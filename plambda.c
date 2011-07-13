@@ -105,6 +105,7 @@
 //
 //
 //
+// TODO: 2x2 and 3x3 matrix multiplication
 // TODO: admit images of different number of channels
 // TODO: implement shunting-yard algorithm to admit infix notation
 
@@ -763,6 +764,13 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 		vstack_push_vector(s, y, m);
 		break;
 				  }
+	//case PLAMBDA_STACKOP_MUL22: {
+	//	float a[6];
+	//	FORI(6) {
+	//		float tmp[PLAMBDA_MAX_PIXELDIM];
+	//		if (1 == vstack_pop_vector)
+	//	vstack_pop_vector
+	//			    }
 	case PLAMBDA_STACKOP_VMERGEALL:
 		error("mergeall not implemented");
 		break;
