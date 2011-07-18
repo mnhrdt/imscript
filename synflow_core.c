@@ -3,6 +3,7 @@
 
 
 #include "getpixel.c"
+#include "marching_interpolation.c"
 
 static float interpolate_bilinear(float a, float b, float c, float d,
 					float x, float y)
@@ -15,13 +16,21 @@ static float interpolate_bilinear(float a, float b, float c, float d,
 	return r;
 }
 
+static float interpolate_nearest(float a, float b, float c, float d,
+					float x, float y)
+{
+	// return a;
+	if (x<0.5) return y<0.5 ? a : b;
+	else return y<0.5 ? c : d;
+}
+
 static float interpolate_cell(float a, float b, float c, float d,
 					float x, float y, int method)
 {
 	//fprintf(stderr, "icell %g %g %g %g (%g %g)\n", a,b,c,d,x,y);
 	switch(method) {
-	//case 0: return interpolate_nearest(a, b, c, d, x, y);
-	//case 1: return marchi(a, b, c, d, x, y);
+	case 0: return interpolate_nearest(a, b, c, d, x, y);
+	case 1: return marchi(a, b, c, d, x, y);
 	case 2: return interpolate_bilinear(a, b, c, d, x, y);
 	default: error("caca de vaca");
 	}
@@ -104,6 +113,10 @@ static void projective_map(double y[2], double H[9], double x[2])
 //#include <complex.h>
 static double solvecubicspecial(double a, double b)
 {
+	if (fabs(a) < 1e-29) {
+		//error("significant errors introduced for a=%g", a);
+		return b;
+	}
 	long double x;
 	long double r;
 	if (a < 0) {
@@ -460,12 +473,15 @@ static double produce_radial_model(double A[3], double iA[3], int w, int h,
 		FORI(3) A[i] = v[i];
 	} else if (0 == strcmp(pradtype, "pradial_pixelic")) {
 		FORI(2) A[i] = v[i];
-		A[2] = (8*v[2])/(1.0*w*w*w);
+		double p = v[2];
+		double a = p;
+		A[2] = (8*a)/(1.0*w*w*w);
 	} else if (0 == strcmp(pradtype, "pradialrc")) {
-		FORI(2) A[i] = v[i];
-		//double rw = 100.0
-		double rw = w;
-		A[2] = (8*v[2])/(1.0*rw*rw*rw);
+		A[0] = w/2.0 + w*v[9]/100.0;
+		A[1] = h/2.0 + h*v[1]/100.0;
+		double p = v[2];
+		double a = p*w/100.0;
+		A[2] = (8*a)/(1.0*w*w*w);
 	} else error("non-raw radial model not yet supported");
 	if (A[2] < 0) {
 		// TODO: some more fine-grained warnings about warping
@@ -486,13 +502,53 @@ static double produce_iradial_model(double A[3], double iA[3], int w, int h,
 {
 	if (0 == strcmp(pradtype, "ipararaw")) { // actual parameters
 		FORI(3) iA[i] = A[i] = v[i];
-	} else if (0 == strcmp(pradtype, "ipradialrc")) {
+	} else if (0 == strcmp(pradtype, "ipradial_pixelic")) {
 		FORI(2) A[i] = v[i];
-		A[2] = (8*v[2])/(1.0*w*w*w);
+		double p = v[2];
+		double a = p;
+		A[2] = (8*a)/(1.0*w*w*w);
+	} else if (0 == strcmp(pradtype, "ipradialrc")) {
+		A[0] = w/2.0 + w*v[9]/100.0;
+		A[1] = h/2.0 + h*v[1]/100.0;
+		double p = v[2];
+		double a = p*w/100.0;
+		A[2] = (8*a)/(1.0*w*w*w);
 	} else error("non-raw radial model not yet supported");
 	return 0;
 }
 
+static double produce_combi2_model(double H[15], int w, int h,
+		char *combitype, double *v)
+{
+	if (0 == strcmp(combitype, "combi2raw")) {
+		FORI(15) H[i] = v[i];
+	} else if (0 == strcmp(combitype, "combi2rc")) {
+		//error("nice parameters not implemented");
+		double c[2][2] = {
+			{w/2.0 + w*v[0]/100.0, h/2.0 + h*v[1]/100.0},
+			{w/2.0 + w*v[11]/100.0, h/2.0 + h*v[12]/100.0}
+		};
+		double a[2] = {8*v[2]/(1.0*w*w*w), 8*v[13]/(1.0*w*w*w)};
+		double corner[4][2] = {{0,0}, {w,0}, {0,h}, {w,h}};
+		double other[4][2] = {
+			{0 + w*v[3]/100, 0 + h*v[4]/100},
+			{w + w*v[5]/100, 0 + h*v[6]/100},
+			{0 + w*v[7]/100, h + h*v[8]/100},
+			{w + w*v[9]/100, h + h*v[10]/100}
+		};
+		double R[3][3];
+		homography_from_4corresp(
+				corner[0], corner[1], corner[2], corner[3],
+				other[0], other[1], other[2], other[3], R);
+		FORI(2) H[i] = c[0][i];
+		H[2] = a[0];
+		FORI(9) H[i+3] = R[0][i];
+		FORI(2) H[12+i] = c[1][i];
+		H[14] = a[1];
+	}
+
+	return 0;
+}
 #define SYNFLOW_MAXPARAM 40 // whatever
 
 
@@ -511,6 +567,7 @@ static double produce_iradial_model(double A[3], double iA[3], int w, int h,
 // data structure to store models for parametric (synthethic) movements
 // together with their inverses
 struct flow_model {
+	bool given_by_field;
 	char *model_name; // only for reference
 
 	int n; // number of "visible" parameters
@@ -522,6 +579,7 @@ struct flow_model {
 	double iH[SYNFLOW_MAXPARAM]; // "hidden" parameters of backward model
 
 	int w, h;
+	float (*field)[2];
 };
 
 // returns the number of hidden parameters
@@ -559,15 +617,18 @@ static int parse_flow_name(int *vp, int *hidden_id, char *model_name)
 		{"cpradial",      1, 3, FLOWMODEL_HIDDEN_PRADIAL},
 //		{"cpradialr",     1, 3, FLOWMODEL_HIDDEN_PRADIAL},
 		{"cpradialrc",    1, 3, FLOWMODEL_HIDDEN_PRADIAL},
+		{"pradial_pixelic",       3, 3, FLOWMODEL_HIDDEN_PRADIAL},
 		{"pradial",       3, 3, FLOWMODEL_HIDDEN_PRADIAL},
 //		{"pradialr",      3, 3, FLOWMODEL_HIDDEN_PRADIAL},
 		{"pradialrc",     3, 3, FLOWMODEL_HIDDEN_PRADIAL},
 		{"cipradial",     1, 3, FLOWMODEL_HIDDEN_IPRADIAL},
 //		{"cipradialr",    1, 3, FLOWMODEL_HIDDEN_IPRADIAL},
 		{"cipradialrc",   1, 3, FLOWMODEL_HIDDEN_IPRADIAL},
-		{"ipradial",      3, 3, FLOWMODEL_HIDDEN_IPRADIAL},
+		{"ipradial_pixelic",      3, 3, FLOWMODEL_HIDDEN_IPRADIAL},
 //		{"ipradialr",     3, 3, FLOWMODEL_HIDDEN_IPRADIAL},
 		{"ipradialrc",    3, 3, FLOWMODEL_HIDDEN_IPRADIAL},
+		{"combi2raw",     15, 15, FLOWMODEL_HIDDEN_COMBI2},
+		{"combi2rc",      14, 15, FLOWMODEL_HIDDEN_COMBI2},
 		// combined, etc
 		{"",0,0,0}
 	};
@@ -584,11 +645,14 @@ static int parse_flow_name(int *vp, int *hidden_id, char *model_name)
 	return 0;
 }
 
+//static void invert_combi2(double H[15], 
+
 // "API"
 // fills H, iH and other fields
 static void produce_flow_model(struct flow_model *f,
 		double *p, int np, char *name, int w, int h)
 {
+	f->given_by_field = false;
 	int vp;
 	f->nh = parse_flow_name(&vp, &f->hidden_id, name);
 	if (vp != np)
@@ -626,11 +690,54 @@ static void produce_flow_model(struct flow_model *f,
 		produce_iradial_model(H, invH, w, h, f->model_name, f->p);
 		FORI(6) f->H[i] = H[i];
 		FORI(6) f->iH[i] = invH[i];
+	} else if (f->hidden_id == FLOWMODEL_HIDDEN_COMBI2) {
+		assert(f->nh == 15);
+		double H[15], invH[9];
+		produce_combi2_model(H, w, h, f->model_name, f->p);
+		invert_homography(invH, H+3);
+		FORI(15) f->H[i] = H[i];
+		FORI(9) f->iH[i] = invH[i];
+	//} else if (f->hidden_id == FLOWMODEL_HIDDEN_ICOMBI2) {
+	//	assert(f->nh == 15);
+	//	double H[15], invH[15];
+	//	produce_icombi2_model(H, invH, w, h, f->model_name, f->p);
+	//	FORI(15) f->H[i] = H[i];
+	//	FORI(15) f->iH[i] = invH[i];
 	} else error("flow model \"%s\" not yet implemented", name);
 
-	FORI(np) fprintf(stderr, "pfm p[%d] = %g\n", i, f->p[i]);
-	FORI(f->nh) fprintf(stderr, "H[%d] = %g\n", i, f->H[i]);
-	FORI(f->nh) fprintf(stderr, "invH[%d] = %g\n", i, f->iH[i]);
+	//FORI(np) fprintf(stderr, "pfm p[%d] = %g\n", i, f->p[i]);
+	//FORI(f->nh) fprintf(stderr, "H[%d] = %g\n", i, f->H[i]);
+	//FORI(f->nh) fprintf(stderr, "invH[%d] = %g\n", i, f->iH[i]);
+}
+
+static void apply_flowmodel_affine(float y[2], float x[2], double A[6])
+{
+	y[0] = A[0]*x[0] + A[1]*x[1] + A[2];
+	y[1] = A[3]*x[0] + A[4]*x[1] + A[5];
+}
+
+static void apply_flowmodel_projective(float y[2], float x[2], double H[9])
+{
+	float z[3];
+	z[0] = H[0]*x[0] + H[1]*x[1] + H[2];
+	z[1] = H[3]*x[0] + H[4]*x[1] + H[5];
+	z[2] = H[6]*x[0] + H[7]*x[1] + H[8];
+	y[0] = z[0]/z[2];
+	y[1] = z[1]/z[2];
+}
+
+static void apply_flowmodel_pradial(float y[2], float x[2], double p[3],
+		bool inv)
+{
+	double c[2] = {p[0], p[1]};
+	double a = p[2];
+	double r = hypot(x[0] - c[0], x[1] - c[1]);
+	double R = inv ? invertparabolicdistortion(a, r) :
+						parabolicdistortion(a, r);
+	if (r > 0.000001)
+		FORL(2) y[l] = c[l] + (R/r)*(x[l] - c[l]);
+	else
+		FORL(2) y[l] = 0;
 }
 
 // evaluate the flow vector at one given source point
@@ -638,56 +745,38 @@ static void apply_flow(float y[2], struct flow_model *f, float x[2], bool inv)
 {
 	switch(f->hidden_id) {
 	case FLOWMODEL_HIDDEN_AFFINE: {
-		double *p = inv ? f->iH : f->H;
-		float F[3];
 		assert(f->nh == 6);
-		F[0] = p[0]*x[0] + p[1]*x[1] + p[2];
-		F[1] = p[3]*x[0] + p[4]*x[1] + p[5];
-		y[0] = F[0];// - x[0];
-		y[1] = F[1];// - x[1];
-		//fprintf(stderr, "p = %g %g %g %g %g %g\n",
-		//		p[0], p[1], p[2], p[3], p[4], p[5]);
-		//fprintf(stderr, "(%g,%g) -> (%g,%g)\n", x[0], x[1], y[0], y[1]);
+		double *p = inv ? f->iH : f->H;
+		apply_flowmodel_affine(y, x, p);
 		break;
 				      }
 	case FLOWMODEL_HIDDEN_PROJECTIVE: {
-		double *p = inv ? f->iH : f->H;
-		float F[3];
 		assert(f->nh == 9);
-		F[0] = p[0]*x[0] + p[1]*x[1] + p[2];
-		F[1] = p[3]*x[0] + p[4]*x[1] + p[5];
-		F[2] = p[6]*x[0] + p[7]*x[1] + p[8];
-		y[0] = F[0]/F[2];// - x[0];
-		y[1] = F[1]/F[2];// - x[1];
+		double *p = inv ? f->iH : f->H;
+		apply_flowmodel_projective(y, x, p);
 		break;
 					  }
 	case FLOWMODEL_HIDDEN_PRADIAL: {
 		assert(f->nh == 3);
-		double c[2] = {f->H[0], f->H[1]};
-		double a = f->H[2];
-		double r = hypot(x[0] - c[0], x[1] - c[1]);
-		double R = inv ? invertparabolicdistortion(a, r) :
-					parabolicdistortion(a, r);
-		if (r > 0.000001)
-			FORL(2) y[l] = c[l] + (R/r)*(x[l] - c[l]);
-		else
-			FORL(2) y[l] = 0;
+		apply_flowmodel_pradial(y, x, f->H, inv);
 		break;
 				       }
 	case FLOWMODEL_HIDDEN_IPRADIAL: {
 		assert(f->nh == 3);
-		double c[2] = {f->H[0], f->H[1]};
-		double a = f->H[2];
-		double r = hypot(x[0] - c[0], x[1] - c[1]);
-		double R = inv ? parabolicdistortion(a, r) :
-					invertparabolicdistortion(a, r);
-		if (r > 0.000001)
-			FORL(2) y[l] = c[l] + (R/r)*(x[l] - c[l]);
-		else
-			FORL(2) y[l] = 0;
+		apply_flowmodel_pradial(y, x, f->H, !inv);
 		break;
 				       }
-
+	case FLOWMODEL_HIDDEN_COMBI2: {
+		assert(f->nh == 15);
+		//double c[2][2] = {{f->H[0], f->H[1]}, {f->H[12], f->H[13]}};
+		//double a[2] = {f->H[2], f->H[14]};
+		float tmp[2], tmp2[2];
+		double *H = inv ? f->iH : f->H + 3;
+		apply_flowmodel_pradial(tmp, x, f->H, inv);
+		apply_flowmodel_projective(tmp2, tmp, H);
+		apply_flowmodel_pradial(y, tmp2, f->H + 12, !inv);
+		break;
+				      }
 	default: error("bizarre");
 	}
 }

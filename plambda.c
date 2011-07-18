@@ -66,6 +66,11 @@
 //		join	join the components of two vectors ATTOTS
 //		join3	join the components of three vectors ATTOTS
 //
+//	Other operators:
+//
+//		TOKEN	MEANING
+//		vmprod3x3 
+//
 // EXAMPLES
 // 	Sum two images:
 //

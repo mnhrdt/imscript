@@ -108,14 +108,17 @@ static void overlines(uint8_t (**y)[3], float (**x)[2], int w, int h, float s)
 
 int main_viewflow(int c, char *v[])
 {
-	if (c != 4) {
+	if (c != 4 && c != 3 && c != 2) {
 		fprintf(stderr, "usage:\n\t%s satscale flow view\n", *v);
 				//          0    1       2     3
 		return EXIT_FAILURE;
 	}
 
+	char *infile = c > 2 ? v[2] : "-";
+	char *outfile = c > 3 ? v[3] : "-";
+
 	int w, h, pd;
-	void *data = iio_read_image_float_matrix_vec(v[2], &w, &h, &pd);
+	void *data = iio_read_image_float_matrix_vec(infile, &w, &h, &pd);
 	float (**flow)[pd] = data;
 	if (pd != 2) error("input is not a vector field");
 
@@ -128,7 +131,7 @@ int main_viewflow(int c, char *v[])
 	if (satscale < 0)
 		overlines(view, flow, w, h, -satscale);
 
-	iio_save_image_uint8_vec(v[3], view[0][0], w, h, 3);
+	iio_save_image_uint8_vec(outfile, view[0][0], w, h, 3);
 
 	free(view);
 	free(flow);

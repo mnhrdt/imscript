@@ -96,7 +96,7 @@ static bool innerP(int w, int h, int i, int j)
 	if (i < 0) return false;
 	if (j < 0) return false;
 	if (i >= w) return false;
-	if (j >= w) return false;
+	if (j >= h) return false;
 	return true;
 }
 
@@ -144,7 +144,7 @@ int main_downsa(int c, char *v[])
 	char *in = c > 3 ? v[3] : "-";
 	char *out = c > 4 ? v[4] : "-";
 
-	int w, h, pd, wn, hn;
+	int w, h, pd;
 	float *x = iio_read_image_float_vec(in, &w, &h, &pd);
 	int W = w/n;
 	int H = h/n;

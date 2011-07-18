@@ -196,6 +196,7 @@ static void gblur(float *y, float *x, int w, int h, int pd, float s)
 	free(gc);
 }
 
+#ifndef OMIT_GBLUR_MAIN
 int main(int c, char *v[])
 {
 	if (c != 2 && c != 3 && c != 4) {
@@ -219,3 +220,4 @@ int main(int c, char *v[])
 	free(y);
 	return EXIT_SUCCESS;
 }
+#endif//OMIT_GBLUR_MAIN

@@ -50,7 +50,7 @@ static double eval_objective_function(struct problem_data *p, double *v, int nv)
 	float *x = p->x;
 	float *y = p->y;
 	int w = p->w;
-	int h = p->w;
+	int h = p->h;
 	int pd = p->pd;
 	float *bp = xmalloc(w * h * pd * sizeof*bp);
 	struct flow_model fm[1];
@@ -123,11 +123,11 @@ static int minimize_objective_function(void *pp,
 		FORI(dim) fprintf(stderr, "%g ", gsl_vector_get(s->x, i));
 		fprintf(stderr, ") f=%g size=%g\n", s->fval, size);
 
-		scount = are_equal(oldval, s->fval) ? scount+1 : 0;
-		if (scount > SIMPLEX_NEQ) break;
+		//scount = are_equal(oldval, s->fval) ? scount+1 : 0;
+		//if (scount > SIMPLEX_NEQ) break;
 		oldval = s->fval;
 
-	} while (status == GSL_CONTINUE && iter < 90);
+	} while (status == GSL_CONTINUE && iter < 490);
 
 	FORI(dim) result[i] = gsl_vector_get(s->x, i);
 
@@ -234,15 +234,236 @@ static double kendall(float *x, float *y, int n)
 	fprintf(stderr, "nonties = %Lf\n", nonties);
 	//double kk = (concordant +concordantp - discordant - discordantp) / npairs;
 	double kk = (concordant +concordantp - discordant - discordantp) / nonties;
+	fprintf(stderr, "kk = %lf\n", kk);
 	return kk;
+}
+
+#define ERRPCWINRADIUS 7
+
+static double error_l2_at_pcpoint(float *xx, float *yy, int w, int h, int pd,
+		float p[2])
+{
+	float (*x)[w][pd] = (void*)xx;
+	float (*y)[w][pd] = (void*)yy;
+
+	int i0 = w*p[0]/100;
+	int j0 = h*p[1]/100;
+	int i_start = i0 - ERRPCWINRADIUS;
+	int i_end   = i0 + ERRPCWINRADIUS;
+	int j_start = j0 - ERRPCWINRADIUS;
+	int j_end   = j0 + ERRPCWINRADIUS;
+
+	if (i_start < 0 || j_start < 0 || i_end >= w || j_end >= h)
+		return -1;
+
+	double r = 0;
+	for (int j = j_start; j <= j_end; j++)
+	for (int i = i_start; i <= i_end; i++)
+	{
+		double t = 0;
+		FORL(pd)
+			t = hypot(t, x[j][i][l] - y[j][i][l]);
+		r += t*t;
+	}
+
+	return r;
+}
+
+static double error_l2_at_point(float *xx, float *yy, int w, int h, int pd,
+		int p[2])
+{
+	float (*x)[w][pd] = (void*)xx;
+	float (*y)[w][pd] = (void*)yy;
+
+
+	int i0 = p[0];
+	int j0 = p[1];
+	int i_start = i0 - ERRPCWINRADIUS;
+	int i_end   = i0 + ERRPCWINRADIUS;
+	int j_start = j0 - ERRPCWINRADIUS;
+	int j_end   = j0 + ERRPCWINRADIUS;
+
+	if (i_start < 0 || j_start < 0 || i_end >= w || j_end >= h)
+		return -1;
+
+	double r = 0;
+	for (int j = j_start; j <= j_end; j++)
+	for (int i = i_start; i <= i_end; i++)
+	{
+		double t = 0;
+		FORL(pd)
+			t = hypot(t, x[j][i][l] - y[j][i][l]);
+		r += t*t;
+	}
+
+	return r;
+}
+
+static double error_corr_at_point(float *xx, float *yy, int w, int h, int pd,
+		int p[2])
+{
+	float (*x)[w][pd] = (void*)xx;
+	float (*y)[w][pd] = (void*)yy;
+
+
+	int i0 = p[0];
+	int j0 = p[1];
+	int i_start = i0 - ERRPCWINRADIUS;
+	int i_end   = i0 + ERRPCWINRADIUS;
+	int j_start = j0 - ERRPCWINRADIUS;
+	int j_end   = j0 + ERRPCWINRADIUS;
+
+	if (i_start < 0 || j_start < 0 || i_end >= w || j_end >= h)
+		return -1;
+
+	double r = 0;
+	float t[pd*(2*ERRPCWINRADIUS+1)*(2*ERRPCWINRADIUS+1)];
+	float s[pd*(2*ERRPCWINRADIUS+1)*(2*ERRPCWINRADIUS+1)];
+	int n = 0;
+	for (int j = j_start; j <= j_end; j++)
+	for (int i = i_start; i <= i_end; i++)
+	{
+		FORL(pd) {
+			t[n] = x[j][i][l];
+			s[n] = y[j][i][l];
+			n += 1;
+		}
+	}
+	assert(n == pd * (2*ERRPCWINRADIUS+1)*(2*ERRPCWINRADIUS+1));
+
+	double k = corrf(t, s, n);
+	assert(k >= 0);
+	assert(k <= 1);
+	return 1 - k;
+}
+
+static double error_kendall_at_pcpoint(float *xx, float *yy,
+		int w, int h, int pd,
+		float p[2])
+{
+	float (*x)[w][pd] = (void*)xx;
+	float (*y)[w][pd] = (void*)yy;
+
+	int i0 = w*p[0]/100;
+	int j0 = h*p[1]/100;
+	int i_start = i0 - ERRPCWINRADIUS;
+	int i_end   = i0 + ERRPCWINRADIUS;
+	int j_start = j0 - ERRPCWINRADIUS;
+	int j_end   = j0 + ERRPCWINRADIUS;
+
+	if (i_start < 0 || j_start < 0 || i_end >= w || j_end >= h)
+		return -1;
+
+	double r = 0;
+	float t[pd*(2*ERRPCWINRADIUS+1)*(2*ERRPCWINRADIUS+1)];
+	float s[pd*(2*ERRPCWINRADIUS+1)*(2*ERRPCWINRADIUS+1)];
+	int n = 0;
+	for (int j = j_start; j <= j_end; j++)
+	for (int i = i_start; i <= i_end; i++)
+	{
+		FORL(pd) {
+			t[n] = x[j][i][l];
+			s[n] = y[j][i][l];
+			n += 1;
+		}
+	}
+	assert(n == pd * (2*ERRPCWINRADIUS+1)*(2*ERRPCWINRADIUS+1));
+
+	double k = kendall(t, s, n);
+	assert(k >= 0);
+	assert(k <= 1);
+	return 1 - k;
+}
+
+static double error_at_pcpoints(float *xx, float *yy, int w, int h, int pd,
+		float (*pcpoints)[2], int n,
+		double (f)(float*,float*,int,int,int,float*) )
+{
+	double r = 0;
+	int m = 0;
+	FORI(n) {
+		double t = f(xx, yy, w, h, pd, pcpoints[i]);
+		if (t >= 0) {
+			r += t;
+			m += 1;
+		}
+	}
+	if (!m) error("could not evaluate error at any of the given points!");
+	return r/m;
+}
+
+static double error_at_points(float *xx, float *yy, int w, int h, int pd,
+		int (*points)[2], int n,
+		double (f)(float*,float*,int,int,int,int*) )
+{
+	double r = 0;
+	int m = 0;
+	FORI(n) {
+		double t = f(xx, yy, w, h, pd, points[i]);
+		if (t >= 0) {
+			r += t;
+			m += 1;
+		}
+	}
+	if (m != 8) error("m != 8 (%d)", m);
+	if (!m) error("could not evaluate error at any of the given points!");
+	return r/m;
 }
 
 static double evaluate_error_between_images(float *xx, float *yy,
 		int w, int h, int pd, char *error_id)
 {
+	if (0 == strcmp(error_id, "l2points")) {
+		int points[8][2] = {
+			{169,978},
+			{127,900},
+			{469,943},
+			{533,1046},
+			{169,157},
+			{393,241},
+			{411,104},
+			{161,395}
+		};
+		double r = error_at_points(xx, yy, w, h, pd, points, 8,
+				error_l2_at_point);
+		return r;
+	}
+	if (0 == strcmp(error_id, "corrpoints")) {
+		int points[7][2] = {
+			{169,978},
+			{127,900},
+			{469,943},
+			{533,1046},
+			{169,157},
+			{393,241},
+			{411,104}
+		};
+		double r = error_at_points(xx, yy, w, h, pd, points, 7,
+				error_corr_at_point);
+		return r;
+	}
+	if (0 == strcmp(error_id, "l2pcpoints")) {
+		float pcpoints[4][2] = {{20,20},{20,80},{80,20},{80,80}};
+		double r = error_at_pcpoints(xx, yy, w, h, pd, pcpoints, 4,
+				error_l2_at_pcpoint);
+		return r;
+	}
+	if (0 == strcmp(error_id, "kendallpcpoints")) {
+		float pcpoints[4][2] = {{20,20},{20,80},{80,20},{80,80}};
+		double r = error_at_pcpoints(xx, yy, w, h, pd, pcpoints, 4,
+				error_kendall_at_pcpoint);
+		return r;
+	}
+	//if (0 == strcmp(error_id, "corrpoints")) {
+	//	float pcpoints[4][2] = {{20,20},{20,80},{80,20},{80,80}};
+	//	double r = error_corr_at_pcpoints(x, y, w, h, pd, pcpoints, 4);
+	//	return r;
+	//}
+
 	float (*x)[w][pd] = (void*)xx;
 	float (*y)[w][pd] = (void*)yy;
-	// TODO: omit a passepartout
+
+
 	int passepartout = 8;
 	double r;
 	int n = w*h*pd;
@@ -285,6 +506,8 @@ static double evaluate_error_between_images(float *xx, float *yy,
 	//struct statistics_float s;
 	//statistics_getf(&s, d, n);
 	//print_stats(stderr, &s, "fabs(diff)");
+	free(xvals);
+	free(yvals);
 	free(d);
 	return r;
 }
@@ -311,7 +534,7 @@ static void do_stuff(float *x, float *y, int w, int h, int pd,
 	float starting_point[nparams];
 	float stepsize[nparams];
 	FORI(nparams) starting_point[i] = param[i];
-	FORI(nparams) stepsize[i] = 0.1;
+	FORI(nparams) stepsize[i] = 1;
 	if (0 == strcmp(model_id, "affine")) {
 		assert(nparams == 6);
 		stepsize[0] = 0.0001;
@@ -323,7 +546,18 @@ static void do_stuff(float *x, float *y, int w, int h, int pd,
 	}
 	int r= minimize_objective_function(p, result, starting_point, stepsize);
 
+	fprintf(stderr, "gsl exit status = %d\n", r);
 	FORI(nparams) fprintf(stderr, "result[%d] = %g\n", i, result[i]);
+
+	{
+		struct flow_model fm[1];
+		double rrr[nparams]; FORI(nparams) rrr[i]=result[i];
+		produce_flow_model(fm, rrr, nparams, model_id, w, h);
+		float *flo = xmalloc(w*h*2*sizeof*flo);
+		fill_flow_field(flo, fm, w, h);
+		iio_save_image_float_vec("/tmp/fff.tiff", flo, w, h, 2);
+		free(flo);
+	}
 
 	//fprintf(stderr, "r = %lf\n", r);
 }
@@ -348,7 +582,7 @@ int main(int c, char *v[])
 	if (wx != wy || hx != hy || pdx != pdy)
 		error("input size mismatch");
 
-	int maxparam = 10;
+	int maxparam = 40;
 	double param[maxparam];
 	int nparams = parse_doubles(param, maxparam, v[4]);
 
