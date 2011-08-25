@@ -376,6 +376,9 @@ static void beautify_histogram(float ***h, int bins)
 		       	h[i][j][k] = log(1 + h[i][j][k]);
 }
 
+// build a view of a 3d histogram
+// input: histogram "h"
+// output: image "out"
 static void chistoview(uint8_t (**out)[3], int pside,
 		float rx, float ry, float rz,
 		float view_f, float view_d, float vtres,
@@ -387,22 +390,27 @@ static void chistoview(uint8_t (**out)[3], int pside,
 	// number of points used to draw each edge of the cube
 	int ndotsside = 300;
 
+	// draw the background of the output image in gray
 	FORJ(pside) FORI(pside) FORL(3)
-	{
-		//fprintf(stderr, "jil = %d %d %d\n", j, i, l);
 		out[j][i][l] = 127;
-	}
+
+	// count the total number of points
 	int np = 0;
 	FORK(hside) FORJ(hside) FORI(hside)
 		if (h[k][j][i] >= vtres)
 			np += 1;
 	np += 12*ndotsside;
+
 	struct list_of_dots l[1]; start_list_of_dots(l, np);
 	int maxcolor = hside;
 	int bw = 256 / maxcolor;
+
+	// add the large enough bins
 	FORK(hside) FORJ(hside) FORI(hside)
 		if (h[k][j][i] >= vtres)
 			add_dot_to_list(l, bw*i, bw*j, bw*k, h[k][j][i]);
+
+	// add the edges of the cube
 	FORI(ndotsside) {
 		float p = pside - 1;
 		float t = i * (p/(ndotsside-1.0));
@@ -419,14 +427,22 @@ static void chistoview(uint8_t (**out)[3], int pside,
 		add_dot_to_list(l, p, t, p, INFINITY);
 		add_dot_to_list(l, t, p, p, INFINITY);
 	}
+
+	// compute the approrpiate projection matrix
 	float mrx[3][3]; matrix_rotx(mrx, rx);
 	float mry[3][3]; matrix_roty(mry, ry);
 	float mrz[3][3]; matrix_rotz(mrz, rz);
 	float mrxy[3][3]; matrix_product(mrxy, mrx, mry);
 	float m[3][3]; matrix_product(m, mrxy, mrz);
+
+	// project all dots
 	FORI(l->n)
 		project_dot(l->t + i, m, view_f, view_d, pside);
+
+	//sort by depth
 	qsort(l->t, l->n, sizeof*l->t, compare_dots);
+
+	// plot projected dots into output image
 	FORI(l->n)
 		plot_dot(out, l->t + i, pside);
 

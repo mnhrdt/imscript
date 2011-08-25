@@ -3,7 +3,8 @@ IMSCRIPT
 
 Imscript is a language to express simple image processing operations.
 The goal is that safe online implementations of the language are
-trivially easy to deploy.
+trivially easy to deploy.  Each of the simple image processing
+operations is available as a separate, standalone program.
 
 
 LANGUAGE OVERVIEW
