@@ -33,6 +33,17 @@ static float extend_float_image_by_zero(float *xx, int w, int h, int i, int j)
 		return x[j][i];
 }
 
+static float extend_float_image_constant(float *xx, int w, int h, int i, int j)
+{
+	float (*x)[w] = (void*)xx;
+	if (i < 0) i = 0;
+	if (j < 0) j = 0;
+	if (i >= w) i = w - 1;
+	if (j >= h) j = h - 1;
+	return x[j][i];
+}
+
+
 // spatial derivatives, centered differences
 static void fill_gradx(float *out_gradx, float *in_x, int w, int h)
 {
@@ -94,6 +105,54 @@ static float solve_linear_2x2(float x[2], float a[2][2], float b[2])
 	return det;
 }
 
+static void fill_fbar(float *out_ubar, float *u, int w, int h)
+{
+	float (*ubar)[w] = (void*)out_ubar;
+
+	extension_operator_float p = extend_float_image_constant;
+
+	FORJ(h) FORI(w)
+		ubar[j][i] = (1.0/6) * (
+				p(u,w,h, i-1, j)+
+				p(u,w,h, i, j-1)+
+				p(u,w,h, i+1, j)+
+				p(u,w,h, i, j+1)
+			) + (1.0/12) * (
+				p(u,w,h, i-1, j-1)+
+				p(u,w,h, i+1, j-1)+
+				p(u,w,h, i+1, j+1)+
+				p(u,w,h, i-1, j+1)
+			);
+}
+
+static void hs_iteration(float *out_nextu, float *out_nextv,
+		float *in_u, float *in_v,
+		float *in_ex, float *in_ey, float *in_et,
+		int w, int h, float alpha)
+{
+	float *ubar = xmalloc(w*h*sizeof*ubar);
+	float *vbar = xmalloc(w*h*sizeof*vbar);
+	fill_fbar(ubar, in_u, w, h);
+	fill_fbar(vbar, in_v, w, h);
+
+	FORJ(h) FORI(w) {
+		int idx = j*w + i;
+		float ex = in_ex[idx];
+		float ey = in_ey[idx];
+		float et = in_et[idx];
+		float ub = ubar[idx];
+		float vb = vbar[idx];
+		float fac = alpha*alpha + ex*ex + ey*ey;
+		float nextu = ub - ex * (ex * ub + ey * vb + et)/fac;
+		float nextv = vb - ey * (ex * ub + ey * vb + et)/fac;
+		out_nextu[idx] = nextu;
+		out_nextv[idx] = nextv;
+	}
+
+	free(ubar);
+	free(vbar);
+}
+
 static void ofc(float *xa, float *xb, int w, int h)
 {
 	float (*x)[w] = (void*)xa;
@@ -105,6 +164,11 @@ static void ofc(float *xa, float *xb, int w, int h)
 	float (*gitx)[w][2] = xmalloc(w*h*2*sizeof*gitx);
 	float (*f1)[w][2] = xmalloc(w*h*2*sizeof*f1);
 	float (*f2)[w][2] = xmalloc(w*h*2*sizeof*f2);
+
+	float (*u)[w] = xmalloc(w*h*sizeof*u);
+	float (*v)[w] = xmalloc(w*h*sizeof*v);
+	float (*ubar)[w] = xmalloc(w*h*sizeof*ubar);
+	float (*vbar)[w] = xmalloc(w*h*sizeof*vbar);
 
 	fill_it(it[0], xa, xb, w, h);
 	fill_gradx(gradx[0][0], xa, w, h);

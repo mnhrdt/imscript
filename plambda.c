@@ -158,6 +158,9 @@ static double sum_two_doubles      (double a, double b) { return a + b; }
 static double substract_two_doubles(double a, double b) { return a - b; }
 static double multiply_two_doubles (double a, double b) { return a * b; }
 static double divide_two_doubles   (double a, double b) { return a / b; }
+static double logic_g      (double a, double b) { return a > b; }
+static double logic_l      (double a, double b) { return a < b; }
+static double logic_e      (double a, double b) { return a == b; }
 static double quantize_255 (double x)
 {
 	int ix = x;
@@ -229,6 +232,9 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(quantize_easy,"qe",3),
 	REGISTER_FUNCTIONN(pow,"^",2),
 	REGISTER_FUNCTIONN(sum_two_doubles,"+",2),
+	REGISTER_FUNCTIONN(logic_g,">",2),
+	REGISTER_FUNCTIONN(logic_l,"<",2),
+	REGISTER_FUNCTIONN(logic_e,"=",2),
 	REGISTER_FUNCTIONN(divide_two_doubles,"/",2),
 	REGISTER_FUNCTIONN(multiply_two_doubles,"*",2),
 	REGISTER_FUNCTIONN(substract_two_doubles,"-",2),
@@ -356,7 +362,7 @@ static int token_is_stackop(const char *t)
 static int token_is_word(const char *t, const char **endptr)
 {
 	*endptr = NULL;
-	if ((*t=='+'||*t=='-'||*t=='/'||*t=='^'||*t=='*')&&t[1]=='\0')
+	if ((*t=='+'||*t=='-'||*t=='/'||*t=='^'||*t=='*'||*t=='>'||*t=='<'||*t=='=')&&t[1]=='\0')
 		return 1;
 	if (!isalpha(t[0])) {
 		return 0;
