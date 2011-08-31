@@ -1,8 +1,12 @@
+#include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "iio.h"
 
-#define xmalloc malloc
+//#define xmalloc malloc
+#include "fragments.c"
+
 
 #define SETMINMAX(min,max,a,b) do {\
 	if (a < b) { min = a; max = b; }\
@@ -43,7 +47,7 @@ int main(int c, char *v[])
 	float (*y)[w[2]][pd[2]] = xmalloc(w[2] * h[2] * pd[2] * sizeof*y);
 
 	for (int i = 0; i < w[2] * h[2] * pd[2]; i++)
-		((float*)(y))[i] = 0;
+		((float*)(y))[i]= 0;
 
 	extension_operator_float p = extend_float_image_by_zero;
 	for (int j = 0; j < h[2]; j++)
