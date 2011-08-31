@@ -4,7 +4,7 @@ LIBS="iio.o -ltiff -lpng -lfftw3f"
 OUTDIR="bin/"
 
 PROGS="plambda"
-PROGS="sum qauto fft sort harris closeup gblur plambda synflow flowdiv viewflow faxpb downsa component qeasy vecstack backflow rgbcube iminfo fnorm faxpby"
+PROGS="fftshift imdim sum qauto fft sort harris closeup gblur plambda synflow flowdiv viewflow faxpb downsa component qeasy vecstack backflow rgbcube iminfo fnorm faxpby"
 
 $CC $FLGS paraflow.c $LIBS -o ${OUTDIR}paraflow -lgsl -lgslcblas
 
