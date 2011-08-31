@@ -44,7 +44,7 @@ int main(int c, char *v[])
 	SETMINMAX(h[3], h[2], h[0], h[1]);
 	SETMINMAX(pd[3], pd[2], pd[0], pd[1]);
 
-	float (*y)[w[2]][pd[2]] = xmalloc(w[2] * h[2] * pd[2] * sizeof*y);
+	float (*y)[w[2]][pd[2]] = xmalloc(w[2] * h[2] * pd[2] * sizeof(float));
 
 	for (int i = 0; i < w[2] * h[2] * pd[2]; i++)
 		((float*)(y))[i]= 0;

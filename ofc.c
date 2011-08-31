@@ -62,8 +62,8 @@ static void fill_gradx(float *out_gradx, float *in_x, int w, int h)
 static void fill_git(float *out_git, float *xa, float *xb, int w, int h)
 {
 	float (*git)[w][2] = (void*)out_git;
-	float (*grad0)[w][2] = xmalloc(w*h*2*sizeof*grad0);
-	float (*grad1)[w][2] = xmalloc(w*h*2*sizeof*grad0);
+	float (*grad0)[w][2] = xmalloc(w*h*2*sizeof(float));
+	float (*grad1)[w][2] = xmalloc(w*h*2*sizeof(float));
 	fill_gradx(grad0[0][0], xa, w, h);
 	fill_gradx(grad1[0][0], xb, w, h);
 	FORJ(h) FORI(w) FORL(2)
@@ -158,17 +158,17 @@ static void ofc(float *xa, float *xb, int w, int h)
 	float (*x)[w] = (void*)xa;
 	float (*y)[w] = (void*)xb;
 
-	float (*it)[w] = xmalloc(w*h*sizeof*it);
-	float (*gradx)[w][2] = xmalloc(w*h*2*sizeof*gradx);
-	float (*hessx)[w][3] = xmalloc(w*h*3*sizeof*hessx);
-	float (*gitx)[w][2] = xmalloc(w*h*2*sizeof*gitx);
-	float (*f1)[w][2] = xmalloc(w*h*2*sizeof*f1);
-	float (*f2)[w][2] = xmalloc(w*h*2*sizeof*f2);
+	float (*it)[w] = xmalloc(w*h*sizeof(float));
+	float (*gradx)[w][2] = xmalloc(w*h*2*sizeof(float));
+	float (*hessx)[w][3] = xmalloc(w*h*3*sizeof(float);
+	float (*gitx)[w][2] = xmalloc(w*h*2*sizeof(float));
+	float (*f1)[w][2] = xmalloc(w*h*2*sizeof(float));
+	float (*f2)[w][2] = xmalloc(w*h*2*sizeof(float));
 
-	float (*u)[w] = xmalloc(w*h*sizeof*u);
-	float (*v)[w] = xmalloc(w*h*sizeof*v);
-	float (*ubar)[w] = xmalloc(w*h*sizeof*ubar);
-	float (*vbar)[w] = xmalloc(w*h*sizeof*vbar);
+	float (*u)[w] = xmalloc(w*h*sizeof(float));
+	float (*v)[w] = xmalloc(w*h*sizeof(float));
+	float (*ubar)[w] = xmalloc(w*h*sizeof(float));
+	float (*vbar)[w] = xmalloc(w*h*sizeof(float));
 
 	fill_it(it[0], xa, xb, w, h);
 	fill_gradx(gradx[0][0], xa, w, h);

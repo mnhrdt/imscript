@@ -51,7 +51,7 @@ int main(int c, char *v[])
 
 	int w, h, pd;
 	float *x = iio_read_image_float_vec(in, &w, &h, &pd);
-	float (*y)[w][pd] = xmalloc(w*h*pd*sizeof*y);
+	float (*y)[w][pd] = xmalloc(w*h*pd*sizeof(float));
 
 	extension_operator_float p = extend_float_image_periodic;
 
