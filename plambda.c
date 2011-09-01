@@ -518,7 +518,8 @@ static void process_token(struct plambda_program *p, const char *tokke)
 		int idx = word_is_predefined(tok);
 		if (idx < 0) {
 			char varname[PLAMBDA_MAX_VARLEN+1];
-			int varlen = endptr-tok;
+			int varlen = strlen(tok);
+			if (endptr) varlen = endptr-tok;
 			if (varlen >= PLAMBDA_MAX_VARLEN)
 				varlen = PLAMBDA_MAX_VARLEN;
 			FORI(varlen) varname[i] = tok[i];
