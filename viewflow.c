@@ -42,7 +42,7 @@ static void viewflow_pd(uint8_t (**y)[3], float (**x)[2], int w, int h, float m)
 	}
 }
 
-static void viewflow_flat(uint8_t *py, float *px, int w, int h, int m)
+static void viewflow_flat(uint8_t *py, float *px, int w, int h, float m)
 {
 	float (*x)[w][2] = (void*)px;
 	uint8_t (*y)[w][3] = (void*)py;
