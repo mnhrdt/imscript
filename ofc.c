@@ -59,6 +59,22 @@ static void fill_gradx(float *out_gradx, float *in_x, int w, int h)
 	}
 }
 
+static void fill_gradx_bo(float *out_gradx,
+		float *in_x, float *in_y,
+		int w, int h)
+{
+	float (*gradx)[w][2] = (void*)out_gradx;
+	float *x = in_x;
+	float *y = in_x;
+
+	extension_operator_float p = extend_float_image_by_zero;
+
+	FORJ(h) FORI(w) {
+		gradx[j][i][0] = (p(x,w,h, i+1, j) - p(x,w,h, i-1, j))/4;
+		gradx[j][i][1] = (p(x,w,h, i, j+1) - p(x,w,h, i, j-1))/2;
+	}
+}
+
 static void fill_git(float *out_git, float *xa, float *xb, int w, int h)
 {
 	float (*git)[w][2] = (void*)out_git;
@@ -160,7 +176,7 @@ static void ofc(float *xa, float *xb, int w, int h)
 
 	float (*it)[w] = xmalloc(w*h*sizeof(float));
 	float (*gradx)[w][2] = xmalloc(w*h*2*sizeof(float));
-	float (*hessx)[w][3] = xmalloc(w*h*3*sizeof(float);
+	float (*hessx)[w][3] = xmalloc(w*h*3*sizeof(float));
 	float (*gitx)[w][2] = xmalloc(w*h*2*sizeof(float));
 	float (*f1)[w][2] = xmalloc(w*h*2*sizeof(float));
 	float (*f2)[w][2] = xmalloc(w*h*2*sizeof(float));
@@ -208,25 +224,59 @@ static void ofc(float *xa, float *xb, int w, int h)
 	xfree(f2);
 }
 
+static void ofc_err(float *fe, float *fi, float *xa, float *xb, int w, int h)
+{
+	float (*x)[w] = (void*)xa;
+	float (*y)[w] = (void*)xb;
+	float (*e)[w] = (void*)fe;
+	float (*f)[w][2] = (void*)fi;
+
+	float (*it)[w] = xmalloc(w*h*sizeof(float));
+	float (*gradx)[w][2] = xmalloc(w*h*2*sizeof(float));
+
+//	fill_it_bo(it[0], xa, xb, w, h);
+//	fill_gradx_bo(gradx[0][0], xa, xb, w, h);
+	fill_it(it[0], xa, xb, w, h);
+	fill_gradx(gradx[0][0], xa, w, h);
+
+	FORJ(h) FORI(w) {
+		e[j][i] = it[j][i];
+		FORL(2)
+			e[j][i] += gradx[j][i][l] * f[j][i][l];
+	}
+
+	iio_save_image_float_vec("/tmp/it.tiff", it[0], w, h, 1);
+	iio_save_image_float_vec("/tmp/grad.tiff", gradx[0][0], w, h, 2);
+
+	xfree(it);
+	xfree(gradx);
+}
+
 int main(int c, char *v[])
 {
-	if (c != 3) {
-		fprintf(stderr, "usage:\n\t%s framea frameb\n", *v);
+	if (c != 4) {
+		fprintf(stderr, "usage:\n\t%s framea frameb candiflow\n", *v);
 		return EXIT_FAILURE;
 	}
 	char *framea = v[1];
 	char *frameb = v[2];
+	char *fcflow = v[3];
 
-	int w[2], h[2], pd[2];
-	float *xa = iio_read_image_float_vec(framea, w, h, pd);
-	float *xb = iio_read_image_float_vec(frameb, w+1, h+1, pd+1);
+	int w[3], h[3], pd;
+	float *xa = iio_read_image_float(framea, w, h);
+	float *xb = iio_read_image_float(frameb, w+1, h+1);
+	float *f = iio_read_image_float_vec(fcflow, w+2, h+2, &pd);
 
-	if (w[0] != w[1] || h[0] != h[1] || pd[0] != pd[1])
+	if (w[0] != w[1] || h[0] != h[1] || w[0] != w[2] || h[0] != h[2])
 		error("two frames sizing mismatch");
+	if (pd != 2)
+		error("expected a vector field as second argument");
 
-	if (*pd != 1) error("only gray level by now");
+	float *ofce = xmalloc(*w * *h *  sizeof(float));
 
-	ofc(xa, xb, *w, *h);
+	ofc_err(ofce, f, xa, xb, *w, *h);
+
+	iio_save_image_float_vec("-", ofce, *w, *h, 1);
 
 	return EXIT_SUCCESS;
 }
