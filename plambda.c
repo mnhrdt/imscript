@@ -597,6 +597,7 @@ static const char *arity(struct predefined_function *f)
 	case 1: return "unary";
 	case 2: return "binary";
 	case 3: return "ternary";
+	case -1: return "strange";
 	default: return "unrecognized";
 	}
 }
@@ -690,11 +691,20 @@ static void vstack_print(FILE *f, struct value_vstack *s)
 	}
 }
 
+static void treat_strange_case(struct value_vstack *s,
+		struct predefined_function *f)
+{
+	assert(f->nargs == -1);
+	float r = apply_function(f, NULL);
+	vstack_push_vector(s, &r, 1);
+}
+
 // this function is complicated because it contains the scalar+vector
 // semantics, which is complicated
 static void vstack_apply_function(struct value_vstack *s,
 					struct predefined_function *f)
 {
+	if (f->nargs == -1) {treat_strange_case(s,f); return;}
 	int d[f->nargs], rd = 1;
 	float v[f->nargs][PLAMBDA_MAX_PIXELDIM];
 	float r[PLAMBDA_MAX_PIXELDIM];
