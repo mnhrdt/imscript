@@ -1,17 +1,17 @@
-#include <assert.h>
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "iio.h"
 
-//#define xmalloc malloc
-#include "fragments.c"
+#define BAD_MAX(a,b) (a)<(b)?(b):(a)
 
 
-#define SETMINMAX(min,max,a,b) do {\
-	if (a < b) { min = a; max = b; }\
-	else { min = b; max = a; }\
-	}while(0);
+static void *xmalloc(size_t size)
+{
+	void *new = malloc(size);
+	if (!new)
+		exit(fprintf(stderr, "xmalloc: out of memory\n"));
+	return new;
+}
 
 typedef float (*extension_operator_float)(float*,int,int,int,int,int,int);
 
@@ -36,13 +36,13 @@ int main(int c, char *v[])
 	char *infile2 = c > 2 ? v[2] : "-";
 	char *outfile = c > 3 ? v[3] : "-";
 
-	int w[4], h[4], pd[4];
+	int w[3], h[3], pd[3];
 	float *x1 = iio_read_image_float_vec(infile1, w+0, h+0, pd+0);
 	float *x2 = iio_read_image_float_vec(infile2, w+1, h+1, pd+1);
 
-	SETMINMAX(w[3], w[2], w[0], w[1]);
-	SETMINMAX(h[3], h[2], h[0], h[1]);
-	SETMINMAX(pd[3], pd[2], pd[0], pd[1]);
+	w[2] = BAD_MAX(w[0], w[1]);
+	h[2] = BAD_MAX(h[0], h[1]);
+	pd[2] = BAD_MAX(pd[0], pd[1]);
 
 	float (*y)[w[2]][pd[2]] = xmalloc(w[2] * h[2] * pd[2] * sizeof(float));
 

@@ -1,5 +1,3 @@
-// gaussian blur of a 2D image
-
 #include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
