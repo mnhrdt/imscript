@@ -873,7 +873,7 @@ static int run_program_vectorially(float *out, int pdmax,
 		struct plambda_program *p,
 		float **val, int w, int h, int *pd)
 {
-	int r;
+	int r = 0;
 	FORJ(h) FORI(w) {
 		float result[pdmax];
 		r = run_program_vectorially_at(result, p,val, w,h,pd, i,j);

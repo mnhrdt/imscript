@@ -37,7 +37,7 @@ void bequeath_wisdom(void) {}
 #endif//USE_WISDOM
 
 
-static void dft_2dfloat(float *fx, float *x, int w, int h)
+static void dct_2dfloat(float *fx, float *x, int w, int h)
 {
 	float normalization_factor = sqrt(4*(w-1)*(h-1));
 	float *a = fftwf_malloc(w*h*sizeof*a);
@@ -52,14 +52,14 @@ static void dft_2dfloat(float *fx, float *x, int w, int h)
 	fftwf_cleanup();
 }
 
-static void dft(float *y, float *x, int w, int h, int pd)
+static void dct(float *y, float *x, int w, int h, int pd)
 {
 	float *c = xmalloc(w*h*sizeof*c);
 	float *gc = xmalloc(w*h*sizeof*gc);
 	FORL(pd) {
 		FORI(w*h)
 			c[i] = x[i*pd + l];
-		dft_2dfloat(gc, c, w, h);
+		dct_2dfloat(gc, c, w, h);
 		FORI(w*h)
 			y[i*pd + l] = gc[i];
 	}
@@ -83,7 +83,7 @@ int main(int c, char *v[])
 
 	float *y = xmalloc(w*h*pd*sizeof*y);
 
-	dft(y, x, w, h, pd);
+	dct(y, x, w, h, pd);
 
 	iio_save_image_float_vec(out, y, w, h, pd);
 	free(x);
