@@ -9,6 +9,17 @@ static float getsample_0(float *x, int w, int h, int pd, int i, int j, int l)
 	return x[(i+j*w)*pd + l];
 }
 
+static float getsample_1(float *x, int w, int h, int pd, int i, int j, int l)
+{
+	if (i < 0) i = 0;
+	if (j < 0) j = 0;
+	if (l < 0) l = 0;
+	if (i >= w) i = w-1;
+	if (j >= h) j = h-1;
+	if (l >= pd) l = pd-1;
+	return x[(i+j*w)*pd + l];
+}
+
 static float getsample_error(float *x, int w, int h, int pd, int i, int j, int l)
 {
 	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)

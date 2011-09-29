@@ -108,6 +108,9 @@
 //	Set to 0 the green component of a RGB image
 //		plambda lena.png "x[0] 0 x[2] join3"
 //
+//	Naive Canny filter:
+//		cat lena.png | gblur 2 | plambda - "x(1,0) 2 * x(1,1) x(1,-1) + + x(-1,0) 2 * x(-1,1) x(-1,-1) + + - >1 x(0,1) 2 * x(1,1) x(-1,1) + + x(0,-1) 2 * x(1,-1) x(-1,-1) + + - >2 <1 <2 hypot <2 <1 atan2 join" | plambda - "x[0] 4 > >1 x[1] fabs pi 4 / > x[1] fabs pi 4 / 3 * < * >2 x[1] fabs pi 4 / < x[1] fabs pi 4 / 3 * > + >3 x[0] x[0](0,1) > x[0] x[0](0,-1) > * >4 x[0] x[0](1,0) > x[0] x[0](-1,0) > * >5 <1 <3 <5 * * <1 <2 <4 * * + x[0] *" | qauto | d
+//
 //
 //
 // TODO: 2x2 and 3x3 matrix multiplication
@@ -832,7 +835,7 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			int daj = aj + t->displacement[1];
 			int cmp = t->component;
 			int pdv = pd[t->index];
-			float x = getsample_0(img, w, h, pdv, dai, daj, cmp);
+			float x = getsample_1(img, w, h, pdv, dai, daj, cmp);
 			vstack_push_scalar(s, x);
 			break;
 				     }
@@ -843,7 +846,7 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			int pdv = pd[t->index];
 			float x[pdv];
 			FORL(pdv)
-				x[l] = getsample_0(img, w, h, pdv, dai, daj, l);
+				x[l] = getsample_1(img, w, h, pdv, dai, daj, l);
 			vstack_push_vector(s, x, pdv);
 				     }
 			break;
