@@ -116,6 +116,7 @@
 // TODO: 2x2 and 3x3 matrix multiplication
 // TODO: admit images of different number of channels
 // TODO: implement shunting-yard algorithm to admit infix notation
+// TODO: handle 3D and nD images
 
 
 #include <assert.h>
@@ -572,7 +573,7 @@ static void plambda_compile_program(struct plambda_program *p, const char *str)
 {
 	char s[1+strlen(str)];
 	strcpy(s, str);
-	char *spacing = " ";
+	char *spacing = " \n\t";
 
 	FORI(10) p->regn[i] = 0;
 
@@ -581,6 +582,7 @@ static void plambda_compile_program(struct plambda_program *p, const char *str)
 	int n = 0;
 	char *tok = strtok(s, spacing);
 	while (tok) {
+		//fprintf(stderr, "token[%d] = %s\n", n, tok);
 		process_token(p, tok);
 		tok = strtok(NULL, spacing);
 		n += 1;
