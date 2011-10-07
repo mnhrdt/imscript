@@ -151,7 +151,7 @@ static void fill_window_values(float *wv, int (*wo)[2], int kside, float sigma)
 	}
 }
 
-#include "svd.c"
+//#include "svd.c"
 #include "vvector.h"
 
 static float solve_sdp_2x2(float x[2], float A[3], float b[2])
@@ -171,7 +171,7 @@ static float solve_sdp_2x2(float x[2], float A[3], float b[2])
 	return det;
 }
 
-#define STLEN 9
+#define STLEN 3
 
 static void compute_structure_tensor_here(float atwa[STLEN],
 		float *wv, int (*wo)[2], int kside,
@@ -193,15 +193,15 @@ static void compute_structure_tensor_here(float atwa[STLEN],
 	}
 
 	// svd of structure tensor (for visualization)
-	float A[4] = {atwa[0], atwa[1], atwa[1], atwa[2]};
-	float U[4], V[4], D[2];
-	svd_float(D, A, U, 2, V, 2);
-	atwa[3] = D[0];
-	atwa[4] = D[1];
-	atwa[5] = U[0];
-	atwa[6] = U[1];
-	atwa[7] = U[2];
-	atwa[8] = U[3];
+	//float A[4] = {atwa[0], atwa[1], atwa[1], atwa[2]};
+	//float U[4], V[4], D[2];
+	//svd_float(D, A, U, 2, V, 2);
+	//atwa[3] = D[0];
+	//atwa[4] = D[1];
+	//atwa[5] = U[0];
+	//atwa[6] = U[1];
+	//atwa[7] = U[2];
+	//atwa[8] = U[3];
 }
 
 static void compute_rhs_here(float rhsh[2],
@@ -292,12 +292,12 @@ static void least_squares_ofc(float *u, float *v,
 		float *st = xmalloc(w * h * STLEN * sizeof(float));
 		float *rhs = xmalloc(w * h * 2 * sizeof(float));
 		compute_structure_tensor_field(st, wv, wo, kside, gx, gy, w, h);
-		iio_save_image_float_vec("/tmp/st.tiff", st, w, h, STLEN);
+		//iio_save_image_float_vec("/tmp/st.tiff", st, w, h, STLEN);
 		compute_rhs(rhs, wv, wo, kside, gx, gy, gt, w, h);
-		iio_save_image_float_vec("/tmp/rhs.tiff", rhs, w, h, 2);
+		//iio_save_image_float_vec("/tmp/rhs.tiff", rhs, w, h, 2);
 		solve_pointwise(u, v, st, rhs, w, h);
-		iio_save_image_float("/tmp/u.tiff", u, w, h);
-		iio_save_image_float("/tmp/v.tiff", v, w, h);
+		//iio_save_image_float("/tmp/u.tiff", u, w, h);
+		//iio_save_image_float("/tmp/v.tiff", v, w, h);
 		free(rhs);
 		free(st);
 	}
