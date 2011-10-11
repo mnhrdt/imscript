@@ -151,7 +151,7 @@ static void fill_window_values(float *wv, int (*wo)[2], int kside, float sigma)
 	}
 }
 
-//#include "svd.c"
+#include "svd.c"
 #include "vvector.h"
 
 static float solve_sdp_2x2(float x[2], float A[3], float b[2])
@@ -169,6 +169,58 @@ static float solve_sdp_2x2(float x[2], float A[3], float b[2])
 	//e[1] = A[1]*x[0] + A[2]*x[1] - b[1];
 	//fprintf(stderr, "e=(%g %g)\n", e[0], e[1]);
 	return det;
+}
+
+
+/*  solvps.c    CCMATH mathematics library source code.
+ *
+ *  Copyright (C)  2000   Daniel A. Atkinson    All rights reserved.
+ *  This code may be redistributed under the terms of the GNU library
+ *  public license (LGPL). ( See the lgpl.license file for details.)
+ * ------------------------------------------------------------------------
+ */
+int solvps(double *a,double *b,int n)
+{ double *p,*q,*r,*s,t;
+  int j,k;
+  for(j=0,p=a; j<n ;++j,p+=n+1){
+    for(q=a+j*n; q<p ;++q) *p-= *q* *q;
+    if(*p<=0.) return -1;
+    *p=sqrt(*p);
+    for(k=j+1,q=p+n; k<n ;++k,q+=n){
+      for(r=a+j*n,s=a+k*n,t=0.; r<p ;) t+= *r++ * *s++;
+      *q-=t; *q/= *p;
+     }
+   }
+  for(j=0,p=a; j<n ;++j,p+=n+1){
+    for(k=0,q=a+j*n; k<j ;) b[j]-=b[k++]* *q++;
+    b[j]/= *p;
+   }
+  for(j=n-1,p=a+n*n-1; j>=0 ;--j,p-=n+1){
+    for(k=j+1,q=p+n; k<n ;q+=n) b[j]-=b[k++]* *q;
+    b[j]/= *p;
+   }
+  return 0;
+}
+
+static double solve_sdp_6x6(double x[6], double A[6][6], double b[6])
+{
+	fprintf(stderr,"A = \n"); for (int j = 0; j < 6; j++) {
+		for (int i = 0; i < 6; i++)fprintf(stderr," %g", A[j][i]);fprintf(stderr,"\n");}
+	fprintf(stderr,"rhs = \n");for(int i=0;i<6;i++)fprintf(stderr," %g",b[i]);fprintf(stderr,"\n");
+
+	int r = solvps(A[0], b, 6);
+	if(r<0)exit(fprintf(stderr,"affine structure tensor is singular"));
+	for (int i = 0; i < 6; i++)
+		x[i] = b[i];
+	//double d[6], u[6][6], v[6][6];
+	//svd(d, A[0], u[0], 6, v[0], 6);
+	//printf("u = \n"); for (int j = 0; j < 6; j++) {
+	//	for (int i = 0; i < 6; i++)printf(" %g", u[j][i]);printf("\n");}
+	//printf("v = \n"); for (int j = 0; j < 6; j++) {
+	//	for (int i = 0; i < 6; i++)printf(" %g", v[j][i]);printf("\n");}
+	//printf("d = \n");for(int i=0;i<6;i++)printf(" %g",d[i]);printf("\n");
+	fprintf(stderr,"x = \n");for(int i=0;i<6;i++)fprintf(stderr," %g",x[i]);fprintf(stderr,"\n");
+	return 0;
 }
 
 #define STLEN 3
@@ -272,6 +324,114 @@ static void solve_pointwise(float *u, float *v, float *st, float *rhs,
 	}
 }
 
+static void global_constant_approximation(float *u, float *v,
+		float *gx, float *gy, float *gt, int w, int h)
+{
+	extension_operator_float p = extend_float_image_constant;
+
+	float atwa[STLEN], rhs[2];
+	atwa[0] = atwa[1] = atwa[2] = rhs[0] = rhs[1] = 0;
+
+	for (int j = 0; j < h; j++)
+		for (int i = 0; i < w; i++)
+		{
+			atwa[0] += 1 * sqr(p(gx, w, h, i, j));
+			atwa[1] += 1 * p(gx,w,h, i, j) * p(gy,w,h, i, j);
+			atwa[2] += 1 * sqr(p(gy, w, h, i, j));
+			rhs[0] -= 1 * p(gx,w,h, i, j) * p(gt,w,h, i, j);
+			rhs[1] -= 1 * p(gy,w,h, i, j) * p(gt,w,h, i, j);
+		}
+
+	float f[2];
+	solve_sdp_2x2(f, atwa, rhs);
+	for (int j = 0; j < h; j++)
+		for (int i = 0; i < w; i++)
+		{
+			u[j*w + i] = f[0];
+			v[j*w + i] = f[1];
+		}
+}
+
+static void global_affine_approximation(float *u, float *v,
+		float *gx, float *gy, float *gt, int w, int h)
+{
+	extension_operator_float p = extend_float_image_constant;
+
+	double ast[6][6], rhs[6] = {0,0,0,0,0,0};
+	for (int j = 0; j < 6; j++)
+	for (int i = 0; i < 6; i++)
+		ast[j][i] = 0;
+
+	for (int j = 0; j < h; j++)
+		for (int i = 0; i < w; i++)
+		{
+			double x = i;
+			double y = j;
+			double Ex = p(gx, w, h, i, j);
+			double Ey = p(gy, w, h, i, j);
+			double Et = p(gt, w, h, i, j);
+			ast[0][0] += Ex * Ex * x * x;
+			ast[0][1] += Ex * Ex * x * y;
+			ast[0][2] += Ex * Ex * x;
+			ast[0][3] += Ex * Ey * x * x;
+			ast[0][4] += Ex * Ey * x * y;
+			ast[0][5] += Ex * Ey * x;
+			ast[1][0] += Ex * Ex * x * y;
+			ast[1][1] += Ex * Ex * y * y;
+			ast[1][2] += Ex * Ex * y;
+			ast[1][3] += Ex * Ey * x * y;
+			ast[1][4] += Ex * Ey * y * y;
+			ast[1][5] += Ex * Ey * y;
+			ast[2][0] += Ex * Ex * x;
+			ast[2][1] += Ex * Ex * y;
+			ast[2][2] += Ex * Ex;
+			ast[2][3] += Ex * Ey * x;
+			ast[2][4] += Ex * Ey * y;
+			ast[2][5] += Ex * Ey;
+			ast[3][0] += Ex * Ey * x * x;
+			ast[3][1] += Ex * Ey * x * y;
+			ast[3][2] += Ex * Ey * x;
+			ast[3][3] += Ey * Ey * x * x;
+			ast[3][4] += Ey * Ey * x * y;
+			ast[3][5] += Ey * Ey * x;
+			ast[4][0] += Ex * Ey * x * y;
+			ast[4][1] += Ex * Ey * y * y;
+			ast[4][2] += Ex * Ey * y;
+			ast[4][3] += Ey * Ey * x * y;
+			ast[4][4] += Ey * Ey * y * y;
+			ast[4][5] += Ey * Ey * y;
+			ast[5][0] += Ex * Ey * x;
+			ast[5][1] += Ex * Ey * y;
+			ast[5][2] += Ex * Ey;
+			ast[5][3] += Ey * Ey * x;
+			ast[5][4] += Ey * Ey * y;
+			ast[5][5] += Ey * Ey;
+			rhs[0] -= Et * Ex * x;
+			rhs[1] -= Et * Ex * y;
+			rhs[2] -= Et * Ex;
+			rhs[3] -= Et * Ey * x;
+			rhs[4] -= Et * Ey * y;
+			rhs[5] -= Et * Ey;
+		}
+
+	//for (int j = 0; j < 6; j++)
+	//for (int i = 0; i < 6; i++)
+	//	ast[j][i] /= sqrt(w*h);
+	//for (int i = 0; i < 6; i++)
+	//	rhs[i] /= sqrt(w*h);
+
+	double f[6];
+	solve_sdp_6x6(f, ast, rhs);
+	for (int j = 0; j < h; j++)
+		for (int i = 0; i < w; i++)
+		{
+			double x = i;
+			double y = j;
+			u[j*w + i] = f[0]*x + f[1]*y + f[2];
+			v[j*w + i] = f[3]*x + f[4]*y + f[5];
+		}
+}
+
 static void least_squares_ofc(float *u, float *v,
 		float *a, float *b, int w, int h,
 		int kside, float sigma)
@@ -280,9 +440,11 @@ static void least_squares_ofc(float *u, float *v,
 	float *gy = xmalloc(w * h * sizeof(float));
 	float *gt = xmalloc(w * h * sizeof(float));
 	compute_input_derivatives(gx, gy, gt, a, b, w, h);
-	if (kside == -1) { // global approximation
-
-	} else {
+	if (kside == -1)
+		global_constant_approximation(u, v, gx, gy, gt, w, h);
+	else if (kside == -2)
+		global_affine_approximation(u, v, gx, gy, gt, w, h);
+	else {
 		if (kside % 2 != 1) exit(fprintf(stderr,
 			"I need an ODD window size (got %d)\n", kside));
 		if (kside > 40) exit(fprintf(stderr,
