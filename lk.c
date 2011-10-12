@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -209,7 +210,7 @@ static double solve_sdp_6x6(double x[6], double A[6][6], double b[6])
 	fprintf(stderr,"rhs = \n");for(int i=0;i<6;i++)fprintf(stderr," %g",b[i]);fprintf(stderr,"\n");
 
 	int r = solvps(A[0], b, 6);
-	if(r<0)exit(fprintf(stderr,"affine structure tensor is singular"));
+	if(r<0)exit(fprintf(stderr,"affine structure tensor is singular\n"));
 	for (int i = 0; i < 6; i++)
 		x[i] = b[i];
 	//double d[6], u[6][6], v[6][6];
@@ -220,6 +221,33 @@ static double solve_sdp_6x6(double x[6], double A[6][6], double b[6])
 	//	for (int i = 0; i < 6; i++)printf(" %g", v[j][i]);printf("\n");}
 	//printf("d = \n");for(int i=0;i<6;i++)printf(" %g",d[i]);printf("\n");
 	fprintf(stderr,"x = \n");for(int i=0;i<6;i++)fprintf(stderr," %g",x[i]);fprintf(stderr,"\n");
+	return 0;
+}
+
+static double solve_sdp_nxn(double *x, double *A, double *b, int n)
+{
+	//fprintf(stderr, "\n\nSOLVE SDP NXN (n=%d)\n\n", n);
+	//fprintf(stderr,"A = \n"); for (int j = 0; j < n; j++) {
+	//	for (int i = 0; i < n; i++)fprintf(stderr," %g", A[j*n+i]);fprintf(stderr,"\n");}
+	//fprintf(stderr,"rhs = \n");for(int i=0;i<n;i++)fprintf(stderr," %g",b[i]);fprintf(stderr,"\n");
+
+	for (int j = 0; j < n; j++)
+		for (int i = 0; i < n; i++)
+			assert(A[n*i+j] == A[n*j + i]);
+
+	int r = solvps(A, b, n);
+	for (int i = 0; i < n; i++)
+		x[i] = b[i];
+
+	double d[n], u[n][n], v[n][n];
+	svd(d, A, u[0], n, v[0], n);
+	//fprintf(stderr,"u = \n"); for (int j = 0; j < n; j++) {
+	//	for (int i = 0; i < n; i++)fprintf(stderr," %g", u[j][i]);fprintf(stderr,"\n");}
+	//fprintf(stderr,"v = \n"); for (int j = 0; j < n; j++) {
+	//	for (int i = 0; i < n; i++)fprintf(stderr," %g", v[j][i]);fprintf(stderr,"\n");}
+	//fprintf(stderr,"d = \n");for(int i=0;i<n;i++)fprintf(stderr," %g",d[i]);fprintf(stderr,"\n");
+	//fprintf(stderr,"x = \n");for(int i=0;i<n;i++)fprintf(stderr," %g",x[i]);fprintf(stderr,"\n");
+	if(r<0)exit(fprintf(stderr,"polynomial structure tensor is singular\n"));
 	return 0;
 }
 
@@ -432,6 +460,106 @@ static void global_affine_approximation(float *u, float *v,
 		}
 }
 
+
+static double ipow(double base, int exponent)
+{
+	double result = 1;
+	while (exponent)
+	{
+		if (exponent & 1)
+			result *= base;
+		exponent >>= 1;
+		base *= base;
+	}
+	return result;
+}
+
+static double monomium(double x, double y, int exponent[2])
+{
+	return ipow(x,exponent[0]) * ipow(y,exponent[1]);
+}
+
+static double polynomium(double x, double y,
+		double *f, int (*polindex)[2], int nc)
+{
+	double r = 0;
+	for (int i = 0; i < nc; i++)
+		r += f[i] * monomium(x, y, polindex[i]);
+	return r;
+}
+
+static void global_polynomial_approximation(float *u, float *v,
+		float *gx, float *gy, float *gt, int w, int h, int deg)
+{
+	int nc = (deg + 2) * (deg + 1) / 2; // number of coefficients
+	double pst[2*nc][2*nc], rhs[2*nc];
+	int polindex[nc][2], idx = 0;
+	for (int j = 0; j <= deg; j++)
+	for (int i = 0; i <= j; i++)
+	{
+		polindex[idx][0] = j-i;
+		polindex[idx][1] = i;
+		idx += 1;
+	}
+	assert(idx == nc);
+
+	//for (int i = 0; i < nc; i++)
+	//	fprintf(stderr, "polindex[%d] = {%d, %d};\n",
+	//			i, polindex[i][0], polindex[i][1]);
+
+	for (int j = 0; j < 2*nc; j++)
+	for (int i = 0; i < 2*nc; i++)
+		pst[j][i] = 0;
+	for (int i = 0; i < 2*nc; i++)
+		rhs[i] = 0;
+
+	double nfac = sqrt(w*h);//100;
+
+	int passepartoutw = 2;//0.004 * w;
+	int passepartouth = 2;//0.004 * h;
+
+	for (int jj = passepartouth; jj < h - passepartouth; jj++)
+		for (int ii = passepartoutw; ii < w - passepartoutw; ii++)
+		{
+			extension_operator_float p= extend_float_image_constant;
+			double x = ii/nfac;
+			double y = jj/nfac;
+			double Ex = p(gx, w, h, ii, jj);
+			double Ey = p(gy, w, h, ii, jj);
+			double Et = p(gt, w, h, ii, jj);
+
+			for (int j = 0; j < nc; j++)
+			for (int i = 0; i < nc; i++)
+			{
+				int m[2] = {
+					polindex[i][0] + polindex[j][0],
+					polindex[i][1] + polindex[j][1]
+				};
+				pst[j][i] += Ex * Ex * monomium(x, y, m);
+				pst[j+nc][i] += Ex * Ey * monomium(x, y, m);
+				pst[j][i+nc] += Ex * Ey * monomium(x, y, m);
+				pst[j+nc][i+nc] += Ey * Ey * monomium(x, y, m);
+			}
+			for (int i = 0; i < nc; i++)
+			{
+				int m[2] = { polindex[i][0], polindex[i][1] };
+				rhs[i] -= Et * Ex * monomium(x, y, m);
+				rhs[i+nc] -= Et * Ey * monomium(x, y, m);
+			}
+		}
+
+	double f[2*nc];
+	solve_sdp_nxn(f, pst[0], rhs, 2*nc);
+	for (int j = 0; j < h; j++)
+		for (int i = 0; i < w; i++)
+		{
+			double x = i/nfac;
+			double y = j/nfac;
+			u[j*w + i] = polynomium(x, y, f, polindex, nc);;
+			v[j*w + i] = polynomium(x, y, f+nc, polindex, nc);;
+		}
+}
+
 static void least_squares_ofc(float *u, float *v,
 		float *a, float *b, int w, int h,
 		int kside, float sigma)
@@ -444,6 +572,11 @@ static void least_squares_ofc(float *u, float *v,
 		global_constant_approximation(u, v, gx, gy, gt, w, h);
 	else if (kside == -2)
 		global_affine_approximation(u, v, gx, gy, gt, w, h);
+	else if (kside == -3) {
+		int deg = sigma;
+		fprintf(stderr, "USING POLYNOMIALS OF DEGREE %d\n", deg);
+		global_polynomial_approximation(u, v, gx, gy, gt, w, h, deg);
+	}
 	else {
 		if (kside % 2 != 1) exit(fprintf(stderr,
 			"I need an ODD window size (got %d)\n", kside));
