@@ -615,7 +615,7 @@ int main(int argc, char *argv[])
 	float *b = iio_read_image_float(filename_b, &ww, &hh);
 	if (w != ww || h != hh)
 		exit(fprintf(stderr, "input images size mismatch\n"));
-	iio_save_image_float("/tmp/merdota.tiff", a, w, h);
+	//iio_save_image_float("/tmp/merdota.tiff", a, w, h);
 	float *u = xmalloc(w * h * sizeof(float));
 	float *v = xmalloc(w * h * sizeof(float));
 	least_squares_ofc(u, v, a, b, w, h, kside, sigma);
