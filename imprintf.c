@@ -1,8 +1,37 @@
 // usage:
 // 	imprintf format [image]
+//
+// %w         width of the image
+// %h         height of the image
+// %c         pixel dimension
+// %n         number of samples (%w * %h * %c)
+// %N         number of pixels (%w * %h)
+// %p[x,y,l]  lth sample of pixel (x,y)
+// %P[x,y,l]  values of pixel (x,y)
+// %i         value of smallest sample
+// %a         value of largest sample
+// %v         average sample value
+// %m         median sample
+// %I         value of smallest pixel
+// %A         value of largest pixel
+// %V         average pixel value
+// %M         median pixel
+// %q[n]      nth sample percentile
+// %Q[n]      nth pixel percentile
+// %k         number of different samples
+// %K         number of different pixels
+// %r         root mean square
+// %%         literal %
+// \n         newline
+// \t         tab
+// \\         backslash
+// ~f[~F]     set number format to %F (default F="%g")
+// ~s[F]     set vector separation to F (default F=", ")
+// ~~         literal ~
 
 
 #include <assert.h>
+#include <ctype.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -49,15 +78,6 @@ struct printable_data {
 	float *squared_samples;
 	float sum_squared_samples;
 
-	//long double minsample, maxsample, avgsample, medsample;
-	//long double minpixel[MAX_PIXELDIM];
-	//long double maxpixel[MAX_PIXELDIM];
-	//long double avgpixel[MAX_PIXELDIM];
-	//long double medpixel[MAX_PIXELDIM];
-	//long double nvectors, nscalars;
-
-	char *string;
-	//int strln;
 	char *numberformat;
 	char *vectorspacing;
 
@@ -66,6 +86,7 @@ struct printable_data {
 
 	float *x;
 	int w, h, pd;
+	char *string;
 };
 
 static int getidx(struct printable_data *p, char *id)
@@ -94,26 +115,12 @@ static void setnumbers(struct printable_data *p, char *id,long double *x, int n)
 	assert(0 <= n && n <= MAX_PIXELDIM);
 	p->t[idx].number_of_values = n;
 	for (int i = 0; i < n; i++)
+	{
+		//fprintf(stderr, "SETNUMBER[%d \"%s\"]_%d = %g\n", idx, id, i, (double)x[i]);
 		p->t[idx].value[i] = x[i];
+	}
 }
 
-static int getnumbers(long double *x, struct printable_data *p, char *id)
-{
-	int idx = getidx(p, id);
-	int r = p->t[idx].number_of_values;
-	assert(r > 0);
-	for (int i = 0; i < r; i++)
-		x[i] = p->t[idx].value[i];
-	return r;
-}
-
-static long double getnumber(struct printable_data *p, char *id)
-{
-	int idx = getidx(p, id);
-	int n = p->t[idx].number_of_values;
-	assert(n == 1);
-	return p->t[idx].value[0];
-}
 
 static void config_printable_data(struct printable_data *p, char *fmt)
 {
@@ -182,14 +189,14 @@ static void compute_stuff_basic(struct printable_data *p,
 	avgsample /= ns;
 	setnumber(p, "minsample", minsample);
 	setnumber(p, "maxsample", maxsample);
-	setnumber(p, "avfsample", avgsample);
+	setnumber(p, "avgsample", avgsample);
 
 
 	// pixel basic stuff
 	int np = w * h, minpixel_idx, maxpixel_idx;
 	float minpixel = INFINITY, maxpixel = -INFINITY;
 	long double avgpixel[MAX_PIXELDIM] = {0};
-	int minidx, maxidx;
+	int minidx=-1, maxidx=-1;
 	for (int j = 0; j < pd; j++)
 		avgpixel[j] = 0;
 	for (int i = 0; i < np; i++)
@@ -203,7 +210,7 @@ static void compute_stuff_basic(struct printable_data *p,
 	long double mipi[pd], mapi[pd];
 	for (int j = 0; j < pd; j++) {
 		mipi[j] = x[minidx*pd+j];
-		mapi[j] = x[minidx*pd+j];
+		mapi[j] = x[maxidx*pd+j];
 		avgpixel[j] /= np;
 	}
 	setnumbers(p, "minpixel", mipi, pd);
@@ -259,10 +266,9 @@ static void compute_stuff_squares(struct printable_data *p,
 		hyp = hypotl(hyp, sq);
 	}
 	p->sum_squared_samples = hyp * hyp;
+	setnumber(p, "rms", sqrt(p->sum_squared_samples));
 }
 
-
-#define GETBIT(x,i) ((x)&(1<<(i)))
 
 static void compute_printable_data(struct printable_data *p,
 		float *x, int w, int h, int pd)
@@ -273,23 +279,10 @@ static void compute_printable_data(struct printable_data *p,
 	for (int i = 0; i < 0x100; i++)
 		action_table[i] = -1;
 	while (p->t[idx].name) {
-		if (p->t[idx].selected) {
+		if (p->t[idx].selected)
 			p->compuflag |= p->t[idx].required_precomputation;
-			//fprintf(stderr, "going to compute \"%s\"\n",
-			//		p->t[idx].name);
-		}
 		idx += 1;
 	}
-
-	//fprintf(stderr, "            ba ss sp sc vn sq\n");
-	//fprintf(stderr, "compuflag = %d  %d  %d  %d  %d  %d\n",
-	//		(bool)GETBIT(p->compuflag,0),
-	//		(bool)GETBIT(p->compuflag,1),
-	//		(bool)GETBIT(p->compuflag,2),
-	//		(bool)GETBIT(p->compuflag,3),
-	//		(bool)GETBIT(p->compuflag,4),
-	//		(bool)GETBIT(p->compuflag,5)
-	//       );
 
 	compute_stuff_nothing(p, x, w, h, pd);
 	if (REQ_BASIC & p->compuflag) compute_stuff_basic(p, x, w, h, pd);
@@ -300,21 +293,126 @@ static void compute_printable_data(struct printable_data *p,
 	if (REQ_SQUARES & p->compuflag) compute_stuff_squares(p, x, w, h, pd);
 }
 
+static void print_scalar(FILE *f, struct printable_data *p, double x)
+{
+	fprintf(f, p->numberformat, x);
+}
+
+static void print_vector(FILE*f, struct printable_data *p, long double*x, int n)
+{
+	for (int i = 0; i < n; i++)
+	{
+		print_scalar(f, p, x[i]);
+		if (i < n-1)
+			fprintf(f, "%s", p->vectorspacing);
+	}
+}
+
 static void print_printable_datum(FILE *f, struct printable_data *p, int idx)
 {
 	//fprintf(f, "PRINTABLE DATUM[%d \"%s\"] = \"", idx, p->t[idx].name);
 	int n = p->t[idx].number_of_values;
-	for (int i = 0; i < n; i++) {
-		fprintf(f, p->numberformat, (double)(p->t[idx].value[i]));
-		if (i > 0)
-			fprintf(f, "%s", p->vectorspacing);
-	}
+	print_vector(f, p, p->t[idx].value, n);
 	//fprintf(f, "\"\n");
+}
+
+static void print_parametric_datum(FILE *f, struct printable_data *p, int idx,
+							int argc, int *argv)
+{
+	//fprintf(f, "PRINTABLE PDATUM[%d \"%s\"]\n", idx, p->t[idx].name);
+	int ppos = argv[0];
+	if (false) {
+	} else if (0 == strcmp("getsample", p->t[idx].name)) {
+		// idx
+		// x y s
+		if (argc != 1) { if (argc != 3) exit(fprintf(stderr, "ERROR: "
+				"%%p operator needs 1 or 3 arguments\n"));
+			else
+				ppos = p->pd*(argv[0]*p->w + argv[1])+argv[2];
+		}
+		double y = 0;
+		if (ppos >= 0 && ppos < p->w * p->h * p->pd)
+			y = p->x[ppos];
+		print_scalar(f, p, p->x[ppos]);
+	} else if (0 == strcmp("getpixel", p->t[idx].name)) {
+		// idx
+		// x y
+		if (argc != 1) { if (argc != 2) exit(fprintf(stderr, "ERROR: "
+				"%%P operator needs 1 or 2 arguments\n"));
+			else
+				ppos = argv[0]*p->w + argv[1];
+		}
+		long double y[MAX_PIXELDIM] = {0};
+		if (ppos >= 0 && ppos < p->w * p->h)
+			for (int i = 0; i < p->pd; i++)
+				y[i] = p->x[p->pd*ppos + i];
+		print_vector(f, p, y, p->pd);
+	} else if (0 == strcmp("percentile", p->t[idx].name)) {
+		// q
+		int q = ((int)argv[0])%101;
+		assert(q >= 0);
+		assert(q <= 100);
+		float factor = p->w * p->h * p->pd - 1;
+		int pq = (factor * q)/100;
+		assert(pq >= 0);
+		assert(pq < p->w * p->h * p->pd);
+		print_scalar(f, p, p->sorted_samples[pq]);
+	} else if (0 == strcmp("Percentile", p->t[idx].name)) {
+		exit(fprintf(stderr, "ERROR: Percentile not implemented\n"));
+	}
 }
 
 static void my_putchar(FILE *f, int c)
 {
 	fputc(c, f);
+}
+
+static int gather_arguments(int *argv, char **fmt)
+{
+	char *s = *fmt;
+	int c = *s++, n = 0, argc = 0;
+	if (c != '[') return 0;
+	while(1) {
+		c = *s++;
+		if (!c) return 0;
+		if (isdigit(c))
+			n = 10*n + (c - '0');
+		else {
+			if (c == ']') {
+				*argv = n;
+				*fmt = s;
+				return 1 + argc;
+			} else if (c == ',') {
+				*argv = n;
+				n = 0;
+				if (++argc >= MAX_PIXELDIM) return 0;
+				argv += 1;
+			} else return 0;
+		}
+	}
+}
+
+static void apply_format_option(struct printable_data *p, char **fmt)
+{
+	char *s = *fmt, bufopt[0x101] = {0};
+	int c = *s++, cmd = c, i = 0;
+	if (!c) return;
+	c = *s++;
+	if (!c || c != '[') return;
+	while (i < 0x100) {
+		c = *s++;
+		if (c == ']') break;
+		if (!c) return;
+		bufopt[i] = (cmd=='f'&&c=='~')?'%':c;
+		i += 1;
+	}
+	if (c != ']') return;
+	if (cmd == 'f')
+		memcpy(p->numberformat = xmalloc(0x100), bufopt, 0x100);
+	else if (cmd == 's')
+		memcpy(p->vectorspacing = xmalloc(0x100), bufopt, 0x100);
+	// leaks are the least important problem of this function
+	*fmt = s;
 }
 
 static void print_printable_data(FILE *f, struct printable_data *p)
@@ -328,15 +426,29 @@ static void print_printable_data(FILE *f, struct printable_data *p)
 			c = *fmt++; if (!c) break;
 			int idx = p->action_table[c%0x100];
 			if (idx >= 0) {
-				//printf("_GOT: \"%s\"\n", p->t[idx].name);
-				print_printable_datum(f, p, idx);
-				p->t[idx].selected = true;
+				//fprintf(stderr,"GOT: \"%s\"\n",p->t[idx].name);
+				//fprintf(stderr,"argie %d\n",p->t[idx].argc);
+				if (p->t[idx].argc) {
+					int v[MAX_PIXELDIM];
+					int nv = gather_arguments(v, &fmt);
+					//fprintf(stderr, "gath argc = %d\n", nv);
+					//for (int j = 0; j < nv; j++)
+					//	fprintf(stderr, "argv[%d] = %d\n", j, v[j]);
+					print_parametric_datum(f, p, idx, nv,v);
+				} else {
+					print_printable_datum(f, p, idx);
+					p->t[idx].selected = true;
+				}
 			}
 		} else if (c == '\\') {
 			c = *fmt++; if (!c) break;
 			if (c == 'n') my_putchar(f, '\n');
 			if (c == 't') my_putchar(f, '\t');
 			if (c == '\\') my_putchar(f, '\\');
+		} else if (c == '~') {
+			c = *fmt++; if (!c) break;
+			if (c == '~') my_putchar(f, '~');
+			else { fmt--; apply_format_option(p, &fmt); }
 		} else
 			my_putchar(f, c);
 	}
@@ -363,6 +475,7 @@ static void imprintf_2d(FILE *f, char *fmt, float *x, int w, int h, int pd)
 			{"medsample",  "m", REQ_SORTS,   1, {0}, 0, {0}, false},
 			{"percentile", "q", REQ_SORTS,   1, {0}, 1, {0}, false},
 			{"minpixel",   "I", REQ_BASIC,  -1, {0}, 0, {0}, false},
+			{"maxpixel",   "A", REQ_BASIC,  -1, {0}, 0, {0}, false},
 			{"avgpixel",   "V", REQ_BASIC,  -1, {0}, 0, {0}, false},
 			{"medpixel",   "M", REQ_SORTP,  -1, {0}, 0, {0}, false},
 			{"Percentile", "Q", REQ_SORTP,   1, {0}, 1, {0}, false},
