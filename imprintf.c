@@ -21,6 +21,7 @@
 // %k         number of different samples
 // %K         number of different pixels
 // %r         root mean square
+// %e         average absolute value
 // %%         literal %
 // \n         newline
 // \t         tab
@@ -48,7 +49,7 @@
 #define REQ_SORTS 2
 #define REQ_SORTP 4
 #define REQ_SORTC 8
-#define REQ_VNORM 16
+//#define REQ_VNORM 16
 #define REQ_SQUARES 32
 
 struct conversion_specifier_and_its_data {
@@ -76,7 +77,7 @@ struct printable_data {
 	float *sorted_vectors; // by comparing their norm
 	float *sorted_colors;  // by comparing their samples
 	float *squared_samples;
-	float sum_squared_samples;
+	//float sum_squared_samples;
 
 	char *numberformat;
 	char *vectorspacing;
@@ -152,7 +153,7 @@ static void config_printable_data(struct printable_data *p, char *fmt)
 	}
 }
 
-static float vnormf(float *x, int n)
+static float vnormf(const float *x, int n)
 {
 	float r = 0;
 	for (int i = 0; i < n; i++)
@@ -195,7 +196,7 @@ static void compute_stuff_basic(struct printable_data *p,
 	// pixel basic stuff
 	int np = w * h, minpixel_idx, maxpixel_idx;
 	float minpixel = INFINITY, maxpixel = -INFINITY;
-	long double avgpixel[MAX_PIXELDIM] = {0};
+	long double avgpixel[MAX_PIXELDIM] = {0}, avgnorm = 0;
 	int minidx=-1, maxidx=-1;
 	for (int j = 0; j < pd; j++)
 		avgpixel[j] = 0;
@@ -206,7 +207,9 @@ static void compute_stuff_basic(struct printable_data *p,
 		if (xnorm > maxpixel) { maxidx = i; maxpixel = xnorm; }
 		for (int j = 0; j < pd; j++)
 			avgpixel[j] += x[pd*i+j];
+		avgnorm += xnorm;
 	}
+	avgnorm /= np;
 	long double mipi[pd], mapi[pd];
 	for (int j = 0; j < pd; j++) {
 		mipi[j] = x[minidx*pd+j];
@@ -216,6 +219,7 @@ static void compute_stuff_basic(struct printable_data *p,
 	setnumbers(p, "minpixel", mipi, pd);
 	setnumbers(p, "maxpixel", mapi, pd);
 	setnumbers(p, "avgpixel", avgpixel, pd);
+	setnumber(p, "error", avgnorm);
 }
 
 static int compare_floats(const void *a, const void *b)
@@ -223,6 +227,70 @@ static int compare_floats(const void *a, const void *b)
 	const float *da = (const float *) a;
 	const float *db = (const float *) b;
 	return (*da > *db) - (*da < *db);
+}
+
+static int compare_vectors_by_length(const void *a, const void *b)
+{
+	static int dim = 0;
+	if (!a) { // setup dimension
+		const int *db = (const int *)b;
+		return dim = *db;
+	} else {
+		assert(dim);
+		const float *da = (const float *) a;
+		const float *db = (const float *) b;
+		float na = vnormf(da, dim);
+		float nb = vnormf(db, dim);
+		return (na > nb) - (na < nb);
+	}
+}
+
+static int compare_vectors_by_components(const void *a, const void *b)
+{
+	static int dim = 0;
+	if (!a) { // setup dimension
+		const int *db = (const int *)b;
+		return dim = *db;
+	} else {
+		assert(dim);
+		const float *da = (const float *) a;
+		const float *db = (const float *) b;
+		for (int i = 0; i < dim; i++) {
+			int r = (da[i] > db[i]) - (da[i] < db[i]);
+			if (r) return r;
+		}
+		return 0;
+	}
+}
+
+static int count_unique_floats(float *x, int n)
+{
+	if (!n) return 0;
+	int count = 1;
+	for (int i = 1; i < n; i++) {
+		assert(x[i-1] <= x[i]);
+		if (x[i] != x[i-1])
+			count += 1;
+	}
+	return count;
+}
+
+static int count_unique_floatvectors(float *x, int n, int d)
+{
+	if (!n) return 0;
+	int count = 1;
+	for (int i = 1; i < n; i++) {
+		float *p = x + d*(i-1);
+		float *q = x + d*i;
+		for (int j = 0; j < d; j++) {
+			assert(p[j] <= q[j]);
+			if (p[j] != q[j]) {
+				count += 1;
+				break;
+			}
+		}
+	}
+	return count;
 }
 
 static void compute_stuff_sorts(struct printable_data *p,
@@ -233,24 +301,36 @@ static void compute_stuff_sorts(struct printable_data *p,
 	for (int i = 0; i < ns; i++)
 		p->sorted_samples[i] = x[i];
 	qsort(p->sorted_samples, ns, sizeof*p->sorted_samples, compare_floats);
+	setnumber(p, "medsample", p->sorted_samples[ns/2]);
+	int nsamples = count_unique_floats(p->sorted_samples, ns);
+	setnumber(p, "nscalars", nsamples);
 }
 
 static void compute_stuff_sortp(struct printable_data *p,
 		float *x, int w, int h, int pd)
 {
-	exit(fprintf(stderr, "ERROR: sortp not yet implemented\n"));
+	//exit(fprintf(stderr, "ERROR: sortp not yet implemented\n"));
+	int np = w * h;
+	p->sorted_vectors = xmalloc(np * pd * sizeof*p->sorted_vectors);
+	for (int i = 0; i < np * pd; i++)
+		p->sorted_vectors[i] = x[i];
+	compare_vectors_by_length(NULL, &pd);
+	qsort(p->sorted_vectors, np, pd*sizeof*p->sorted_vectors,
+						compare_vectors_by_length);
 }
 
 static void compute_stuff_sortc(struct printable_data *p,
 		float *x, int w, int h, int pd)
 {
-	exit(fprintf(stderr, "ERROR: sortc not yet implemented\n"));
-}
-
-static void compute_stuff_vnorm(struct printable_data *p,
-		float *x, int w, int h, int pd)
-{
-	exit(fprintf(stderr, "ERROR: vnorm not yet implemented\n"));
+	int np = w * h;
+	p->sorted_colors = xmalloc(np * pd * sizeof*p->sorted_colors);
+	for (int i = 0; i < np * pd; i++)
+		p->sorted_colors[i] = x[i];
+	compare_vectors_by_components(NULL, &pd);
+	qsort(p->sorted_colors, np, pd*sizeof*p->sorted_colors,
+						compare_vectors_by_components);
+	int ncolors = count_unique_floatvectors(p->sorted_colors, np, pd);
+	setnumber(p, "nvectors", ncolors);
 }
 
 static void compute_stuff_squares(struct printable_data *p,
@@ -265,8 +345,7 @@ static void compute_stuff_squares(struct printable_data *p,
 		p->squared_samples[i] = sq;
 		hyp = hypotl(hyp, sq);
 	}
-	p->sum_squared_samples = hyp * hyp;
-	setnumber(p, "rms", sqrt(p->sum_squared_samples));
+	setnumber(p, "rms", hyp / sqrt(n));
 }
 
 
@@ -289,7 +368,6 @@ static void compute_printable_data(struct printable_data *p,
 	if (REQ_SORTS & p->compuflag) compute_stuff_sorts(p, x, w, h, pd);
 	if (REQ_SORTP & p->compuflag) compute_stuff_sortp(p, x, w, h, pd);
 	if (REQ_SORTC & p->compuflag) compute_stuff_sortc(p, x, w, h, pd);
-	if (REQ_VNORM & p->compuflag) compute_stuff_vnorm(p, x, w, h, pd);
 	if (REQ_SQUARES & p->compuflag) compute_stuff_squares(p, x, w, h, pd);
 }
 
@@ -482,6 +560,7 @@ static void imprintf_2d(FILE *f, char *fmt, float *x, int w, int h, int pd)
 			{"nscalars",   "k", REQ_SORTS,   1, {0}, 0, {0}, false},
 			{"nvectors",   "K", REQ_SORTC,   1, {0}, 0, {0}, false},
 			{"rms",        "r", REQ_SQUARES, 1, {0}, 0, {0}, false},
+			{"error",      "e", REQ_BASIC,   1, {0}, 0, {0}, false},
 			{NULL, NULL, 0, 0, {0}, 0, {0}, false} },
 		.sorted_samples = NULL,
 		.sorted_vectors = NULL,
