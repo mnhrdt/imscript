@@ -29,6 +29,13 @@
 // ~f[~F]     set number format to %F (default F="%g")
 // ~s[F]     set vector separation to F (default F=", ")
 // ~~         literal ~
+// @0         "%w %h\n"
+// @1         "%wx%h\n"
+// @2         "%wx%h %c\n"
+// @3         "%wx%h %c\n"
+// @4         "%wx%h[%i %v %a] %c[%I %V %A]\n"
+// @5         "%wx%h[%k] %c[%K]\n"
+// @9         "(everything)\n"
 
 
 #include <assert.h>
@@ -532,6 +539,76 @@ static void print_printable_data(FILE *f, struct printable_data *p)
 	}
 }
 
+// %w         width of the image
+// %h         height of the image
+// %c         pixel dimension
+// %n         number of samples (%w * %h * %c)
+// %N         number of pixels (%w * %h)
+// %p[x,y,l]  lth sample of pixel (x,y)
+// %P[x,y,l]  values of pixel (x,y)
+// %i         value of smallest sample
+// %a         value of largest sample
+// %v         average sample value
+// %m         median sample
+// %I         value of smallest pixel
+// %A         value of largest pixel
+// %V         average pixel value
+// %M         median pixel
+// %q[n]      nth sample percentile
+// %Q[n]      nth pixel percentile
+// %k         number of different samples
+// %K         number of different pixels
+// %r         root mean square
+// %e         average absolute value
+// %%         literal %
+// \n         newline
+// \t         tab
+// \\         backslash
+// ~f[~F]     set number format to %F (default F="%g")
+// ~s[F]     set vector separation to F (default F=", ")
+// ~~         literal ~
+// @0         "%w %h\n"
+// @1         "%wx%h\n"
+// @2         "%wx%h %c\n"
+// @3         "%wx%h %c\n"
+// @4         "%wx%h[%i %v %a] %c[%I %V %A]\n"
+// @5         "%wx%h[%k] %c[%K]\n"
+// @9         "(everything)\n"
+
+static char *preprocess_arrobas(char *fmt)
+{
+	if (fmt[0] != '@') return fmt;
+	switch(fmt[1]-'0') {
+	case 0: return "%w %h\\n";
+	case 1: return "%wx%h\\n";
+	case 2: return "%wx%h %c\\n";
+	case 3: return "%wx%h %c\\n";
+	case 4: return "%wx%h [%i %v %a] %c [(%I) (%V) (%A)]\\n";
+	case 5: return "%wx%h [%k] %c [%K]\\n";
+	case 9: return
+"width:                  %w\n"
+"height:                 %h\n"
+"pixeldim:               %c\n"
+"numsamples:             %n\n"
+"numpixels:              %N\n"
+"smallest sample:        %i\n"
+"average sample:         %v\n"
+"median sample:          %m\n"
+"max sample:             %a\n"
+"smallest pixel:         %I\n"
+"average pixel:          %V\n"
+"median pixel:           %M\n"
+"max pixel:              %A\n"
+"sample quartiles:       %q[0] %q[25] %q[50] %q[75] %q[100]\n"
+//"pixel quartiles:        (%Q[0]) (%Q[25]) (%Q[50]) (%Q[75]) (%Q[100])\n"
+"different samples:      %k\n"
+"different pixels:       %K\n"
+"root mean square:       %r\n"
+"average absolute value: %e\n";
+	default: return fmt;
+	}
+}
+
 static void imprintf_2d(FILE *f, char *fmt, float *x, int w, int h, int pd)
 {
 	struct printable_data p[1] = {{
@@ -574,7 +651,7 @@ static void imprintf_2d(FILE *f, char *fmt, float *x, int w, int h, int pd)
 		//.strln = 0,
 	}};
 
-	config_printable_data(p, fmt);
+	config_printable_data(p, preprocess_arrobas(fmt));
 	compute_printable_data(p, x, w, h, pd);
 	print_printable_data(f, p);
 }
