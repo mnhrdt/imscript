@@ -7,7 +7,7 @@
 // %n         number of samples (%w * %h * %c)
 // %N         number of pixels (%w * %h)
 // %p[x,y,l]  lth sample of pixel (x,y)
-// %P[x,y,l]  values of pixel (x,y)
+// %P[x,y]    values of pixel (x,y)
 // %i         value of smallest sample
 // %a         value of largest sample
 // %v         average sample value
@@ -36,6 +36,8 @@
 // @4         "%wx%h[%i %v %a] %c[%I %V %A]\n"
 // @5         "%wx%h[%k] %c[%K]\n"
 // @9         "(everything)\n"
+
+// TODO: dump an (image, channel, line) in (uint8_t, uint16_t, uint32_t, float, double)
 
 
 #include <assert.h>
@@ -350,7 +352,7 @@ static void compute_stuff_squares(struct printable_data *p,
 	{
 		float sq = x[i] * x[i];
 		p->squared_samples[i] = sq;
-		hyp = hypotl(hyp, sq);
+		hyp = hypotl(hyp, x[i]);
 	}
 	setnumber(p, "rms", hyp / sqrt(n));
 }

@@ -39,7 +39,7 @@ int main(int c, char *v[])
 
 	float rmin, rmax;
 	get_rminmax(&rmin, &rmax, x, w*h*pd, w*h*pd/200);
-	fprintf(stderr, "rminmax = %g %g\n", rmin, rmax);
+	fprintf(stderr, "qauto: rminmax = %g %g\n", rmin, rmax);
 
 	uint8_t *y = xmalloc(w*h*pd);
 	for (int i = 0; i < w*h*pd; i++) {
