@@ -22,7 +22,7 @@
 // %K         number of different pixels
 // %r         root mean square
 // %e         average absolute value
-// %%         literal %
+// \%         literal %
 // \n         newline
 // \t         tab
 // \\         backslash
@@ -186,24 +186,26 @@ static void compute_stuff_basic(struct printable_data *p,
 		float *x, int w, int h, int pd)
 {
 	// sample basic stuff
-	int ns = w * h * pd;
+	int ns = w * h * pd, rns = 0;
 	float minsample = INFINITY, maxsample = -INFINITY;
 	long double avgsample = 0;
 	for (int i = 0; i < ns; i++)
 	{
 		float y = x[i];
+		if (isnan(y)) continue;
 		if (y < minsample) minsample = y;
 		if (y > maxsample) maxsample = y;
 		avgsample += y;
+		rns += 1;
 	}
-	avgsample /= ns;
+	avgsample /= rns;
 	setnumber(p, "minsample", minsample);
 	setnumber(p, "maxsample", maxsample);
 	setnumber(p, "avgsample", avgsample);
 
 
 	// pixel basic stuff
-	int np = w * h, minpixel_idx, maxpixel_idx;
+	int np = w * h, minpixel_idx, maxpixel_idx, rnp = 0;
 	float minpixel = INFINITY, maxpixel = -INFINITY;
 	long double avgpixel[MAX_PIXELDIM] = {0}, avgnorm = 0;
 	int minidx=-1, maxidx=-1;
@@ -212,18 +214,20 @@ static void compute_stuff_basic(struct printable_data *p,
 	for (int i = 0; i < np; i++)
 	{
 		float xnorm = vnormf(x + pd*i, pd);
+		if (isnan(xnorm)) continue;
 		if (xnorm < minpixel) { minidx = i; minpixel = xnorm; }
 		if (xnorm > maxpixel) { maxidx = i; maxpixel = xnorm; }
 		for (int j = 0; j < pd; j++)
 			avgpixel[j] += x[pd*i+j];
 		avgnorm += xnorm;
+		rnp += 1;
 	}
 	avgnorm /= np;
 	long double mipi[pd], mapi[pd];
 	for (int j = 0; j < pd; j++) {
 		mipi[j] = x[minidx*pd+j];
 		mapi[j] = x[maxidx*pd+j];
-		avgpixel[j] /= np;
+		avgpixel[j] /= rnp;
 	}
 	setnumbers(p, "minpixel", mipi, pd);
 	setnumbers(p, "maxpixel", mapi, pd);
@@ -277,7 +281,8 @@ static int count_unique_floats(float *x, int n)
 	if (!n) return 0;
 	int count = 1;
 	for (int i = 1; i < n; i++) {
-		assert(x[i-1] <= x[i]);
+		if (!isnan(x[i-1]) && !isnan(x[i]))
+			assert(x[i-1] <= x[i]);
 		if (x[i] != x[i-1])
 			count += 1;
 	}
@@ -292,7 +297,8 @@ static int count_unique_floatvectors(float *x, int n, int d)
 		float *p = x + d*(i-1);
 		float *q = x + d*i;
 		for (int j = 0; j < d; j++) {
-			assert(p[j] <= q[j]);
+			if (!isnan(p[j]) && !isnan(q[j]))
+				assert(p[j] <= q[j]);
 			if (p[j] != q[j]) {
 				count += 1;
 				break;
@@ -345,16 +351,18 @@ static void compute_stuff_sortc(struct printable_data *p,
 static void compute_stuff_squares(struct printable_data *p,
 		float *x, int w, int h, int pd)
 {
-	int n = w * h * pd;
+	int n = w * h * pd, rn = 0;
 	p->squared_samples = xmalloc(n * sizeof*p->squared_samples);
 	long double hyp = 0;
 	for (int i = 0; i < n; i++)
 	{
 		float sq = x[i] * x[i];
+		if (isnan(sq)) continue;
 		p->squared_samples[i] = sq;
 		hyp = hypotl(hyp, x[i]);
+		rn += 1;
 	}
-	setnumber(p, "rms", hyp / sqrt(n));
+	setnumber(p, "rms", hyp / sqrt(rn));
 }
 
 
@@ -529,6 +537,7 @@ static void print_printable_data(FILE *f, struct printable_data *p)
 			}
 		} else if (c == '\\') {
 			c = *fmt++; if (!c) break;
+			if (c == '%') my_putchar(f, '%');
 			if (c == 'n') my_putchar(f, '\n');
 			if (c == 't') my_putchar(f, '\t');
 			if (c == '\\') my_putchar(f, '\\');
@@ -562,7 +571,7 @@ static void print_printable_data(FILE *f, struct printable_data *p)
 // %K         number of different pixels
 // %r         root mean square
 // %e         average absolute value
-// %%         literal %
+// \%         literal %
 // \n         newline
 // \t         tab
 // \\         backslash
@@ -588,25 +597,25 @@ static char *preprocess_arrobas(char *fmt)
 	case 4: return "%wx%h [%i %v %a] %c [(%I) (%V) (%A)]\\n";
 	case 5: return "%wx%h [%k] %c [%K]\\n";
 	case 9: return
-"width:                  %w\n"
-"height:                 %h\n"
-"pixeldim:               %c\n"
-"numsamples:             %n\n"
-"numpixels:              %N\n"
-"smallest sample:        %i\n"
-"average sample:         %v\n"
-"median sample:          %m\n"
-"max sample:             %a\n"
-"smallest pixel:         %I\n"
-"average pixel:          %V\n"
-"median pixel:           %M\n"
-"max pixel:              %A\n"
-"sample quartiles:       %q[0] %q[25] %q[50] %q[75] %q[100]\n"
+"width (\\%w):                  %w\n"
+"height (\\%h):                 %h\n"
+"pixeldim (\\%c):               %c\n"
+"numsamples (\\%n):             %n\n"
+"numpixels (\\%N):              %N\n"
+"smallest sample (\\%i):        %i\n"
+"average sample (\\%v):         %v\n"
+"median sample (\\%m):          %m\n"
+"max sample (\\%a):             %a\n"
+"smallest pixel (\\%I):         %I\n"
+"average pixel (\\%V):          %V\n"
+"median pixel (\\%M):           %M\n"
+"max pixel (\\%A):              %A\n"
+"sample quartiles (\\%q[*]):       %q[0] %q[25] %q[50] %q[75] %q[100]\n"
 //"pixel quartiles:        (%Q[0]) (%Q[25]) (%Q[50]) (%Q[75]) (%Q[100])\n"
-"different samples:      %k\n"
-"different pixels:       %K\n"
-"root mean square:       %r\n"
-"average absolute value: %e\n";
+"different samples (\\%k):      %k\n"
+"different pixels (\\%K):       %K\n"
+"root mean square (\\%r):       %r\n"
+"average absolute value (\\%e): %e\n";
 	default: return fmt;
 	}
 }
@@ -640,6 +649,8 @@ static void imprintf_2d(FILE *f, char *fmt, float *x, int w, int h, int pd)
 			{"nvectors",   "K", REQ_SORTC,   1, {0}, 0, {0}, false},
 			{"rms",        "r", REQ_SQUARES, 1, {0}, 0, {0}, false},
 			{"error",      "e", REQ_BASIC,   1, {0}, 0, {0}, false},
+//			{"l1norm",     "1", REQ_SQUARES, 1, {0}, 0, {0}, false},
+//			{"l2norm",     "2", REQ_SQUARES, 1, {0}, 0, {0}, false},
 			{NULL, NULL, 0, 0, {0}, 0, {0}, false} },
 		.sorted_samples = NULL,
 		.sorted_vectors = NULL,

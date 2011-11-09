@@ -240,7 +240,7 @@ static void overlines(uint8_t (**y)[3], float (**x)[2], int w, int h, float s)
 	FORJ(h) FORI(w)
 		scalar[j][i] = hypot(x[j][i][0], x[j][i][1]);
 
-	FORI(11)
+	FORI(51)
 		overlay_level_line_in_black(y, scalar, w, h, s*i);
 }
 
