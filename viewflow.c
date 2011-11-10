@@ -49,7 +49,9 @@ static void viewflow_flat(uint8_t *py, float *px, int w, int h, float m)
 	FORJ(h) FORI(w) {
 		float *v = x[j][i];
 		double r = hypot(v[0], v[1]);
-		if (r > 1e8) { FORL(3) y[j][i][l] = 255; continue; }
+		if (r > 1e8 || !isfinite(r)) {
+			FORL(3) y[j][i][l] = 255; continue;
+		}
 		r = r>m ? 1 : r/m;
 		double a = atan2(v[1], -v[0]);
 		a = (a+M_PI)*(180/M_PI);

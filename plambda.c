@@ -722,8 +722,8 @@ static void vstack_apply_function(struct value_vstack *s,
 		// TODO: solve commutativity issue here
 		if (d[i] != rd) {
 			if (rd > 1)
-				error("can not mix %d- and %d-vectors\n",
-					rd, d[i]);
+				error("can not mix %d- and %d-vectors [%s]\n",
+					rd, d[i], f->name);
 			else
 				rd = d[i];
 		}

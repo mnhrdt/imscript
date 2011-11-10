@@ -22,6 +22,8 @@
 // %K         number of different pixels
 // %r         root mean square
 // %e         average absolute value
+// %y         quantity of infinite samples
+// %Y         quantity of NaN samples
 // \%         literal %
 // \n         newline
 // \t         tab
@@ -82,7 +84,7 @@ struct printable_data {
 	// the following table is initialized "statically" at the main function
 	struct conversion_specifier_and_its_data *t;
 
-	float *sorted_samples;
+	float *sorted_samples; int nsorted_samples;
 	float *sorted_vectors; // by comparing their norm
 	float *sorted_colors;  // by comparing their samples
 	float *squared_samples;
@@ -186,13 +188,17 @@ static void compute_stuff_basic(struct printable_data *p,
 		float *x, int w, int h, int pd)
 {
 	// sample basic stuff
-	int ns = w * h * pd, rns = 0;
+	int ns = w * h * pd, rns = 0, nnan = 0, ninf = 0;
 	float minsample = INFINITY, maxsample = -INFINITY;
 	long double avgsample = 0;
 	for (int i = 0; i < ns; i++)
 	{
 		float y = x[i];
-		if (isnan(y)) continue;
+		if (isnan(y)) {
+			nnan += 1;
+			continue;
+		}
+		if (!isfinite(y)) ninf += 1;
 		if (y < minsample) minsample = y;
 		if (y > maxsample) maxsample = y;
 		avgsample += y;
@@ -202,6 +208,8 @@ static void compute_stuff_basic(struct printable_data *p,
 	setnumber(p, "minsample", minsample);
 	setnumber(p, "maxsample", maxsample);
 	setnumber(p, "avgsample", avgsample);
+	setnumber(p, "nnan", nnan);
+	setnumber(p, "ninf", ninf);
 
 
 	// pixel basic stuff
@@ -311,13 +319,17 @@ static int count_unique_floatvectors(float *x, int n, int d)
 static void compute_stuff_sorts(struct printable_data *p,
 		float *x, int w, int h, int pd)
 {
-	int ns = w * h * pd;
+	int ns = w * h * pd, ns0 = 0;
 	p->sorted_samples = xmalloc(ns * sizeof*p->sorted_samples);
 	for (int i = 0; i < ns; i++)
-		p->sorted_samples[i] = x[i];
-	qsort(p->sorted_samples, ns, sizeof*p->sorted_samples, compare_floats);
-	setnumber(p, "medsample", p->sorted_samples[ns/2]);
-	int nsamples = count_unique_floats(p->sorted_samples, ns);
+		if (!isnan(x[i])) {
+			p->sorted_samples[i] = x[i];
+			ns0 += 1;
+		}
+	p->nsorted_samples = ns0;
+	qsort(p->sorted_samples, ns0, sizeof*p->sorted_samples, compare_floats);
+	setnumber(p, "medsample", p->sorted_samples[ns0/2]);
+	int nsamples = count_unique_floats(p->sorted_samples, ns0);
 	setnumber(p, "nscalars", nsamples);
 }
 
@@ -447,10 +459,11 @@ static void print_parametric_datum(FILE *f, struct printable_data *p, int idx,
 		int q = ((int)argv[0])%101;
 		assert(q >= 0);
 		assert(q <= 100);
-		float factor = p->w * p->h * p->pd - 1;
+		int ns0 = p->nsorted_samples;
+		float factor = ns0 - 1;
 		int pq = (factor * q)/100;
 		assert(pq >= 0);
-		assert(pq < p->w * p->h * p->pd);
+		assert(pq < ns0);
 		print_scalar(f, p, p->sorted_samples[pq]);
 	} else if (0 == strcmp("Percentile", p->t[idx].name)) {
 		exit(fprintf(stderr, "ERROR: Percentile not implemented\n"));
@@ -615,7 +628,9 @@ static char *preprocess_arrobas(char *fmt)
 "different samples (\\%k):      %k\n"
 "different pixels (\\%K):       %K\n"
 "root mean square (\\%r):       %r\n"
-"average absolute value (\\%e): %e\n";
+"average absolute value (\\%e): %e\n"
+"infinite samples (\\%y):       %y\n"
+"nan samples (\\%Y):            %Y\n";
 	default: return fmt;
 	}
 }
@@ -649,6 +664,8 @@ static void imprintf_2d(FILE *f, char *fmt, float *x, int w, int h, int pd)
 			{"nvectors",   "K", REQ_SORTC,   1, {0}, 0, {0}, false},
 			{"rms",        "r", REQ_SQUARES, 1, {0}, 0, {0}, false},
 			{"error",      "e", REQ_BASIC,   1, {0}, 0, {0}, false},
+			{"ninf",       "y", REQ_BASIC,   1, {0}, 0, {0}, false},
+			{"nnan",       "Y", REQ_BASIC,   1, {0}, 0, {0}, false},
 //			{"l1norm",     "1", REQ_SQUARES, 1, {0}, 0, {0}, false},
 //			{"l2norm",     "2", REQ_SQUARES, 1, {0}, 0, {0}, false},
 			{NULL, NULL, 0, 0, {0}, 0, {0}, false} },
