@@ -166,10 +166,13 @@ static void config_printable_data(struct printable_data *p, char *fmt)
 
 static float vnormf(const float *x, int n)
 {
-	float r = 0;
-	for (int i = 0; i < n; i++)
-		r = hypot(r, x[i]);
-	return r;
+	if (n == 1) return fabs(x[0]);
+	else {
+		float r = 0;
+		for (int i = 0; i < n; i++)
+			r = hypot(r, x[i]);
+		return r;
+	}
 }
 
 static void compute_stuff_nothing(struct printable_data *p,
@@ -230,7 +233,8 @@ static void compute_stuff_basic(struct printable_data *p,
 		avgnorm += xnorm;
 		rnp += 1;
 	}
-	avgnorm /= np;
+	assert(rnp);
+	avgnorm /= rnp;
 	long double mipi[pd], mapi[pd];
 	for (int j = 0; j < pd; j++) {
 		mipi[j] = x[minidx*pd+j];

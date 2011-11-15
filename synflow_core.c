@@ -364,7 +364,7 @@ static double produce_affinity(double A[6], int w, int h,
 		char *afftype, double *v)
 {
 	if (0 == strcmp(afftype, "aff")) { // actual parameters
-		FORI(9) A[i] = v[i];
+		FORI(6) A[i] = v[i];
 	} else if (0 == strcmp(afftype, "aff3p")) {
 		// absolute displacement of the image corners
 		double corner[3][2] = {{0,0}, {w,0}, {0,h}};
@@ -461,6 +461,15 @@ static double produce_affinity(double A[6], int w, int h,
 		affine_map(rc, R, c);
 		R[2] = w*v[2]/100 - rc[0] + c[0];
 		R[5] = h*v[3]/100 - rc[1] + c[1];
+		FORI(6) A[i] = R[i];
+	} else if (0 == strcmp(afftype, "colorwheel")) {
+		double disp = v[0];
+		double scale = 1 + disp/100.0;
+		fprintf(stderr, "scale = %g\n", scale);
+		double R[6] = {
+			scale, 0, (1-scale)*w/2.0,
+			0, scale, (1-scale)*h/2.0
+		};
 		FORI(6) A[i] = R[i];
 	} else error("unrecognized affinity type \"%s\"", afftype);
 	return 0;
@@ -605,6 +614,7 @@ static int parse_flow_name(int *vp, int *hidden_id, char *model_name)
 		{"aff12",         12, 6, FLOWMODEL_HIDDEN_AFFINE},
 //		{"aff12r",        12, 6, FLOWMODEL_HIDDEN_AFFINE},
 		{"aff12rc",       12, 6, FLOWMODEL_HIDDEN_AFFINE},
+		{"colorwheel",     1, 6, FLOWMODEL_HIDDEN_AFFINE},
 		{"hom",           9, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
 		{"hom4p",         8, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
 //		{"hom4pr",        8, 9, FLOWMODEL_HIDDEN_PROJECTIVE},

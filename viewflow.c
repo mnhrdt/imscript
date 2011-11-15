@@ -205,6 +205,20 @@ static void viewflow_middlebury(uint8_t *py, float *px, int w, int h)
 	}
 }
 
+static float pick_scale(float (*x)[2], int n)
+{
+	float range = -1;
+	FORI(n) {
+		if (middlebury_toolarge(x[i]))
+			continue;
+		float nv = hypot(x[i][0], x[i][1]);
+		if (nv > range)
+			range = nv;
+	}
+	return range;
+}
+
+
 static void black_pixel(int x, int y, void *ii)
 {
 	static int hack_width = 0;
@@ -265,6 +279,10 @@ int main_viewflow(int c, char *v[])
 	uint8_t (**view)[3] = matrix_build(w, h, sizeof**view);
 
 	float satscale = atof(v[1]);
+	if (0 == satscale) {
+		satscale = pick_scale(flow[0], w*h);
+		fprintf(stderr, "computed scale = %g\n", satscale);
+	}
 
 	//viewflow_pd(view, flow, w, h, fabs(satscale));
 	if (isfinite(satscale)) {
