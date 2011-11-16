@@ -34,6 +34,15 @@ static float getsample(float *fx, int w, int h, int pd, int i, int j, int l)
 	//return x[(i+j*w)*pd + l];
 }
 
+static float getsamplen(float *fx, int w, int h, int pd, int i, int j, int l)
+{
+	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
+		return NAN;
+	float (*x)[w][pd] = (void*)fx;
+	return x[j][i][l];
+	//return x[(i+j*w)*pd + l];
+}
+
 static void bilinear_interpolation_at(float *result,
 		float *x, int w, int h, int pd,
 		float p, float q)
@@ -41,10 +50,10 @@ static void bilinear_interpolation_at(float *result,
 	int ip = p;
 	int iq = q;
 	FORL(pd) {
-		float a = getsample(x, w, h, pd, ip  , iq  , l);
-		float b = getsample(x, w, h, pd, ip+1, iq  , l);
-		float c = getsample(x, w, h, pd, ip  , iq+1, l);
-		float d = getsample(x, w, h, pd, ip+1, iq+1, l);
+		float a = getsamplen(x, w, h, pd, ip  , iq  , l);
+		float b = getsamplen(x, w, h, pd, ip+1, iq  , l);
+		float c = getsamplen(x, w, h, pd, ip  , iq+1, l);
+		float d = getsamplen(x, w, h, pd, ip+1, iq+1, l);
 		float r = evaluate_bilinear_cell(a, b, c, d, p-ip, q-iq);
 		result[l] = r;
 	}
