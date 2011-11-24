@@ -1,8 +1,11 @@
+#include <assert.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <omp.h>
 #include "iio.h"
 
 static void *xmalloc(size_t size)
@@ -61,6 +64,7 @@ static void compute_input_derivatives(float *Ex, float *Ey, float *Et,
 static void compute_bar(float *ubar, float *u, int w, int h)
 {
 	extension_operator_float p = extend_float_image_constant;
+#pragma omp parallel for
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 		ubar[j*w+i] = (1.0/6) * (p(u,w,h, i-1, j) + p(u,w,h, i+1, j)
@@ -94,20 +98,29 @@ static bool hs_iteration_stopping(float *u, float *v,
 	float *vbar = xmalloc(w * h * sizeof(float));
 	compute_bar(ubar, u, w, h);
 	compute_bar(vbar, v, w, h);
-	float maxdiff = 0;
+	double scale = (19.0*INT_MAX)/(20+w*h);
+	int mm = 0;
+#pragma omp parallel for reduction(|:mm)
 	for (int i = 0; i < w*h; i++) {
 		float t = Ex[i]*ubar[i] + Ey[i]*vbar[i] + Et[i];
 		t /= alpha*alpha + Ex[i]*Ex[i] + Ey[i]*Ey[i];
 		float newu = ubar[i] - Ex[i] * t;
 		float newv = vbar[i] - Ey[i] * t;
-		if (fabs(newu - u[i]) > maxdiff) maxdiff = fabs(newu);
-		if (fabs(newv - v[i]) > maxdiff) maxdiff = fabs(newv);
+		float du = fabs(newu - u[i]);
+		float dv = fabs(newv - v[i]);
 		u[i] = newu;
 		v[i] = newv;
+		int mmnew = scale * (du > dv ? du : dv);
+		//fprintf(stderr, "mmnew %x\n", mmnew);
+		mm |= mmnew;
 	}
+	float mms = mm / scale;
+	//fprintf(stderr, "scale =  %g\n", scale);
+	//fprintf(stderr, "mm %o\n", mm);
+	//fprintf(stderr, "mms %g\n", mms);
 	free(ubar);
 	free(vbar);
-	return maxdiff < epsilon;
+	return mms < epsilon;
 }
 
 static void hs(float *u, float *v, float *a, float *b, int w, int h,
@@ -147,14 +160,17 @@ static int hs_stopping(float *u, float *v, float *a, float *b, int w, int h,
 
 int main(int argc, char *argv[])
 {
-	if (argc != 6 && argc != 7)
-		exit(fprintf(stderr, "usage:\n\t%s niter alpha a b f\n",*argv));
-	int niter = atoi(argv[1]);
-	float alpha = atof(argv[2]);
-	float epsilon = argc == 7 ? atof(argv[3]) : NAN;
-	char *filename_a = argv[argc-3];
-	char *filename_b = argv[argc-2];
-	char *filename_f = argv[argc-1];
+	if (argc != 8)
+		exit(fprintf(stderr, "usage:\n\t"
+			"%s nprocs niter alpha epsilon a b f\n",*argv));
+	     //           0 1      2      3     4      5 6 7
+	int nprocs = atoi(argv[1]);
+	int niter = atoi(argv[2]);
+	float alpha = atof(argv[3]);
+	float epsilon = atof(argv[4]);
+	char *filename_a = argv[5];
+	char *filename_b = argv[6];
+	char *filename_f = argv[7];
 	int w, h, ww, hh;
 	float *a = iio_read_image_float(filename_a, &w, &h);
 	float *b = iio_read_image_float(filename_b, &ww, &hh);
@@ -162,11 +178,9 @@ int main(int argc, char *argv[])
 		exit(fprintf(stderr, "input images size mismatch\n"));
 	float *u = xmalloc(w * h * sizeof(float));
 	float *v = xmalloc(w * h * sizeof(float));
-	if (isfinite(epsilon)) {
-		int nit = hs_stopping(u, v, a, b, w, h, niter, alpha, epsilon);
-		fprintf(stderr, "ran %d iterations\n", nit);
-	} else
-		hs(u, v, a, b, w, h, niter, alpha);
+	if(nprocs > 0) omp_set_num_threads(nprocs);
+	int nit = hs_stopping(u, v, a, b, w, h, niter, alpha, epsilon);
+	fprintf(stderr, "ran %d iterations\n", nit);
 	float *f = xmalloc(w * h * 2 * sizeof(float));
 	for (int i = 0; i < w*h; i++) {
 		f[2*i] = u[i];

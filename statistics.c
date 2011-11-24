@@ -10,16 +10,16 @@ struct statistics_float {
 	float min, max, median, average, sample, variance, middle;
 };
 
-#ifdef _STDIO_H
 void print_stats(FILE *f, struct statistics_float *s, char *name)
 {
+#ifdef _STDIO_H
 	fprintf(f, "%s min: %g\n", name, s->min);
 	fprintf(f, "%s max: %g\n", name, s->max);
 	fprintf(f, "%s median: %g\n", name, s->median);
 	fprintf(f, "%s average: %g\n", name, s->average);
 	fprintf(f, "%s variance: %g\n", name, s->variance);
-}
 #endif//STDIO_H
+}
 
 //SMART_PARAMETER_INT(STATISTIC_MEDIAN_BIAS,0)
 //SMART_PARAMETER_SILENT(STATISTIC_MIDDLE_BIAS,-1)

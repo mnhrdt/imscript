@@ -188,7 +188,9 @@ static void gblur(float *y, float *x, int w, int h, int pd, float s)
 	FORL(pd) {
 		FORI(w*h)
 			c[i] = x[i*pd + l];
-		gblur_gray(gc, c, w, h, s);
+		if (s)
+			gblur_gray(gc, c, w, h, s);
+		else FORI(w*h) gc[i] = c[i];
 		FORI(w*h)
 			y[i*pd + l] = gc[i];
 	}
