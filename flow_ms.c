@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include "iio.h"
+
 #include "error.c"
 #include "xmalloc.c"
 
@@ -114,7 +116,9 @@ static void downscale_image(float *out, float *in,
 			       	+ p(in,inw,inh, 2*i+1, 2*j+1));
 }
 
-static void produce_downwards_pyramid(
+// starting from a high-resolution image, produce a pyramid of lower-resolution
+// versions
+static void produce_upwards_pyramid(
 		float **out_pyrx, int *out_pyrw, int *out_pyrh, int *out_pyrs,
 		float *x, int w, int h,
 		int nscales, float scalestep)
@@ -169,13 +173,13 @@ static void produce_downwards_pyramid(
 }
 
 
-static void upscale_flow(float *out, float *in,
+static void upscale_flow_component(float *out, float *in,
 		int outw, int outh, int inw, int inh,
 		float scalestep)
 {
 	assert(scalestep == 2);
-	assert(outw == 2*inw);
-	assert(outh == 2*inh);
+	assert(outw <= 2*inw);
+	assert(outh <= 2*inh);
 
 	float (*o)[outw] = (void*)out;
 	float (*x)[inw] = (void*)in;
@@ -185,9 +189,12 @@ static void upscale_flow(float *out, float *in,
 	for (int i = 0; i < inw; i++)
 	{
 		o[2*j][2*i] = x[j][i];
-		o[2*j+1][2*i] = (x[j][i] + x[j+1][i])/2;
-		o[2*j][2*i+1] = (x[j][i] + x[j][i+1])/2;
-		o[2*j+1][2*i+1] = (x[j][i]+x[j][i+1]+x[j+1][i]+x[j+1][i+1])/4;
+		if (2*j+1 < outh)
+			o[2*j+1][2*i] = (x[j][i] + x[j+1][i])/2;
+		if (2*i+1 < outw)
+			o[2*j][2*i+1] = (x[j][i] + x[j][i+1])/2;
+		if (2*j+1 < outh && 2*i+1 < outw)
+			o[2*j+1][2*i+1] = (x[j][i]+x[j][i+1]+x[j+1][i]+x[j+1][i+1])/4;
 	}
 
 	for (int i = 0; i < outw * outh; i++)
@@ -260,71 +267,97 @@ static void upscale_flow(float *out, float *in,
 //	// ...
 //}
 
+static void save_debug_image(char *fpat, int id, float *x, int w, int h)
+{
+	char filename[0x100];
+	snprintf(filename, 0x100, fpat, id);
+	iio_save_image_float(filename, x, w, h);
+}
 
-//void generic_multi_scale_optical_flow(float *u, float *v,
-//		float *a, float *b, int w, int h,
-//		generic_optical_flow *of, void *data,
-//		int nscales, float scalestep)
-//{
-//	assert(scalestep > 1);
-//
-//	// compute scale factors
-//	float factor[nscales];
-//	factor[0] = 1;
-//	for (int i = 1; i < nscales; i++)
-//		factor[i] = factor[i-1] / scalestep;
-//
-//	// compute pyramid sizes
-//	int pyrsize[nscales][2];
-//	pyrsize[0][0] = w;
-//	pyrsize[0][1] = h;
-//	for (int i = 1; i < nscales; i++) {
-//		pyrsize[i][0] = ceil(pyrsize[i-1][0] * factor[i]);
-//		pyrsize[i][1] = ceil(pyrsize[i-1][1] * factor[i]);
-//	}
-//	for (int i = 0; i < nscales; i++)
-//		pyrsize[i][2] = pyrsize[i][0] * pyrsize[i][1];
-//
-//	// build pyramid
-//	float *pyr[nscales][4]; // (u, v, a, b)
-//	for (int i = 0; i < nscales; i++)
-//	for (int j = 0; j < 4; j++)
-//		pyr[i][j] = xmalloc(pyrsize[i][2] * sizeof(float));
-//	for (int i = 0; i < w*h; i++) {
-//		pyr[0][2][i] = a[i];
-//		pyr[0][3][i] = b[i];
-//	}
-//	for (int i = 1; i < nscales; i++) {
-//		downscale_image(pyr[i][2], pyr[i-1][2],
-//				pyrsize[i][0], pyrsize[i][1],
-//				pyrsize[i-1][0], pyrsize[i-1][2], scalestep);
-//		downscale_image(pyr[i][3], pyr[i-1][3],
-//				pyrsize[i][0], pyrsize[i][1],
-//				pyrsize[i-1][0], pyrsize[i-1][2], scalestep);
-//	}
-//
-//
-//	// run flow at top of pyramid, initialized by zero
-//	float *tmpu = xmalloc(w * h * sizeof(float));
-//	float *tmpv = xmalloc(w * h * sizeof(float));
-//	int s = nscales-1;
-//	for (int j = 0; j < pyrsize[s][2]; j++)
-//		tmpu[j] = tmpv[j] = 0;
-//	of(pyr[s][0], pyr[s][1], pyr[s][2], pyr[s][3], tmpu, tmpv, w, h, data);
-//
-//	// re-scale flow, and use it to initialize the next step of the pyramid
-//	s -= 1;
-//	upscale_flow(pyr[s][2], pyr[s-1][2]);
-//
-//	// WORNG!!!! do start with the UPPER level, not the lower
-//	// (XXX FIXME WRONG ERROR)
-//
-//	of(pyr[1][0], pyr[1][1], pyr[1][2], pyr[1][3], su, sv, w, h, data);
-//	// re-scale flow, and use it to initialize the next step of the pyramid
-//	of(pyr[2][0], pyr[2][1], pyr[2][2], pyr[2][3], su, sv, w, h, data);
-//	// re-scale flow, and use it to initialize the next step of the pyramid
-//	// ...
-//}
+static void save_debug_flow(char *fpat, int id, float*u, float*v, int w, int h)
+{
+	char filename[0x100];
+	snprintf(filename, 0x100, fpat, id);
+	float *f = xmalloc(w*h*2*sizeof*f);
+	for (int i = 0; i < w*h; i++) {
+		f[2*i] = u[i];
+		f[2*i+1] = v[i];
+	}
+
+	iio_save_image_float_vec(filename, f, w, h, 2);
+	xfree(f);
+}
+
+void generic_multi_scale_optical_flow(float *u, float *v,
+		float *a, float *b, int w, int h,
+		generic_optical_flow of, void *data,
+		int nscales, float step)
+{
+	assert(step > 1);
+
+	float *pyra[nscales], *pyrb[nscales], *pyru[nscales], *pyrv[nscales];
+	int pyrw[nscales], pyrh[nscales], pyrs[nscales];
+
+	produce_upwards_pyramid(NULL, pyrw,pyrh,pyrs, NULL,w,h, nscales,step);
+	produce_upwards_pyramid(pyra, NULL,NULL,NULL, a,w,h, nscales, step);
+	produce_upwards_pyramid(pyrb, NULL,NULL,NULL, b,w,h, nscales, step);
+	produce_upwards_pyramid(pyru, NULL,NULL,NULL, u,w,h, nscales, step);
+	produce_upwards_pyramid(pyrv, NULL,NULL,NULL, v,w,h, nscales, step);
+
+	for (int i = 0; i < nscales; i++) {
+		save_debug_image("/tmp/ms_debug_downpyr_a_%02d", i,
+				pyra[i], pyrw[i], pyrh[i]);
+		save_debug_image("/tmp/ms_debug_downpyr_b_%02d", i,
+				pyrb[i], pyrw[i], pyrh[i]);
+	}
+
+	// run flow at top of pyramid
+	int s = nscales - 1;
+	of(pyru[s], pyrv[s], pyra[s], pyrb[s], pyrw[s], pyrh[s], data);
+
+	save_debug_flow("/tmp/ms_debug_downpyr_uv_%02d", s,
+				pyru[s], pyrv[s], pyrw[s], pyrh[s]);
+
+	// upscale flow to the next level
+	upscale_flow_component(pyru[s-1], pyru[s],
+			pyrw[s-1], pyrh[s-1], pyrw[s], pyrh[s], step);
+	upscale_flow_component(pyrv[s-1], pyrv[s],
+			pyrw[s-1], pyrh[s-1], pyrw[s], pyrh[s], step);
+
+	s = s - 1;
+	save_debug_flow("/tmp/ms_debug_downpyr_uv_%02d", s,
+				pyru[s], pyrv[s], pyrw[s], pyrh[s]);
+
+	//for (int i = 0; i < nscales; i++) {
+	//	char buf[0x100];
+	//	snprintf(buf, 0x100, filepattern_out, i);
+	//	printf("SCALE NUMBER %d: %dx%d (%d) => \"%s\"\n", i,
+	//			pyrw[i], pyrh[i], pyrs[i], buf);
+	//	iio_save_image_float(buf, pyrx[i], pyrw[i], pyrh[i]);
+	//}
+
+
+	//// run flow at top of pyramid, initialized by zero
+	//float *tmpu = xmalloc(w * h * sizeof(float));
+	//float *tmpv = xmalloc(w * h * sizeof(float));
+	//int s = nscales-1;
+	//for (int j = 0; j < pyrsize[s][2]; j++)
+	//	tmpu[j] = tmpv[j] = 0;
+	//of(pyr[s][0], pyr[s][1], pyr[s][2], pyr[s][3], tmpu, tmpv, w, h, data);
+
+	//// re-scale flow, and use it to initialize the next step of the pyramid
+	//s -= 1;
+	//upscale_flow(pyr[s][2], pyr[s-1][2]);
+
+	//// WORNG!!!! do start with the UPPER level, not the lower
+	//// (XXX FIXME WRONG ERROR)
+
+	//of(pyr[1][0], pyr[1][1], pyr[1][2], pyr[1][3], su, sv, w, h, data);
+	//// re-scale flow, and use it to initialize the next step of the pyramid
+	//of(pyr[2][0], pyr[2][1], pyr[2][2], pyr[2][3], su, sv, w, h, data);
+	//// re-scale flow, and use it to initialize the next step of the pyramid
+	//// ...
+}
 
 
 #ifdef USE_MAIN
@@ -349,7 +382,7 @@ int main(int c, char *v[])
 	float *pyrx[nscales];
 	int pyrw[nscales], pyrh[nscales], pyrs[nscales];
 
-	produce_downwards_pyramid(pyrx, pyrw, pyrh, pyrs,
+	produce_upwards_pyramid(pyrx, pyrw, pyrh, pyrs,
 			x, w, h, nscales, scalestep);
 
 	for (int i = 0; i < nscales; i++) {
@@ -365,5 +398,51 @@ int main(int c, char *v[])
 }
 
 #endif//USE_MAIN
+
+#ifdef USE_MAINPHS
+
+static void genericized_hs(
+		float *out_u, float *out_v,
+		float *in_a, float *in_b,
+		int width, int height,
+		void *data)
+{
+	float *fdata = data;
+	float alpha = fdata[0];
+	int niter = fdata[1];
+void hs(float *u, float *v, float *a, float *b, int w, int h,
+		int niter, float alpha);
+	hs(out_u, out_v, in_a, in_b, width, height, niter, alpha);
+}
+
+int main(int argc, char *argv[])
+{
+	if (argc != 7) {
+		fprintf(stderr, "usage:\n\t"
+				"%s a b alpha niter step nscales\n", *argv);
+		//               0  1 2 3     4      5   6
+		return EXIT_FAILURE;
+	}
+	char *filename_a = argv[1];
+	char *filename_b = argv[2];
+	float alpha = atof(argv[3]);
+	int niter = atoi(argv[4]);
+	float scalestep = atof(argv[5]);
+	int nscales = atoi(argv[6]);
+
+	int w, h, ww, hh;
+	float *a = iio_read_image_float(filename_a, &w, &h);
+	float *b = iio_read_image_float(filename_b, &ww, &hh);
+	if (w != ww || h != hh) error("input image size mismatch");
+	float *u = xmalloc(w * h * sizeof(float));
+	float *v = xmalloc(w * h * sizeof(float));
+
+	float fdata[2] = {alpha, niter};
+	generic_multi_scale_optical_flow(u, v, a, b, w, h,
+			genericized_hs, fdata, nscales, scalestep);
+
+	return EXIT_SUCCESS;
+}
+#endif//USE_MAINPHS
 
 // vim:set foldmethod=marker:

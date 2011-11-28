@@ -110,7 +110,7 @@ static bool hs_iteration_stopping(float *u, float *v,
 	return maxdiff < epsilon;
 }
 
-static void hs(float *u, float *v, float *a, float *b, int w, int h,
+void hs(float *u, float *v, float *a, float *b, int w, int h,
 		int niter, float alpha)
 {
 	float *gx = xmalloc(w * h * sizeof(float));
@@ -145,6 +145,7 @@ static int hs_stopping(float *u, float *v, float *a, float *b, int w, int h,
 	return i;
 }
 
+#ifndef OMIT_MAIN
 int main(int argc, char *argv[])
 {
 	if (argc != 6 && argc != 7)
@@ -175,3 +176,4 @@ int main(int argc, char *argv[])
 	iio_save_image_float_vec(filename_f, f, w, h, 2);
 	return EXIT_SUCCESS;
 }
+#endif//OMIT_MAIN
