@@ -158,7 +158,7 @@ static float average(float *x, int n)
 }
 
 // gaussian blur of a gray 2D image
-static void gblur_gray(float *y, float *x, int w, int h, float s)
+void gblur_gray(float *y, float *x, int w, int h, float s)
 {
 	s = 1/s;
 
@@ -181,7 +181,7 @@ static void gblur_gray(float *y, float *x, int w, int h, float s)
 
 // gausian blur of a 2D image with pd-dimensional pixels
 // (the blurring is performed independently for each co-ordinate)
-static void gblur(float *y, float *x, int w, int h, int pd, float s)
+void gblur(float *y, float *x, int w, int h, int pd, float s)
 {
 	float *c = xmalloc(w*h*sizeof*c);
 	float *gc = xmalloc(w*h*sizeof*gc);

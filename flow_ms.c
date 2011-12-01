@@ -15,6 +15,8 @@
 
 #include "iio.h"
 
+#include "smapa.h"
+
 #include "error.c"
 #include "xmalloc.c"
 
@@ -95,13 +97,36 @@ static float interpolate_float_image_bilinearly(float *x, int w, int h,
 	return cell_interpolate(a, b, c, d, i-ii, j-jj, 2);
 }
 
+static void save_debug_image(char *fpat, int id, float *x, int w, int h)
+{
+	char filename[0x100];
+	snprintf(filename, 0x100, fpat, id);
+	fprintf(stderr, "saving image \"%s\"\n", filename);
+	iio_save_image_float(filename, x, w, h);
+}
+
+static void save_debug_flow(char *fpat, int id, float*u, float*v, int w, int h)
+{
+	char filename[0x100];
+	snprintf(filename, 0x100, fpat, id);
+	float *f = xmalloc(w*h*2*sizeof*f);
+	for (int i = 0; i < w*h; i++) {
+		f[2*i] = u[i];       
+		f[2*i+1] = v[i];
+	}
+
+	fprintf(stderr, "saving field \"%s\"\n", filename);
+	iio_save_image_float_vec(filename, f, w, h, 2);
+	xfree(f);
+}
+
 // image scaling {{{1
-static void downscale_image(float *out, float *in,
+static void downscale_image_old(float *out, float *in,
 		int outw, int outh, int inw, int inh,
 		float scalestep)
 {
 	assert(scalestep == 2);
-	fprintf(stderr, "downscale(%g): %dx%d => %dx%d\n", 
+	fprintf(stderr, "downscale(%g): %dx%d => %dx%d\n",
 			scalestep, inw, inh, outw, outh);
 	assert(2*outw >= inw);
 	assert(2*outh >= inh);
@@ -111,42 +136,69 @@ static void downscale_image(float *out, float *in,
 	for (int j = 0; j < outh; j++)
 	for (int i = 0; i < outw; i++)
 		out[outw*j+i] = 0.25 * ( p(in,inw,inh, 2*i, 2*j)
-			       	+ p(in,inw,inh, 2*i+1, 2*j)
-			       	+ p(in,inw,inh, 2*i, 2*j+1)
-			       	+ p(in,inw,inh, 2*i+1, 2*j+1));
+		       + p(in,inw,inh, 2*i+1, 2*j)
+		       + p(in,inw,inh, 2*i, 2*j+1)
+		       + p(in,inw,inh, 2*i+1, 2*j+1));
+}
+
+SMART_PARAMETER(MAGIC_SIGMA,0.8)
+
+static void downscale_image(float *out, float *in,
+		int outw, int outh, int inw, int inh,
+		float scalestep)
+{
+	fprintf(stderr, "downscale(%g): %dx%d => %dx%d\n",
+			scalestep, inw, inh, outw, outh);
+
+	assert(scalestep > 1);
+	assert(scalestep * outw >= inw);
+	assert(scalestep * outw <= inw + 1);
+	assert(scalestep * outh >= inh);
+	assert(scalestep * outh <= inh + 1);
+
+	float blur_size = MAGIC_SIGMA()*sqrt(log(scalestep)/log(2));
+
+	fprintf(stderr, "blur_size = %g\n", blur_size);
+
+	float *gin = xmalloc(inw * inh * sizeof(float));
+	void gblur_gray(float*, float*, int, int, float);
+	gblur_gray(gin, in, inw, inh, blur_size);
+
+	interpolation_operator_float ev = interpolate_float_image_bilinearly;
+
+	for (int j = 0; j < outh; j++)
+	for (int i = 0; i < outw; i++)
+	{
+		float x = scalestep*i;
+		float y = scalestep*j;
+		out[outw*j + i] = ev(gin, inw, inh, x, y);
+	}
+
+	xfree(gin);
 }
 
 // starting from a high-resolution image, produce a pyramid of lower-resolution
 // versions
 static void produce_upwards_pyramid(
-		float **out_pyrx, int *out_pyrw, int *out_pyrh, int *out_pyrs,
+		float **out_pyrx, int *out_pyrw, int *out_pyrh,
 		float *x, int w, int h,
 		int nscales, float scalestep)
 {
 	assert(scalestep > 1);
 
-	//// compute scale factors
-	//float factor[nscales];
-	//factor[0] = 1;
-	//for (int i = 1; i < nscales; i++)
-	//	factor[i] = factor[i-1] / scalestep;
-
 	// compute pyramid sizes
-	int pyrsize[nscales][3];
+	int pyrsize[nscales][2];
 	pyrsize[0][0] = w;
 	pyrsize[0][1] = h;
 	for (int i = 1; i < nscales; i++) {
 		pyrsize[i][0] = ceil(pyrsize[i-1][0] / scalestep);
 		pyrsize[i][1] = ceil(pyrsize[i-1][1] / scalestep);
 	}
-	for (int i = 0; i < nscales; i++)
-		pyrsize[i][2] = pyrsize[i][0] * pyrsize[i][1];
 
 	// save requested outputt
 	for (int i = 0; i < nscales; i++) {
 		if (out_pyrw) out_pyrw[i] = pyrsize[i][0];
 		if (out_pyrh) out_pyrh[i] = pyrsize[i][1];
-		if (out_pyrs) out_pyrs[i] = pyrsize[i][2];
 	}
 
 	if (!out_pyrx) return;
@@ -154,14 +206,16 @@ static void produce_upwards_pyramid(
 	// alloc pyramid levels
 	float *pyr[nscales];
 	for (int i = 0; i < nscales; i++)
-		pyr[i] = xmalloc(pyrsize[i][2] * sizeof(float));
+		pyr[i] = xmalloc(pyrsize[i][0] * pyrsize[i][1] * sizeof(float));
+
+	if (!x) return;
 
 	// fill initial level
+	//downscale_image(pyr[0], x, w, h, w, h, 1.0);
 	for (int i = 0; i < w*h; i++)
 		pyr[0][i] = x[i];
 
 	// propagate information to other levels
-	if (out_pyrx)
 	for (int i = 1; i < nscales; i++)
 		downscale_image(pyr[i], pyr[i-1],
 				pyrsize[i][0], pyrsize[i][1],
@@ -169,11 +223,11 @@ static void produce_upwards_pyramid(
 				scalestep);
 
 	for (int i = 0; i < nscales; i++)
-		if (out_pyrx) out_pyrx[i] = pyr[i];
+		out_pyrx[i] = pyr[i];
 }
 
 
-static void upscale_flow_component(float *out, float *in,
+static void upscale_field(float *out, float *in,
 		int outw, int outh, int inw, int inh,
 		float scalestep)
 {
@@ -184,16 +238,20 @@ static void upscale_flow_component(float *out, float *in,
 	float (*o)[outw] = (void*)out;
 	float (*x)[inw] = (void*)in;
 
+	for (int j = 0; j < outh; j++)
+	for (int i = 0; i < outw; i++)
+		o[j][i] = 0;
+
 	// TODO: think about anchoring here, probably this is 0.5 pixels off!
 	for (int j = 0; j < inh; j++)
 	for (int i = 0; i < inw; i++)
 	{
 		o[2*j][2*i] = x[j][i];
-		if (2*j+1 < outh)
+		if (2*j+1 < outh && j+1 < inh)
 			o[2*j+1][2*i] = (x[j][i] + x[j+1][i])/2;
-		if (2*i+1 < outw)
+		if (2*i+1 < outw && i+1 < inw)
 			o[2*j][2*i+1] = (x[j][i] + x[j][i+1])/2;
-		if (2*j+1 < outh && 2*i+1 < outw)
+		if (2*j+1 < outh && 2*i+1 < outw && j+1 < inh && i+1 < inw)
 			o[2*j+1][2*i+1] = (x[j][i]+x[j][i+1]+x[j+1][i]+x[j+1][i+1])/4;
 	}
 
@@ -201,165 +259,129 @@ static void upscale_flow_component(float *out, float *in,
 		out[i] *= scalestep;
 }
 
-// multiscale flow {{{1
-//void perturbative_multi_scale_optical_flow(float *u, float *v,
-//		float *a, float *b, int w, int h,
-//		iterative_optical_flow of, void *data,
-//		int nscales, float scalestep)
-//{
 
-//
-//	// compute scale factors
-//	float factor[nscales];
-//	factor[0] = 1;
-//	for (int i = 1; i < nscales; i++)
-//		factor[i] = factor[i-1] / scalestep;
-//
-//	// compute pyramid sizes
-//	int pyrsize[nscales][2];
-//	pyrsize[0][0] = w;
-//	pyrsize[0][1] = h;
-//	for (int i = 1; i < nscales; i++) {
-//		pyrsize[i][0] = ceil(pyrsize[i-1][0] * factor[i]);
-//		pyrsize[i][1] = ceil(pyrsize[i-1][1] * factor[i]);
-//	}
-//	for (int i = 0; i < nscales; i++)
-//		pyrsize[i][2] = pyrsize[i][0] * pyrsize[i][1];
-//
-//	// build pyramid
-//	float *pyr[nscales][4]; // (u, v, a, b)
-//	for (int i = 0; i < nscales; i++)
-//	for (int j = 0; j < 4; j++)
-//		pyr[i][j] = xmalloc(pyrsize[i][2] * sizeof(float));
-//	for (int i = 0; i < w*h; i++) {
-//		pyr[0][2][i] = a[i];
-//		pyr[0][3][i] = b[i];
-//	}
-//	for (int i = 1; i < nscales; i++) {
-//		downscale_image(pyr[i][2], pyr[i-1][2],
-//				pyrsize[i][0], pyrsize[i][1],
-//				pyrsize[i-1][0], pyrsize[i-1][2], scalestep);
-//		downscale_image(pyr[i][3], pyr[i-1][3],
-//				pyrsize[i][0], pyrsize[i][1],
-//				pyrsize[i-1][0], pyrsize[i-1][2], scalestep);
-//	}
-//
-//
-//	// run flow at top of pyramid, initialized by zero
-//	float *tmpu = xmalloc(w * h * sizeof(float));
-//	float *tmpv = xmalloc(w * h * sizeof(float));
-//	int s = nscales-1;
-//	for (int j = 0; j < pyrsize[s][2]; j++)
-//		tmpu[j] = tmpv[j] = 0;
-//	of(pyr[s][0], pyr[s][1], pyr[s][2], pyr[s][3], tmpu, tmpv, w, h, data);
-//
-//	// re-scale flow, and use it to initialize the next step of the pyramid
-//	s -= 1;
-//	upscale_flow(pyr[s][2], pyr[s-1][2]);
-//
-//	// WORNG!!!! do start with the UPPER level, not the lower
-//	// (XXX FIXME WRONG ERROR)
-//
-//	of(pyr[1][0], pyr[1][1], pyr[1][2], pyr[1][3], su, sv, w, h, data);
-//	// re-scale flow, and use it to initialize the next step of the pyramid
-//	of(pyr[2][0], pyr[2][1], pyr[2][2], pyr[2][3], su, sv, w, h, data);
-//	// re-scale flow, and use it to initialize the next step of the pyramid
-//	// ...
-//}
-
-static void save_debug_image(char *fpat, int id, float *x, int w, int h)
+// image warping {{{1
+static void backwarp_image(float *x_out, float *x_in, float *u, float *v,
+		int w, int h)
 {
-	char filename[0x100];
-	snprintf(filename, 0x100, fpat, id);
-	iio_save_image_float(filename, x, w, h);
-}
+	interpolation_operator_float ev = interpolate_float_image_bilinearly;
 
-static void save_debug_flow(char *fpat, int id, float*u, float*v, int w, int h)
-{
-	char filename[0x100];
-	snprintf(filename, 0x100, fpat, id);
-	float *f = xmalloc(w*h*2*sizeof*f);
-	for (int i = 0; i < w*h; i++) {
-		f[2*i] = u[i];
-		f[2*i+1] = v[i];
+	float *tmpx = xmalloc(w*h*sizeof*tmpx);
+
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		float p = i + u[w*j+i];
+		float q = j + v[w*j+i];
+		tmpx[w*j+i] = ev(x_in, w, h, p, q);
 	}
 
-	iio_save_image_float_vec(filename, f, w, h, 2);
-	xfree(f);
+	for (int i = 0; i < w*h; i++)
+		x_out[i] = tmpx[i];
+
+	xfree(tmpx);
 }
 
-void generic_multi_scale_optical_flow(float *u, float *v,
+// multiscale flow {{{1
+
+// ungenericizer {{{2
+static int global_idx;
+
+// this function should be a closure to turn a generic optical flow
+// into an iterative optical flow
+static void iteritized(generic_optical_flow of,
+		float *out_u, float *out_v,
+		float *in_a, float *in_b,
+		float *in_u, float *in_v,
+		int w, int h,
+		void *data)
+{
+	float *wb = xmalloc(w * h * sizeof*wb);
+	float *u = xmalloc(w * h * sizeof*wb);
+	float *v = xmalloc(w * h * sizeof*wb);
+
+	backwarp_image(wb, in_b, in_u, in_v, w, h);
+
+	save_debug_image("/tmp/ms_debug_image_wb_%02d", global_idx, wb, w, h);
+
+	of(u, v, in_a, wb, w, h, data);
+
+	save_debug_flow("/tmp/ms_debug_field_duv_%02d", global_idx, u, v, w, h);
+	for (int i = 0; i < w *h; i++) {
+		out_u[i] = u[i] + in_u[i];
+		out_v[i] = v[i] + in_v[i];
+	}
+	save_debug_flow("/tmp/ms_debug_field_uv_%02d", global_idx,
+			out_u, out_v, w, h);
+	xfree(u);
+	xfree(v);
+	xfree(wb);
+}
+
+// perturbative multiscale {{{2
+void perturbative_multi_scale_optical_flow(float *u, float *v,
 		float *a, float *b, int w, int h,
+		iterative_optical_flow of, void *data,
+		int nscales, float scalestep)
+{
+	error("not yet implemented");
+}
+
+SMART_PARAMETER_SILENT(NWARPS,1)
+
+// generic multiscale {{{2
+void generic_multi_scale_optical_flow(float *out_u, float *out_v,
+		float *in_a, float *in_b, int in_w, int in_h,
 		generic_optical_flow of, void *data,
 		int nscales, float step)
 {
 	assert(step > 1);
 
-	float *pyra[nscales], *pyrb[nscales], *pyru[nscales], *pyrv[nscales];
-	int pyrw[nscales], pyrh[nscales], pyrs[nscales];
+	float *a[nscales], *b[nscales], *u[nscales], *v[nscales];
+	int w[nscales], h[nscales];
 
-	produce_upwards_pyramid(NULL, pyrw,pyrh,pyrs, NULL,w,h, nscales,step);
-	produce_upwards_pyramid(pyra, NULL,NULL,NULL, a,w,h, nscales, step);
-	produce_upwards_pyramid(pyrb, NULL,NULL,NULL, b,w,h, nscales, step);
-	produce_upwards_pyramid(pyru, NULL,NULL,NULL, u,w,h, nscales, step);
-	produce_upwards_pyramid(pyrv, NULL,NULL,NULL, v,w,h, nscales, step);
+	//                      op ow oh ix 
+	produce_upwards_pyramid(0, w, h, 0,    in_w, in_h, nscales,step);
+	produce_upwards_pyramid(a, 0, 0, in_a, in_w, in_h, nscales,step);
+	produce_upwards_pyramid(b, 0, 0, in_b, in_w, in_h, nscales,step);
+	produce_upwards_pyramid(u, 0, 0, 0,    in_w, in_h, nscales,step);
+	produce_upwards_pyramid(v, 0, 0, 0,    in_w, in_h, nscales,step);
 
 	for (int i = 0; i < nscales; i++) {
-		save_debug_image("/tmp/ms_debug_downpyr_a_%02d", i,
-				pyra[i], pyrw[i], pyrh[i]);
-		save_debug_image("/tmp/ms_debug_downpyr_b_%02d", i,
-				pyrb[i], pyrw[i], pyrh[i]);
+		save_debug_image("/tmp/ms_debug_image_a_%02d", i,
+				a[i], w[i], h[i]);
+		save_debug_image("/tmp/ms_debug_image_b_%02d", i,
+				b[i], w[i], h[i]);
 	}
 
-	// run flow at top of pyramid
+	int nwarps = NWARPS();
+
 	int s = nscales - 1;
-	of(pyru[s], pyrv[s], pyra[s], pyrb[s], pyrw[s], pyrh[s], data);
+	for (int i = 0; i < w[s]*h[s]; i++)
+		u[s][i] = v[s][i] = 0;
+	while (s >= 0) {
+		global_idx = s;
+		// run flow at this level
 
-	save_debug_flow("/tmp/ms_debug_downpyr_uv_%02d", s,
-				pyru[s], pyrv[s], pyrw[s], pyrh[s]);
+		for (int i = 0; i < nwarps; i++)
+			iteritized(of, u[s], v[s], a[s], b[s], u[s], v[s],
+							w[s], h[s], data);
+		if (!s) break;
 
-	// upscale flow to the next level
-	upscale_flow_component(pyru[s-1], pyru[s],
-			pyrw[s-1], pyrh[s-1], pyrw[s], pyrh[s], step);
-	upscale_flow_component(pyrv[s-1], pyrv[s],
-			pyrw[s-1], pyrh[s-1], pyrw[s], pyrh[s], step);
+		// upscale flow to the next level
+		upscale_field(u[s-1], u[s], w[s-1], h[s-1], w[s], h[s], step);
+		upscale_field(v[s-1], v[s], w[s-1], h[s-1], w[s], h[s], step);
 
-	s = s - 1;
-	save_debug_flow("/tmp/ms_debug_downpyr_uv_%02d", s,
-				pyru[s], pyrv[s], pyrw[s], pyrh[s]);
+		save_debug_flow("/tmp/ms_debug_field_suv_%02d", s,
+				u[s-1], v[s-1], w[s-1], h[s-1]);
 
-	//for (int i = 0; i < nscales; i++) {
-	//	char buf[0x100];
-	//	snprintf(buf, 0x100, filepattern_out, i);
-	//	printf("SCALE NUMBER %d: %dx%d (%d) => \"%s\"\n", i,
-	//			pyrw[i], pyrh[i], pyrs[i], buf);
-	//	iio_save_image_float(buf, pyrx[i], pyrw[i], pyrh[i]);
-	//}
-
-
-	//// run flow at top of pyramid, initialized by zero
-	//float *tmpu = xmalloc(w * h * sizeof(float));
-	//float *tmpv = xmalloc(w * h * sizeof(float));
-	//int s = nscales-1;
-	//for (int j = 0; j < pyrsize[s][2]; j++)
-	//	tmpu[j] = tmpv[j] = 0;
-	//of(pyr[s][0], pyr[s][1], pyr[s][2], pyr[s][3], tmpu, tmpv, w, h, data);
-
-	//// re-scale flow, and use it to initialize the next step of the pyramid
-	//s -= 1;
-	//upscale_flow(pyr[s][2], pyr[s-1][2]);
-
-	//// WORNG!!!! do start with the UPPER level, not the lower
-	//// (XXX FIXME WRONG ERROR)
-
-	//of(pyr[1][0], pyr[1][1], pyr[1][2], pyr[1][3], su, sv, w, h, data);
-	//// re-scale flow, and use it to initialize the next step of the pyramid
-	//of(pyr[2][0], pyr[2][1], pyr[2][2], pyr[2][3], su, sv, w, h, data);
-	//// re-scale flow, and use it to initialize the next step of the pyramid
-	//// ...
+		// iterate
+		s = s - 1;
+	}
 }
 
 
+// main for testing pyramid construction {{{1
 #ifdef USE_MAIN
 
 #include "iio.h"
@@ -380,16 +402,16 @@ int main(int c, char *v[])
 	float *x = iio_read_image_float(filename_in, &w, &h);
 
 	float *pyrx[nscales];
-	int pyrw[nscales], pyrh[nscales], pyrs[nscales];
+	int pyrw[nscales], pyrh[nscales];
 
-	produce_upwards_pyramid(pyrx, pyrw, pyrh, pyrs,
+	produce_upwards_pyramid(pyrx, pyrw, pyrh,
 			x, w, h, nscales, scalestep);
 
 	for (int i = 0; i < nscales; i++) {
 		char buf[0x100];
 		snprintf(buf, 0x100, filepattern_out, i);
 		printf("SCALE NUMBER %d: %dx%d (%d) => \"%s\"\n", i,
-				pyrw[i], pyrh[i], pyrs[i], buf);
+				pyrw[i], pyrh[i], buf);
 		iio_save_image_float(buf, pyrx[i], pyrw[i], pyrh[i]);
 	}
 
@@ -399,6 +421,7 @@ int main(int c, char *v[])
 
 #endif//USE_MAIN
 
+// main for testing generic multiscale {{{1
 #ifdef USE_MAINPHS
 
 static void genericized_hs(
@@ -410,8 +433,9 @@ static void genericized_hs(
 	float *fdata = data;
 	float alpha = fdata[0];
 	int niter = fdata[1];
-void hs(float *u, float *v, float *a, float *b, int w, int h,
+	void hs(float *u, float *v, float *a, float *b, int w, int h,
 		int niter, float alpha);
+	fprintf(stderr, "calling HS with input of size %dx%d\n", width, height);
 	hs(out_u, out_v, in_a, in_b, width, height, niter, alpha);
 }
 

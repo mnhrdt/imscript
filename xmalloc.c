@@ -20,12 +20,12 @@ static void *xmalloc(size_t size)
 	return new;
 }
 
-static void *xrealloc(void *p, size_t s)
-{
-	void *r = realloc(p, s);
-	if (!r) error("realloc failed");
-	return r;
-}
+//static void *xrealloc(void *p, size_t s)
+//{
+//	void *r = realloc(p, s);
+//	if (!r) error("realloc failed");
+//	return r;
+//}
 
 static void xfree(void *p)
 {
