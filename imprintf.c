@@ -233,7 +233,7 @@ static void compute_stuff_basic(struct printable_data *p,
 		avgnorm += xnorm;
 		rnp += 1;
 	}
-	assert(rnp);
+	//assert(rnp);
 	avgnorm /= rnp;
 	long double mipi[pd], mapi[pd];
 	for (int j = 0; j < pd; j++) {
@@ -464,11 +464,15 @@ static void print_parametric_datum(FILE *f, struct printable_data *p, int idx,
 		assert(q >= 0);
 		assert(q <= 100);
 		int ns0 = p->nsorted_samples;
-		float factor = ns0 - 1;
-		int pq = (factor * q)/100;
-		assert(pq >= 0);
-		assert(pq < ns0);
-		print_scalar(f, p, p->sorted_samples[pq]);
+		if (!ns0) {
+			print_scalar(f, p, NAN);
+		} else {
+			float factor = ns0 - 1;
+			int pq = (factor * q)/100;
+			assert(pq >= 0);
+			assert(pq < ns0);
+			print_scalar(f, p, p->sorted_samples[pq]);
+		}
 	} else if (0 == strcmp("Percentile", p->t[idx].name)) {
 		exit(fprintf(stderr, "ERROR: Percentile not implemented\n"));
 	}

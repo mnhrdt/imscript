@@ -69,6 +69,11 @@ static void compute_bar(float *ubar, float *u, int w, int h)
 				+ p(u,w,h, i-1,j+1) + p(u,w,h, i+1,j+1));
 }
 
+static float sqr(float x)
+{
+	return x * x;
+}
+
 static void hs_iteration(float *u, float *v,
 		float *Ex, float *Ey, float *Et, int w, int h, float alpha)
 {
@@ -94,20 +99,23 @@ static bool hs_iteration_stopping(float *u, float *v,
 	float *vbar = xmalloc(w * h * sizeof(float));
 	compute_bar(ubar, u, w, h);
 	compute_bar(vbar, v, w, h);
-	float maxdiff = 0;
+	//float maxdiff = 0;
+	long double l2diff = 0;
 	for (int i = 0; i < w*h; i++) {
 		float t = Ex[i]*ubar[i] + Ey[i]*vbar[i] + Et[i];
 		t /= alpha*alpha + Ex[i]*Ex[i] + Ey[i]*Ey[i];
 		float newu = ubar[i] - Ex[i] * t;
 		float newv = vbar[i] - Ey[i] * t;
-		if (fabs(newu - u[i]) > maxdiff) maxdiff = fabs(newu);
-		if (fabs(newv - v[i]) > maxdiff) maxdiff = fabs(newv);
+		//if (fabs(newu - u[i]) > maxdiff) maxdiff = fabs(newu-u[i]);
+		//if (fabs(newv - v[i]) > maxdiff) maxdiff = fabs(newv-v[i]);
+		l2diff += sqr(newu-u[i])+sqr(newv-v[i]);
 		u[i] = newu;
 		v[i] = newv;
 	}
 	free(ubar);
 	free(vbar);
-	return maxdiff < epsilon;
+	//return maxdiff < epsilon;
+	return sqrt(l2diff/(w*h)) < epsilon;
 }
 
 void hs(float *u, float *v, float *a, float *b, int w, int h,
@@ -126,9 +134,10 @@ void hs(float *u, float *v, float *a, float *b, int w, int h,
        	free(gt);
 }
 
-static int hs_stopping(float *u, float *v, float *a, float *b, int w, int h,
+int hs_stopping(float *u, float *v, float *a, float *b, int w, int h,
 		int niter, float alpha, float eps)
 {
+	fprintf(stderr, "HSS N=%d a=%g e=%g\n", niter, alpha, eps);
 	int i;
 	float *gx = xmalloc(w * h * sizeof(float));
 	float *gy = xmalloc(w * h * sizeof(float));
@@ -139,6 +148,7 @@ static int hs_stopping(float *u, float *v, float *a, float *b, int w, int h,
 	for (i = 0; i < niter; i++)
 		if (hs_iteration_stopping(u, v, gx, gy, gt, w, h, alpha, eps))
 			break;
+	fprintf(stderr, "HSS ran %d\n", i);
 	free(gx);
 	free(gy);
        	free(gt);
