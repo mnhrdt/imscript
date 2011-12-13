@@ -31,7 +31,7 @@ static void put_black_line(float *v, int w, int h,
 {
 	struct float_image x = {.w = w, .h = h, .x = v};
 	//traverse_segment(p, q, r, s, draw_black_pixel, &x);
-	traverse_segment_aa(p, q, r, s, draw_black_pixel_aa, &x);
+	traverse_segment_aa2(p, q, r, s, draw_black_pixel_aa, &x);
 }
 
 static void put_black_ball(float *v, int w, int h, float p, float q)
@@ -47,6 +47,13 @@ static void putarrow(float *x, int w, int h, float p, float q, float u, float v)
 		return;
 	//put_black_ball(x, w, h, p, q);
 	put_black_line(x, w, h, p-u/2, q-v/2, p+u/2, q+v/2);
+	if (hypot(u, v) > 3) {
+		float a[2] = {p+u/2, q+v/2};
+		float b[2] = {p-v/7, q+u/7};
+		float c[2] = {p+v/7, q-u/7};
+		put_black_line(x, w, h, a[0], a[1], b[0], b[1]);
+		put_black_line(x, w, h, a[0], a[1], c[0], c[1]);
+	}
 }
 
 static void flowarrows(float *vv, float *ff, int w, int h, float s, int g)
