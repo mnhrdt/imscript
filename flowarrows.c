@@ -67,13 +67,15 @@ static void flowarrows(float *vv, float *ff, int w, int h, float s, int g)
 		for (int ii = 0; ii < g; ii++) {
 			int pi = g*i + ii;
 			int pj = g*j + jj;
-			if (pi < w && pj < h) {
+			if (pi < w && pj < h && isfinite(f[pj][pi][0])
+					     && isfinite(f[pj][pi][1]))	{
 				m[0] += f[pj][pi][0];
 				m[1] += f[pj][pi][1];
 				nm += s;
 			}
 		}
-		putarrow(vv, w, h, g*i+g/2, g*j+g/2, m[0]/nm, m[1]/nm);
+		if (nm > 0)
+			putarrow(vv, w, h, g*i+g/2, g*j+g/2, m[0]/nm, m[1]/nm);
 	}
 }
 

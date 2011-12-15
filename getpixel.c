@@ -1,7 +1,10 @@
+#ifndef _GETPIXEL_C
+#define _GETPIXEL_C
 
 typedef float (*getsample_operator)(float*,int,int,int,int,int,int);
 //typedef void (*setsample_operator)(float*,int,int,int,int,int,int,float);
 
+// extrapolate by 0
 static float getsample_0(float *x, int w, int h, int pd, int i, int j, int l)
 {
 	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
@@ -9,6 +12,7 @@ static float getsample_0(float *x, int w, int h, int pd, int i, int j, int l)
 	return x[(i+j*w)*pd + l];
 }
 
+// extrapolate by nearest value
 static float getsample_1(float *x, int w, int h, int pd, int i, int j, int l)
 {
 	if (i < 0) i = 0;
@@ -48,3 +52,5 @@ static void setsample_0(float *x, int w, int h, int pd, int i, int j, int l,
 //		return;
 //	x[i + j*w] = v;
 //}
+
+#endif//_GETPIXEL_C
