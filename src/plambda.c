@@ -500,25 +500,25 @@ static void process_token(struct plambda_program *p, const char *tokke)
 		goto endtok;
 	}
 
-	if (tok_id = token_is_colonvar(tok)) {
+	if ((tok_id = token_is_colonvar(tok))) {
 		t->type = PLAMBDA_COLONVAR;
 		t->colonvar = tok_id;
 		goto endtok;
 	}
 
-	if (tok_id = token_is_stackop(tok)) {
+	if ((tok_id = token_is_stackop(tok))) {
 		t->type = PLAMBDA_STACKOP;
 		t->index = tok_id;
 		goto endtok;
 	}
 
-	if (tok_id = token_is_vardef(tok)) {
+	if ((tok_id = token_is_vardef(tok))) {
 		t->type = PLAMBDA_VARDEF;
 		t->index = tok_id;
 		goto endtok;
 	}
 
-	if (token_is_word(tok, &tok_end))
+	if ((token_is_word(tok, &tok_end)))
 	{
 		int idx = word_is_predefined(tok);
 		if (idx < 0) {

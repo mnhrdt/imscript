@@ -387,7 +387,7 @@ static void compute_printable_data(struct printable_data *p,
 {
 	p->x = x; p->w = w; p->h = h; p->pd = pd;
 	int action_table[0x100], idx = 0;
-	p->compuflag;
+	p->compuflag = 0;
 	for (int i = 0; i < 0x100; i++)
 		action_table[i] = -1;
 	while (p->t[idx].name) {
