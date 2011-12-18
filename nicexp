@@ -1,1 +1,0 @@
-./bin/plambda /tmp/lena.png "l :r 40 * cos 100 * +" | qeasy 0 255 | d
