@@ -490,53 +490,48 @@ static void process_token(struct plambda_program *p, const char *tokke)
 	strcpy(tok, tokke);
 	struct plambda_token *t = p->t + p->n; // the compiled token
 
+	int tok_id;
+	const char *tok_end;
+
 	float x;
-	if (token_is_number(&x, tok))
-	{
+	if (token_is_number(&x, tok)) {
 		t->type = PLAMBDA_CONSTANT;
 		t->value = x;
 		goto endtok;
 	}
 
-	int colonvar = token_is_colonvar(tok);
-	if (colonvar)
-	{
+	if (tok_id = token_is_colonvar(tok)) {
 		t->type = PLAMBDA_COLONVAR;
-		t->colonvar = colonvar;
+		t->colonvar = tok_id;
 		goto endtok;
 	}
 
-	int stackop = token_is_stackop(tok);
-	if (stackop)
-	{
+	if (tok_id = token_is_stackop(tok)) {
 		t->type = PLAMBDA_STACKOP;
-		t->index = stackop;
+		t->index = tok_id;
 		goto endtok;
 	}
 
-	int vardef = token_is_vardef(tok);
-	if (vardef)
-	{
+	if (tok_id = token_is_vardef(tok)) {
 		t->type = PLAMBDA_VARDEF;
-		t->index = vardef;
+		t->index = tok_id;
 		goto endtok;
 	}
 
-	const char *endptr;
-	if (token_is_word(tok, &endptr))
+	if (token_is_word(tok, &tok_end))
 	{
 		int idx = word_is_predefined(tok);
 		if (idx < 0) {
 			char varname[PLAMBDA_MAX_VARLEN+1];
 			int varlen = strlen(tok);
-			if (endptr) varlen = endptr-tok;
+			if (tok_end) varlen = tok_end-tok;
 			if (varlen >= PLAMBDA_MAX_VARLEN)
 				varlen = PLAMBDA_MAX_VARLEN;
 			FORI(varlen) varname[i] = tok[i];
 			varname[varlen] = '\0';
 			int comp, disp[2];
 			t->tmphack =collection_of_varnames_add(p->var, varname);
-			parse_modifiers(endptr, &comp, disp, disp+1);
+			parse_modifiers(tok_end, &comp, disp, disp+1);
 			t->type = comp<0 ? PLAMBDA_VECTOR : PLAMBDA_SCALAR;
 			t->component = comp;
 			t->displacement[0] = disp[0];

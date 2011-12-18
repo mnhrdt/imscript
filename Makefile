@@ -1,4 +1,5 @@
 CFLAGS += -std=c99
+OFLAGS = -O3
 
 SRCDIR = src
 BINDIR = bin
