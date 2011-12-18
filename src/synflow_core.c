@@ -34,7 +34,7 @@ static float interpolate_cell(float a, float b, float c, float d,
 	case 2: return interpolate_bilinear(a, b, c, d, x, y);
 	default: error("caca de vaca");
 	}
-	return -1;
+	//return -1;
 }
 
 static void general_interpolate(float *result,
@@ -652,7 +652,7 @@ static int parse_flow_name(int *vp, int *hidden_id, char *model_name)
 		i = i + 1;
 	}
 	error("unrecognized transform name %s", model_name);
-	return 0;
+	//return 0;
 }
 
 //static void invert_combi2(double H[15], 

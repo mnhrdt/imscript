@@ -170,7 +170,8 @@ void middlebury_computeColor(float fx, float fy, unsigned char *pix)
 	return smapa_value_ ## n;\
 }
 
-SMART_PARAMETER(MRANGE,NAN)
+
+SMART_PARAMETER(MRANGE,0)
 
 static bool middlebury_toolarge(float *v)
 {

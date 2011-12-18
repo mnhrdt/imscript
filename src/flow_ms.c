@@ -81,7 +81,6 @@ static float cell_interpolate(float a, float b, float c, float d,
 	case 2: return cell_interpolate_bilinear(a, b, c, d, x, y);
 	default: return 0;
 	}
-	return -1;
 }
 
 static float interpolate_float_image_bilinearly(float *x, int w, int h,

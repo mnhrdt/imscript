@@ -33,7 +33,8 @@ static const char *myname(void) { return ""; }
 
 #include <stdarg.h>
 
-static void error(const char *fmt, ...) __attribute__((noreturn,format(printf,1,2)));
+//static void error(const char *fmt, ...) __attribute__((noreturn,format(printf,1,2)));
+static void error(const char *fmt, ...) __attribute__((noreturn));
 static void error(const char *fmt, ...)
 
 {

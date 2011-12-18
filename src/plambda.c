@@ -291,7 +291,7 @@ static float apply_function(struct predefined_function *f, float *v)
 	case -1: return ((double(*)())(f->f))();
 	default: error("bizarre");
 	}
-	return 0;
+	//return 0;
 }
 
 static float eval_colonvar(int w, int h, int i, int j, int c)

@@ -122,7 +122,7 @@ float march_singular_raw(float a, float b, float c, float d, float x, float y)
 		return ix;
 	}
 
-	return 0;
+	//return 0;
 }
 
 #include <stdlib.h>

@@ -105,7 +105,7 @@ static void fill_hess(void *out_hess, void *in_x, int w, int h)
 		hess[j][i][0] = p(x,w,h, i-1, j)
                            -2 * p(x,w,h, i, j)
                               + p(x,w,h, i+1, j);
-		hess[j][i][3] = p(x,w,h, i, j-1)
+		hess[j][i][1] = p(x,w,h, i, j-1)
                            -2 * p(x,w,h, i, j)
                               + p(x,w,h, i, j+1);
 		hess[j][i][2] = 0.25 * (

@@ -465,7 +465,7 @@ static double evaluate_error_between_images(float *xx, float *yy,
 
 
 	int passepartout = 8;
-	double r;
+	double r = 0;
 	int n = w*h*pd;
 	float (*d)[w][pd] = xmalloc(n*sizeof(float));
 	int nvals = 0;
@@ -499,9 +499,9 @@ static double evaluate_error_between_images(float *xx, float *yy,
 		r = corrf(xvals, yvals, nvals);
 		r = fabs(r);
 	} else if (0 == strcmp(error_id, "kendall")) {
-		error("kendall computation too slow!");
 		r = kendall(xvals, yvals, nvals);
 		r = fabs(r);
+		error("kendall computation too slow!");
 	} else error("bad error id \"%s\"", error_id);
 	//struct statistics_float s;
 	//statistics_getf(&s, d, n);
