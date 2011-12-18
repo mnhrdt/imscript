@@ -1,0 +1,6 @@
+plambda /tmp/lena.png "x randu 0.98 >" | qauto - /tmp/dots1.png
+plambda /tmp/lena.png "x randu randu 0.98 >" | qauto - /tmp/dots2.png
+plambda /tmp/lena.png "x :i 120 - fabs 40 < :j 120 - fabs 40 < *" > /tmp/square1
+plambda /tmp/square1 "x x join" > /tmp/square11
+synflow traslation "10 0" /tmp/square1 /tmp/square2 /tmp/flow10
+plambda /tmp/square11 /tmp/flow10 "x y *"

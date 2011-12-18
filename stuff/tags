@@ -1,0 +1,97 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+FORI	plambda.c	134;"	d	file:
+FORJ	plambda.c	137;"	d	file:
+FORK	plambda.c	140;"	d	file:
+FORL	plambda.c	143;"	d	file:
+PLAMBDA_COLONVAR	plambda.c	153;"	d	file:
+PLAMBDA_CONSTANT	plambda.c	149;"	d	file:
+PLAMBDA_MAX_PIXELDIM	plambda.c	129;"	d	file:
+PLAMBDA_MAX_TOKENS	plambda.c	127;"	d	file:
+PLAMBDA_MAX_VARLEN	plambda.c	128;"	d	file:
+PLAMBDA_OPERATOR	plambda.c	152;"	d	file:
+PLAMBDA_SCALAR	plambda.c	150;"	d	file:
+PLAMBDA_STACKOP	plambda.c	154;"	d	file:
+PLAMBDA_STACKOP_DEL	plambda.c	337;"	d	file:
+PLAMBDA_STACKOP_DUP	plambda.c	338;"	d	file:
+PLAMBDA_STACKOP_NO	plambda.c	336;"	d	file:
+PLAMBDA_STACKOP_ROT	plambda.c	341;"	d	file:
+PLAMBDA_STACKOP_VMERGE	plambda.c	340;"	d	file:
+PLAMBDA_STACKOP_VMERGE3	plambda.c	342;"	d	file:
+PLAMBDA_STACKOP_VMERGEALL	plambda.c	343;"	d	file:
+PLAMBDA_STACKOP_VSPLIT	plambda.c	339;"	d	file:
+PLAMBDA_VARDEF	plambda.c	155;"	d	file:
+PLAMBDA_VECTOR	plambda.c	151;"	d	file:
+REGISTER_FUNCTION	plambda.c	183;"	d	file:
+REGISTER_FUNCTION	plambda.c	243;"	d	file:
+REGISTER_FUNCTIONN	plambda.c	184;"	d	file:
+apply_function	plambda.c	/^static float apply_function(struct predefined_function *f, float *v)$/;"	f	file:
+arity	plambda.c	/^static const char *arity(struct predefined_function *f)$/;"	f	file:
+collection_of_varnames	plambda.c	/^struct collection_of_varnames {$/;"	s	file:
+collection_of_varnames_add	plambda.c	/^static char *collection_of_varnames_add(struct collection_of_varnames *x,$/;"	f	file:
+collection_of_varnames_end	plambda.c	/^static void collection_of_varnames_end(struct collection_of_varnames *x)$/;"	f	file:
+collection_of_varnames_find	plambda.c	/^static int collection_of_varnames_find(struct collection_of_varnames *x,$/;"	f	file:
+collection_of_varnames_init	plambda.c	/^static void collection_of_varnames_init(struct collection_of_varnames *x)$/;"	f	file:
+collection_of_varnames_sort	plambda.c	/^static void collection_of_varnames_sort(struct collection_of_varnames *x)$/;"	f	file:
+colonvar	plambda.c	/^	int colonvar;        \/\/ if type==colon, the letter$/;"	m	struct:plambda_token	file:
+component	plambda.c	/^	int component;       \/\/ if type==variable, index of selected component$/;"	m	struct:plambda_token	file:
+d	plambda.c	/^	int d[PLAMBDA_MAX_TOKENS];$/;"	m	struct:value_vstack	file:
+displacement	plambda.c	/^	int displacement[2]; \/\/ if type==variable, relative displacement$/;"	m	struct:plambda_token	file:
+divide_two_doubles	plambda.c	/^static double divide_two_doubles   (double a, double b) { return a \/ b; }$/;"	f	file:
+eval_colonvar	plambda.c	/^static float eval_colonvar(int w, int h, int i, int j, int c)$/;"	f	file:
+f	plambda.c	/^	void (*f)(void);$/;"	m	struct:predefined_function	file:
+global_table_of_predefined_functions	plambda.c	/^} global_table_of_predefined_functions[] = {$/;"	v	typeref:struct:predefined_function
+index	plambda.c	/^	int index;           \/\/ if type==variable, its index$/;"	m	struct:plambda_token	file:
+logic_e	plambda.c	/^static double logic_e      (double a, double b) { return a == b; }$/;"	f	file:
+logic_g	plambda.c	/^static double logic_g      (double a, double b) { return a > b; }$/;"	f	file:
+logic_l	plambda.c	/^static double logic_l      (double a, double b) { return a < b; }$/;"	f	file:
+main	plambda.c	/^int main(int c, char *v[])$/;"	f
+multiply_two_doubles	plambda.c	/^static double multiply_two_doubles (double a, double b) { return a * b; }$/;"	f	file:
+n	plambda.c	/^	int n;$/;"	m	struct:collection_of_varnames	file:
+n	plambda.c	/^	int n;$/;"	m	struct:plambda_program	file:
+n	plambda.c	/^	int n;$/;"	m	struct:value_vstack	file:
+name	plambda.c	/^	char *name;$/;"	m	struct:predefined_function	file:
+nargs	plambda.c	/^	int nargs;$/;"	m	struct:predefined_function	file:
+parse_modifiers	plambda.c	/^static void parse_modifiers(const char *mods, int *ocomp, int *odx, int *ody)$/;"	f	file:
+plambda_compile_program	plambda.c	/^static void plambda_compile_program(struct plambda_program *p, const char *str)$/;"	f	file:
+plambda_program	plambda.c	/^struct plambda_program {$/;"	s	file:
+plambda_token	plambda.c	/^struct plambda_token {$/;"	s	file:
+predefined_function	plambda.c	/^struct predefined_function {$/;"	s	file:
+print_compiled_program	plambda.c	/^static void print_compiled_program(struct plambda_program *p)$/;"	f	file:
+process_token	plambda.c	/^static void process_token(struct plambda_program *p, const char *tokke)$/;"	f	file:
+quantize_255	plambda.c	/^static double quantize_255 (double x)$/;"	f	file:
+quantize_easy	plambda.c	/^static double quantize_easy(double x, double a, double b)$/;"	f	file:
+regn	plambda.c	/^	int regn[10];$/;"	m	struct:plambda_program	file:
+regv	plambda.c	/^	float regv[10][PLAMBDA_MAX_PIXELDIM];$/;"	m	struct:plambda_program	file:
+run_program_vectorially	plambda.c	/^static int run_program_vectorially(float *out, int pdmax,$/;"	f	file:
+run_program_vectorially_at	plambda.c	/^static int run_program_vectorially_at(float *out, struct plambda_program *p,$/;"	f	file:
+shrink_components	plambda.c	/^static void shrink_components(float *y, float *x, int n, int ypd, int xpd)$/;"	f	file:
+strcmp_for_qsort	plambda.c	/^static int strcmp_for_qsort(const void *aa, const void *bb)$/;"	f	file:
+substract_two_doubles	plambda.c	/^static double substract_two_doubles(double a, double b) { return a - b; }$/;"	f	file:
+sum_two_doubles	plambda.c	/^static double sum_two_doubles      (double a, double b) { return a + b; }$/;"	f	file:
+t	plambda.c	/^	char *t[PLAMBDA_MAX_TOKENS];$/;"	m	struct:collection_of_varnames	file:
+t	plambda.c	/^	float t[PLAMBDA_MAX_TOKENS][PLAMBDA_MAX_PIXELDIM];$/;"	m	struct:value_vstack	file:
+t	plambda.c	/^	struct plambda_token t[PLAMBDA_MAX_TOKENS];$/;"	m	struct:plambda_program	typeref:struct:plambda_program::plambda_token	file:
+tmphack	plambda.c	/^	char *tmphack;       \/\/ temporary place for storing the unsorted index$/;"	m	struct:plambda_token	file:
+token_is_colonvar	plambda.c	/^static int token_is_colonvar(const char *t)$/;"	f	file:
+token_is_number	plambda.c	/^static bool token_is_number(float *x, const char *t)$/;"	f	file:
+token_is_stackop	plambda.c	/^static int token_is_stackop(const char *t)$/;"	f	file:
+token_is_vardef	plambda.c	/^static int token_is_vardef(const char *t)$/;"	f	file:
+token_is_word	plambda.c	/^static int token_is_word(const char *t, const char **endptr)$/;"	f	file:
+type	plambda.c	/^	int type;$/;"	m	struct:plambda_token	file:
+unhack_varnames	plambda.c	/^static void unhack_varnames(struct plambda_program *p)$/;"	f	file:
+value	plambda.c	/^	float value;         \/\/ if type==constant, value$/;"	m	struct:plambda_token	file:
+value	plambda.c	/^	float value;$/;"	m	struct:predefined_function	file:
+value_vstack	plambda.c	/^struct value_vstack {$/;"	s	file:
+var	plambda.c	/^	struct collection_of_varnames var[1];$/;"	m	struct:plambda_program	typeref:struct:plambda_program::collection_of_varnames	file:
+vstack_apply_function	plambda.c	/^static void vstack_apply_function(struct value_vstack *s,$/;"	f	file:
+vstack_pop_vector	plambda.c	/^static int vstack_pop_vector(float *val, struct value_vstack *s)$/;"	f	file:
+vstack_print	plambda.c	/^static void vstack_print(FILE *f, struct value_vstack *s)$/;"	f	file:
+vstack_process_op	plambda.c	/^static void vstack_process_op(struct value_vstack *s, int opid)$/;"	f	file:
+vstack_push_scalar	plambda.c	/^static void vstack_push_scalar(struct value_vstack *s, float x)$/;"	f	file:
+vstack_push_vector	plambda.c	/^static void vstack_push_vector(struct value_vstack *s, float *v, int n)$/;"	f	file:
+word_is_predefined	plambda.c	/^static int word_is_predefined(const char *id)$/;"	f	file:
