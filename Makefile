@@ -3,7 +3,7 @@ BINDIR = bin
 
 SRCIIO = plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad
 SRCFFT = gblur fft dct
-SRCGSL = paraflow
+SRCGSL = paraflow minimize
 
 IIOFLAGS = -ljpeg -ltiff -lpng
 FFTFLAGS = -lfftw3f
@@ -68,7 +68,7 @@ $(BINDIR)/flow_ms: $(addprefix $(SRCDIR)/,flow_ms.c gblur.o hs.o iio.o)
 
 .PHONY: clean
 clean:
-	rm -f $(PROGRAMS) $(SRCDIR)/*.o
+	@rm -f $(PROGRAMS) $(SRCDIR)/*.o
 
 .PHONY: zipdate
 zipdate: clean

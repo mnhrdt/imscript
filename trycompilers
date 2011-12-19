@@ -1,1 +1,7 @@
-for i in sunc99 icc gcc clang; do make clean ; CC=$i make -j4 ; done
+
+gccw="gcc -std=c99 -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds -O3"
+
+for i in sunc99 icc gcc clang "$gccw"; do
+	make clean
+	CC=$i make -j4
+done
