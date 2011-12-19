@@ -1,0 +1,1 @@
+for i in sunc99 icc gcc clang; do make clean ; CC=$i make -j4 ; done
