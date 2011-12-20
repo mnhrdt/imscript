@@ -29,10 +29,15 @@ ifeq ($(UNAME), Linux)
 	CFLAGSIIO = $(CFLAGS) -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700
 endif
 ifeq ($(UNAME), Darwin)
-	MPE := $(shell if test -d /opt/macports ; then echo macport ; fi)
-	ifeq ($(MPE), macport)
-		export C_INCLUDE_PATH = /opt/macports/include
-		export LIBRARY_PATH = /opt/macports/lib
+	MPE := $(shell if test -d /opt/macports ; then echo yes ; fi)
+	ifeq ($(MPE), yes)
+		export C_INCLUDE_PATH := /opt/macports/include:$(C_INCLUDE_PATH)
+		export LIBRARY_PATH := /opt/macports/lib:$(LIBRARY_PATH)
+	endif
+	MPE := $(shell if test -d /usr/X11 ; then echo yes ; fi)
+	ifeq ($(MPE), yes)
+		export C_INCLUDE_PATH := /usr/X11/include:$(C_INCLUDE_PATH)
+		export LIBRARY_PATH := /usr/X11/lib:$(LIBRARY_PATH)
 	endif
 endif
 
