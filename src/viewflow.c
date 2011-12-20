@@ -175,7 +175,8 @@ SMART_PARAMETER(MRANGE,0)
 
 static bool middlebury_toolarge(float *v)
 {
-	return fabs(v[0]) > 1e5 || fabs(v[1]) > 1e5;
+	return (!isfinite(v[0])) || (!isfinite(v[1])) ||
+		fabs(v[0]) > 1e5 || fabs(v[1]) > 1e5;
 }
 
 static void viewflow_middlebury(uint8_t *py, float *px, int w, int h)
