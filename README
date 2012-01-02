@@ -1,4 +1,3 @@
 This is a collection of small independent image processing utilities in C.
 See the file "imscript.txt" for an attempt to unify this mess.
 All programs use the "iio" library for opening and saving images.
-The file "fesprogs" is a (tentative) compilation script.

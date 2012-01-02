@@ -1,10 +1,13 @@
+ENABLE_GSL = yes
+CFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds -O3
+
 SRCDIR = src
 BINDIR = bin
 
 SRCIIO = plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad
 SRCFFT = gblur fft dct
 ifeq ($(ENABLE_GSL), yes)
-	SRCGSL = paraflow
+	SRCGSL = paraflow minimize
 endif
 
 IIOFLAGS = -ljpeg -ltiff -lpng

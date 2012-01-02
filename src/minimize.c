@@ -28,7 +28,7 @@
 //
 // 2. SYNTAX
 //
-// 	./minimize program "optset" "parset0" "parset1" ... "parsetN"
+// 	./minimize program "optvec" "startvec" "stepvec"
 //
 //
 
@@ -40,119 +40,8 @@
 #include "fail.c"
 
 
+#include "minimize_gsl.c"
 
-//
-// HERE BE DRAGONS (GSL multidimensional minimization)
-//
-
-struct problem_data {
-	// image pair
-	int w, h, pd;
-	float *x, *y;
-
-	// model metadata
-	int n;
-	char *model_id;
-	char *error_id;
-};
-
-// this function is independent of GSL
-static double eval_objective_function(struct problem_data *p, double *v, int nv)
-{
-	float *x = p->x;
-	float *y = p->y;
-	int w = p->w;
-	int h = p->h;
-	int pd = p->pd;
-	float *bp = xmalloc(w * h * pd * sizeof*bp);
-	struct flow_model fm[1];
-	produce_flow_model(fm, v, nv, p->model_id, w, h);
-	transform_back(bp, fm, y, w, h, pd);
-	//apply_parametric_invflow(bp, y, w, h, pd, p->model_id, v, nv);
-	//iio_save_image_float_vec("/tmp/merdota.tiff", bp, w, h, pd);
-	double r = evaluate_error_between_images(bp, x, w, h, pd, p->error_id);
-	free(bp);
-	return r;
-}
-
-// this function is called by the GSL minimzator
-static double objective_function(const gsl_vector *v, void *pp)
-{
-	struct problem_data *p = pp;
-	assert(p->n == (int)v->size);
-	double point[v->size];
-	FORI((int)v->size)
-		point[i] = gsl_vector_get(v, i);
-	double r = eval_objective_function(p, point, v->size);
-	return r;
-}
-
-//SMART_PARAMETER(SIMPLEX_NEQ,5)
-#define SIMPLEX_NEQ 5
-
-static bool are_equal(double a, double b)
-{
-	return fabs(b-a) < 0.000000000001;
-}
-
-// external interface to GSL code (for 4D vectors)
-static int minimize_objective_function(void *pp,
-		float *result, float *starting_point, float *stepsize)
-{
-	struct problem_data *p = pp;
-	int dim = p->n;
-
-	gsl_vector *ss = gsl_vector_alloc(dim);
-	gsl_vector *x = gsl_vector_alloc(dim);
-
-	FORI(dim) gsl_vector_set(ss, i, stepsize[i]);
-	FORI(dim) gsl_vector_set(x, i, starting_point[i]);
-
-	const gsl_multimin_fminimizer_type *T =
-		gsl_multimin_fminimizer_nmsimplex2;
-	gsl_multimin_fminimizer *s = gsl_multimin_fminimizer_alloc(T, dim);
-
-	gsl_multimin_function f = {.f=objective_function, .n=dim, .params=pp};
-
-	gsl_multimin_fminimizer_set(s, &f, x, ss);
-
-	int status, iter = 0;
-	int scount = 0; // counts the number of repeated values
-	double oldval = INFINITY;
-	do {
-		iter += 1;
-
-		status = gsl_multimin_fminimizer_iterate(s);
-		if (status) break;
-
-		double size = gsl_multimin_fminimizer_size(s);
-		status = gsl_multimin_test_size(size, 0.00001);
-
-		if (status == GSL_SUCCESS)
-			fprintf(stderr, "converged to minimum!\n");
-
-		fprintf(stderr, "iter = %d (", iter);
-		FORI(dim) fprintf(stderr, "%g ", gsl_vector_get(s->x, i));
-		fprintf(stderr, ") f=%g size=%g\n", s->fval, size);
-
-		//scount = are_equal(oldval, s->fval) ? scount+1 : 0;
-		//if (scount > SIMPLEX_NEQ) break;
-		oldval = s->fval;
-
-	} while (status == GSL_CONTINUE && iter < 490);
-
-	FORI(dim) result[i] = gsl_vector_get(s->x, i);
-
-	gsl_vector_free(x);
-	gsl_vector_free(ss);
-	gsl_multimin_fminimizer_free(s);
-
-	return status;
-}
-
-//
-// END OF GSL STUFF
-//
 
 struct program {
 	char *name;
@@ -162,6 +51,8 @@ struct program {
 
 static double run_program(struct program *p, double *x)
 {
+	static int run_idx = 0;
+
 	int bufsize = 0x1000;
 	char buf[bufsize];
 
@@ -169,16 +60,27 @@ static double run_program(struct program *p, double *x)
 	for (int i = 0; i < p->n; i++)
 		n += snprintf(buf+n, bufsize-n, " %f", x[i]);
 	//snprintf(buf+n, bufsize-n, "");
-	fprintf(stderr, "RUN %s\n", buf);
+	fprintf(stderr, "RUN[%d] %s", run_idx,  buf);
 
 	FILE *f = popen(buf, "r");
 	double y;
 	if (1 != fscanf(f, "%lf\n", &y))
-		fail("command [%s] did not print a number\n", buf);
+		fail("\ncommand [%s] did not print a number\n", buf);
 	pclose(f);
 
+	fprintf(stderr, "\t=> %g\n", y);
+
+	run_idx += 1;
 	return y;
 }
+
+static double run_program_as_of(double *x, int n, void *data)
+{
+	struct program *p = data;
+	assert(p->n ==  n);
+	return run_program(p, x);
+}
+
 
 static int parse_doubles(double *t, int nmax, const char *s)
 {
@@ -192,24 +94,29 @@ static int parse_doubles(double *t, int nmax, const char *s)
 
 int main(int c, char *v[])
 {
-	if (c < 4) {
+	if (c != 5) {
 		fprintf(stderr, "usage:\n\t"
-		"%s program \"optset\" \"parset0\" ... \"parsetN\"\n", *v);
-	//       0  1         2          3               c-1
+		"%s program \"optvec\" \"parvec\" \"stepvec\"\n", *v);
+	//       0  1         2          3          4
 		return EXIT_FAILURE;
 	}
-	int nmax = c  - 3 - 1;
-	struct program p = {.name = v[1], .optset = v[2], .n = nmax};
-	for (int i = 3; i < c; i++) {
-		double t[nmax];
-		int n = parse_doubles(t, nmax, v[i]);
-		if (n != nmax)
-			fail("you must supply %d vectors of length %d,\n"
-			"however, your %dth vector has length %d\n",
-						nmax+1, nmax, i-2, n);
-		double x = run_program(&p, t);
-		fprintf(stderr, "returned x = %g\n", x);
-	}
+	struct program p[1] = {{.name = v[1], .optset = v[2]}};
+	int nmax = 100;
+	double startvec[nmax], stepvec[nmax];
+	int n = parse_doubles(startvec, nmax, v[3]);
+	int ns = parse_doubles(stepvec, nmax, v[4]);
+	if (n != ns)
+		fail("dimensions %d and %d do not match", n, ns);
+	p->n = n;
+
+	//double x = run_program(p, startvec);
+	//fprintf(stderr, "got %g\n", x);
+
+	double result[n];
+	int r = minimize_objective_function(result, startvec, stepvec,
+			run_program_as_of, n, p);
+
+	fprintf(stderr, "minimization returned %d\n", r);
 
 	return EXIT_SUCCESS;
 }
