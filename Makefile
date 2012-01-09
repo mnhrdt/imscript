@@ -1,5 +1,7 @@
+# compiler specific part (may be removed with minor damage)
 ENABLE_GSL = yes
 CFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds -O3
+#end of compiler specific part
 
 SRCDIR = src
 BINDIR = bin
