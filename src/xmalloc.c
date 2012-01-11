@@ -3,17 +3,17 @@
 
 #include <stdlib.h>
 
-#include "error.c"
+#include "fail.c"
 
 static void *xmalloc(size_t size)
 {
 	if (size == 0)
-		error("xmalloc: zero size");
+		fail("xmalloc: zero size");
 	void *new = malloc(size);
 	if (!new)
 	{
 		double sm = size / (0x100000 * 1.0);
-		error("xmalloc: out of memory when requesting "
+		fail("xmalloc: out of memory when requesting "
 			"%zu bytes (%gMB)",//:\"%s\"",
 			size, sm);//, strerror(errno));
 	}
@@ -30,7 +30,7 @@ static void *xmalloc(size_t size)
 static void xfree(void *p)
 {
 	if (!p)
-		error("thou shalt not free a null pointer!");
+		fail("thou shalt not free a null pointer!");
 	free(p);
 }
 

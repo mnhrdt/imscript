@@ -1,7 +1,9 @@
 
 gccw="gcc -std=c99 -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds -O3"
+iccw="icc -std=c99 -Wall -w2 -Wremarks -wd177,981"
+sccw="sunc99 -Xc"
 
-for i in sunc99 icc gcc clang "$gccw"; do
+for i in sunc99 icc gcc clang "$gccw" "$iccw" "$sccw"; do
 	make clean
 	CC=$i make -j4
 done

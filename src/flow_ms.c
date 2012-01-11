@@ -17,7 +17,7 @@
 
 #include "smapa.h"
 
-#include "error.c"
+#include "fail.c"
 #include "xmalloc.c"
 
 // typedefs {{{1
@@ -385,7 +385,7 @@ void perturbative_multi_scale_optical_flow(float *u, float *v,
 		iterative_optical_flow of, void *data,
 		int nscales, float scalestep)
 {
-	error("not yet implemented");
+	fail("not yet implemented");
 }
 
 SMART_PARAMETER_SILENT(NWARPS,1)
@@ -532,7 +532,7 @@ int main(int argc, char *argv[])
 	int w, h, ww, hh;
 	float *a = iio_read_image_float(filename_a, &w, &h);
 	float *b = iio_read_image_float(filename_b, &ww, &hh);
-	if (w != ww || h != hh) error("input image size mismatch");
+	if (w != ww || h != hh) fail("input image size mismatch");
 	float *u = xmalloc(w * h * sizeof(float));
 	float *v = xmalloc(w * h * sizeof(float));
 

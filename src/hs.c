@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "iio.h"
 
 static void *xmalloc(size_t size)
 {
@@ -157,6 +156,7 @@ int hs_stopping(float *u, float *v, float *a, float *b, int w, int h,
 }
 
 #ifndef OMIT_MAIN
+#include "iio.h"
 int main(int argc, char *argv[])
 {
 	if (argc != 6 && argc != 7)
