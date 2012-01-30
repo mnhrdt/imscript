@@ -186,8 +186,12 @@ void gblur(float *y, float *x, int w, int h, int pd, float s)
 	float *c = xmalloc(w*h*sizeof*c);
 	float *gc = xmalloc(w*h*sizeof*gc);
 	FORL(pd) {
-		FORI(w*h)
-			c[i] = x[i*pd + l];
+		FORI(w*h) {
+			float tmp = x[i*pd + l];
+			if (!isfinite(tmp))
+				tmp = 0;
+			c[i] = tmp;//x[i*pd + l];
+		}
 		if (s)
 			gblur_gray(gc, c, w, h, s);
 		else FORI(w*h) gc[i] = c[i];

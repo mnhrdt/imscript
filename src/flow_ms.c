@@ -369,6 +369,7 @@ static void iteritized(generic_optical_flow of,
 
 	save_debug_flow("/tmp/ms_debug_field_duv_%02d", global_idx, u, v, w, h);
 	for (int i = 0; i < w *h; i++) {
+		// XXX WRONG FIXME TODO : should warp in_u by the new u !!!
 		out_u[i] = u[i] + in_u[i];
 		out_v[i] = v[i] + in_v[i];
 	}
