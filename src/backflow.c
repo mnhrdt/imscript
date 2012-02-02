@@ -12,7 +12,11 @@
 #define FORJ(n) for(int j=0;j<(n);j++)
 #define FORL(n) for(int l=0;l<(n);l++)
 
-#include "fragments.c"
+#include "fail.c"
+#include "xmalloc.c"
+#include "getpixel.c"
+
+#include "smapa.h"
 
 static float evaluate_bilinear_cell(float a, float b, float c, float d,
 							float x, float y)
@@ -59,20 +63,45 @@ static void bilinear_interpolation_at(float *result,
 	}
 }
 
+SMART_PARAMETER_SILENT(BACKDIV,0)
+
+static void compute_flow_div(float *d, float *u, int w, int h)
+{
+	getsample_operator p = getsample_1;
+	FORJ(h) FORI(w) {
+		float ux = 0.5*(p(u,w,h,2, i+1, j, 0) - p(u,w,h,2, i-1, j, 0));
+		float vy = 0.5*(p(u,w,h,2, i, j+1, 1) - p(u,w,h,2, i, j-1, 1));
+		d[j*w+i] = ux + vy;
+	}
+}
+
 
 static void invflow(float *ou, float *flo, float *pin, int w, int h, int pd)
 {
 	float (*out)[w][pd] = (void*)ou;
 	float (*in)[w][pd] = (void*)pin;
 	float (*flow)[w][2] = (void*)flo;
+	float *flowdiv = NULL;
+
+	if (BACKDIV() > 0) {
+		flowdiv = xmalloc(w * h * sizeof*flowdiv);
+		compute_flow_div(flowdiv, flo, w, h);
+	}
 
 	FORJ(h) FORI(w) {
 		float p[2] = {i + flow[j][i][0], j + flow[j][i][1]};
 		float result[pd];
 		bilinear_interpolation_at(result, pin, w, h, pd, p[0], p[1]);
+		float factor = 1;
+		if (flowdiv)
+			factor = exp(BACKDIV() * flowdiv[j*w+i]);
 		FORL(pd)
-			out[j][i][l] = result[l];
+			out[j][i][l] = factor * result[l];
+			//out[j][i][l] = 100*log(factor * exp(result[l]/100));
 	}
+
+	if (flowdiv)
+		free(flowdiv);
 }
 
 int main_backflow(int c, char *v[])
@@ -90,13 +119,13 @@ int main_backflow(int c, char *v[])
 	fprintf(stderr, "w h pd P = %d %d %d %d\n", w, h, pd, w*h*pd);
 
 	if (pd != 2)
-		error("flow must have two-dimensional pixels\n");
+		fail("flow must have two-dimensional pixels\n");
 
 	int iw, ih;
 	float *in = iio_read_image_float_vec(inname, &iw, &ih, &pd);
 	fprintf(stderr, "w h pd P = %d %d %d %d\n", iw, ih, pd, iw*ih*pd);
 	if (iw != w || ih != h)
-		error("flow and image size mismatch\n");
+		fail("flow and image size mismatch\n");
 	float *out = xmalloc(w*h*pd*sizeof*out);
 	fprintf(stderr, "p = %p\n", (void*)out);
 	invflow(out, flow, in, w, h, pd);
