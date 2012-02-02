@@ -1,7 +1,7 @@
 # compiler specific part (may be removed with minor damage)
 ENABLE_GSL = yes
-#CFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds -O3 -DNDEBUG
-#CFLAGS = -g -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds
+CFLAGS = -g -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds
+CFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds -O3 -DNDEBUG
 #end of compiler specific part
 
 SRCDIR = src
@@ -50,7 +50,7 @@ endif
 
 
 SRC = $(SRCIIO) $(SRCFFT) $(SRCGSL)
-PROGRAMS = $(addprefix $(BINDIR)/,$(SRC) flow_ms rgfield)
+PROGRAMS = $(addprefix $(BINDIR)/,$(SRC) flow_ms rgfield rgfields)
 
 
 .PHONY: default
@@ -79,6 +79,9 @@ $(BINDIR)/flow_ms: $(addprefix $(SRCDIR)/,flow_ms.c gblur.o hs.o iio.o)
 	$(CC) $(CFLAGS) $(OFLAGS) -DUSE_MAINPHS $^ -o $@ $(IIOFLAGS) $(FFTFLAGS)
 
 $(BINDIR)/rgfield: $(addprefix $(SRCDIR)/,rgfield.c gblur.o iio.o)
+	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS) $(FFTFLAGS)
+
+$(BINDIR)/rgfields: $(addprefix $(SRCDIR)/,rgfields.c gblur.o iio.o)
 	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS) $(FFTFLAGS)
 
 

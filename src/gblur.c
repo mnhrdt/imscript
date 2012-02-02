@@ -17,43 +17,13 @@
 #define M_PI		3.14159265358979323846	/* pi */
 #endif
 
-// this function prints an error message and aborts the program
-static void error(const char *fmt, ...)
-{
-	va_list argp;
-	fprintf(stderr, "\nERROR: ");
-	va_start(argp, fmt);
-	vfprintf(stderr, fmt, argp);
-	va_end(argp);
-	fprintf(stderr, "\n\n");
-	fflush(NULL);
-#ifdef NDEBUG
-	exit(-1);
-#else
-	exit(*(int *)0x43);
-#endif
-}
-
-
-// this function always returns a valid pointer
-static void *xmalloc(size_t size)
-{
-	if (size == 0)
-		error("xmalloc: zero size");
-	void *new = malloc(size);
-	if (!new)
-	{
-		double sm = size / (0x100000 * 1.0);
-		error("xmalloc: out of memory when requesting "
-			"%zu bytes (%gMB)",//:\"%s\"",
-			size, sm);//, strerror(errno));
-	}
-	return new;
-}
+#include "fail.c"
+#include "xmalloc.c"
 
 
 #define FORI(n) for(int i=0;i<(n);i++)
 #define FORJ(n) for(int j=0;j<(n);j++)
+#define FORK(n) for(int k=0;k<(n);k++)
 #define FORL(n) for(int l=0;l<(n);l++)
 
 
@@ -117,6 +87,56 @@ static void ifft_2dfloat(float *ifx,  fftwf_complex *fx, int w, int h)
 	fftwf_cleanup();
 }
 
+// wrapper around FFTW3 that computes the complex-valued Fourier transform
+// of a real-valued 3D image
+static void fft_3dfloat(fftwf_complex *fx, float *x, int w, int h, int d)
+{
+	fftwf_complex *a = fftwf_malloc(w*h*d*sizeof*a);
+
+	//fprintf(stderr, "planning...\n");
+	evoke_wisdom();
+	fftwf_plan p = fftwf_plan_dft_3d(d, h, w, a, fx,
+						FFTW_FORWARD, FFTW_ESTIMATE);
+	bequeath_wisdom();
+	//fprintf(stderr, "...planned!\n");
+
+	FORI(w*h*d) a[i] = x[i]; // complex assignment!
+	fftwf_execute(p);
+
+	fftwf_destroy_plan(p);
+	fftwf_free(a);
+	fftwf_cleanup();
+}
+
+// Wrapper around FFTW3 that computes the real-valued inverse Fourier transform
+// of a complex-valued frequantial 3D image.
+// The input data must be hermitic.
+static void ifft_3dfloat(float *ifx,  fftwf_complex *fx, int w, int h, int d)
+{
+	fftwf_complex *a = fftwf_malloc(w*h*d*sizeof*a);
+	fftwf_complex *b = fftwf_malloc(w*h*d*sizeof*b);
+
+	//fprintf(stderr, "planning...\n");
+	evoke_wisdom();
+	fftwf_plan p = fftwf_plan_dft_3d(d, h, w, a, b,
+						FFTW_BACKWARD, FFTW_ESTIMATE);
+	bequeath_wisdom();
+	//fprintf(stderr, "...planned!\n");
+
+	FORI(w*h*d) a[i] = fx[i];
+	fftwf_execute(p);
+	float scale = 1.0/(w*h*d);
+	FORI(w*h*d) {
+		fftwf_complex z = b[i] * scale;
+		ifx[i] = crealf(z);
+		assert(cimagf(z) < 0.001);
+	}
+	fftwf_destroy_plan(p);
+	fftwf_free(a);
+	fftwf_free(b);
+	fftwf_cleanup();
+}
+
 //static void pointwise_complex_rmultiplication(fftwf_complex *w,
 //		fftwf_complex *z, float *x, int n)
 //{
@@ -150,6 +170,23 @@ static void fill_2d_gaussian_image(float *gg, int w, int h, float inv_s)
 	FORJ(h) FORI(w) g[j][i] /= m;
 }
 
+static void fill_3d_gaussian_image(float *gg, int w, int h, int d, float is[3])
+{
+	float (*g)[h][w] = (void *)gg;
+
+	FORK(d) FORJ(h) FORI(w) {
+		float x = i < w/2 ? i : i - w;
+		float y = j < h/2 ? j : j - h;
+		float z = k < d/2 ? k : k - d;
+		float v = exp(-x*x*is[0] -y*y*is[1] -z*z*is[2]);
+		g[k][j][i] = v;
+	}
+
+	double m = 0;
+	FORK(d) FORJ(h) FORI(w) m += g[k][j][i];
+	FORK(d) FORJ(h) FORI(w) g[k][j][i] /= m;
+}
+
 static float average(float *x, int n)
 {
 	double r = 0;
@@ -179,6 +216,29 @@ void gblur_gray(float *y, float *x, int w, int h, float s)
 	free(g);
 }
 
+// gaussian blur of a gray 3D image
+void gblur_gray_3d(float *y, float *x, int w, int h, int d, float rs[3])
+{
+	float s[3] = {1/rs[0], 1/rs[1], 1/rs[2]};
+	int n = w * h * d;
+
+	fftwf_complex *fx = fftwf_malloc(n*sizeof*fx);
+	fft_3dfloat(fx, x, w, h, d);
+
+	float *g = xmalloc(n*sizeof*g);
+	fill_3d_gaussian_image(g, w, h, d, s);
+
+	fftwf_complex *fg = fftwf_malloc(n*sizeof*fg);
+	fft_3dfloat(fg, g, w, h, d);
+
+	pointwise_complex_multiplication(fx, fx, fg, n);
+	ifft_3dfloat(y, fx, w, h, d);
+
+	fftwf_free(fx);
+	fftwf_free(fg);
+	free(g);
+}
+
 // gausian blur of a 2D image with pd-dimensional pixels
 // (the blurring is performed independently for each co-ordinate)
 void gblur(float *y, float *x, int w, int h, int pd, float s)
@@ -202,6 +262,29 @@ void gblur(float *y, float *x, int w, int h, int pd, float s)
 	free(gc);
 }
 
+// gausian blur of a 3D image with pd-dimensional pixels
+// (the blurring is performed independently for each co-ordinate)
+void gblur3d(float *y, float *x, int w, int h, int d, int pd, float s[3])
+{
+	int n = w * h * d;
+	float *c = xmalloc(n*sizeof*c);
+	float *gc = xmalloc(n*sizeof*gc);
+#pragma omp parallel for
+	FORL(pd) {
+		FORI(n) {
+			float tmp = x[i*pd + l];
+			if (!isfinite(tmp))
+				tmp = 0;
+			c[i] = tmp;//x[i*pd + l];
+		}
+		gblur_gray_3d(gc, c, w, h, d, s);
+		FORI(n)
+			y[i*pd + l] = gc[i];
+	}
+	free(c);
+	free(gc);
+}
+
 #ifndef OMIT_GBLUR_MAIN
 int main(int c, char *v[])
 {
@@ -211,7 +294,7 @@ int main(int c, char *v[])
 		return EXIT_FAILURE;
 	}
 	float s = atof(v[1]);
-	if (!s || !isfinite(s)) error("bad variance %g", s);
+	if (!s || !isfinite(s)) fail("bad variance %g", s);
 	char *in = c > 2 ? v[2] : "-";
 	char *out = c > 3 ? v[3] : "-";
 

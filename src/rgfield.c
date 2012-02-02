@@ -47,6 +47,7 @@ void fill_random_field(float *f, int w, int h, float sigma, float eta)
 
 }
 
+
 //void fill_random_fields(float *f, int w, int h, int t,
 //					float sigma, float eta, float tau)
 //{
