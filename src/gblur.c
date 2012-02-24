@@ -20,6 +20,13 @@
 #include "fail.c"
 #include "xmalloc.c"
 
+static void *fftwf_xmalloc(size_t n)
+{
+	float *r = fftwf_malloc(n);
+	if (!n)
+		fail("coult not fftwf_malloc %zu bytes\n", n);
+	return r;
+}
 
 #define FORI(n) for(int i=0;i<(n);i++)
 #define FORJ(n) for(int j=0;j<(n);j++)
@@ -41,7 +48,7 @@ void bequeath_wisdom(void) {}
 // of a real-valued image
 static void fft_2dfloat(fftwf_complex *fx, float *x, int w, int h)
 {
-	fftwf_complex *a = fftwf_malloc(w*h*sizeof*a);
+	fftwf_complex *a = fftwf_xmalloc(w*h*sizeof*a);
 
 	//fprintf(stderr, "planning...\n");
 	evoke_wisdom();
@@ -63,8 +70,8 @@ static void fft_2dfloat(fftwf_complex *fx, float *x, int w, int h)
 // The input data must be hermitic.
 static void ifft_2dfloat(float *ifx,  fftwf_complex *fx, int w, int h)
 {
-	fftwf_complex *a = fftwf_malloc(w*h*sizeof*a);
-	fftwf_complex *b = fftwf_malloc(w*h*sizeof*b);
+	fftwf_complex *a = fftwf_xmalloc(w*h*sizeof*a);
+	fftwf_complex *b = fftwf_xmalloc(w*h*sizeof*b);
 
 	//fprintf(stderr, "planning...\n");
 	evoke_wisdom();
@@ -91,7 +98,7 @@ static void ifft_2dfloat(float *ifx,  fftwf_complex *fx, int w, int h)
 // of a real-valued 3D image
 static void fft_3dfloat(fftwf_complex *fx, float *x, int w, int h, int d)
 {
-	fftwf_complex *a = fftwf_malloc(w*h*d*sizeof*a);
+	fftwf_complex *a = fftwf_xmalloc(w*h*d*sizeof*a);
 
 	//fprintf(stderr, "planning...\n");
 	evoke_wisdom();
@@ -113,8 +120,8 @@ static void fft_3dfloat(fftwf_complex *fx, float *x, int w, int h, int d)
 // The input data must be hermitic.
 static void ifft_3dfloat(float *ifx,  fftwf_complex *fx, int w, int h, int d)
 {
-	fftwf_complex *a = fftwf_malloc(w*h*d*sizeof*a);
-	fftwf_complex *b = fftwf_malloc(w*h*d*sizeof*b);
+	fftwf_complex *a = fftwf_xmalloc(w*h*d*sizeof*a);
+	fftwf_complex *b = fftwf_xmalloc(w*h*d*sizeof*b);
 
 	//fprintf(stderr, "planning...\n");
 	evoke_wisdom();
@@ -187,6 +194,37 @@ static void fill_3d_gaussian_image(float *gg, int w, int h, int d, float is[3])
 	FORK(d) FORJ(h) FORI(w) g[k][j][i] /= m;
 }
 
+static float xax3(float a[3][3], float x[3])
+{
+	float ax[3];
+	ax[0] = a[0][0] * x[0] + a[0][1] * x[1] + a[0][2] * x[2];
+	ax[1] = a[1][0] * x[0] + a[1][1] * x[1] + a[1][2] * x[2];
+	ax[2] = a[2][0] * x[0] + a[2][1] * x[1] + a[2][2] * x[2];
+	return x[0]*ax[0] + x[1]*ax[1] + x[2]*ax[2];
+}
+
+static void fill_3dm_gaussian_image(float *gg, int w, int h, int d, float is[6])
+{
+	float (*g)[h][w] = (void *)gg;
+
+	float M[3][3] = {{is[0], is[1], is[2]},
+		         {is[1], is[3], is[4]},
+		         {is[2], is[4], is[5]}};
+
+	FORK(d) FORJ(h) FORI(w) {
+		float x[3];
+		x[0] = i < w/2 ? i : i - w;
+		x[1] = j < h/2 ? j : j - h;
+		x[2] = k < d/2 ? k : k - d;
+		float v = exp(-xax3(M, x));
+		g[k][j][i] = v;
+	}
+
+	double m = 0;
+	FORK(d) FORJ(h) FORI(w) m += g[k][j][i];
+	FORK(d) FORJ(h) FORI(w) g[k][j][i] /= m;
+}
+
 static float average(float *x, int n)
 {
 	double r = 0;
@@ -199,13 +237,13 @@ void gblur_gray(float *y, float *x, int w, int h, float s)
 {
 	s = 1/s;
 
-	fftwf_complex *fx = fftwf_malloc(w*h*sizeof*fx);
+	fftwf_complex *fx = fftwf_xmalloc(w*h*sizeof*fx);
 	fft_2dfloat(fx, x, w, h);
 
 	float *g = xmalloc(w*h*sizeof*g);
 	fill_2d_gaussian_image(g, w, h, s);
 
-	fftwf_complex *fg = fftwf_malloc(w*h*sizeof*fg);
+	fftwf_complex *fg = fftwf_xmalloc(w*h*sizeof*fg);
 	fft_2dfloat(fg, g, w, h);
 
 	pointwise_complex_multiplication(fx, fx, fg, w*h);
@@ -222,13 +260,57 @@ void gblur_gray_3d(float *y, float *x, int w, int h, int d, float rs[3])
 	float s[3] = {1/rs[0], 1/rs[1], 1/rs[2]};
 	int n = w * h * d;
 
-	fftwf_complex *fx = fftwf_malloc(n*sizeof*fx);
+	fftwf_complex *fx = fftwf_xmalloc(n*sizeof*fx);
 	fft_3dfloat(fx, x, w, h, d);
 
 	float *g = xmalloc(n*sizeof*g);
 	fill_3d_gaussian_image(g, w, h, d, s);
 
-	fftwf_complex *fg = fftwf_malloc(n*sizeof*fg);
+	fftwf_complex *fg = fftwf_xmalloc(n*sizeof*fg);
+	fft_3dfloat(fg, g, w, h, d);
+
+	pointwise_complex_multiplication(fx, fx, fg, n);
+	ifft_3dfloat(y, fx, w, h, d);
+
+	fftwf_free(fx);
+	fftwf_free(fg);
+	free(g);
+}
+
+
+static
+void invert_symmetric_positive_definite_3x3_matrix(float ia[6], float a[6])
+{
+	float A[3][3] = {{a[0], a[1], a[2]},
+		         {a[1], a[3], a[4]},
+		         {a[2], a[4], a[5]}};
+	float iA[3][3];
+	double det;
+#include "vvector.h"
+	INVERT_3X3(iA,det,A);
+	ia[0] = iA[0][0];
+	ia[1] = iA[0][1];
+	ia[2] = iA[0][2];
+	ia[3] = iA[1][1];
+	ia[4] = iA[1][2];
+	ia[5] = iA[2][2];
+}
+
+// gaussian blur of a gray 3D image
+void gblur_gray_3dm(float *y, float *x, int w, int h, int d, float v[6])
+{
+	int n = w * h * d;
+
+	float iv[6];
+	invert_symmetric_positive_definite_3x3_matrix(iv, v);
+
+	fftwf_complex *fx = fftwf_xmalloc(n*sizeof*fx);
+	fft_3dfloat(fx, x, w, h, d);
+
+	float *g = xmalloc(n*sizeof*g);
+	fill_3dm_gaussian_image(g, w, h, d, iv);
+
+	fftwf_complex *fg = fftwf_xmalloc(n*sizeof*fg);
 	fft_3dfloat(fg, g, w, h, d);
 
 	pointwise_complex_multiplication(fx, fx, fg, n);
@@ -269,7 +351,7 @@ void gblur3d(float *y, float *x, int w, int h, int d, int pd, float s[3])
 	int n = w * h * d;
 	float *c = xmalloc(n*sizeof*c);
 	float *gc = xmalloc(n*sizeof*gc);
-#pragma omp parallel for
+//#pragma omp parallel for
 	FORL(pd) {
 		FORI(n) {
 			float tmp = x[i*pd + l];
@@ -278,6 +360,29 @@ void gblur3d(float *y, float *x, int w, int h, int d, int pd, float s[3])
 			c[i] = tmp;//x[i*pd + l];
 		}
 		gblur_gray_3d(gc, c, w, h, d, s);
+		FORI(n)
+			y[i*pd + l] = gc[i];
+	}
+	free(c);
+	free(gc);
+}
+
+// gausian blur of a 3D image with pd-dimensional pixels
+// (the blurring is performed independently for each co-ordinate)
+void gblur3dm(float *y, float *x, int w, int h, int d, int pd, float v[6])
+{
+	int n = w * h * d;
+	float *c = xmalloc(n*sizeof*c);
+	float *gc = xmalloc(n*sizeof*gc);
+//#pragma omp parallel for
+	FORL(pd) {
+		FORI(n) {
+			float tmp = x[i*pd + l];
+			if (!isfinite(tmp))
+				tmp = 0;
+			c[i] = tmp;//x[i*pd + l];
+		}
+		gblur_gray_3dm(gc, c, w, h, d, v);
 		FORI(n)
 			y[i*pd + l] = gc[i];
 	}

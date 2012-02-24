@@ -308,3 +308,15 @@ int main(int c, char *v[])
 	return main_viewflow(c, v);
 }
 #endif//OMIT_MAIN
+
+// TODO:
+// viewflow method "parlist" [in [out]]
+//
+// methods:
+//
+// 1. ipol
+// 2. middlebury
+// 3. boldt/whoever
+// 4. heidelberg
+// 5. depth
+// 6. shadows

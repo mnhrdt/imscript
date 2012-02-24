@@ -128,7 +128,7 @@
 #include <math.h>
 #include "iio.h"
 
-#define PLAMBDA_MAX_TOKENS 0x100
+#define PLAMBDA_MAX_TOKENS 2049
 #define PLAMBDA_MAX_VARLEN 0x100
 #define PLAMBDA_MAX_PIXELDIM 40
 
