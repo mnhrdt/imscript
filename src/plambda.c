@@ -168,6 +168,9 @@ static double divide_two_doubles   (double a, double b) {
 static double logic_g      (double a, double b) { return a > b; }
 static double logic_l      (double a, double b) { return a < b; }
 static double logic_e      (double a, double b) { return a == b; }
+static double logic_ge     (double a, double b) { return a >= b; }
+static double logic_le     (double a, double b) { return a <= b; }
+static double logic_ne     (double a, double b) { return a != b; }
 static double logic_if (double a, double b, double c) { return a ? b : c; }
 static double quantize_255 (double x)
 {
@@ -244,6 +247,9 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(logic_g,">",2),
 	REGISTER_FUNCTIONN(logic_l,"<",2),
 	REGISTER_FUNCTIONN(logic_e,"=",2),
+	REGISTER_FUNCTIONN(logic_ge,">=",2),
+	REGISTER_FUNCTIONN(logic_le,"<=",2),
+	REGISTER_FUNCTIONN(logic_ne,"!=",2),
 	REGISTER_FUNCTIONN(logic_if,"if",3),
 	REGISTER_FUNCTIONN(divide_two_doubles,"/",2),
 	REGISTER_FUNCTIONN(multiply_two_doubles,"*",2),
