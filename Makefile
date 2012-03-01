@@ -1,7 +1,7 @@
 # compiler specific part (may be removed with minor damage)
 ENABLE_GSL = yes
-CFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds -O3 -DNDEBUG
 CFLAGS = -g -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds
+CFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds -O3 -DNDEBUG
 #end of compiler specific part
 
 SRCDIR = src
