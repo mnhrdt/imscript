@@ -923,7 +923,7 @@ int main(int c, char *v[])
 	float *x[n];
 	FORI(n) x[i] = iio_read_image_float_vec(v[i+1], w + i, h + i, pd + i);
 	FORI(n-1)
-		if (w[0] != w[i+1] || h[0] != h[i+1] || pd[0] != pd[i+1])
+		if (w[0] != w[i+1] || h[0] != h[i+1])// || pd[0] != pd[i+1])
 			error("input images size mismatch");
 
 	FORI(n)
