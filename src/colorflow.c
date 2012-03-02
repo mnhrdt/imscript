@@ -225,17 +225,31 @@ static void colorflow_boldt(uint8_t *view, float *flow, int w, int h,
 		FORL(3)
 			y[j][i][l] = 255*rgb[l];
 	}
-
 }
 
-static void colorflow_heidelberg(uint8_t *v, float *f, int w, int h,
+static void colorflow_heidelberg(uint8_t *view, float *flow, int w, int h,
 		float *p, int n)
 {
 }
 
-static void colorflow_depth(uint8_t *v, float *f, int w, int h,
+static void colorflow_depth(uint8_t *view, float *flow, int w, int h,
 		float *p, int n)
 {
+	if (n != 1)
+		fail("Depth colorization expects one single parameter");
+	float (*x)[w][2] = (void*)flow;
+	uint8_t (*y)[w][3] = (void*)view;
+	float scale = p[0] ? fabs(p[0]) :
+		get_max_length_among_small_enough(flow, w*h, 1e11)/2;
+	FORJ(h) FORI(w) {
+		float *vbad = x[j][i];
+		float v[2] = {vbad[0]/scale, vbad[1]/scale};
+		float disp = hypot(v[0]+300,v[1])-hypot(300,0);
+		if (disp < 0) disp = 0;
+		if (disp > 255) disp = 255;
+		FORL(3)
+			y[j][i][l] = disp;
+	}
 }
 
 static void colorflow_shadows(uint8_t *v, float *f, int w, int h,
