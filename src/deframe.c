@@ -57,7 +57,13 @@ static bool canonicalize_point_ordering_inplace(float x[4][2])
 		assert(qidx >= 0);
 		assert(qidx < 4);
 		if (quadrant[qidx] > 0)
+		{
+			//x[0][0] = p[imx][0]; x[0][1] = p[imy][1];
+			//x[1][0] = p[iMx][0]; x[1][1] = p[imy][1];
+			//x[2][0] = p[imx][0]; x[2][1] = p[iMy][1];
+			//x[3][0] = p[iMx][0]; x[3][1] = p[iMy][1];
 			return false;
+		}
 		quadrant[qidx] = i;
 		fprintf(stderr, "quadrant[%d] = %d\n", qidx, i);
 	}
@@ -222,8 +228,8 @@ static void deframe(float *y, int *out_w, int *out_h,
 		float *x, int in_w, int in_h, int pd, float points[4][2])
 {
 	bool good_data = canonicalize_point_ordering_inplace(points);
-	if (!good_data)
-		fail("the four given points are too far from a rectangle");
+	//if (!good_data)
+	//	fail("the four given points are too far from a rectangle");
 
 	float cpoints[4][2];
 	compute_rectangular_fit(cpoints, points);
