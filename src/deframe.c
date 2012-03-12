@@ -52,17 +52,27 @@ static bool canonicalize_point_ordering_inplace(float x[4][2])
 
 	// find the quadrant for each point
 	int quadrant[4] = {-1, -1, -1, -1};
+	int qs = quadrant_signature(p, midx, midy);
 	for (int i = 0; i < 4; i++) {
 		int qidx = 2*(p[i][1] > midy) + (p[i][0] > midx);
 		assert(qidx >= 0);
 		assert(qidx < 4);
 		if (quadrant[qidx] > 0)
 		{
+			assert(qs != 15);
+			switch(qs) {
+			case 9:
+				break;
+			case 6:
+				break;
+			default:
+				return false;
+			}
 			//x[0][0] = p[imx][0]; x[0][1] = p[imy][1];
 			//x[1][0] = p[iMx][0]; x[1][1] = p[imy][1];
 			//x[2][0] = p[imx][0]; x[2][1] = p[iMy][1];
 			//x[3][0] = p[iMx][0]; x[3][1] = p[iMy][1];
-			return false;
+			//return false;
 		}
 		quadrant[qidx] = i;
 		fprintf(stderr, "quadrant[%d] = %d\n", qidx, i);
@@ -109,6 +119,15 @@ static void compute_rectangular_fit(float np[4][2], float p[4][2])
 	np[1][0] = xspan; np[1][1] = 0;
 	np[2][0] = 0;     np[2][1] = yspan;
 	np[3][0] = xspan; np[3][1] = yspan;
+}
+
+
+static int quadrant_signature(float midx, float midy, float p[4][2])
+{
+	int q[4];
+	for (int i = 0; i < 4; i++)
+		q[i] = 2*(p[i][1] > midy) + (p[i][0] > midx);
+	return q[0] + 2*q[1] + 4*q[2] + 8*q[3];
 }
 
 // compute the homography given by the images of four points
