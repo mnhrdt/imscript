@@ -1,9 +1,15 @@
 # compiler specific part (may be removed with minor damage)
+#
 ENABLE_GSL = yes
-CFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds -O3 -DNDEBUG
+WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds
+
+CFLAGS = $(WFLAGS) -O3 -DNDEBUG
+CFLAGS = $(WFLAGS)
 CFLAGS = -g
-CFLAGS = -g -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds
+
 #end of compiler specific part
+
+
 
 SRCDIR = src
 BINDIR = bin
@@ -18,7 +24,9 @@ IIOFLAGS = -ljpeg -ltiff -lpng
 FFTFLAGS = -lfftw3f
 GSLFLAGS = -lgsl -lgslcblas
 
-# compiler detection hacks (some compilers do not use the standard by default)
+# compiler detection hacks
+# (because some compilers do not use the standard by default)
+# TODO: move this stuff to a separate "hacks" file
 ifeq ($(CC), cc)
 	CC += -std=c99
 endif
@@ -31,6 +39,7 @@ endif
 
 
 # OS detection hacks
+# TODO: move this stuff to a separate "portability" file
 UNAME := $(shell uname)
 ifeq ($(UNAME), Linux)
 	CFLAGSIIO = $(CFLAGS) -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700
