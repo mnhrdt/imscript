@@ -13,6 +13,14 @@
 
 #include "cmphomod.c"
 
+static int quadrant_signature(float midx, float midy, float p[4][2])
+{
+	int q[4];
+	for (int i = 0; i < 4; i++)
+		q[i] = 2*(p[i][1] > midy) + (p[i][0] > midx);
+	return q[0] + 2*q[1] + 4*q[2] + 8*q[3];
+}
+
 
 // Sort four points so that they are ordered like that:
 //
@@ -52,7 +60,7 @@ static bool canonicalize_point_ordering_inplace(float x[4][2])
 
 	// find the quadrant for each point
 	int quadrant[4] = {-1, -1, -1, -1};
-	int qs = quadrant_signature(p, midx, midy);
+	int qs = quadrant_signature(midx, midy, p);
 	for (int i = 0; i < 4; i++) {
 		int qidx = 2*(p[i][1] > midy) + (p[i][0] > midx);
 		assert(qidx >= 0);
@@ -121,14 +129,6 @@ static void compute_rectangular_fit(float np[4][2], float p[4][2])
 	np[3][0] = xspan; np[3][1] = yspan;
 }
 
-
-static int quadrant_signature(float midx, float midy, float p[4][2])
-{
-	int q[4];
-	for (int i = 0; i < 4; i++)
-		q[i] = 2*(p[i][1] > midy) + (p[i][0] > midx);
-	return q[0] + 2*q[1] + 4*q[2] + 8*q[3];
-}
 
 // compute the homography given by the images of four points
 static void compute_homography_from_point_pairs(double H[3][3],
