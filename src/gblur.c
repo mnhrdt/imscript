@@ -23,7 +23,7 @@
 static void *fftwf_xmalloc(size_t n)
 {
 	float *r = fftwf_malloc(n);
-	if (!n)
+	if (!r)
 		fail("coult not fftwf_malloc %zu bytes\n", n);
 	return r;
 }

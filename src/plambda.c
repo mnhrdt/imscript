@@ -130,7 +130,7 @@
 
 #define PLAMBDA_MAX_TOKENS 2049
 #define PLAMBDA_MAX_VARLEN 0x100
-#define PLAMBDA_MAX_PIXELDIM 40
+#define PLAMBDA_MAX_PIXELDIM 6
 
 
 
@@ -282,7 +282,7 @@ struct plambda_program {
 	int n;
 	struct plambda_token t[PLAMBDA_MAX_TOKENS];
 	struct collection_of_varnames var[1];
-	int regn[10];
+	int regn[10]; // registers
 	float regv[10][PLAMBDA_MAX_PIXELDIM];
 };
 
