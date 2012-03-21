@@ -117,20 +117,24 @@ static void pstack(struct stack_of_operators *s)
 
 static void push(struct stack_of_operators *s, struct token *t)
 {
-	//fprintf(stderr, "\tpushing token \"%s\"\n", t->s);
 	s->t[s->n] = *t;
 	s->n += 1;
 }
 
+static struct token *top(struct stack_of_operators *s)
+{
+	if (s->n <= 0)
+		return NULL;
+	else
+		return s->t + s->n - 1;
+}
+
 static struct token *pop(struct stack_of_operators *s)
 {
-	if (!s->n)
-		return NULL;
-	else {
-		//fprintf(stderr, "\tpopping token \"%s\"\n", s->t[s->n-1].s);
+	struct token *r = top(s);
+	if (r)
 		s->n -= 1;
-		return s->t + s->n;
-	}
+	return r;
 }
 
 static void queue(struct token *t)
@@ -160,35 +164,27 @@ static void shunting_yard(char *s)
 			push(stack, tok);
 			break;
 		case TOK_COMMA:
-			while ((tt = pop(stack)) && tt->type != TOK_LEFTPAR)
-				queue(tt);
+			while ((tt = top(stack)) && tt->type != TOK_LEFTPAR)
+				queue(pop(stack));
 			if (!tt) fail("mismatched parentheses\n");
 			break;
 		case TOK_OPERATOR:
-			while (tt = pop(stack)) {
-				if (tt->type == TOK_OPERATOR
+			while ((tt = top(stack)) && tt->type == TOK_OPERATOR
 					&& precedence(tok) <= precedence(tt))
-					queue(tt);
-				else {
-					push(stack, tt);
-					break;
-				}
-			}
+				queue(pop(stack));
 			push(stack, tok);
 			break;
 		case TOK_LEFTPAR:
 			push(stack, tok);
 			break;
 		case TOK_RIGHTPAR:
-			while ((tt = pop(stack)) && tt->type != TOK_LEFTPAR)
-				queue(tt);
+			while ((tt = top(stack)) && tt->type != TOK_LEFTPAR)
+				queue(pop(stack));
 			if (!tt) fail("mismatched parens\n");
-			if (tt = pop(stack)) {
-				if (tt->type == TOK_FUNCTION)
-					queue(tt);
-				else
-					push(stack, tt);
-			}
+			assert(tt->type == TOK_LEFTPAR);
+			pop(stack);
+			if ((tt = top(stack)) && tt->type == TOK_FUNCTION)
+				queue(pop(stack));
 			break;
 		default:
 			fail("don't know how to deal with %s\n",
@@ -196,6 +192,8 @@ static void shunting_yard(char *s)
 		}
 	}
 
+	//fprintf(stderr, "no more tokens\n");
+	//pstack(stack);
 	while (tt = pop(stack))
 		if (tt->type == TOK_LEFTPAR || tt->type == TOK_RIGHTPAR)
 			fail("unmatched parentheses\n");
