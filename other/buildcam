@@ -1,0 +1,2 @@
+C_INCLUDE_PATH=/home/coco/prefix/include/:/home/coco/prefix/include/opencv LIBRARY_PATH=/home/coco/prefix/lib colorgcc -std=c99 -O3 -ffast-math webcam.c  -lopencv_core -lopencv_imgproc -lopencv_highgui
+# LD_LIBRARY_PATH=/home/coco/prefix/lib ./a.out 0 10
