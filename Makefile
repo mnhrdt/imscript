@@ -3,9 +3,9 @@
 ENABLE_GSL = yes
 WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds
 
-CFLAGS = $(WFLAGS) -O3 -DNDEBUG
 CFLAGS = $(WFLAGS)
 CFLAGS = -g
+CFLAGS = $(WFLAGS) -O3 -DNDEBUG
 
 #end of compiler specific part
 
@@ -14,7 +14,7 @@ CFLAGS = -g
 SRCDIR = src
 BINDIR = bin
 
-SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop shuntingyard angleplot
+SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot
 SRCFFT = gblur fft dct
 ifeq ($(ENABLE_GSL), yes)
 	SRCGSL = paraflow minimize
@@ -82,11 +82,17 @@ $(SRCDIR)/iio.o : $(SRCDIR)/iio.c $(SRCDIR)/iio.h
 $(SRCDIR)/hs.o: $(SRCDIR)/hs.c
 	$(CC) $(CFLAGS) $(OFLAGS) -DOMIT_MAIN -c $< -o $@
 
+$(SRCDIR)/lk.o: $(SRCDIR)/lk.c
+	$(CC) $(CFLAGS) $(OFLAGS) -DOMIT_MAIN -c $< -o $@
+
 $(SRCDIR)/gblur.o: $(SRCDIR)/gblur.c
 	$(CC) $(CFLAGS) $(OFLAGS) -DOMIT_GBLUR_MAIN -c $< -o $@
 
-$(BINDIR)/flow_ms: $(addprefix $(SRCDIR)/,flow_ms.c gblur.o hs.o iio.o)
-	$(CC) $(CFLAGS) $(OFLAGS) -DUSE_MAINPHS $^ -o $@ $(IIOFLAGS) $(FFTFLAGS)
+$(SRCDIR)/flow_ms.o: $(SRCDIR)/flow_ms.c
+	$(CC) $(CFLAGS) $(OFLAGS) -c $< -o $@
+
+$(BINDIR)/flow_ms: $(addprefix $(SRCDIR)/,flow_ms.c gblur.o hs.o lk.o iio.o)
+	$(CC) $(CFLAGS) $(OFLAGS) -DUSE_MAINAPI $^ -o $@ $(IIOFLAGS) $(FFTFLAGS)
 
 $(BINDIR)/rgfield: $(addprefix $(SRCDIR)/,rgfield.c gblur.o iio.o)
 	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS) $(FFTFLAGS)

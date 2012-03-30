@@ -560,7 +560,7 @@ static void global_polynomial_approximation(float *u, float *v,
 		}
 }
 
-static void least_squares_ofc(float *u, float *v,
+void least_squares_ofc(float *u, float *v,
 		float *a, float *b, int w, int h,
 		int kside, float sigma)
 {
@@ -601,6 +601,7 @@ static void least_squares_ofc(float *u, float *v,
        	free(gt);
 }
 
+#ifndef OMIT_MAIN
 int main(int argc, char *argv[])
 {
 	if (argc != 6)
@@ -627,3 +628,4 @@ int main(int argc, char *argv[])
 	iio_save_image_float_vec(filename_f, f, w, h, 2);
 	return EXIT_SUCCESS;
 }
+#endif//OMIT_MAIN

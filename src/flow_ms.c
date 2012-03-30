@@ -11,6 +11,7 @@
 // #includes {{{1
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 
 #include "iio.h"
@@ -98,14 +99,16 @@ static float interpolate_float_image_bilinearly(float *x, int w, int h,
 
 static void save_debug_image(char *fpat, int id, float *x, int w, int h)
 {
+	return;
 	char filename[0x100];
 	snprintf(filename, 0x100, fpat, id);
-	//fprintf(stderr, "saving image \"%s\"\n", filename);
+	fprintf(stderr, "saving image \"%s\"\n", filename);
 	iio_save_image_float(filename, x, w, h);
 }
 
 static void save_debug_flow(char *fpat, int id, float*u, float*v, int w, int h)
 {
+	return;
 	char filename[0x100];
 	snprintf(filename, 0x100, fpat, id);
 	float *f = xmalloc(w*h*2*sizeof*f);
@@ -114,7 +117,7 @@ static void save_debug_flow(char *fpat, int id, float*u, float*v, int w, int h)
 		f[2*i+1] = v[i];
 	}
 
-	//fprintf(stderr, "saving field \"%s\"\n", filename);
+	fprintf(stderr, "saving field \"%s\"\n", filename);
 	iio_save_image_float_vec(filename, f, w, h, 2);
 	xfree(f);
 }
@@ -140,6 +143,28 @@ static void save_debug_flow(char *fpat, int id, float*u, float*v, int w, int h)
 //		       + p(in,inw,inh, 2*i+1, 2*j+1));
 //}
 
+static void downsa_v2(float *out, float *in,
+		int outw, int outh, int inw, int inh)
+{
+	//fprintf(stderr, "\n\ndownsa_v2 (%d x %d) => (%d x %d)\n\n",
+	//		inw,inh,outw,outh);
+	if (2*outw != inw) fail("bad horizontal halving");
+	if (2*outh != inh) fail("bad vertical halving");
+
+	float (*y)[outw] = (void*)out;
+	float (*x)[inw] = (void*)in;
+
+	for (int j = 0; j < outh; j++)
+	for (int i = 0; i < outw; i++) {
+		float g = 0;
+		g += x[2*j+0][2*i+0];
+		g += x[2*j+0][2*i+1];
+		g += x[2*j+1][2*i+0];
+		g += x[2*j+1][2*i+1];
+		y[j][i] = g/4;
+	}
+}
+
 SMART_PARAMETER(MAGIC_SIGMA,1.6)
 SMART_PARAMETER(PRESMOOTH,0)
 
@@ -147,8 +172,9 @@ static void downscale_image(float *out, float *in,
 		int outw, int outh, int inw, int inh,
 		float scalestep)
 {
-	fprintf(stderr, "downscale(%g): %dx%d => %dx%d\n",
-			scalestep, inw, inh, outw, outh);
+	if (scalestep == -2) {downsa_v2(out,in,outw,outh,inw,inh); return;}
+	//fprintf(stderr, "downscale(%g): %dx%d => %dx%d\n",
+	//		scalestep, inw, inh, outw, outh);
 
 	assert(scalestep > 1);
 	assert(scalestep * outw >= inw);
@@ -194,8 +220,9 @@ static void downscale_image(float *out, float *in,
 static void produce_upwards_pyramid(
 		float **out_pyrx, int *out_pyrw, int *out_pyrh,
 		float *x, int w, int h,
-		int nscales, float scalestep)
+		int nscales, float sscalestep)
 {
+	float scalestep = fabs(sscalestep);
 	assert(scalestep > 1);
 
 	// compute pyramid sizes
@@ -239,14 +266,21 @@ static void produce_upwards_pyramid(
 		downscale_image(out_pyrx[i], out_pyrx[i-1],
 				pyrsize[i][0], pyrsize[i][1],
 				pyrsize[i-1][0], pyrsize[i-1][1],
-				scalestep);
+				sscalestep);
 
+}
+
+static void dealloc_pyramid(float **pyr, int n)
+{
+	for (int i = 0; i < n; i++)
+		xfree(pyr[i]);
 }
 
 static void upscale_image(float *out, float *in,
 		int outw, int outh, int inw, int inh,
-		float scalestep)
+		float sscalestep)
 {
+	float scalestep = fabs(sscalestep);
 	assert(scalestep > 1);
 	//assert(outw >= scalestep*inw);
 	//assert(outw <= scalestep*(inw + 1));
@@ -366,6 +400,15 @@ static void iteritized(generic_optical_flow of,
 	save_debug_image("/tmp/ms_debug_image_wb0_%02d", global_idx, wb, w, h);
 
 	of(u, v, in_a, wb, w, h, data);
+	for (int i = 0; i < w*h; i++)
+	{
+		float r = hypot(u[i], v[i]);
+		float maxr = 1;
+		if (r > maxr) {
+			u[i] /= (r/maxr);
+			v[i] /= (r/maxr);
+		}
+	}
 
 	save_debug_flow("/tmp/ms_debug_field_duv_%02d", global_idx, u, v, w, h);
 	for (int i = 0; i < w *h; i++) {
@@ -378,6 +421,22 @@ static void iteritized(generic_optical_flow of,
 	xfree(u);
 	xfree(v);
 	xfree(wb);
+}
+
+// this function simply copies the flow
+static void do_nothing(generic_optical_flow of,
+		float *out_u, float *out_v,
+		float *in_a, float *in_b,
+		float *in_u, float *in_v,
+		int w, int h,
+		void *data)
+{
+	for (int i = 0; i < w *h; i++) {
+		out_u[i] = in_u[i];
+		out_v[i] = in_v[i];
+	}
+	save_debug_flow("/tmp/ms_debug_field_uv_%02d", global_idx,
+			out_u, out_v, w, h);
 }
 
 // perturbative multiscale {{{2
@@ -395,19 +454,21 @@ SMART_PARAMETER_SILENT(NWARPS,1)
 void generic_multi_scale_optical_flow(float *out_u, float *out_v,
 		float *in_a, float *in_b, int in_w, int in_h,
 		generic_optical_flow of, void *data,
-		int nscales, float step)
+		int nscales, float sstep, int last_scale)
 {
+	if (last_scale >= nscales) last_scale = nscales - 1;
+	float step = fabs(sstep);
 	assert(step > 1);
 
 	float *a[nscales], *b[nscales], *u[nscales], *v[nscales];
 	int w[nscales], h[nscales];
 
 	//                      op ow oh ix
-	produce_upwards_pyramid(0, w, h, 0,    in_w, in_h, nscales,step);
-	produce_upwards_pyramid(a, 0, 0, in_a, in_w, in_h, nscales,step);
-	produce_upwards_pyramid(b, 0, 0, in_b, in_w, in_h, nscales,step);
-	produce_upwards_pyramid(u, 0, 0, 0,    in_w, in_h, nscales,step);
-	produce_upwards_pyramid(v, 0, 0, 0,    in_w, in_h, nscales,step);
+	produce_upwards_pyramid(0, w, h, 0,    in_w, in_h, nscales,sstep);
+	produce_upwards_pyramid(a, 0, 0, in_a, in_w, in_h, nscales,sstep);
+	produce_upwards_pyramid(b, 0, 0, in_b, in_w, in_h, nscales,sstep);
+	produce_upwards_pyramid(u, 0, 0, 0,    in_w, in_h, nscales,sstep);
+	produce_upwards_pyramid(v, 0, 0, 0,    in_w, in_h, nscales,sstep);
 
 	for (int i = 0; i < nscales; i++) {
 		save_debug_image("/tmp/ms_debug_image_a_%02d", i,
@@ -425,9 +486,14 @@ void generic_multi_scale_optical_flow(float *out_u, float *out_v,
 		global_idx = s;
 
 		// run flow at this level
-		for (int i = 0; i < nwarps; i++)
-			iteritized(of, u[s], v[s], a[s], b[s], u[s], v[s],
+		if (s >= last_scale)
+			for (int i = 0; i < nwarps; i++)
+				iteritized(of, u[s], v[s], a[s], b[s],
+						u[s], v[s], w[s], h[s], data);
+		else
+			do_nothing(of, u[s], v[s], a[s], b[s], u[s], v[s],
 							w[s], h[s], data);
+
 		if (!s) break;
 
 		// upscale flow to the next level
@@ -445,11 +511,164 @@ void generic_multi_scale_optical_flow(float *out_u, float *out_v,
 		out_u[i] = u[0][i];
 		out_v[i] = v[0][i];
 	}
+
+	dealloc_pyramid(a, nscales);
+	dealloc_pyramid(b, nscales);
+	dealloc_pyramid(u, nscales);
+	dealloc_pyramid(v, nscales);
 }
 
+// genericized flows {{{1
+static void genericized_hs(
+		float *out_u, float *out_v,
+		float *in_a, float *in_b,
+		int width, int height,
+		void *data)
+{
+	float *fdata = data;
+	float alpha = fdata[0];
+	int niter = fdata[1];
+	float epsilon = fdata[2];
+	void hs(float *u, float *v, float *a, float *b, int w, int h,
+		int niter, float alpha);
+	void hs_stopping(float *u, float *v, float *a, float *b, int w, int h,
+		int niter, float alpha, float epsilon);
+	//fprintf(stderr, "calling HS with input of size %dx%d\n", width, height);
+	//hs(out_u, out_v, in_a, in_b, width, height, niter, alpha);
+	hs_stopping(out_u, out_v, in_a, in_b, width, height,
+			niter, alpha, epsilon);
+}
+
+static void genericized_lk(
+		float *out_u, float *out_v,
+		float *in_a, float *in_b,
+		int w, int h,
+		void *data)
+{
+	float *fdata = data;
+	float kside = fdata[0];
+	float sigma = fdata[1];
+	void least_squares_ofc(float *u, float *v,
+		float *a, float *b, int w, int h, int kside, float sigma);
+	least_squares_ofc(out_u, out_v, in_a, in_b, w, h, kside, sigma);
+}
+
+// actually usable api {{{1
+void multi_scale_optical_flow(char *algorithm_name, float *pars, int npars,
+		float *u, float *v, float *a, float *b, int w, int h,
+		int nscales, float scale_step, int last_scale)
+{
+	fprintf(stderr, "multi-scale flow \"%s\" [%d %g %d]", algorithm_name,
+			nscales, scale_step, last_scale);
+	for (int i = 0; i < npars; i++)
+		fprintf(stderr, " %g", pars[i]);
+	fprintf(stderr, "\n");
+
+	generic_optical_flow of = NULL;
+	if (0 == strcmp("hs", algorithm_name)) {
+		if (npars != 3)
+			fail("flow \"%s\" needs 3 parameters", algorithm_name);
+		of = genericized_hs;
+	}
+	if (0 == strcmp("lk", algorithm_name)) {
+		if (npars != 2)
+			fail("flow \"%s\" needs 2 parameters", algorithm_name);
+		of = genericized_lk;
+	}
+	if (0 == strcmp("zero", algorithm_name)) {
+		for (int i = 0; i < w*h; i++)
+			u[i] = v[i] = 0;
+		return;
+	}
+	if (!of) fail("unrecognized flow method \"%s\"", algorithm_name);
+
+	generic_multi_scale_optical_flow(u, v, a, b, w, h, of, pars,
+			nscales, scale_step, last_scale);
+}
+
+void multi_scale_optical_flow_pd(char *algorithm_name, float *pars, int npars,
+		float *u, float *v, float *a, float *b, int w, int h, int pd,
+		int nscales, float scale_step, int last_scale)
+{
+	float *ga = xmalloc(w*h*sizeof*ga);
+	float *gb = xmalloc(w*h*sizeof*ga);
+	for (int i = 0; i < w*h; i++)
+	{
+		float ma = 0;
+		float mb = 0;
+		for (int j = 0; j < pd; j++) {
+			ma += a[i*pd + j];
+			mb += b[i*pd + j];
+		}
+		ga[i] = ma/pd;
+		gb[i] = mb/pd;
+	}
+
+	multi_scale_optical_flow(algorithm_name, pars, npars,
+			u, v, ga, gb, w, h, nscales, scale_step, last_scale);
+}
+
+// main for testing api {{{1
+#ifdef USE_MAINAPI
+
+#define BAD_MIN(a,b) (a)<(b)?(a):(b)
+
+static int parse_floats(float *t, int nmax, const char *s)
+{
+	int i = 0, w;
+	while (i < nmax && 1 == sscanf(s, "%g %n", t + i, &w)) {
+		i += 1;
+		s += w;
+	}
+	return i;
+}
+
+int main(int argc, char *argv[])
+{
+	if (argc != 9 && argc != 8) {
+		fprintf(stderr, "usage:\n\t"
+		"%s a b method \"params\" step nscales lastscale [f]\n", *argv);
+	//       0  1 2 3        4        5    6       7          8
+		return EXIT_FAILURE;
+	}
+	char *filename_a = argv[1];
+	char *filename_b = argv[2];
+	char *method_id = argv[3];
+	char *parstring = argv[4];
+	float scale_step = atof(argv[5]);
+	int nscales = atoi(argv[6]);
+	int last_scale = atoi(argv[7]);
+	char *filename_f = argc > 8 ? argv[8] : "-";
+
+	float params[0x100];
+	int nparams = parse_floats(params, 0x100, parstring);
+
+	int w, h, ww, hh;
+	float *a = iio_read_image_float(filename_a, &w, &h);
+	float *b = iio_read_image_float(filename_b, &ww, &hh);
+	if (w != ww || h != hh) fail("input image size mismatch");
+	float *u = xmalloc(2 * w * h * sizeof(float));
+	float *v = u + w * h;
+
+	// bound the number of scales to disallow images smaller than 16 pixels
+	float Nscales = 1.5+log(BAD_MIN(w,h)/3.0)/log(fabs(scale_step));
+	if (Nscales < nscales)
+		nscales = Nscales;
+
+	multi_scale_optical_flow(method_id, params, nparams,
+			u, v, a, b, w, h, nscales, scale_step, last_scale);
+
+	iio_save_image_float_split(filename_f, u, w, h, 2);
+
+	xfree(u);
+	xfree(a);
+	xfree(b);
+	return EXIT_SUCCESS;
+}
+#endif//USE_MAINAPI
 
 // main for testing pyramid construction {{{1
-#ifdef USE_MAIN
+#ifdef USE_MAINPCS
 
 #include "iio.h"
 
@@ -488,28 +707,10 @@ int main(int c, char *v[])
 
 #endif//USE_MAIN
 
+
 // main for testing generic multiscale {{{1
 #ifdef USE_MAINPHS
 
-static void genericized_hs(
-		float *out_u, float *out_v,
-		float *in_a, float *in_b,
-		int width, int height,
-		void *data)
-{
-	float *fdata = data;
-	float alpha = fdata[0];
-	int niter = fdata[1];
-	float epsilon = fdata[2];
-	void hs(float *u, float *v, float *a, float *b, int w, int h,
-		int niter, float alpha);
-	void hs_stopping(float *u, float *v, float *a, float *b, int w, int h,
-		int niter, float alpha, float epsilon);
-	fprintf(stderr, "calling HS with input of size %dx%d\n", width, height);
-	//hs(out_u, out_v, in_a, in_b, width, height, niter, alpha);
-	hs_stopping(out_u, out_v, in_a, in_b, width, height,
-			niter, alpha, epsilon);
-}
 
 #define BAD_MIN(a,b) (a)<(b)?(a):(b)
 
@@ -537,13 +738,13 @@ int main(int argc, char *argv[])
 	float *u = xmalloc(w * h * sizeof(float));
 	float *v = xmalloc(w * h * sizeof(float));
 
-	float Nscales = 1.5+log(BAD_MIN(w,h)/3.0)/log(scalestep);
+	float Nscales = 1.5+log(BAD_MIN(w,h)/3.0)/log(fabs(scalestep));
 	if (Nscales < nscales)
 		nscales = Nscales;
 
 	float fdata[3] = {alpha, niter, epsilon};
 	generic_multi_scale_optical_flow(u, v, a, b, w, h,
-			genericized_hs, fdata, nscales, scalestep);
+			genericized_lk, fdata, nscales, scalestep, 0);
 
 	float *f = xmalloc(w*h*2*sizeof*f);
 	for (int i = 0; i < w*h; i++) {

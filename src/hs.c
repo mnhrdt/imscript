@@ -137,7 +137,7 @@ void hs(float *u, float *v, float *a, float *b, int w, int h,
 int hs_stopping(float *u, float *v, float *a, float *b, int w, int h,
 		int niter, float alpha, float eps)
 {
-	fprintf(stderr, "HSS N=%d a=%g e=%g\n", niter, alpha, eps);
+	//fprintf(stderr, "HSS N=%d a=%g e=%g\n", niter, alpha, eps);
 	int i;
 	float *gx = xmalloc(w * h * sizeof(float));
 	float *gy = xmalloc(w * h * sizeof(float));
@@ -148,7 +148,7 @@ int hs_stopping(float *u, float *v, float *a, float *b, int w, int h,
 	for (i = 0; i < niter; i++)
 		if (hs_iteration_stopping(u, v, gx, gy, gt, w, h, alpha, eps))
 			break;
-	fprintf(stderr, "HSS ran %d\n", i);
+	//fprintf(stderr, "HSS ran %d\n", i);
 	free(gx);
 	free(gy);
        	free(gt);
