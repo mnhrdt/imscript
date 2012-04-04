@@ -53,7 +53,7 @@ static enum token_id get_token_type(char *str)
 	if (0 == strcmp(str, ")")) return TOK_RIGHTPAR;
 	if (0 == strcmp(str, ",")) return TOK_COMMA;
 	if (0 == strcmp(str, ";")) return TOK_SEMICOLON;
-	if (0 == strcmp(str, ":=")) return TOK_ASSIGN;
+	if (0 == strcmp(str, ":")) return TOK_ASSIGN;
 	if (0 == strcmp(str, "+")) return TOK_OPERATOR;
 	if (0 == strcmp(str, "-")) return TOK_OPERATOR;
 	if (0 == strcmp(str, "*")) return TOK_OPERATOR;
@@ -82,8 +82,117 @@ static int precedence(struct token *t)
 	}
 }
 
+
+static void add_to_token(char *tok, int c)
+{
+	int n = strlen(tok);
+	tok[n] = c;
+}
+
+static void emit_token(char *tok)
+{
+	fprintf(stderr, "TOKEN \"tok\"\n", tok);
+	for (int i = 0; i < MAX_TOK_LEN; i++)
+		tok[i] = 0;
+}
+
+// hand-written naive lexer
+static void experimental_tokenization(char *input_string)
+{
+	// character types
+	enum {
+		T_UNKNOWN,
+		T_ALNUM,      // letters and numbers
+		T_WHITESPACE, // space, tab, newline
+		T_PUNCT,      // single-character punctuation and operators
+		T_MINUS,      // -
+		T_PLUS,       // +
+		T_OPENCLY,    // {
+		T_CLOSECLY,   // }
+		T_OPENBRA,    // [
+		T_CLOSEBRA,   // ]
+		T_COMMA,      // ,
+		T_DOT,        // .
+		T_COLON,      // :
+		T_END,	// '\0'
+		T_N
+	};
+
+
+	// fill table of character types
+	int t[0x100];
+	for (int i = 0; i < 0x100; i++)  t[i] = T_UNKNOWN;
+	for (int i = 'a'; i <= 'z'; i++) t[i] = t[toupper(i)] = T_ALNUM;
+	for (int i = '0'; i <= '9'; i++) t[i] = T_ALNUM;
+	t['+'] = T_PLUS;
+	t['-'] = T_MINUS;
+	t['{'] = T_OPENCLY;
+	t['}'] = T_CLOSECLY;
+	t['['] = T_OPENBRA;
+	t[']'] = T_CLOSEBRA;
+	t[','] = T_COMMA;
+	t['.'] = T_DOT;
+	t[':'] = T_COLON;
+	t['<']=t['>']=t['*']=t['(']=t[')']=t['/']=t['^'] = T_PUNCT;
+	t['\0'] = T_END;
+
+
+	// state machine states (codifying the state at the last read symbol)
+	enum {
+		S_START,
+		S_IDENT, // inside constant, identifier or its modifiers
+		S_PUNCT, // punctuation and single-letter operators
+		S_SPACE, // whitespace
+		S_END,
+		S_N
+       	};
+
+	// state machine actions
+	enum {
+		A_NOP,
+		A_EMIT,
+		A_FAIL
+	}
+
+	// build state machine: default actions and transitions
+	int fsm[T_N][S_N][2];
+	for (int j = 0; j < T_N; j++)
+	for (int i = 0; i < S_N; i++) {
+		fsm[j][i][0] = A_FAIL;
+		fsm[j][i][1] = S_END;
+	}
+
+	// build state machine
+
+
+	// run state machine
+	int state = LEX_IN_START;
+	char tok[MAX_TOK_LEN] = {0};
+
+	int c;
+	while ((c = *input_string++)) {
+		assert(c >= 0 && c < 0x100);
+		assert(state != S_END);
+		fprintf(stderr, "read character '%c'\n", c);
+
+		int tc = t[c];
+		int action = fsm[tc][state][0];
+		switch(action) {
+		case A_NOP: break;
+		case A_EMIT: emit_token(tok); break;
+		case A_FAIL: fail("caca\n"); break;
+		default: fail("merda\n");
+		}
+		state = fsm[tc][state][0];
+		add_to_token(tok, c);
+	}
+
+}
+
 static int tokenize(struct token *t, char *str, int nmax)
 {
+	experimental_tokenization(str);
+	exit(2);
 	char s[1+strlen(str)];
 	strcpy(s, str);
 	char *spacing = " \n\t";
