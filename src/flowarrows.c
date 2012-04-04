@@ -56,7 +56,7 @@ static void putarrow(float *x, int w, int h, float p, float q, float u, float v)
 	}
 }
 
-static void flowarrows(float *vv, float *ff, int w, int h, float s, int g)
+void flowarrows(float *vv, float *ff, int w, int h, float s, int g)
 {
 	float (*f)[w][2] = (void*)ff;
 	int gw = w/g, gh = h/g;
@@ -79,6 +79,7 @@ static void flowarrows(float *vv, float *ff, int w, int h, float s, int g)
 	}
 }
 
+#ifndef OMIT_MAIN
 int main(int c, char *v[])
 {
 	if (c != 3 && c != 4 && c != 5) {
@@ -101,3 +102,4 @@ int main(int c, char *v[])
 	iio_save_image_float_vec(outfile, y, w, h, 1);
 	return EXIT_SUCCESS;
 }
+#endif

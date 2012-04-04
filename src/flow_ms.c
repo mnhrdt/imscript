@@ -606,6 +606,9 @@ void multi_scale_optical_flow_pd(char *algorithm_name, float *pars, int npars,
 
 	multi_scale_optical_flow(algorithm_name, pars, npars,
 			u, v, ga, gb, w, h, nscales, scale_step, last_scale);
+
+	xfree(ga);
+	xfree(gb);
 }
 
 // main for testing api {{{1

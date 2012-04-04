@@ -13,6 +13,18 @@
 #include "highgui.h"
 
 
+char *global_method_id;
+float global_scale_step;
+int   global_nscales;
+int   global_last_scale;
+float global_params[0x100];
+int   global_nparams;
+float global_vscale;
+const float global_vscale_factor = 1.4142;
+
+bool global_display_arrows = false;
+bool global_display_img = false;
+bool global_display_diff = false;
 
 #include "xmalloc.c"
 
@@ -69,6 +81,24 @@ static void flow_to_frgb(float *y, float u, float v, float m)
 		y[l] = 255*rgb[l];
 }
 
+static void flow_to_farr(float *farr, float *u, float *v, int w, int h, float m)
+{
+	float *f = xmalloc(2*w*h*sizeof*f);
+	float *a = xmalloc(w*h*sizeof*a);
+	for (int i = 0; i < w*h; i++) {
+		f[2*i+0] = u[i];
+		f[2*i+1] = v[i];
+		a[i] = 255;
+	}
+	void flowarrows(float *, float *, int, int, float, int);
+	flowarrows(a, f, w, h, m, 19);
+	for (int i = 0; i < w*h; i++)
+		for (int l = 0; l < 3; l++)
+			farr[3*i+l] = a[i];
+	free(f);
+	free(a);
+}
+
 void multi_scale_optical_flow_pd(char *algorithm_name, float *pars, int npars,
 		float *u, float *v, float *a, float *b, int w, int h, int pd,
 		int nscales, float scale_step, int last_scale);
@@ -76,24 +106,41 @@ void multi_scale_optical_flow_pd(char *algorithm_name, float *pars, int npars,
 // visualize the "difference" between two consecutive frames
 static void d_tacu(float *out, float *in_a, float *in_b, int w, int h, int pd)
 {
-	//for (int i = 0; i < w*h*pd; i++) {
-	//	float g = (in_b[i] - in_a[i])/2 + 128;
-	//	if (g > 255) g = 255;
-	//	if (g < 0) g = 0;
-	//	out[i] = g;
-	//}
-	//return;
+	if (global_display_img) {
+		for (int i = 0; i < w*h*pd; i++) {
+			float g = in_b[i];
+			if (g > 255) g = 255;
+			if (g < 0) g = 0;
+			out[i] = g;
+		}
+		return;
+	}
+
+	if (global_display_diff) {
+		for (int i = 0; i < w*h*pd; i++) {
+			float g = (in_b[i] - in_a[i])/1 + 128;
+			if (g > 255) g = 255;
+			if (g < 0) g = 0;
+			out[i] = g;
+		}
+		return;
+	}
+
 
 	float *u = xmalloc(w*h*sizeof*u);
 	float *v = xmalloc(w*h*sizeof*u);
 
-	float params[3] = {19, 5, 0.01};
-	multi_scale_optical_flow_pd("hs", params, 3,
-			u, v, in_a, in_b, w, h, pd, 3, -2, 3);
+	//float params[3] = {19, 5, 0.01};
+	multi_scale_optical_flow_pd(global_method_id,
+		       	global_params, global_nparams,
+			u, v, in_a, in_b, w, h, pd,
+		       	global_nscales, global_scale_step, global_last_scale);
 
-	for (int i = 0; i < w*h; i++)
-	{
-		flow_to_frgb(out+3*i, u[i], v[i], 1);
+	if (global_display_arrows) {
+		flow_to_farr(out, u, v, w, h, global_vscale);
+	} else {
+		for (int i = 0; i < w*h; i++)
+			flow_to_frgb(out+3*i, v[i], u[i], global_vscale);
 	}
 
 	free(u);
@@ -113,7 +160,7 @@ static void process_tacu(float *out, float *in, int w, int h, int pd)
 	static int ow = 0;
 	static int oh = 0;
 
-	fprintf(stderr, "pt count %d\n", count);
+	fprintf(stderr, "pt count %d {%g}\n", count, global_vscale);
 
 	if (count > 0 && (ow!=w || oh!=h))
 		fail("do not change size, please");
@@ -140,9 +187,33 @@ static void process_tacu(float *out, float *in, int w, int h, int pd)
 	count += 1;
 }
 
-#include "iio.h"
-int main( int argc, char **argv )
+static int parse_floats(float *t, int nmax, const char *s)
 {
+	int i = 0, w;
+	while (i < nmax && 1 == sscanf(s, "%g %n", t + i, &w)) {
+		i += 1;
+		s += w;
+	}
+	return i;
+}
+
+#include "iio.h"
+int main( int argc, char *argv[] )
+{
+	if (argc != 7) {
+		fprintf(stderr, "usage:\n\t"
+		"%s method \"params\" step nscales lastscale vnorm\n", *argv);
+	//       0  1        2        3    4       5         6
+		return EXIT_FAILURE;
+	}
+
+	global_method_id = argv[1];
+	char *parstring = argv[2];
+	global_scale_step = atof(argv[3]);
+	global_nscales = atoi(argv[4]);
+	global_last_scale = atoi(argv[5]);
+	global_nparams = parse_floats(global_params, 0x100, parstring);
+	global_vscale = atof(argv[6]);
 
 	CvCapture *capture = 0;
 	int accum_index = 0;
@@ -222,12 +293,26 @@ int main( int argc, char **argv )
 
 		/* exit if user press 'q' */
 		key = cvWaitKey( 1 );
-		if (key > 0) {
-			fprintf(stderr, "key = %d '%c'\n", key, key);
-			char buf[0x100];
-			snprintf(buf, 0x100, "/tmp/bcam_%c.png", key);
-			iio_save_image_float_vec(buf, taccu_out, W, H, pd);
+		if (key == 'd') {
+			global_display_diff = !global_display_diff;
+			global_display_img = false;
 		}
+		if (key == 'i') {
+			global_display_img = !global_display_img;
+			global_display_diff = false;
+		}
+		if (key == 'a')
+			global_display_arrows = !global_display_arrows;
+		if (key == '(')
+			global_vscale /= global_vscale_factor;
+		if (key == ')')
+			global_vscale *= global_vscale_factor;
+		//if (key > 0) {
+		//	fprintf(stderr, "key = %d '%c'\n", key, key);
+		//	char buf[0x100];
+		//	snprintf(buf, 0x100, "/tmp/bcam_%c.png", key);
+		//	iio_save_image_float_vec(buf, taccu_out, W, H, pd);
+		//}
 	}
 
 	/* free memory */

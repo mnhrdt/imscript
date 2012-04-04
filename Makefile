@@ -91,6 +91,9 @@ $(SRCDIR)/gblur.o: $(SRCDIR)/gblur.c
 $(SRCDIR)/flow_ms.o: $(SRCDIR)/flow_ms.c
 	$(CC) $(CFLAGS) $(OFLAGS) -c $< -o $@
 
+$(SRCDIR)/flowarrows.o: $(SRCDIR)/flowarrows.c
+	$(CC) $(CFLAGS) $(OFLAGS) -DOMIT_MAIN -c $< -o $@
+
 $(BINDIR)/flow_ms: $(addprefix $(SRCDIR)/,flow_ms.c gblur.o hs.o lk.o iio.o)
 	$(CC) $(CFLAGS) $(OFLAGS) -DUSE_MAINAPI $^ -o $@ $(IIOFLAGS) $(FFTFLAGS)
 
