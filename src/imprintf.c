@@ -191,9 +191,10 @@ static void compute_stuff_basic(struct printable_data *p,
 		float *x, int w, int h, int pd)
 {
 	// sample basic stuff
-	int ns = w * h * pd, rns = 0, nnan = 0, ninf = 0;
+	int ns = w * h * pd, rns = 0, rnz = 0, nnan = 0, ninf = 0;
 	float minsample = INFINITY, maxsample = -INFINITY;
 	long double avgsample = 0;
+	long double avgnzsample = 0;
 	for (int i = 0; i < ns; i++)
 	{
 		float y = x[i];
@@ -206,11 +207,17 @@ static void compute_stuff_basic(struct printable_data *p,
 		if (y > maxsample) maxsample = y;
 		avgsample += y;
 		rns += 1;
+		if (y) {
+			avgnzsample += y;
+			rnz += 1;
+		}
 	}
 	avgsample /= rns;
+	avgnzsample /= rnz;
 	setnumber(p, "minsample", minsample);
 	setnumber(p, "maxsample", maxsample);
 	setnumber(p, "avgsample", avgsample);
+	setnumber(p, "avgnzsample", avgnzsample);
 	setnumber(p, "nnan", nnan);
 	setnumber(p, "ninf", ninf);
 
@@ -661,6 +668,7 @@ static void imprintf_2d(FILE *f, char *fmt, float *x, int w, int h, int pd)
 			{"minsample",  "i", REQ_BASIC,   1, {0}, 0, {0}, false},
 			{"maxsample",  "a", REQ_BASIC,   1, {0}, 0, {0}, false},
 			{"avgsample",  "v", REQ_BASIC,   1, {0}, 0, {0}, false},
+			{"avgnzsample","b", REQ_BASIC,   1, {0}, 0, {0}, false},
 			{"medsample",  "m", REQ_SORTS,   1, {0}, 0, {0}, false},
 			{"percentile", "q", REQ_SORTS,   1, {0}, 1, {0}, false},
 			{"minpixel",   "I", REQ_BASIC,  -1, {0}, 0, {0}, false},
