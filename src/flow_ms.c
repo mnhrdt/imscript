@@ -394,6 +394,8 @@ static void iteritized(generic_optical_flow of,
 	float *wb = xmalloc(w * h * sizeof*wb);
 	float *u = xmalloc(w * h * sizeof*wb);
 	float *v = xmalloc(w * h * sizeof*wb);
+	float *wu = xmalloc(w * h * sizeof*wb);
+	float *wv = xmalloc(w * h * sizeof*wb);
 
 	backwarp_image(wb, in_b, in_u, in_v, w, h);
 
@@ -410,16 +412,22 @@ static void iteritized(generic_optical_flow of,
 		}
 	}
 
+
+	backwarp_image(wu, in_u, u, v, w, h);
+	backwarp_image(wv, in_v, u, v, w, h);
+
 	save_debug_flow("/tmp/ms_debug_field_duv_%02d", global_idx, u, v, w, h);
 	for (int i = 0; i < w *h; i++) {
 		// XXX WRONG FIXME TODO : should warp in_u by the new u !!!
-		out_u[i] = u[i] + in_u[i];
-		out_v[i] = v[i] + in_v[i];
+		out_u[i] = wu[i] + u[i];
+		out_v[i] = wv[i] + v[i];
 	}
 	save_debug_flow("/tmp/ms_debug_field_uv_%02d", global_idx,
 			out_u, out_v, w, h);
-	xfree(u);
+	xfree(wv);
+	xfree(wu);
 	xfree(v);
+	xfree(u);
 	xfree(wb);
 }
 

@@ -13,6 +13,10 @@
 #include "highgui.h"
 
 
+
+#include "iio.h"
+
+
 char *global_method_id;
 float global_scale_step;
 int   global_nscales;
@@ -22,7 +26,17 @@ int   global_nparams;
 float global_vscale;
 const float global_vscale_factor = 1.4142;
 
-bool global_display_arrows = false;
+enum flow_visualization_id {
+	VFLOW_COLORS,
+	VFLOW_ARROWS,
+	VFLOW_DIVERGENCE,
+	VFLOW_GRADIENT,
+	VFLOW_BACK,
+	VFLOW_BACKDIFF
+};
+
+int global_flow_visualization = VFLOW_COLORS;
+
 bool global_display_img = false;
 bool global_display_diff = false;
 
@@ -91,12 +105,110 @@ static void flow_to_farr(float *farr, float *u, float *v, int w, int h, float m)
 		a[i] = 255;
 	}
 	void flowarrows(float *, float *, int, int, float, int);
-	flowarrows(a, f, w, h, m, 19);
+	flowarrows(a, f, w, h, 0.037*m, 19);
 	for (int i = 0; i < w*h; i++)
 		for (int l = 0; l < 3; l++)
 			farr[3*i+l] = a[i];
 	free(f);
 	free(a);
+}
+
+static float getpixel(float *x, int w, int h, int i, int j)
+{
+	if (i < 0 || i >= w || j < 0 || j >= h)
+		return 0;
+	return x[i + j*w];
+}
+
+static void flow_to_fdiv(float *fdiv, float *u, float *v, int w, int h, float m)
+{
+	float (*cdiv)[w][3] = (void*)fdiv;
+#define FX(i,j) getpixel(u,w,h,(i),(j))
+#define FY(i,j) getpixel(v,w,h,(i),(j))
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++) {
+		float xx = -FX(i-1,j-1)-2*FX(i-1,j)-FX(i-1,j+1)
+			+FX(i+1,j-1)+2*FX(i+1,j)+FX(i+1,j+1);
+		float yy = -FY(i-1,j-1)-2*FY(i,j-1)-FY(i+1,j-1)
+			+FY(i-1,j+1)+2*FY(i,j+1)+FY(i+1,j+1);
+		float dd = xx + yy;
+		float g = 255.0*(dd + m)/(2.0*m);
+		if (g < 0) g = 0;
+		if (g > 255) g = 255;
+		for (int l = 0; l < 3; l++)
+			cdiv[j][i][l] = g;
+	}
+#undef FX
+#undef FY
+}
+
+static float getsamplen(float *fx, int w, int h, int pd, int i, int j, int l)
+{
+	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
+		return NAN;
+	float (*x)[w][pd] = (void*)fx;
+	return x[j][i][l];
+	//return x[(i+j*w)*pd + l];
+}
+
+static float evaluate_bilinear_cell(float a, float b, float c, float d,
+							float x, float y)
+{
+	float r = 0;
+	r += a * (1-x) * (1-y);
+	r += b * ( x ) * (1-y);
+	r += c * (1-x) * ( y );
+	r += d * ( x ) * ( y );
+	return r;
+}
+
+
+static void bilinear_interpolation_at(float *result,
+		float *x, int w, int h, int pd,
+		float p, float q)
+{
+	int ip = p;
+	int iq = q;
+	for (int l = 0; l < pd; l++) {
+		float a = getsamplen(x, w, h, pd, ip  , iq  , l);
+		float b = getsamplen(x, w, h, pd, ip+1, iq  , l);
+		float c = getsamplen(x, w, h, pd, ip  , iq+1, l);
+		float d = getsamplen(x, w, h, pd, ip+1, iq+1, l);
+		float r = evaluate_bilinear_cell(a, b, c, d, p-ip, q-iq);
+		result[l] = r;
+	}
+}
+
+static void flow_to_fback(float *wb, float *b, float *u, float *v, int w, int h)
+{
+	float (*out)[w][3] = (void*)wb;
+	//float (*in)[w][3] = (void*)b;
+	float (*img_u)[w] = (void*)u;
+	float (*img_v)[w] = (void*)v;
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++) {
+		float p[2] = {i + img_u[j][i], j + img_v[j][i]};
+		float result[3];
+		bilinear_interpolation_at(result, b, w, h, 3, p[0], p[1]);
+		float factor = 1;
+		for (int l = 0; l < 3; l++)
+			out[j][i][l] = result[l];
+	}
+}
+
+static void flow_to_fbackdiff(float *out, float *a, float *b,
+		float *u, float *v, int w, int h, float m)
+{
+	float *wb = xmalloc(w * h * 3 * sizeof*wb);
+	flow_to_fback(wb, b, u, v, w, h);
+	for (int i = 0; i < w * h * 3; i++) {
+		float dd = wb[i] - a[i];
+		float g = dd/1 + 128;
+		if (g < 0) g = 0;
+		if (g > 255) g = 255;
+		out[i] = g;
+	}
+	free(wb);
 }
 
 void multi_scale_optical_flow_pd(char *algorithm_name, float *pars, int npars,
@@ -130,17 +242,65 @@ static void d_tacu(float *out, float *in_a, float *in_b, int w, int h, int pd)
 	float *u = xmalloc(w*h*sizeof*u);
 	float *v = xmalloc(w*h*sizeof*u);
 
-	//float params[3] = {19, 5, 0.01};
-	multi_scale_optical_flow_pd(global_method_id,
-		       	global_params, global_nparams,
-			u, v, in_a, in_b, w, h, pd,
-		       	global_nscales, global_scale_step, global_last_scale);
-
-	if (global_display_arrows) {
-		flow_to_farr(out, u, v, w, h, global_vscale);
+	if (0 == strcmp(global_method_id, "tvl1")) {
+		float *I0 = xmalloc(w*h*sizeof*I0);
+		float *I1 = xmalloc(w*h*sizeof*I0);
+		for (int i = 0; i < w*h; i++) {
+			I0[i] = I1[i] = 0;
+			for (int l = 0; l < pd; l++) {
+				I0[i] += in_a[i*pd+l];
+				I1[i] += in_b[i*pd+l];
+			}
+		}
+		void Dual_TVL1_optic_flow_multiscale(float *I0, float *I1,
+			float *u1, float *u2,
+			const int nxx, const int nyy,
+			const float tau, const float lambda, const float theta,
+			const int nscales, const float zfactor, const int warps,
+			const float epsilon, const bool  verbose);
+		if (global_nparams != 5)
+			fail("tvl1 needs 5 pars: \"tau lbd theta nwarp eps\"");
+		float p_tau = global_params[0];
+		float p_lambda = global_params[1];
+		float p_theta = global_params[2];
+		int p_nscales = abs(global_nscales);
+		float p_zfactor = 1.0/fabs(global_scale_step);
+		int p_nwarps = global_params[3];
+		float p_epsilon = global_params[4];
+		fprintf(stderr, "tvl1 %g %g %g %d %g %d %g\n", p_tau, p_lambda,
+				p_theta, p_nscales, p_zfactor, p_nwarps,
+				p_epsilon);
+		Dual_TVL1_optic_flow_multiscale(I0, I1, u, v, w, h,
+				p_tau, p_lambda, p_theta, p_nscales, p_zfactor,
+				p_nwarps, p_epsilon, 0);
+		//fprintf(stderr, "tvl1 finished\n");
+		free(I0);
+		free(I1);
 	} else {
+		multi_scale_optical_flow_pd(global_method_id,
+			global_params, global_nparams,
+			u, v, in_a, in_b, w, h, pd,
+			global_nscales, global_scale_step, global_last_scale);
+	}
+
+	switch(global_flow_visualization) {
+	case VFLOW_COLORS:
 		for (int i = 0; i < w*h; i++)
 			flow_to_frgb(out+3*i, v[i], u[i], global_vscale);
+		break;
+	case VFLOW_ARROWS:
+		flow_to_farr(out, u, v, w, h, global_vscale);
+		break;
+	case VFLOW_DIVERGENCE:
+		flow_to_fdiv(out, u, v, w, h, global_vscale);
+		break;
+	case VFLOW_BACK:
+		flow_to_fback(out, in_b, u, v, w, h);
+		break;
+	case VFLOW_BACKDIFF:
+		flow_to_fbackdiff(out, in_a, in_b, u, v, w, h, global_vscale);
+		break;
+	default: fail("unrecognized flow visualization type");
 	}
 
 	free(u);
@@ -160,7 +320,9 @@ static void process_tacu(float *out, float *in, int w, int h, int pd)
 	static int ow = 0;
 	static int oh = 0;
 
-	fprintf(stderr, "pt count %d {%g}\n", count, global_vscale);
+	fprintf(stderr, "pt count %d {%g}\t", count, global_vscale);
+	if (global_display_img || global_display_diff)
+		fprintf(stderr, "\n");
 
 	if (count > 0 && (ow!=w || oh!=h))
 		fail("do not change size, please");
@@ -184,6 +346,11 @@ static void process_tacu(float *out, float *in, int w, int h, int pd)
 		d_tacu(out, a, b, w, h, pd);
 	}
 
+	if (global_display_img && count == 100)
+		iio_save_image_float_vec("/tmp/a.png", a, w, h, pd);
+	if (global_display_img && count == 110)
+		iio_save_image_float_vec("/tmp/b.png", a, w, h, pd);
+
 	count += 1;
 }
 
@@ -197,7 +364,6 @@ static int parse_floats(float *t, int nmax, const char *s)
 	return i;
 }
 
-#include "iio.h"
 int main( int argc, char *argv[] )
 {
 	if (argc != 7) {
@@ -301,8 +467,11 @@ int main( int argc, char *argv[] )
 			global_display_img = !global_display_img;
 			global_display_diff = false;
 		}
-		if (key == 'a')
-			global_display_arrows = !global_display_arrows;
+		if (key == 'a') global_flow_visualization = VFLOW_ARROWS;
+		if (key == 'c') global_flow_visualization = VFLOW_COLORS;
+		if (key == 'y') global_flow_visualization = VFLOW_DIVERGENCE;
+		if (key == 'b') global_flow_visualization = VFLOW_BACK;
+		if (key == 'v') global_flow_visualization = VFLOW_BACKDIFF;
 		if (key == '(')
 			global_vscale /= global_vscale_factor;
 		if (key == ')')
