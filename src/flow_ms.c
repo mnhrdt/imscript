@@ -382,6 +382,48 @@ static void backwarp_image(float *x_out, float *x_in, float *u, float *v,
 // ungenericizer {{{2
 static int global_idx;
 
+static int compare_floats(const void *a, const void *b)
+{
+	const float *da = (const float *) a;
+	const float *db = (const float *) b;
+	return (*da > *db) - (*da < *db);
+}
+
+static void filter_of(float *uu, float *vv, int w, int h)
+{
+	float *o_uu = xmalloc(w * h * sizeof*uu);
+	float *o_vv = xmalloc(w * h * sizeof*uu);
+	for (int i = 0; i < w*h; i++) {
+		o_uu[i] = uu[i];
+		o_vv[i] = vv[i];
+	}
+	float (*u)[w] = (void*)uu;
+	float (*v)[w] = (void*)vv;
+	float (*ou)[w] = (void*)o_uu;
+	float (*ov)[w] = (void*)o_vv;
+	for (int j = 1; j < h-1; j++)
+	for (int i = 1; i < w-1; i++) {
+		float mu[9], mv[9];
+		int idx = 0;
+		for (int di = -1; di <= 1; di++)
+		for (int dj = -1; dj <= 1; dj++) {
+			mu[idx] = u[j+dj][i+di];
+			mv[idx] = v[j+dj][i+di];
+			idx += 1;
+		}
+		qsort(mu, 9, sizeof*mu, compare_floats);
+		qsort(mv, 9, sizeof*mu, compare_floats);
+		ou[j][i] = mu[4];
+		ov[j][i] = mv[4];
+	}
+	for (int i = 0; i < w*h; i++) {
+		uu[i] = o_uu[i];
+		vv[i] = o_vv[i];
+	}
+	free(o_uu);
+	free(o_vv);
+}
+
 // this function should be a closure to turn a generic optical flow
 // into an iterative optical flow
 static void iteritized(generic_optical_flow of,
@@ -402,6 +444,7 @@ static void iteritized(generic_optical_flow of,
 	save_debug_image("/tmp/ms_debug_image_wb0_%02d", global_idx, wb, w, h);
 
 	of(u, v, in_a, wb, w, h, data);
+	filter_of(u, v, w, h);
 	for (int i = 0; i < w*h; i++)
 	{
 		float r = hypot(u[i], v[i]);

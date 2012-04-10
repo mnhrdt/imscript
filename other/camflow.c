@@ -32,7 +32,8 @@ enum flow_visualization_id {
 	VFLOW_DIVERGENCE,
 	VFLOW_GRADIENT,
 	VFLOW_BACK,
-	VFLOW_BACKDIFF
+	VFLOW_BACKDIFF,
+	VFLOW_BARROWS,
 };
 
 int global_flow_visualization = VFLOW_COLORS;
@@ -211,6 +212,25 @@ static void flow_to_fbackdiff(float *out, float *a, float *b,
 	free(wb);
 }
 
+static void flow_to_barr(float *barr, float *a, float *u, float *v,
+		int w, int h, float m)
+{
+	float *f = xmalloc(2*w*h*sizeof*f);
+	float *arr = xmalloc(w*h*sizeof*a);
+	for (int i = 0; i < w*h; i++) {
+		f[2*i+0] = u[i];
+		f[2*i+1] = v[i];
+		arr[i] = a[3*i+1]/2+127;
+	}
+	void flowarrows(float *, float *, int, int, float, int);
+	flowarrows(arr, f, w, h, 0.037*m, 19);
+	for (int i = 0; i < w*h; i++)
+		for (int l = 0; l < 3; l++)
+			barr[3*i+l] = arr[i];
+	free(f);
+	free(arr);
+}
+
 void multi_scale_optical_flow_pd(char *algorithm_name, float *pars, int npars,
 		float *u, float *v, float *a, float *b, int w, int h, int pd,
 		int nscales, float scale_step, int last_scale);
@@ -299,6 +319,9 @@ static void d_tacu(float *out, float *in_a, float *in_b, int w, int h, int pd)
 		break;
 	case VFLOW_BACKDIFF:
 		flow_to_fbackdiff(out, in_a, in_b, u, v, w, h, global_vscale);
+		break;
+	case VFLOW_BARROWS:
+		flow_to_barr(out, in_a, u, v, w, h, global_vscale);
 		break;
 	default: fail("unrecognized flow visualization type");
 	}
@@ -468,6 +491,7 @@ int main( int argc, char *argv[] )
 			global_display_diff = false;
 		}
 		if (key == 'a') global_flow_visualization = VFLOW_ARROWS;
+		if (key == 's') global_flow_visualization = VFLOW_BARROWS;
 		if (key == 'c') global_flow_visualization = VFLOW_COLORS;
 		if (key == 'y') global_flow_visualization = VFLOW_DIVERGENCE;
 		if (key == 'b') global_flow_visualization = VFLOW_BACK;

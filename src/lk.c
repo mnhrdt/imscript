@@ -355,7 +355,8 @@ static void solve_pointwise(float *u, float *v, float *st, float *rhs,
 }
 
 #include "smapa.h"
-SMART_PARAMETER(LK_GRADMIN,0)
+SMART_PARAMETER(LK_GRADXMIN,0)
+SMART_PARAMETER(LK_GRADTMIN,0)
 
 static void zeroize_pointwise(float *u, float *v,
 		float *gx, float *gy, float *gt,
@@ -365,8 +366,9 @@ static void zeroize_pointwise(float *u, float *v,
 	{
 		//float n = hypot(gx[i], gy[i]);
 		//n = hypot(n, gt[i]);
-		float n = fabs(gt[i]);
-		if (n < LK_GRADMIN())
+		float ndt = fabs(gt[i]);
+		float ndx = hypot(gx[i], gy[i]);
+		if (ndt < LK_GRADTMIN() || ndx < LK_GRADXMIN())
 			u[i] = v[i] = 0;
 	}
 }
@@ -611,7 +613,7 @@ void least_squares_ofc(float *u, float *v,
 		compute_rhs(rhs, wv, wo, kside, gx, gy, gt, w, h);
 		//iio_save_image_float_vec("/tmp/rhs.tiff", rhs, w, h, 2);
 		solve_pointwise(u, v, st, rhs, w, h);
-		if (LK_GRADMIN() > 0)
+		if (LK_GRADTMIN() > 0 || LK_GRADXMIN() > 0)
 			zeroize_pointwise(u, v, gx, gy, gt, w, h);
 		//iio_save_image_float("/tmp/u.tiff", u, w, h);
 		//iio_save_image_float("/tmp/v.tiff", v, w, h);

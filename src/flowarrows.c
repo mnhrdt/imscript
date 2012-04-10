@@ -41,13 +41,23 @@ static void put_black_ball(float *v, int w, int h, float p, float q)
 		setsample_0(v, w, h, 1, p+i, q+j, 0, 0);
 }
 
+#include "smapa.h"
+SMART_PARAMETER(FLOWARR_MAXLEN,100)
+SMART_PARAMETER(FLOWARR_MINDOT,1)
+SMART_PARAMETER(FLOWARR_DODRAW,3)
+
 static void putarrow(float *x, int w, int h, float p, float q, float u, float v)
 {
-	if (hypot(u, v) < 1)
+	float n = hypot(u, v);
+	if (n < FLOWARR_MINDOT())
 		return;
 	//put_black_ball(x, w, h, p, q);
+	if (n > FLOWARR_MAXLEN()) {
+		u *= FLOWARR_MAXLEN()/n;
+		v *= FLOWARR_MAXLEN()/n;
+	}
 	put_black_line(x, w, h, p-u/2, q-v/2, p+u/2, q+v/2);
-	if (hypot(u, v) > 3) {
+	if (n > FLOWARR_DODRAW()) {
 		float a[2] = {p+u/2, q+v/2};
 		float b[2] = {p-v/7, q+u/7};
 		float c[2] = {p+v/7, q-u/7};
@@ -56,6 +66,11 @@ static void putarrow(float *x, int w, int h, float p, float q, float u, float v)
 	}
 }
 
+
+// vv: output arrow gray image
+// ff: input flow image
+// s: arrow scaling
+// g: grid spacing
 void flowarrows(float *vv, float *ff, int w, int h, float s, int g)
 {
 	float (*f)[w][2] = (void*)ff;
