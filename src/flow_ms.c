@@ -389,8 +389,11 @@ static int compare_floats(const void *a, const void *b)
 	return (*da > *db) - (*da < *db);
 }
 
+SMART_PARAMETER(FLOW_MS_DO_FILTER,0)
+
 static void filter_of(float *uu, float *vv, int w, int h)
 {
+	if (!FLOW_MS_DO_FILTER()) return;
 	float *o_uu = xmalloc(w * h * sizeof*uu);
 	float *o_vv = xmalloc(w * h * sizeof*uu);
 	for (int i = 0; i < w*h; i++) {

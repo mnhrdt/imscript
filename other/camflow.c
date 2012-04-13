@@ -225,8 +225,12 @@ static void flow_to_barr(float *barr, float *a, float *u, float *v,
 	void flowarrows(float *, float *, int, int, float, int);
 	flowarrows(arr, f, w, h, 0.037*m, 19);
 	for (int i = 0; i < w*h; i++)
-		for (int l = 0; l < 3; l++)
-			barr[3*i+l] = arr[i];
+		if (arr[i] > 127)
+			for (int l = 0; l < 3; l++)
+				barr[3*i+l] = a[3*i+l]/2+127;
+		else
+			for (int l = 0; l < 3; l++)
+				barr[3*i+l] = arr[i];
 	free(f);
 	free(arr);
 }
