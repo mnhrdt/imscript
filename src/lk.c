@@ -155,6 +155,7 @@ static void fill_window_values(float *wv, int (*wo)[2], int kside, float sigma)
 #include "svd.c"
 #include "vvector.h"
 
+
 static float solve_sdp_2x2(float x[2], float A[3], float b[2])
 {
 	float m[2][2] = {{A[0], A[1]}, {A[1], A[2]}};
@@ -334,6 +335,7 @@ static void compute_rhs(float *rhs,
 	}
 }
 
+
 static void solve_pointwise(float *u, float *v, float *st, float *rhs,
 		int w, int h)
 {
@@ -351,6 +353,26 @@ static void solve_pointwise(float *u, float *v, float *st, float *rhs,
 		x_v[j][i] = f[1];//x_st[j][i][1];
 	}
 }
+
+#include "smapa.h"
+SMART_PARAMETER(LK_GRADXMIN,0)
+SMART_PARAMETER(LK_GRADTMIN,0)
+
+static void zeroize_pointwise(float *u, float *v,
+		float *gx, float *gy, float *gt,
+		int w, int h)
+{
+	for (int i = 0; i < w*h; i++)
+	{
+		//float n = hypot(gx[i], gy[i]);
+		//n = hypot(n, gt[i]);
+		float ndt = fabs(gt[i]);
+		float ndx = hypot(gx[i], gy[i]);
+		if (ndt < LK_GRADTMIN() || ndx < LK_GRADXMIN())
+			u[i] = v[i] = 0;
+	}
+}
+
 
 static void global_constant_approximation(float *u, float *v,
 		float *gx, float *gy, float *gt, int w, int h)
@@ -560,7 +582,7 @@ static void global_polynomial_approximation(float *u, float *v,
 		}
 }
 
-static void least_squares_ofc(float *u, float *v,
+void least_squares_ofc(float *u, float *v,
 		float *a, float *b, int w, int h,
 		int kside, float sigma)
 {
@@ -591,6 +613,8 @@ static void least_squares_ofc(float *u, float *v,
 		compute_rhs(rhs, wv, wo, kside, gx, gy, gt, w, h);
 		//iio_save_image_float_vec("/tmp/rhs.tiff", rhs, w, h, 2);
 		solve_pointwise(u, v, st, rhs, w, h);
+		if (LK_GRADTMIN() > 0 || LK_GRADXMIN() > 0)
+			zeroize_pointwise(u, v, gx, gy, gt, w, h);
 		//iio_save_image_float("/tmp/u.tiff", u, w, h);
 		//iio_save_image_float("/tmp/v.tiff", v, w, h);
 		free(rhs);
@@ -601,6 +625,7 @@ static void least_squares_ofc(float *u, float *v,
        	free(gt);
 }
 
+#ifndef OMIT_MAIN
 int main(int argc, char *argv[])
 {
 	if (argc != 6)
@@ -627,3 +652,4 @@ int main(int argc, char *argv[])
 	iio_save_image_float_vec(filename_f, f, w, h, 2);
 	return EXIT_SUCCESS;
 }
+#endif//OMIT_MAIN

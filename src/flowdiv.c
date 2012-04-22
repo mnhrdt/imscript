@@ -19,6 +19,7 @@ static void flowdiv(float *y, float *flow, int w, int h)
 			+FX(i+1,j-1)+2*FX(i+1,j)+FX(i+1,j+1);
 		float yy = -FY(i-1,j-1)-2*FY(i,j-1)-FY(i+1,j-1)
 			+FY(i-1,j+1)+2*FY(i,j+1)+FY(i+1,j+1);
+		//divergence[j][i] = (xx + yy)/8;
 		divergence[j][i] = xx + yy;
 	}
 #undef FX

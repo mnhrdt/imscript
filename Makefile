@@ -1,14 +1,30 @@
 # compiler specific part (may be removed with minor damage)
+#
 ENABLE_GSL = yes
+<<<<<<< HEAD
 CFLAGS = -g -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds
 CFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds -O3 -DNDEBUG
 CFLAGS = -O3 -DNDEBUG
+=======
+WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds
+
+CFLAGS = $(WFLAGS)
+CFLAGS = -g
+CFLAGS = $(WFLAGS) -O3 -DNDEBUG
+
+>>>>>>> b0c6246fd4767cc4f86109ff62c9da3a2478dfe1
 #end of compiler specific part
+
+
 
 SRCDIR = src
 BINDIR = bin
 
+<<<<<<< HEAD
 SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow
+=======
+SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot
+>>>>>>> b0c6246fd4767cc4f86109ff62c9da3a2478dfe1
 SRCFFT = gblur fft dct
 ifeq ($(ENABLE_GSL), yes)
 	SRCGSL = paraflow minimize
@@ -18,7 +34,9 @@ IIOFLAGS = -ljpeg -ltiff -lpng
 FFTFLAGS = -lfftw3f
 GSLFLAGS = -lgsl -lgslcblas
 
-# compiler detection hacks (some compilers do not use the standard by default)
+# compiler detection hacks
+# (because some compilers do not use the standard by default)
+# TODO: move this stuff to a separate "hacks" file
 ifeq ($(CC), cc)
 	CC += -std=c99
 endif
@@ -31,6 +49,7 @@ endif
 
 
 # OS detection hacks
+# TODO: move this stuff to a separate "portability" file
 UNAME := $(shell uname)
 ifeq ($(UNAME), Linux)
 	CFLAGSIIO = $(CFLAGS) -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700
@@ -73,11 +92,20 @@ $(SRCDIR)/iio.o : $(SRCDIR)/iio.c $(SRCDIR)/iio.h
 $(SRCDIR)/hs.o: $(SRCDIR)/hs.c
 	$(CC) $(CFLAGS) $(OFLAGS) -DOMIT_MAIN -c $< -o $@
 
+$(SRCDIR)/lk.o: $(SRCDIR)/lk.c
+	$(CC) $(CFLAGS) $(OFLAGS) -DOMIT_MAIN -c $< -o $@
+
 $(SRCDIR)/gblur.o: $(SRCDIR)/gblur.c
 	$(CC) $(CFLAGS) $(OFLAGS) -DOMIT_GBLUR_MAIN -c $< -o $@
 
-$(BINDIR)/flow_ms: $(addprefix $(SRCDIR)/,flow_ms.c gblur.o hs.o iio.o)
-	$(CC) $(CFLAGS) $(OFLAGS) -DUSE_MAINPHS $^ -o $@ $(IIOFLAGS) $(FFTFLAGS)
+$(SRCDIR)/flow_ms.o: $(SRCDIR)/flow_ms.c
+	$(CC) $(CFLAGS) $(OFLAGS) -c $< -o $@
+
+$(SRCDIR)/flowarrows.o: $(SRCDIR)/flowarrows.c
+	$(CC) $(CFLAGS) $(OFLAGS) -DOMIT_MAIN -c $< -o $@
+
+$(BINDIR)/flow_ms: $(addprefix $(SRCDIR)/,flow_ms.c gblur.o hs.o lk.o iio.o)
+	$(CC) $(CFLAGS) $(OFLAGS) -DUSE_MAINAPI $^ -o $@ $(IIOFLAGS) $(FFTFLAGS)
 
 $(BINDIR)/rgfield: $(addprefix $(SRCDIR)/,rgfield.c gblur.o iio.o)
 	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS) $(FFTFLAGS)

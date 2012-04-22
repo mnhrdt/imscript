@@ -1,0 +1,3 @@
+#C_INCLUDE_PATH=/home/coco/prefix/include/:/home/coco/prefix/include/opencv LIBRARY_PATH=/home/coco/prefix/lib colorgcc -std=c99 -O3 -ffast-math camflow.c  -lopencv_core -lopencv_imgproc -lopencv_highgui iio.o gblur.o flow_ms.o lk.o hs.o -lfftw3f
+C_INCLUDE_PATH=/home/coco/prefix/include/:/home/coco/prefix/include/opencv LIBRARY_PATH=/home/coco/prefix/lib colorgcc -std=c99 -O3 -fopenmp camflow.c  -lopencv_core -lopencv_imgproc -lopencv_highgui iio.o gblur.o flow_ms.o lk.o hs.o flowarrows.o tvl1flow_lib.o -lfftw3f
+# LD_LIBRARY_PATH=/home/coco/prefix/lib ./a.out 0 10

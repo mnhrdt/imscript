@@ -13,6 +13,14 @@
 
 #include "cmphomod.c"
 
+static int quadrant_signature(float midx, float midy, float p[4][2])
+{
+	int q[4];
+	for (int i = 0; i < 4; i++)
+		q[i] = 2*(p[i][1] > midy) + (p[i][0] > midx);
+	return q[0] + 2*q[1] + 4*q[2] + 8*q[3];
+}
+
 
 // Sort four points so that they are ordered like that:
 //
@@ -52,7 +60,7 @@ static bool canonicalize_point_ordering_inplace(float x[4][2])
 
 	// find the quadrant for each point
 	int quadrant[4] = {-1, -1, -1, -1};
-	int qs = quadrant_signature(p, midx, midy);
+	int qs = quadrant_signature(midx, midy, p);
 	for (int i = 0; i < 4; i++) {
 		int qidx = 2*(p[i][1] > midy) + (p[i][0] > midx);
 		assert(qidx >= 0);
@@ -121,14 +129,6 @@ static void compute_rectangular_fit(float np[4][2], float p[4][2])
 	np[3][0] = xspan; np[3][1] = yspan;
 }
 
-
-static int quadrant_signature(float midx, float midy, float p[4][2])
-{
-	int q[4];
-	for (int i = 0; i < 4; i++)
-		q[i] = 2*(p[i][1] > midy) + (p[i][0] > midx);
-	return q[0] + 2*q[1] + 4*q[2] + 8*q[3];
-}
 
 // compute the homography given by the images of four points
 static void compute_homography_from_point_pairs(double H[3][3],
@@ -203,11 +203,16 @@ static float interpolate_cell(float a, float b, float c, float d,
 	}
 }
 
+#include "bicubic.c"
+
 // interpolate an image at a given sub-pixelic point
 static void general_interpolate(float *result,
 		float *x, int w, int h, int pd, float p, float q,
 		int m) // method
 {
+	if (m == 3) {
+		bicubic_interpolation(result, x, w, h, pd, p, q);
+	} else {
 		int ip = floor(p);
 		int iq = floor(q);
 		for (int l = 0; l < pd; l++) {
@@ -218,7 +223,9 @@ static void general_interpolate(float *result,
 			float v = interpolate_cell(a, b, c, d, p-ip, q-iq, m);
 			result[l] = v;
 		}
+	}
 }
+
 
 // pull back an image by a given vector field
 static void pull_back(float *yy, int yw, int yh, float *ff,
@@ -231,7 +238,7 @@ static void pull_back(float *yy, int yw, int yh, float *ff,
 			float p[2] = {i, j};
 			float q[2] = {i + f[j][i][0], j + f[j][i][1]};
 			float val[pd];
-			general_interpolate(val, xx, xw, xh, pd, q[0], q[1], 2);
+			general_interpolate(val, xx, xw, xh, pd, q[0], q[1], 3);
 			for (int l = 0; l < pd; l++)
 				y[j][i][l] = val[l];
 		}
