@@ -4,8 +4,8 @@ ENABLE_GSL = yes
 WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds
 
 CFLAGS = $(WFLAGS)
-CFLAGS = -g
 CFLAGS = $(WFLAGS) -O3 -DNDEBUG
+CFLAGS = -g
 
 #end of compiler specific part
 
@@ -14,7 +14,7 @@ CFLAGS = $(WFLAGS) -O3 -DNDEBUG
 SRCDIR = src
 BINDIR = bin
 
-SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot
+SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco
 SRCFFT = gblur fft dct
 ifeq ($(ENABLE_GSL), yes)
 	SRCGSL = paraflow minimize
@@ -105,7 +105,6 @@ $(BINDIR)/rgfields: $(addprefix $(SRCDIR)/,rgfields.c gblur.o iio.o)
 
 $(BINDIR)/rgfieldst: $(addprefix $(SRCDIR)/,rgfieldst.c gblur.o iio.o)
 	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS) $(FFTFLAGS)
-
 
 .PHONY: clean
 clean:

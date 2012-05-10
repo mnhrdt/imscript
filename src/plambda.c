@@ -158,6 +158,7 @@
 #define PLAMBDA_STACKOP 5    // stack operator
 #define PLAMBDA_VARDEF 6     // register variable definition (hacky)
 
+// local functions
 static double sum_two_doubles      (double a, double b) { return a + b; }
 static double substract_two_doubles(double a, double b) { return a - b; }
 static double multiply_two_doubles (double a, double b) { return a * b; }
@@ -172,6 +173,7 @@ static double logic_ge     (double a, double b) { return a >= b; }
 static double logic_le     (double a, double b) { return a <= b; }
 static double logic_ne     (double a, double b) { return a != b; }
 static double logic_if (double a, double b, double c) { return a ? b : c; }
+
 static double quantize_255 (double x)
 {
 	int ix = x;
@@ -180,12 +182,13 @@ static double quantize_255 (double x)
 	return ix;
 }
 
-
 static double quantize_easy(double x, double a, double b)
 {
 	return quantize_255(255.0*(x-a)/(b-a));
 }
 
+
+// table of all functions (local and from math.h)
 struct predefined_function {
 	void (*f)(void);
 	char *name;
@@ -256,6 +259,8 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(substract_two_doubles,"-",2),
 	REGISTER_FUNCTIONN(random_uniform,"randu",-1),
 	REGISTER_FUNCTIONN(random_normal,"randn",-1),
+	//REGISTER_FUNCTIONN(rgb2hsv,"rgb2hsv",3),
+	//REGISTER_FUNCTIONN(hsv2rgb,"rgb2hsv",3),
 #undef REGISTER_FUNCTION
 	{NULL, "pi", 0, M_PI}
 };
@@ -300,6 +305,7 @@ static float apply_function(struct predefined_function *f, float *v)
 	//return 0;
 }
 
+// the value of colon variables depends on the position within the image
 static float eval_colonvar(int w, int h, int i, int j, int c)
 {
 	switch(c) {
@@ -333,6 +339,8 @@ static bool token_is_number(float *x, const char *t)
 	return true;
 }
 
+// if token is colonvar, return the id
+// otherwise, return zero
 static int token_is_colonvar(const char *t)
 {
 	if (t[0] != ':') return 0;
@@ -340,6 +348,8 @@ static int token_is_colonvar(const char *t)
 	return 0;
 }
 
+// if token is a variable definition, return the index
+// otherwise, return zero
 static int token_is_vardef(const char *t)
 {
 	if (t[0]=='>' && isdigit(t[1]) && t[1]>'0' && t[2]=='\0')
@@ -357,7 +367,11 @@ static int token_is_vardef(const char *t)
 #define PLAMBDA_STACKOP_ROT 5
 #define PLAMBDA_STACKOP_VMERGE3 6
 #define PLAMBDA_STACKOP_VMERGEALL 7
+#define PLAMBDA_STACKOP_HSV2RGB 8
+#define PLAMBDA_STACKOP_RGB2HSV 9
 
+// if token is a stack operation, return its id
+// otherwise, return zero
 static int token_is_stackop(const char *t)
 {
 	if (0 == strcmp(t, "del")) return PLAMBDA_STACKOP_DEL;
@@ -370,11 +384,14 @@ static int token_is_stackop(const char *t)
 	if (0 == strcmp(t, "join3")) return PLAMBDA_STACKOP_VMERGE3;
 	if (0 == strcmp(t, "mergeall")) return PLAMBDA_STACKOP_VMERGEALL;
 	if (0 == strcmp(t, "joinall")) return PLAMBDA_STACKOP_VMERGEALL;
+	if (0 == strcmp(t, "hsv2rgb")) return PLAMBDA_STACKOP_HSV2RGB;
+	if (0 == strcmp(t, "rgb2hsv")) return PLAMBDA_STACKOP_RGB2HSV;
 	return 0;
 }
 
 // if the token is a valid word, return its length
-// if the token is followed by modifiers, fill *endptr
+//         and if the token is followed by modifiers, fill *endptr
+// otherwise, return zero
 static int token_is_word(const char *t, const char **endptr)
 {
 	*endptr = NULL;
@@ -405,6 +422,7 @@ static int word_is_predefined(const char *id)
 	return -1;
 }
 
+// fills the modifiers with their defined values, otherwise with the default
 static void parse_modifiers(const char *mods, int *ocomp, int *odx, int *ody)
 {
 	*ocomp = -1;
@@ -788,6 +806,28 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 		FORI(nz) x[nx+ny+i] = z[i];
 		vstack_push_vector(s, x, nx+ny+nz);
 				     }
+		break;
+	case PLAMBDA_STACKOP_HSV2RGB: {
+		float x[PLAMBDA_MAX_PIXELDIM];
+		int n = vstack_pop_vector(x, s);
+		if (n != 3) error("hsv2rgb needs a 3-vector");
+		double dx[3] = {x[0], x[1], x[2]};
+		double dy[3];
+		hsv_to_rgb_doubles(dy, dx);
+		FORI(3) x[i] = dy[i];
+		vstack_push_vector(s, x, 3);
+				      }
+		break;
+	case PLAMBDA_STACKOP_RGB2HSV: {
+		float x[PLAMBDA_MAX_PIXELDIM];
+		int n = vstack_pop_vector(x, s);
+		if (n != 3) error("rgb2hsv needs a 3-vector");
+		double dx[3] = {x[0], x[1], x[2]};
+		double dy[3];
+		rgb_to_hsv_doubles(dy, dx);
+		FORI(3) x[i] = dy[i];
+		vstack_push_vector(s, x, 3);
+				      }
 		break;
 	case PLAMBDA_STACKOP_ROT: {
 		float x[PLAMBDA_MAX_PIXELDIM];
