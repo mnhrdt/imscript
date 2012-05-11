@@ -338,6 +338,24 @@ static float *zoom(float *x, int w, int h, int pd, int n, int zt,
 	return y;
 }
 
+static float *zoom2(float *x, int w, int h, int pd, int n, int zt,
+		int *ow, int *oh)
+{
+	int W = n*w;// - n + 1;
+	int H = n*h;// - n + 1;
+	float *y = xmalloc(W*H*pd*sizeof*y), nf = n;
+	FORJ(H) FORI(W) {
+		float tmp[pd];
+		interpolate_vec(tmp, x, w, h, pd, i/nf, j/nf, zt);
+		FORL(pd)
+			setsample(y, W, H, pd, i, j, l, tmp[l]);
+	}
+
+	*ow = W;
+	*oh = H;
+	return y;
+}
+
 // draw a segment between two points
 void traverse_segment(int px, int py, int qx, int qy,
 		void (*f)(int,int,void*), void *e)
@@ -485,40 +503,24 @@ static int parse_floats(float *t, int nmax, const char *s)
 
 int main(int c, char *v[])
 {
-	if (c != 13) {
-		fprintf(stderr, "usage:\n\t%s "
-	"black white cropx0 cropy0 cropw croph zoom zoomtype \"levels\" levchan"
-	// 1    2      3      4      5    6      7   8         9         10
-	" input_image output_image" "\n" , *v);
-	// 11              12
+	if (c < 3 || c > 5) {
+		fprintf(stderr, "usage:\n\t%s zoomf zoomtype [in [out]]\n", *v);
+		//                            1     2         3   4
 		return EXIT_FAILURE;
 	}
 
-	struct closeup_params p[1];
-
-	p->black = atof(v[1]);
-	p->white = atof(v[2]);
-	FORI(4) p->cropbox[i] = atof(v[3+i]);
-	p->zoom = atoi(v[7]);
-	p->zoomtype = atoi(v[8]);
-	//p->number_of_level_lines = 0; // parse v[9]
-	//p->levels = NULL;             // parse v[9]
-	float pi[100]; p->levels = pi;
-	p->number_of_level_lines = parse_floats(pi, 100, v[9]);
-	//int rpi = parse_floats(pi, 10, v[9]);
-	//fprintf(stderr, "parsed %d floats from \"%s\":\n", rpi, v[9]);
-	//FORI(rpi) fprintf(stderr, "float[%d] = %g\n", i, pi[i]);
-	p->level_type = v[10];
+	int zf = atoi(v[1]);
+	int zt = atoi(v[2]);
+	char *filename_in = c > 3 ? v[3] : "-";
+	char *filename_out = c > 4 ? v[4] : "-";
 
 	int w, h, pd;
-	float *x = iio_read_image_float_vec(v[11], &w, &h, &pd);
-	fprintf(stderr, "ipd = %d\n", pd);
+	float *x = iio_read_image_float_vec(filename_in, &w, &h, &pd);
 
-	int ow, od, opd;
-	float *y = closeup(x, w, h, pd, p, &ow, &od, &opd);
+	int ow, od;
+	float *y = zoom2(x, w, h, pd, zf, zt, &ow, &od);
 
-	fprintf(stderr, "opd = %d\n", opd);
-	iio_save_image_float_vec(v[12], y, ow, od, opd);
+	iio_save_image_float_vec(filename_out, y, ow, od, pd);
 
 	free(x);
 	free(y);

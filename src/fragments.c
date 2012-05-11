@@ -141,6 +141,62 @@ static void hsv_to_rgb_doubles(double *out, double *in)
 	//assert_rgb(out);
 }
 
+#define BAD_MIN(a,b) (b)<(a)?(b):(a)
+
+static void assert_rgb(double t[3])
+{
+	for (int i = 0; i < 3; i++)
+		assert(t[i] >= 0 && t[i] <= 1);
+}
+
+static void assert_hsv(double t[3])
+{
+	if (t[0] < 0 || t[0] >= 360) error("queca %g\n", t[0]);
+	assert(t[0] >= 0 && t[0] < 360);
+	if (!(t[1] >= 0 && t[1] <= 1))
+		error("CACA S = %g\n", t[1]);
+	assert(t[1] >= 0 && t[1] <= 1);
+	assert(t[2] >= 0 && t[2] <= 1);
+}
+
+static void rgb_to_hsv_doubles(double *out, double *in)
+{
+	//assert_rgb(in);
+	double r, g, b, h, s, v, M, m;
+	r = in[0]; g = in[1]; b = in[2];
+
+	//printf("rgb %g,%g,%g...\n", r, g, b);
+
+	if (g >= r && g >= b) {
+		M = g;
+		m = BAD_MIN(r, b);
+		h = M == m ? 0 : 60*(b-r)/(M-m)+120;
+	}
+	else if (b >= g && b >= r) {
+		M = b;
+		m = BAD_MIN(r, b);
+		h = M == m ? 0 : 60*(r-g)/(M-m)+240;
+	}
+	else {
+		assert(r >= g && r >= b);
+		M = r;
+		if (g >= b) {
+			m = b;
+			h = M == m ? 0 : 60*(g-b)/(M-m)+0;
+		} else {
+			m = g;
+			h = M == m ? 0 : 60*(g-b)/(M-m)+360;
+		}
+	}
+
+	s = M == 0 ? 0 : (M - m)/M;
+	v = M;
+	h = fmod(h, 360);
+
+	//printf("\thsv %g,%g,%g\n", h, s, v);
+	out[0] = h; out[1] = s; out[2] = v;
+	//assert_hsv(out);
+}
 
 // draw a segment between two points
 void traverse_segment(int px, int py, int qx, int qy,

@@ -85,6 +85,33 @@ float march_cyclic(float a, float b, float c, float d, float x, float y)
 
 
 static
+float march_singular_raw2(float a, float b, float c, float d, float x, float y)
+{
+	// first triangle
+	float alpha = 0.5;//c == a ? 0.5 : (b - a)/(c - a);
+	if (x <= alpha*(1 - y)) {
+		float ix = a;
+		if (alpha > 0) {
+			float y0=(x+alpha*y)/alpha;
+			assert(y0 >= 0); assert(y0 <= 1);
+			ix = b*y0 + a*(1 - y0);
+		}
+		return ix;
+	}
+
+	// second triangle
+	float gamma = 0.5;//d == c ? 0.5 : (b - c)/(d - c);
+	if (y >= 1 - (1 - gamma)*x) {
+		float y0 = y+(1-gamma)*(x-1);
+		assert(y0 >= 0); assert(y0 <= 1);
+		float ix = d*y0 + c*(1 - y0);
+		return ix;
+	}
+
+	return 0;
+}
+
+static
 float march_singular_raw(float a, float b, float c, float d, float x, float y)
 {
 	assert(a <= d); assert(d <= b); assert(b <= c);

@@ -9,8 +9,8 @@ CFLAGS = -O3 -DNDEBUG
 WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds
 
 CFLAGS = $(WFLAGS)
-CFLAGS = -g
 CFLAGS = $(WFLAGS) -O3 -DNDEBUG
+CFLAGS = -g
 
 >>>>>>> b0c6246fd4767cc4f86109ff62c9da3a2478dfe1
 #end of compiler specific part
@@ -21,10 +21,14 @@ SRCDIR = src
 BINDIR = bin
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow
 =======
 SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot
 >>>>>>> b0c6246fd4767cc4f86109ff62c9da3a2478dfe1
+=======
+SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco
+>>>>>>> 35812e58eda62434e26cead1e002ce1dd9f55cf7
 SRCFFT = gblur fft dct
 ifeq ($(ENABLE_GSL), yes)
 	SRCGSL = paraflow minimize
@@ -115,7 +119,6 @@ $(BINDIR)/rgfields: $(addprefix $(SRCDIR)/,rgfields.c gblur.o iio.o)
 
 $(BINDIR)/rgfieldst: $(addprefix $(SRCDIR)/,rgfieldst.c gblur.o iio.o)
 	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS) $(FFTFLAGS)
-
 
 .PHONY: clean
 clean:
