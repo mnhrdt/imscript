@@ -139,6 +139,27 @@ static float float_mod_1d(float *x, int n)
 	return mi;
 }
 
+//static float float_mod_1dp(float *x, int n, float mi, float ma, int nb)
+//{
+//	float h[nb];
+//	for (int i = 0; i < nb; i++)
+//		h[i] = 0;
+//	for (int i = 0; i < n; i++)
+//	{
+//		int xi = x[i];
+//		if (xi < 0) fail("negative xi=%g", x[i]);//xi = 0;
+//		if (xi > nb-1) fail("large xi=%g", x[i]);//xi = 0xff;
+//		h[xi] += 2;
+//		if (xi > 0) h[xi-1] += 1;
+//		if (xi < nb-1) h[xi+1] += 1;
+//	}
+//	int midx = nb/2;
+//	for (int i = 0; i < nb; i++)
+//		if (h[i] > h[midx])
+//			midx = i;
+//	return midx;
+//}
+
 static void float_modc(float *y, float *xx, int d, int n)
 {
 	float (*x)[d] = (void*)xx;
@@ -245,7 +266,7 @@ int main(int c, char *v[])
 	for (int i = 0; i < n; i++)
 		x[i] = iio_read_image_float_vec(v[i+2], w + i, h + i, pd + i);
 	for (int i = 0; i < n; i++) {
-		if (w[i] != *w || h[i] != *w || pd[i] != *pd)
+		if (w[i] != *w || h[i] != *h || pd[i] != *pd)
 			fail("%dth image sizes mismatch\n", i);
 	}
 	float (*y) = xmalloc(*w * *h * *pd * sizeof*y);
