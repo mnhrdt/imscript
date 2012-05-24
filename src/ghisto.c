@@ -21,14 +21,16 @@ int fill_histogram(long double (*h)[2], float *in_x, int n)
 	qsort(x, n, sizeof*x, compare_floats);
 	h[0][0] = x[0];
 	h[0][1] = 1;
-	int r = 1;
+	int r = 0;
 	for (int i = 1; i < n; i++) {
-		h[r-1][1] += 1;
 		if (x[i] != x[i-1]) {
-			h[r][0] = x[i];
 			r += 1;
+			h[r][0] = x[i];
+			h[r][1] = 0;
 		}
+		h[r][1] += 1;
 	}
+	r += 1;
 
 	free(x);
 	return r;
@@ -47,6 +49,8 @@ void dump_histogram(long double (*h)[2], int n)
 	accumulate_histogram(a, n);
 	printf("set xrange [%Lg:%Lg]\n", h[0][0], h[n-1][0]);
 	printf("set yrange [0:]\n");
+	printf("set format y \"\"\n");
+	printf("unset key\n");
 	printf("plot \"-\" w impulses, \"-\" w lines\n");
 	long double m = 0;
 	for (int i = 0; i < n; i++)
@@ -56,10 +60,10 @@ void dump_histogram(long double (*h)[2], int n)
 	}
 	printf("end\n");
 	long double f = m/a[n-1][1];
-	fprintf(stderr, "m = %Lg\n", m);
-	fprintf(stderr, "f = %Lg\n", f);
-	fprintf(stderr, "a = %Lg\n", a[n-1][1]);
-	fprintf(stderr, "n = %d\n", n);
+	//fprintf(stderr, "m = %Lg\n", m);
+	//fprintf(stderr, "f = %Lg\n", f);
+	//fprintf(stderr, "a = %Lg\n", a[n-1][1]);
+	//fprintf(stderr, "n = %d\n", n);
 	for (int i = 0; i < n; i++)
 		printf("\t%Lg\t%Lg\n", a[i][0], f*a[i][1]);
 	printf("end\n");
