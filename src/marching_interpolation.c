@@ -111,6 +111,19 @@ float march_singular_raw2(float a, float b, float c, float d, float x, float y)
 	return 0;
 }
 
+// consistent with upper-semicontinuous interpolation
+static
+float march_singular_usc(float a, float b, float c, float d, float x, float y)
+{
+	assert(a <= d); assert(d <= b); assert(b <= c);
+
+	if (x + y < 1)
+		return a + (b - a)*x + (c - a)*y;
+	else
+		return d + (c - d)*(1 - x) + (b - d)*(1 - y);
+
+}
+
 static
 float march_singular_raw(float a, float b, float c, float d, float x, float y)
 {
@@ -178,11 +191,14 @@ float march_singular(float a, float b, float c, float d, float x, float y)
 	if (0 == option) option = d1<d0 ? -1 : 1;
 	if (2 == option) option = d1>d0 ? -1 : 1;
 	if (3 == option) option = d1>=d0 ? -1 : 1;
+	if (100 == option) option = d1>=d0 ? -100 : 100;
 	if (10 == option) option = 1;
 	if (-10 == option) option = -1;
 	switch(option) {
 	case 1: return march_singular_raw(a,b,c,d,x,y);
 	case -1:return -march_singular_raw(-c,-d,-a,-b,1-x,y);
+	case 100: return march_singular_usc(a, b, c, d, x, y);
+	case -100:return -march_singular_usc(-c,-d,-a,-b,1-x,y);
 	case -2:return -1;
 	default: assert(0);//error("bad MARCH_SADDLES %d", option);
 	}

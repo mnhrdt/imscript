@@ -9,8 +9,8 @@ CFLAGS = -O3 -DNDEBUG
 WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds
 
 CFLAGS = $(WFLAGS)
-CFLAGS = $(WFLAGS) -O3 -DNDEBUG
 CFLAGS = -g
+CFLAGS = $(WFLAGS) -O3 -DNDEBUG
 
 >>>>>>> b0c6246fd4767cc4f86109ff62c9da3a2478dfe1
 #end of compiler specific part
@@ -22,6 +22,7 @@ BINDIR = bin
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow
 =======
 SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot
@@ -29,6 +30,9 @@ SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdi
 =======
 SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco
 >>>>>>> 35812e58eda62434e26cead1e002ce1dd9f55cf7
+=======
+SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco vecov flowinv ghisto
+>>>>>>> 90aaf710d3fb4c1024d769476c95d67ea2feff06
 SRCFFT = gblur fft dct
 ifeq ($(ENABLE_GSL), yes)
 	SRCGSL = paraflow minimize

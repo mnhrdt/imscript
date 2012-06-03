@@ -67,6 +67,27 @@ static float float_med(float *x, int n)
 	return x[n/2];
 }
 
+static float float_mod(float *x, int n)
+{
+	float h[0x100];
+	for (int i = 0; i < 0x100; i++)
+		h[i] = 0;
+	for (int i = 0; i < n; i++)
+	{
+		int xi = x[i];
+		if (xi < 0) fail("negative xi=%g", x[i]);//xi = 0;
+		if (xi > 0xff) fail("large xi=%g", x[i]);//xi = 0xff;
+		h[xi] += 2;
+		if (xi > 0) h[xi-1] += 1;
+		if (xi < 0xff) h[xi+1] += 1;
+	}
+	int mi = 0x80;
+	for (int i = 0; i < 0x100; i++)
+		if (h[i] > h[mi])
+			mi = i;
+	return mi;
+}
+
 #ifndef EVENP
 #define EVENP(x) (!((x)&1))
 #endif
@@ -115,28 +136,30 @@ int main(int c, char *v[])
 		return EXIT_FAILURE;
 	}
 	int n = c - 2;
-	float *x[n];
-	int w[n], h[n];
-	for (int i = 0; i < n; i++)
-		x[i] = iio_read_image_float(v[i+2], w + i, h + i);
-	float (*y) = xmalloc(*w * *h * n * sizeof*y);
 	char *operation_name = v[1];
-	for (int i = 0; i < n; i++) {
-		if (w[i] != *w || h[i] != *w)
-			fail("%dth image size mismatch\n", i);
 	float (*f)(float *,int) = NULL;
 	if (0 == strcmp(operation_name, "sum"))   f = float_sum;
 	if (0 == strcmp(operation_name, "mul"))   f = float_mul;
 	if (0 == strcmp(operation_name, "prod"))  f = float_mul;
 	if (0 == strcmp(operation_name, "avg"))   f = float_avg;
 	if (0 == strcmp(operation_name, "min"))   f = float_min;
-	if (0 == strcmp(operation_name, "max"))   f = float_min;
+	if (0 == strcmp(operation_name, "max"))   f = float_max;
 	if (0 == strcmp(operation_name, "med"))   f = float_med;
+	if (0 == strcmp(operation_name, "mod"))   f = float_mod;
 	if (0 == strcmp(operation_name, "medi"))   f = float_med;
 	if (0 == strcmp(operation_name, "medv"))   f = float_medv;
 	if (0 == strcmp(operation_name, "rnd"))   f = float_pick;
 	if (0 == strcmp(operation_name, "first")) f = float_first;
 	if (!f) fail("unrecognized operation \"%s\"", operation_name);
+	float *x[n];
+	int w[n], h[n];
+	for (int i = 0; i < n; i++)
+		x[i] = iio_read_image_float(v[i+2], w + i, h + i);
+	for (int i = 0; i < n; i++) {
+		if (w[i] != *w || h[i] != *w)
+			fail("%dth image size mismatch\n", i);
+	}
+	float (*y) = xmalloc(*w * *h * sizeof*y);
 	for (int i = 0; i < *w * *h; i++)
 	{
 		float tmp[n];
@@ -145,7 +168,6 @@ int main(int c, char *v[])
 			if (isgood(x[j][i]))
 				tmp[ngood++] = x[j][i];
 		y[i] = f(tmp, ngood);
-	}
 	}
 	iio_save_image_float("-", y, *w, *h);
 	return EXIT_SUCCESS;

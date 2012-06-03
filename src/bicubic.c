@@ -1,4 +1,4 @@
-#
+
 #ifndef _BICUBIC_C
 #define _BICUBIC_C
 

@@ -9,6 +9,7 @@
 #include "iio.h"
 #include "marching_squares.c"
 #include "marching_interpolation.c"
+#include "bicubic.c"
 
 #define FORI(n) for(int i=0;i<(n);i++)
 #define FORJ(n) for(int j=0;j<(n);j++)
@@ -305,6 +306,8 @@ static void interpolate_vec(float *out, float *x, int w, int h, int pd,
 {
 	if (p < 0 || q < 0 || p+1 >= w || q+1 >= h) {
 		FORL(pd) out[l] = 0;
+	} else if (m == 3) {
+		bicubic_interpolation(out, x, w, h, pd, p, q);
 	} else {
 		int ip = floor(p);
 		int iq = floor(q);
@@ -323,8 +326,8 @@ static void interpolate_vec(float *out, float *x, int w, int h, int pd,
 static float *zoom(float *x, int w, int h, int pd, int n, int zt,
 		int *ow, int *oh)
 {
-	int W = n*w - n + 1;
-	int H = n*h - n + 1;
+	int W = n*w - n;
+	int H = n*h - n;
 	float *y = xmalloc(W*H*pd*sizeof*y), nf = n;
 	FORJ(H) FORI(W) {
 		float tmp[pd];
@@ -518,7 +521,7 @@ int main(int c, char *v[])
 	float *x = iio_read_image_float_vec(filename_in, &w, &h, &pd);
 
 	int ow, od;
-	float *y = zoom2(x, w, h, pd, zf, zt, &ow, &od);
+	float *y = zoom(x, w, h, pd, zf, zt, &ow, &od);
 
 	iio_save_image_float_vec(filename_out, y, ow, od, pd);
 

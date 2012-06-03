@@ -16,6 +16,8 @@
 #include "xmalloc.c"
 #include "getpixel.c"
 
+#include "bicubic.c"
+
 #include "smapa.h"
 
 static float evaluate_bilinear_cell(float a, float b, float c, float d,
@@ -91,7 +93,8 @@ static void invflow(float *ou, float *flo, float *pin, int w, int h, int pd)
 	FORJ(h) FORI(w) {
 		float p[2] = {i + flow[j][i][0], j + flow[j][i][1]};
 		float result[pd];
-		bilinear_interpolation_at(result, pin, w, h, pd, p[0], p[1]);
+		//bilinear_interpolation_at(result, pin, w, h, pd, p[0], p[1]);
+		bicubic_interpolation(result, pin, w, h, pd, p[0], p[1]);
 		float factor = 1;
 		if (flowdiv)
 			factor = exp(BACKDIV() * flowdiv[j*w+i]);
