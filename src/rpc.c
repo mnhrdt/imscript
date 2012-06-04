@@ -2,10 +2,14 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
 
+#include "fail.c"
 #include "xfopen.c"
+#include "xmalloc.c"
+
 
 
 
@@ -128,55 +132,51 @@ void read_rpc_file_xml(struct rpc *p, char *filename)
 
 void print_rpc(FILE *f, struct rpc *p, char *n)
 {
-	FORI(20) fprintf(f, "rpc(\"%s\") numx[%d] = %g\n", n, i, p->numx[i]);
-	FORI(20) fprintf(f, "rpc(\"%s\") denx[%d] = %g\n", n, i, p->denx[i]);
-	FORI(20) fprintf(f, "rpc(\"%s\") numy[%d] = %g\n", n, i, p->numy[i]);
-	FORI(20) fprintf(f, "rpc(\"%s\") deny[%d] = %g\n", n, i, p->deny[i]);
-	FORI(20) fprintf(f, "rpc(\"%s\") inumx[%d] = %g\n", n, i, p->inumx[i]);
-	FORI(20) fprintf(f, "rpc(\"%s\") idenx[%d] = %g\n", n, i, p->idenx[i]);
-	FORI(20) fprintf(f, "rpc(\"%s\") inumy[%d] = %g\n", n, i, p->inumy[i]);
-	FORI(20) fprintf(f, "rpc(\"%s\") ideny[%d] = %g\n", n, i, p->ideny[i]);
-	FORI(3)fprintf(stderr,"rpc(\"%s\") scale[%d] = %g\n",n,i,p->scale[i]);
-	FORI(3)fprintf(stderr,"rpc(\"%s\") offset[%d] = %g\n",n,i,p->offset[i]);
-	FORI(3)fprintf(stderr,"rpc(\"%s\") iscale[%d] = %g\n",n,i,p->iscale[i]);
-	FORI(3)fprintf(stderr,"rpc(\"%s\") ioffset[%d]=%g\n",n,i,p->ioffset[i]);
+	FORI(20) fprintf(f, "rpc(\"%s\") numx[%d] = %.18lf\n", n, i, p->numx[i]);
+	FORI(20) fprintf(f, "rpc(\"%s\") denx[%d] = %.18lf\n", n, i, p->denx[i]);
+	FORI(20) fprintf(f, "rpc(\"%s\") numy[%d] = %.18lf\n", n, i, p->numy[i]);
+	FORI(20) fprintf(f, "rpc(\"%s\") deny[%d] = %.18lf\n", n, i, p->deny[i]);
+	FORI(20) fprintf(f, "rpc(\"%s\") inumx[%d] = %.18lf\n", n, i, p->inumx[i]);
+	FORI(20) fprintf(f, "rpc(\"%s\") idenx[%d] = %.18lf\n", n, i, p->idenx[i]);
+	FORI(20) fprintf(f, "rpc(\"%s\") inumy[%d] = %.18lf\n", n, i, p->inumy[i]);
+	FORI(20) fprintf(f, "rpc(\"%s\") ideny[%d] = %.18lf\n", n, i, p->ideny[i]);
+	FORI(3)fprintf(stderr,"rpc(\"%s\") scale[%d] = %.18lf\n",n,i,p->scale[i]);
+	FORI(3)fprintf(stderr,"rpc(\"%s\") offset[%d] = %.18lf\n",n,i,p->offset[i]);
+	FORI(3)fprintf(stderr,"rpc(\"%s\") iscale[%d] = %.18lf\n",n,i,p->iscale[i]);
+	FORI(3)fprintf(stderr,"rpc(\"%s\") ioffset[%d]=%.18lf\n",n,i,p->ioffset[i]);
 
 }
 
 // evaluate a polynomial of degree 3
 double eval_pol20(double c[20], double x, double y, double z)
 {
-	//double col = x;
-	//double lig = y;
-	//double alt = z;
-	//double m[20] = {1, lig, col, alt, lig*col,
-	//	lig*alt, col*alt, lig*lig, col*col, alt*alt,
-	//	col*lig*alt, lig*lig*lig, lig*col*col, lig*alt*alt, lig*lig*col,
-	//	col*col*col, col*alt*alt, lig*lig*alt, col*col*alt, alt*alt*alt
-	//};
-	double m[20] = {1, y, x, z, x*y,
-		y*z, x*z, y*y, x*x, z*z,
-		x*y*z, y*y*y, y*x*x, y*z*z, y*y*x,
-		x*x*x, x*z*z, y*y*z, x*x*z, z*z*z};
+	double col = x;
+	double lig = y;
+	double alt = z;
+	double m[20] = {1, lig, col, alt, lig*col,
+		lig*alt, col*alt, lig*lig, col*col, alt*alt,
+		col*lig*alt, lig*lig*lig, lig*col*col, lig*alt*alt, lig*lig*col,
+		col*col*col, col*alt*alt, lig*lig*alt, col*col*alt, alt*alt*alt
+	};
+	//double m[20] = {1, y, x, z, x*y,
+	//	y*z, x*z, y*y, x*x, z*z,
+	//	x*y*z, y*y*y, y*x*x, y*z*z, y*y*x,
+	//	x*x*x, x*z*z, y*y*z, x*x*z, z*z*z};
 	double r = 0;
 	for (int i = 0; i < 20; i++)
 		r += c[i]*m[i];
 	return r;
 }
 
-//// evaluate a quotient of 2 polynomials
-//double eval_rpc40(double n[20], double d[20], double x, double y, double z)
-//{
-//}
-
 // evaluate the normalized direct rpc model
 static void eval_nrpc(double *result,
 		struct rpc *p, double x, double y, double z)
 {
-	double numx = eval_pol20(p->numx, x, y, z);
-	double denx = eval_pol20(p->denx, x, y, z);
-	double numy = eval_pol20(p->numy, x, y, z);
-	double deny = eval_pol20(p->deny, x, y, z);
+	// XXX NOTE WARNING (x,y)-inversion here
+	double numx = eval_pol20(p->numx, y, x, z);
+	double denx = eval_pol20(p->denx, y, x, z);
+	double numy = eval_pol20(p->numy, y, x, z);
+	double deny = eval_pol20(p->deny, y, x, z);
 	result[0] = numx/denx;
 	result[1] = numy/deny;
 	//fprintf(stderr, "\t\tnrpc{%p}(%g %g %g)=>(%g %g)\n", p, x, y, z, result[0], result[1]);
@@ -191,8 +191,8 @@ static void eval_nrpci(double *result,
 	double denx = eval_pol20(p->idenx, y, x, z);
 	double numy = eval_pol20(p->inumy, y, x, z);
 	double deny = eval_pol20(p->ideny, y, x, z);
-	result[1] = numx/denx;
-	result[0] = numy/deny;
+	result[0] = numx/denx;
+	result[1] = numy/deny;
 	//fprintf(stderr, "\t\tnrpci{%p}(%g %g %g)=>",p,x,y,z);
 	//fprintf(stderr, "(%g %g)\n", result[0], result[1]);
 }
@@ -230,6 +230,30 @@ static double random_uniform(void)
 	return rand()/(RAND_MAX+1.0);
 }
 
+static int main_trial2(int c, char *v[])
+{
+	struct rpc p[1];
+	nan_rpc(p);
+	read_rpc_file_xml(p, "-");
+	double lx[][3] = { {1,1,0}, {41500,1,0}, {1,16992,0}, {41500,16992,0}};
+	for(int i = 0; i < 4; i++)
+	{
+		fprintf(stderr, "\n");
+		double x = lx[i][0];
+		double y = lx[i][1];
+		double z = lx[i][2];
+		double r[2], rr[2];
+		eval_rpc(r, p, x, y, z);
+		eval_rpci(rr, p, r[0], r[1], z);
+		fprintf(stderr, "(%g %g %g) => ", x, y, z);
+		fprintf(stderr, "(%d:%d %d:%d)",
+		(int)trunc(r[0]), (int)trunc(60*fabs(r[0]-trunc(r[0]))),
+		(int)trunc(r[1]), (int)trunc(60*fabs(r[1]-trunc(r[1])))
+				);
+		fprintf(stderr, " => (%g %g)\n", rr[0], rr[1]);
+	}
+}
+
 static int main_trial(int c, char *v[])
 {
 	struct rpc p[1];
@@ -247,14 +271,30 @@ static int main_trial(int c, char *v[])
 				x, y, z, r[0], r[1], rr[0], rr[1]);
 		//fprintf(stderr, "%g\n", hypot(rr[0]-x, rr[1]-y));
 	}
+	for (int i = 0; i < 10; i++) {
+		double x = 10000+4000*random_uniform();
+		double y = 10000+4000*random_uniform();
+		double z = 1000*random_uniform();
+		double r[2], rr[2];
+		eval_rpc(r, p, x, y, z);
+		eval_rpci(rr, p, r[0], r[1], z);
+		fprintf(stderr, "(%g %g %g) => (%g %g) => (%g %g)\n",
+				x, y, z, r[0], r[1], rr[0], rr[1]);
+		//fprintf(stderr, "%g\n", hypot(rr[0]-x, rr[1]-y));
+	}
 	return 0;
 }
 
+#include "iio.h"
+
+#include "smapa.h"
+SMART_PARAMETER_SILENT(DO_PLOT,0)
+
 static int main_rpcline(int c, char *v[])
 {
-	if (c != 14 && c != 13) {
+	if (c != 14) {
 		fprintf(stderr, "usage:\n\t"
-			"%s imga imgb a0x a0y b0x b0y rpca rpcb x y h0 hf [out]"
+			"%s imga imgb a0x a0y b0x b0y rpca rpcb x y h0 hf out"
 		//        0 1    2    3   4   5   6   7    8    9 10 11 12 13
 			"\n", *v);
 		return EXIT_FAILURE;
@@ -267,22 +307,39 @@ static int main_rpcline(int c, char *v[])
 	char *filename_rpcb = v[8];
 	double basepoint[2] = {atof(v[9]), atof(v[10])};
 	double hrange[2] = {atof(v[11]), atof(v[12])};
+	char *filename_out = v[13];
 
 	struct rpc rpca[1]; read_rpc_file_xml(rpca, filename_rpca);
 	struct rpc rpcb[1]; read_rpc_file_xml(rpcb, filename_rpcb);
 	//print_rpc(stderr, rpca, "a");
 	//print_rpc(stderr, rpcb, "b");
-	int nh = 20;
+	int nh = 21;
+
+	int width, height;
+	uint8_t *img_in, *img_out_raw;
+	if (DO_PLOT()>0) {
+		img_in = iio_read_image_uint8(filename_b, &width, &height);
+		img_out_raw = xmalloc(3*width*height);
+	}
+	uint8_t (*img_out)[width][3] = (void*)img_out_raw;
+	if (DO_PLOT()>0)
+	for (int j = 0; j < height; j++)
+		for (int i = 0; i < width; i++)
+			for (int l = 0; l < 3; l++)
+				img_out[j][i][l] = img_in[width*j+i];
 	for (int i = 0; i < nh; i++)
 	{
 		double ix = basepoint[0];
 		double iy = basepoint[1];
 		double x = ix + offset_a[0];
 		double y = iy + offset_a[1];
-		double z = hrange[0] + i * (hrange[1] - hrange[0])/(nh-1);
+		double ni = i/(nh - 1.0);
+		ni = ni*ni;
+		double z = hrange[0] + ni * (hrange[1] - hrange[0]);
 		double r[2], rr[2];
-		fprintf(stderr, "(%g %g %g) => ", ix, iy, z);
+		fprintf(stderr, "(%g %g %g) =>\t", ix, iy, z);
 		eval_rpc(r, rpca, x, y, z);
+		fprintf(stderr, "(%.20g %.20g) =>\t", r[0], r[1]);
 		eval_rpci(rr, rpcb, r[0], r[1], z);
 		double ox = rr[0] - offset_b[0];
 		double oy = rr[1] - offset_b[1];
@@ -291,10 +348,25 @@ static int main_rpcline(int c, char *v[])
 		//fprintf(stderr, "\trr[0] = %g\n", rr[0]);
 		//fprintf(stderr, "\trr[1] = %g\n", rr[1]);
 		fprintf(stderr, "(%g %g)\n", ox, oy);
+		if (DO_PLOT()>0) {
+			int iox = ox;
+			int ioy = oy;
+			if (iox < 0) iox = 0;
+			if (ioy < 0) ioy = 0;
+			if (iox >= width) iox = width-1;
+			if (ioy >= height) ioy = height-1;
+			img_out[ioy][iox][0] = 255;
+			img_out[ioy][iox][1] = 0;
+			img_out[ioy][iox][2] = 0;
+		}
 	}
+	if (DO_PLOT()>0)
+	iio_save_image_uint8_vec(filename_out, img_out_raw, width, height, 3);
 }
 
 int main(int c, char *v[])
 {
+	//return main_trial(c, v);
+	//return main_trial2(c, v);
 	return main_rpcline(c, v);
 }
