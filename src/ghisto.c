@@ -4,6 +4,20 @@
 #include "iio.h"
 
 #include "xmalloc.c"
+#include "smapa.h"
+
+SMART_PARAMETER_SILENT(HISMOTTH,0)
+
+static void smooth_histogram_rw(long double (*h)[2], int n, int w)
+{
+	for (int i = 0; i < n-w; i++)
+	{
+		long double a = 0;
+		for (int j = 0; j <= w; j++)
+			a += h[i+j][1];
+		h[i][1] = a;
+	}
+}
 
 static int compare_floats(const void *a, const void *b)
 {
@@ -33,6 +47,8 @@ int fill_histogram(long double (*h)[2], float *in_x, int n)
 	r += 1;
 
 	free(x);
+	if (HISMOTTH() > 0)
+		smooth_histogram_rw(h, r, HISMOTTH());
 	return r;
 }
 

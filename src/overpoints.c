@@ -28,13 +28,25 @@ int main(int c, char *v[])
 	while (2 == fscanf(stdin, "%g %g\n", p, p+1)) {
 		int iox = p[0];
 		int ioy = p[1];
-		if (iox < 0) iox = 0;
-		if (ioy < 0) ioy = 0;
-		if (iox >= w) iox = w-1;
-		if (ioy >= h) ioy = h-1;
+		if (iox <= 0) iox = 1;
+		if (ioy <= 0) ioy = 1;
+		if (iox >= w-1) iox = w-2;
+		if (ioy >= h-1) ioy = h-2;
 		img_out[ioy][iox][0] = 255;
 		img_out[ioy][iox][1] = 0;
 		img_out[ioy][iox][2] = 0;
+		img_out[ioy-1][iox][0] = 255;
+		img_out[ioy-1][iox][1] = 0;
+		img_out[ioy-1][iox][2] = 0;
+		img_out[ioy+1][iox][0] = 255;
+		img_out[ioy+1][iox][1] = 0;
+		img_out[ioy+1][iox][2] = 0;
+		img_out[ioy][iox+1][0] = 255;
+		img_out[ioy][iox+1][1] = 0;
+		img_out[ioy][iox+1][2] = 0;
+		img_out[ioy][iox-1][0] = 255;
+		img_out[ioy][iox-1][1] = 0;
+		img_out[ioy][iox-1][2] = 0;
 	}
 	fprintf(stderr, "ok, saving file\n");
 	iio_save_image_uint8_vec("-", img_out_raw, w, h, 3);

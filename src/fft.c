@@ -15,39 +15,8 @@
 #define M_PI		3.14159265358979323846	/* pi */
 #endif
 
-// this function prints an error message and aborts the program
-static void error(const char *fmt, ...)
-{
-	va_list argp;
-	fprintf(stderr, "\nERROR: ");
-	va_start(argp, fmt);
-	vfprintf(stderr, fmt, argp);
-	va_end(argp);
-	fprintf(stderr, "\n\n");
-	fflush(NULL);
-#ifdef NDEBUG
-	exit(-1);
-#else
-	exit(*(int *)0x43);
-#endif
-}
-
-
-// this function always returns a valid pointer
-static void *xmalloc(size_t size)
-{
-	if (size == 0)
-		error("xmalloc: zero size");
-	void *new = malloc(size);
-	if (!new)
-	{
-		double sm = size / (0x100000 * 1.0);
-		error("xmalloc: out of memory when requesting "
-			"%zu bytes (%gMB)",//:\"%s\"",
-			size, sm);//, strerror(errno));
-	}
-	return new;
-}
+#include "fail.c"
+#include "xmalloc.c"
 
 
 #define FORI(n) for(int i=0;i<(n);i++)
@@ -85,6 +54,24 @@ static void fft_2dfloat(fftwf_complex *fx, float *x, int w, int h)
 	fftwf_free(a);
 	fftwf_cleanup();
 }
+
+//static void fft_2dfloatr2c(fftwf_complex *fx, float *x, int w, int h)
+//{
+//	//fftwf_complex *a = fftwf_malloc(w*h*sizeof*a);
+//
+//	//fprintf(stderr, "planning...\n");
+//	evoke_wisdom();
+//	fftwf_plan p = fftwf_plan_dft_r2c_2d(h, w, x, fx, FFTW_ESTIMATE);
+//	bequeath_wisdom();
+//	//fprintf(stderr, "...planned!\n");
+//
+//	//FORI(w*h) a[i] = x[i]; // complex assignment!
+//	fftwf_execute(p);
+//
+//	fftwf_destroy_plan(p);
+//	//fftwf_free(a);
+//	fftwf_cleanup();
+//}
 
 // Wrapper around FFTW3 that computes the real-valued inverse Fourier transform
 // of a complex-valued frequantial image.
@@ -159,7 +146,7 @@ int main(int c, char *v[])
 		return EXIT_FAILURE;
 	}
 	int direction = atoi(v[1]);
-	if (!direction) error("bad direction");
+	if (!direction) fail("bad direction");
 	char *in = c > 2 ? v[2] : "-";
 	char *out = c > 3 ? v[3] : "-";
 
@@ -168,7 +155,7 @@ int main(int c, char *v[])
 
 	if (direction < 0) {
 		pdout = pd/2;
-		if (2*pdout != pd) error("can not ifft real data!");
+		if (2*pdout != pd) fail("can not ifft real data!");
 	} else
 		pdout = 2*pd;
 

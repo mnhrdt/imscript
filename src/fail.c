@@ -30,6 +30,32 @@ static const char *myname(void)
 static const char *myname(void) { return ""; }
 #endif//__linux
 
+#ifdef DOTRACE
+#include <execinfo.h>
+#endif
+
+#ifndef BACKTRACE_SYMBOLS
+#define BACKTRACE_SYMBOLS 50
+#endif
+
+static void print_trace(FILE *f)
+{
+#ifdef DOTRACE
+	void *array[BACKTRACE_SYMBOLS];
+	size_t size, i;
+	char **strings;
+
+	size = backtrace (array, BACKTRACE_SYMBOLS);
+	strings = backtrace_symbols (array, size);
+
+	fprintf (f, "Obtained %zu stack frames.\n", size);
+
+	for (i = 0; i < size; i++)
+		fprintf (f, "%s\n", strings[i]);
+
+	free (strings);
+#endif
+}
 
 #include <stdarg.h>
 
@@ -45,10 +71,10 @@ static void fail(const char *fmt, ...)
 	va_end(argp);
 	fprintf(stderr, "\n\n");
 	fflush(NULL);
+	print_trace(stderr);
 #ifdef NDEBUG
 	exit(-1);
 #else//NDEBUG
-	//print_trace(stderr);
 	exit(*(int *)0x43);
 #endif//NDEBUG
 }
