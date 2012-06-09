@@ -1,18 +1,14 @@
 # compiler specific part (may be removed with minor damage)
 #
 ENABLE_GSL = yes
-<<<<<<< HEAD
 CFLAGS = -g -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds
 CFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds -O3 -DNDEBUG
 CFLAGS = -O3 -DNDEBUG
-=======
-WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds
 
 CFLAGS = $(WFLAGS)
-CFLAGS = -g
 CFLAGS = $(WFLAGS) -O3 -DNDEBUG
+CFLAGS = -g -rdynamic -DDOTRACE
 
->>>>>>> b0c6246fd4767cc4f86109ff62c9da3a2478dfe1
 #end of compiler specific part
 
 
@@ -20,19 +16,7 @@ CFLAGS = $(WFLAGS) -O3 -DNDEBUG
 SRCDIR = src
 BINDIR = bin
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow
-=======
-SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot
->>>>>>> b0c6246fd4767cc4f86109ff62c9da3a2478dfe1
-=======
-SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco
->>>>>>> 35812e58eda62434e26cead1e002ce1dd9f55cf7
-=======
-SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco vecov flowinv ghisto
->>>>>>> 90aaf710d3fb4c1024d769476c95d67ea2feff06
+SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco vecov flowinv ghisto shuntingyard rpc overpoints
 SRCFFT = gblur fft dct
 ifeq ($(ENABLE_GSL), yes)
 	SRCGSL = paraflow minimize

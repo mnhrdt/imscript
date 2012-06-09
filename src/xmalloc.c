@@ -7,6 +7,14 @@
 
 static void *xmalloc(size_t size)
 {
+#ifndef NDEBUG
+	{
+		double sm = size / (0x100000 * 1.0);
+		if (sm > 1000)
+			fprintf(stderr, "WARNING: large malloc"
+					" %zu bytes (%gMB)\n", size, sm);
+	}
+#endif
 	if (size == 0)
 		fail("xmalloc: zero size");
 	void *new = malloc(size);

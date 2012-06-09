@@ -24,7 +24,7 @@ void evoke_wisdom(void)
 	}
 	else {
 		f = fopen(wisdomfilename, "w");
-		if (!f) error("could not create wisdom file");
+		if (!f) fail("could not create wisdom file");
 		fclose(f);
 		fprintf(stderr, "created wisdom file \"%s\"\n", wisdomfilename);
 	}
@@ -40,5 +40,5 @@ void bequeath_wisdom(void)
 		fclose(f);
 	}
 	else
-		error("could not bequeath wisdom");
+		fail("could not bequeath wisdom");
 }
