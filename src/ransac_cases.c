@@ -44,8 +44,15 @@ void straight_line_through_two_points(float *line, float *points, void *usr)
 	assert(hypot(e1, e2) < 0.001);
 }
 
-
-
+int find_straight_line_by_ransac(bool *out_mask, float line[3],
+		float *points, int npoints,
+		int ntrials, float max_err)
+{
+	return ransac(out_mask, line, points, 2, npoints, 3,
+			distance_of_point_to_straight_line,
+			straight_line_through_two_points,
+			4, ntrials, 3, max_err, NULL, NULL);
+}
 
 // ************************************
 // ************************************
@@ -160,6 +167,16 @@ bool affine_map_is_reasonable(float *aff, void *usr)
 	return true;
 }
 
+int find_affinity_by_ransac(bool *out_mask, float affinity[6],
+		float *pairs, int npairs,
+		int ntrials, float max_err)
+{
+	return ransac(out_mask, affinity, pairs, 4, npairs, 6,
+			affine_match_error,
+			affine_map_from_three_pairs,
+			3, ntrials, 4, max_err,
+			affine_map_is_reasonable, NULL);
+}
 
 
 // ************************************

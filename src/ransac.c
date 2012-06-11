@@ -178,10 +178,12 @@ int ransac(
 
 	if (best_ninliers >= min_inliers)
 	{
-		for(int j = 0; j < modeldim; j++)
-			out_model[j] = best_model[j];
-		for(int j = 0; j < n; j++)
-			out_mask[j] = best_mask[j];
+		if (out_model)
+			for(int j = 0; j < modeldim; j++)
+				out_model[j] = best_model[j];
+		if (out_mask)
+			for(int j = 0; j < n; j++)
+				out_mask[j] = best_mask[j];
 		return best_ninliers;
 	} else
 		return 0;
@@ -285,10 +287,10 @@ int main_cases(int c, char *v[])
 	// print a summary of the results
 	if (n_inliers > 0) {
 		printf("RANSAC found a model with %d inliers\n", n_inliers);
-		printf("parameters = [ ");
+		printf("parameters =");
 		for (int i = 0; i < modeldim; i++)
-			printf("%g ", model[i]);
-		printf("]\n");
+			printf(" %g", model[i]);
+		printf("\n");
 	} else printf("RANSAC found no model\n");
 
 	return EXIT_SUCCESS;
