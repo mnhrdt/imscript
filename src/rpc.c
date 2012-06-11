@@ -195,7 +195,7 @@ static void eval_nrpci(double *result,
 }
 
 // evaluate the direct rpc model
-static void eval_rpc(double *result,
+void eval_rpc(double *result,
 		struct rpc *p, double x, double y, double z)
 {
 	double nx = (x - p->offset[0])/p->scale[0];
@@ -208,7 +208,7 @@ static void eval_rpc(double *result,
 }
 
 // evaluate the inverse rpc model
-static void eval_rpci(double *result,
+void eval_rpci(double *result,
 		struct rpc *p, double x, double y, double z)
 {
 	double nx = (x - p->ioffset[0])/p->iscale[0];
@@ -221,7 +221,7 @@ static void eval_rpci(double *result,
 }
 
 // evaluate a correspondence between to images given their rpc
-static void eval_rpc_pair(double xprime[2],
+void eval_rpc_pair(double xprime[2],
 		struct rpc *pa, struct rpc *pb,
 		double x, double y, double z)
 {
@@ -232,41 +232,35 @@ static void eval_rpc_pair(double xprime[2],
 
 // compute the height of a point given its location inside two images
 double rpc_height(struct rpc *rpca, struct rpc *rpcb,
-		double x, double y, double xp, double yp, double *outerr)
+		double xa, double ya, double xb, double yb, double *outerr)
 {
-	double p1[2] = {x, y};
-	double p2[2] = {xp, yp};
+	double x[2] = {xa, ya};
+	double y[2] = {xb, yb};
 
-	double h0 = 0;
-	double r0[2],r1[2];
-	for(int t=0;t<100;t++) {
-		//fprintf(stderr, "(%g %g %g) =>\t", p1[0], p1[1], h0);
-		const double HSTEP = 1;
-		eval_rpc_pair(r0, rpca, rpcb, p1[0], p1[1], h0);
-		eval_rpc_pair(r1, rpca, rpcb, p1[0], p1[1], h0 + HSTEP);
+	double h = 0;
+	for (int t = 0; t < 100; t++) {
+		double hstep = 1;
+		double p[2], q[2];
+		eval_rpc_pair(p, rpca, rpcb, x[0], x[1], h);
+		eval_rpc_pair(q, rpca, rpcb, x[0], x[1], h + hstep);
 
-		double a1 = r1[0] - r0[0];
-		double a2 = r1[1] - r0[1];
+		double a[2] = {q[0] - p[0], q[1] - p[1]};
+		double b[2] = {y[0] - q[0], y[1] - p[1]};
 
-		double b1 = p2[0] - r0[0];
-		double b2 = p2[1] - r0[1];
-
-		double h0inc = (a1*b1 + a2*b2)/(a1*a1 + a2*a2);
+		double lambda = (a[0]*b[0] + a[1]*b[1])/(a[0]*a[0] + a[1]*a[1]);
 
 		// projection of p2 to the line r1-r0
-		double q1 = r0[0] + h0inc * a1;
-		double q2 = r0[1] + h0inc * a2;
+		double z[2] = {p[0] + lambda*a[0], p[1] + lambda*a[1]};
 
-		double err = hypot(q1 - p2[0], q2 - p2[1]);
-		if(outerr) *outerr=err;
+		double err = hypot(z[0] - y[0], z[1] - y[1]);
+		if (outerr) *outerr=err;
 
-		h0 += h0inc;
-		//fprintf(stderr, "h{%g}:%g err: %g\n", h0inc, h0, err);
+		h += lambda;
 
-		if(fabs(h0inc)<0.0001) break;
-
+		if (fabs(lambda) < 0.00001)
+			break;
 	}
-	return h0;
+	return h;
 }
 
 
@@ -364,9 +358,9 @@ static int main_rpcline(int c, char *v[])
 		ni = ni*ni;
 		double z = hrange[0] + ni * (hrange[1] - hrange[0]);
 		double r[2], rr[2];
-		fprintf(stderr, "(%g %g %g) =>\t", ix, iy, z);
+		//fprintf(stderr, "(%g %g %g) =>\t", ix, iy, z);
 		eval_rpc(r, rpca, x, y, z);
-		fprintf(stderr, "(%.10g %.10g) =>\t", r[0], r[1]);
+		//fprintf(stderr, "(%.10g %.10g) =>\t", r[0], r[1]);
 		eval_rpci(rr, rpcb, r[0], r[1], z);
 		double ox = rr[0] - offset_b[0];
 		double oy = rr[1] - offset_b[1];
@@ -374,8 +368,30 @@ static int main_rpcline(int c, char *v[])
 		//fprintf(stderr, "\tr[1] = %g\n", r[1]);
 		//fprintf(stderr, "\trr[0] = %g\n", rr[0]);
 		//fprintf(stderr, "\trr[1] = %g\n", rr[1]);
-		fprintf(stderr, "(%.20g %.20g)\n", ox, oy);
+		//fprintf(stderr, "(%.20g %.20g)\n", ox, oy);
+		fprintf(stdout, "%.20g %.20g\n", ox, oy);
 	}
+	return 0;
+}
+
+static int main_rpcpair(int c, char *v[])
+{
+	if (c != 6) {
+		fprintf(stderr, "usage:\n\t%s rpca rpcb x y h\n", *v);
+		//                          0 1    2    3 4 5
+		return EXIT_FAILURE;
+	}
+	char *filename_rpca = v[1];
+	char *filename_rpcb = v[2];
+	double x[3] = {atof(v[3]), atof(v[4]), atof(v[5])}, y[2];
+
+	struct rpc a[1]; read_rpc_file_xml(a, filename_rpca);
+	struct rpc b[1]; read_rpc_file_xml(b, filename_rpcb);
+
+	eval_rpc_pair(y, a, b, x[0], x[1], x[2]);
+
+	printf("%.20g %.20g\n", y[0], y[1]);
+
 	return 0;
 }
 
@@ -384,6 +400,7 @@ int main(int c, char *v[])
 {
 	//return main_trial(c, v);
 	//return main_trial2(c, v);
-	return main_rpcline(c, v);
+	//return main_rpcline(c, v);
+	return main_rpcpair(c, v);
 }
 #endif
