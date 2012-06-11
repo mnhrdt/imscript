@@ -190,108 +190,82 @@ int ransac(
 
 
 
-// INPUT EXAMPLES
-
-// 1. straight lines
-// 	datadim = 2 (coordinates of each point)
-// 	modeldim = 3 (coefficients of straight line)
-// 	nfit = 2 (number of points that determine a straight line)
-
-// instance of "ransac_error_evaluation_function"
-float distance_of_point_to_straight_line(float *line, float *point, void *usr)
-{
-	float n = hypot(line[0], line[1]);
-	float a = line[0]/n;
-	float b = line[1]/n;
-	float c = line[2]/n;
-	float x = point[0];
-	float y = point[1];
-	float e = a*x + b*y + c;
-	return fabs(e);
-}
-
-
-// instance of "ransac_model_generating_function"
-void straight_line_through_two_points(float *line, float *points, void *usr)
-{
-	float ax = points[0];
-	float ay = points[1];
-	float bx = points[2];
-	float by = points[3];
-	float n = hypot(bx - ax, by - ay);
-	float dx = -(by - ay)/n;
-	float dy = (bx - ax)/n;
-	line[0] = dx;
-	line[1] = dy;
-	line[2] = -(dx*ax + dy*ay);
-
-	// assert that the line goes through the two points
-	float e1 = distance_of_point_to_straight_line(line, points, NULL);
-	float e2 = distance_of_point_to_straight_line(line, points+2, NULL);
-	assert(hypot(e1, e2) < 0.001);
-}
-
-
-
 #ifndef OMIT_MAIN
 
 #include <stdio.h>
+#include <string.h>
 
-// utility function: parse floats from a text file
-// returns a pointer to a malloc'ed array of the parsed floats
-// fills *no with the number of floats
-static float *read_ascii_floats(FILE *f, int *no)
-{
-	int r, n = 0, nt = 0;
-	float *t = NULL;
-	while(1) {
-		if (n >= nt)
-		{
-			nt = 2 * (nt + 1);
-			t = xrealloc(t, nt * sizeof * t);
-		}
-		r = fscanf(f, "%f", t+n);
-		if (r != 1)
-			break;
-		n += 1;
-	}
-	*no = n;
-	return t;
-}
+#include "ransac_cases.c" // example functions for RANSAC input
+#include "parsenumbers.c" // function "read_ascii_floats"
 
-// find a straight line on a set of points
-int main(int c, char *v[])
+int main_cases(int c, char *v[])
 {
-	if (c != 4) {
+	if (c != 5) {
 		fprintf(stderr, "usage:\n\t"
-				"%s ntrials maxerr minliers <points\n", *v);
-		//                0 1       2      3
+			"%s {line,aff} ntrials maxerr minliers <data\n", *v);
+		//        0 1          2       3      4
 		return EXIT_FAILURE;
 	}
-	int ntrials = atoi(v[1]);
-	float maxerr = atof(v[2]);
-	int minliers = atoi(v[3]);
 
+	// parse input options
+	char *model_id = v[1];
+	int ntrials = atoi(v[2]);
+	float maxerr = atof(v[3]);
+	int minliers = atoi(v[4]);
+
+	// declare context variables
+	int modeldim, datadim, nfit;
+	ransac_error_evaluation_function *mev;
+	ransac_model_generating_function *mgen;
+	ransac_model_accepting_function *macc = NULL;
+
+
+	// fill context variables according to ransac case
+	if (0 == strcmp(model_id, "line")) {
+		datadim = 2;
+		modeldim = 3;
+		nfit = 2;
+		mev = distance_of_point_to_straight_line;
+		mgen = straight_line_through_two_points;
+
+	} else if (0 == strcmp(model_id, "aff")) {
+		datadim = 4;
+		modeldim = 6;
+		nfit = 3;
+		mev = affine_match_error;
+		mgen = affine_map_from_three_pairs;
+
+	} else {
+		printf("unrecognized model \"%s\"\n", model_id);
+		return EXIT_FAILURE;
+	}
+
+	// read input data
 	int n;
-	float *t = read_ascii_floats(stdin, &n);
-	n /= 2;
-	fprintf(stderr, "got %d input points\n", n);
+	float *data = read_ascii_floats(stdin, &n);
+	n /= datadim;
 
-	float line[3];
+	// call the ransac function to fit a model to data
+	float model[modeldim];
 	bool *mask = xmalloc(n * sizeof*mask);
-	int n_inliers = ransac(mask, line, t, 2, n, 3,
-			distance_of_point_to_straight_line,
-			straight_line_through_two_points,
-			2, ntrials, minliers, maxerr, NULL, NULL);
+	int n_inliers = ransac(mask, model, data, datadim, n, modeldim,
+			mev, mgen, nfit, ntrials, minliers, maxerr, NULL, NULL);
 
-	if (n_inliers > 0)
-		fprintf(stderr,
-			"RANSAC found line [%g %g %g] with %d inliers\n",
-			line[0], line [1], line[2], n_inliers);
-	else
-		fprintf(stderr, "RANSAC found no model\n");
 
+	// print a summary of the results
+	if (n_inliers > 0) {
+		printf("RANSAC found a model with %d inliers\n", n_inliers);
+		printf("parameters = [ ");
+		for (int i = 0; i < modeldim; i++)
+			printf("%g ", model[i]);
+		printf("]\n");
+	} else printf("RANSAC found no model\n");
 
 	return EXIT_SUCCESS;
+}
+
+int main(int c, char *v[])
+{
+	return main_cases(c, v);
 }
 #endif//OMIT_MAIN
