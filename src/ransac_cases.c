@@ -106,6 +106,7 @@ static void apply_matrix6(double y[6], double A[6][6], double x[6])
 //
 // A[] = {p, q, a, r, s, b}
 //
+static
 double find_affinity(double *A, double *x, double *y, double *xp, double *yp)
 {
 	double caca = y[1]*x[0] + y[2]*x[1] + x[2]*y[0]
@@ -140,6 +141,23 @@ void affine_map_from_three_pairs(float *aff, float *pairs, void *usr)
 	double r = find_affinity(A, x, y, xp, yp);
 	for (int i = 0; i < 6; i++)
 		aff[i] = A[i];
+}
+
+// instance of "ransac_model_accepting_function"
+bool affine_map_is_reasonable(float *aff, void *usr)
+{
+	float a = aff[0];
+	float b = aff[1];
+	float c = aff[3];
+	float d = aff[4];
+	float det = a*d - b*c;
+	if (det < 0) return false;
+	if (fabs(det) > 100) return false;
+	if (fabs(det) < 0.01) return false;
+	double n = a*a + b*b + c*c + d*d;
+	if (n > 10) return false;
+	if (n < 0.1) return false;
+	return true;
 }
 
 

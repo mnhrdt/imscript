@@ -94,6 +94,7 @@ static bool are_different(int *t, int n)
 // generate a set of n different ints between a and b
 static void fill_random_indices(int *idx, int n, int a, int b)
 {
+	// TODO fisher yates shuffle and traverse it by blocks of length nfit
 	int safecount = 0;
 	do {
 		for (int i = 0; i < n; i++)
@@ -150,7 +151,6 @@ int ransac(
 	for (int i = 0; i < ntrials; i++)
 	{
 		int indices[nfit];
-		// TODO fisher yates shuffle and traverse it by blocks of nfit
 		fill_random_indices(indices, nfit, 0, n);
 
 		float x[nfit*datadim];
@@ -201,9 +201,10 @@ int ransac(
 int main_cases(int c, char *v[])
 {
 	if (c != 5) {
-		fprintf(stderr, "usage:\n\t"
-			"%s {line,aff} ntrials maxerr minliers <data\n", *v);
-		//        0 1          2       3      4
+		fprintf(stderr, "usage:\n\t%s {line,aff,affn} "
+		//                         0   1
+			"ntrials maxerr minliers <data\n", *v);
+		//       2       3      4
 		return EXIT_FAILURE;
 	}
 
@@ -215,9 +216,10 @@ int main_cases(int c, char *v[])
 
 	// declare context variables
 	int modeldim, datadim, nfit;
-	ransac_error_evaluation_function *mev;
-	ransac_model_generating_function *mgen;
-	ransac_model_accepting_function *macc = NULL;
+	ransac_error_evaluation_function *model_evaluation;
+	ransac_model_generating_function *model_generation;
+	ransac_model_accepting_function *model_acceptation = NULL;
+	void *user_data = NULL;
 
 
 	// fill context variables according to ransac case
@@ -225,15 +227,23 @@ int main_cases(int c, char *v[])
 		datadim = 2;
 		modeldim = 3;
 		nfit = 2;
-		mev = distance_of_point_to_straight_line;
-		mgen = straight_line_through_two_points;
+		model_evaluation = distance_of_point_to_straight_line;
+		model_generation = straight_line_through_two_points;
 
 	} else if (0 == strcmp(model_id, "aff")) {
 		datadim = 4;
 		modeldim = 6;
 		nfit = 3;
-		mev = affine_match_error;
-		mgen = affine_map_from_three_pairs;
+		model_evaluation = affine_match_error;
+		model_generation = affine_map_from_three_pairs;
+
+	} else if (0 == strcmp(model_id, "affn")) {
+		datadim = 4;
+		modeldim = 6;
+		nfit = 3;
+		model_evaluation = affine_match_error;
+		model_generation = affine_map_from_three_pairs;
+		model_acceptation = affine_map_is_reasonable;
 
 	} else {
 		printf("unrecognized model \"%s\"\n", model_id);
@@ -249,7 +259,9 @@ int main_cases(int c, char *v[])
 	float model[modeldim];
 	bool *mask = xmalloc(n * sizeof*mask);
 	int n_inliers = ransac(mask, model, data, datadim, n, modeldim,
-			mev, mgen, nfit, ntrials, minliers, maxerr, NULL, NULL);
+			model_evaluation, model_generation,
+			nfit, ntrials, minliers, maxerr,
+			model_acceptation, user_data);
 
 
 	// print a summary of the results
