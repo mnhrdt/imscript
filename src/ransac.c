@@ -245,6 +245,24 @@ int main_cases(int c, char *v[])
 		model_generation = affine_map_from_three_pairs;
 		model_acceptation = affine_map_is_reasonable;
 
+	} else if (0 == strcmp(model_id, "hom")) {
+		datadim = 4;
+		modeldim = 9;
+		nfit = 4;
+		fail("not yet implemented");
+		//model_evaluation = homographic_match_error;
+		//model_generation = homography_from_four;
+		//model_acceptation = homography_is_reasonable;
+
+	} else if (0 == strcmp(model_id, "fm")) { // fundamental matrix
+		datadim = 4;
+		modeldim = 9;
+		nfit = 8;
+		fail("not yet implemented");
+		//model_evaluation = fundamental_matrix_match_error;
+		//model_generation = eight_point_algorithm;
+		//model_acceptation = fundamental_matrix_is_reasonable;
+
 	} else {
 		printf("unrecognized model \"%s\"\n", model_id);
 		return EXIT_FAILURE;
