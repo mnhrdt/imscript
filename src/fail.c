@@ -2,6 +2,7 @@
 #define _FAIL_C
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #ifdef __linux
 #  include <sys/types.h>
