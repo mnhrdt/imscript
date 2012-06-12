@@ -178,10 +178,12 @@ int ransac(
 
 	if (best_ninliers >= min_inliers)
 	{
-		for(int j = 0; j < modeldim; j++)
-			out_model[j] = best_model[j];
-		for(int j = 0; j < n; j++)
-			out_mask[j] = best_mask[j];
+		if (out_model)
+			for(int j = 0; j < modeldim; j++)
+				out_model[j] = best_model[j];
+		if (out_mask)
+			for(int j = 0; j < n; j++)
+				out_mask[j] = best_mask[j];
 		return best_ninliers;
 	} else
 		return 0;
@@ -201,7 +203,7 @@ int ransac(
 int main_cases(int c, char *v[])
 {
 	if (c != 5) {
-		fprintf(stderr, "usage:\n\t%s {line,aff,affn} "
+		fprintf(stderr, "usage:\n\t%s {line,aff,affn,fm} "
 		//                         0   1
 			"ntrials maxerr minliers <data\n", *v);
 		//       2       3      4
@@ -257,10 +259,9 @@ int main_cases(int c, char *v[])
 	} else if (0 == strcmp(model_id, "fm")) { // fundamental matrix
 		datadim = 4;
 		modeldim = 9;
-		nfit = 8;
-		fail("not yet implemented");
-		//model_evaluation = fundamental_matrix_match_error;
-		//model_generation = eight_point_algorithm;
+		nfit = 7;
+		model_evaluation = epipolar_algebraic_error;
+		model_generation = seven_point_algorithm;
 		//model_acceptation = fundamental_matrix_is_reasonable;
 
 	} else {
@@ -285,10 +286,10 @@ int main_cases(int c, char *v[])
 	// print a summary of the results
 	if (n_inliers > 0) {
 		printf("RANSAC found a model with %d inliers\n", n_inliers);
-		printf("parameters = [ ");
+		printf("parameters =");
 		for (int i = 0; i < modeldim; i++)
-			printf("%g ", model[i]);
-		printf("]\n");
+			printf(" %g", model[i]);
+		printf("\n");
 	} else printf("RANSAC found no model\n");
 
 	return EXIT_SUCCESS;
