@@ -226,3 +226,46 @@ static float epipolar_algebraic_error(float *fm, float *pair, void *usr)
 	float qfp = q[0]*fp[0] + q[1]*fp[1] + q[2]*fp[2];
 	return fabs(qfp);
 }
+
+int find_fundamental_matrix_by_ransac(bool *out_mask, float out_fm[9],
+		float *pairs, int npairs,
+		int ntrials, float max_err)
+{
+	// compute input statistics
+	double pmean[4] = {0, 0, 0, 0}, pdev[4] = {0, 0, 0, 0};
+	for (int i = 0; i < npairs; i++)
+	for (int j = 0; j < 4; j++)
+		pmean[j] += (pairs[4*i+j])/npairs;
+	for (int i = 0; i < npairs; i++)
+	for (int j = 0; j < 4; j++)
+		pdev[j] += (fabs(pairs[4*i+j]-pmean[j]))/npairs;
+
+	// normalize input
+	float *pairsn = xmalloc(4*npairs*sizeof*pairsn);
+	for (int i = 0; i < npairs; i++)
+	for (int j = 0; j < 4; j++)
+		pairsn[4*i+j] = (pairs[4*i+j]-pmean[j])/pdev[j];
+
+	// set up algorithm context
+	int datadim = 4;
+	int modeldim = 9;
+	int nfit = 7;
+	ransac_error_evaluation_function *f_err = epipolar_algebraic_error;
+	ransac_model_generating_function *f_gen = seven_point_algorithm;
+	ransac_model_accepting_function  *f_acc = NULL;
+
+	// run algorithm on normalized data
+	float nfm[9];
+	int n_inliers = ransac(out_mask, nfm,
+			pairsn, datadim, npairs, modeldim,
+			f_err, f_gen, nfit, ntrials, nfit+1, max_err,
+			f_acc, NULL);
+
+	// un-normalize result
+	// TODO write code that copies nfm to fm, un-normalizing appropriately
+	for (int i = 0; i < 9; i++)
+		out_fm[i] = nfm[i];
+
+	free(pairsn);
+	return n_inliers;
+}
