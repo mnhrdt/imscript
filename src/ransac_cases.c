@@ -186,3 +186,43 @@ int find_affinity_by_ransac(bool *out_mask, float affinity[6],
 //
 //
 // TODO: homograpy, fundamental matrix
+
+// ************************************
+// ************************************
+// ************************************
+// ************************************
+//
+// 4. fundamental matrices
+// 	datadim = 4 (coordinates of each pair)
+// 	modeldim = 9 (fundamental matrix)
+// 	nfit = 7 (seven-point algorithm)
+
+#include "moistiv_epipolar.c"
+void seven_point_algorithm(float *fm, float *p, void *usr)
+{
+	int k[7] = {0, 1, 2, 3, 4, 5, 6};
+	float m1[14] = {p[0],p[1], p[4],p[5], p[8],p[9],   p[12],p[13],
+		          p[16],p[17], p[20],p[21], p[24],p[25] };
+	float m2[14] = {p[2],p[3], p[6],p[7], p[10],p[11], p[14],p[15],
+		          p[18],p[19], p[22],p[23], p[26],p[27] };
+	float z[3], F1[4][4], F2[4][4];
+	// this is so braindead it's not funny
+	int r = moistiv_epipolar(m1, m2, k, z, F1, F2);
+	int ridx = 0;
+	if (r == 3) ridx = random_index(0, 3);
+	for (int i = 1; i <= 3; i++)
+	for (int j = 1; j <= 3; j++)
+		*fm++ = F1[i][j] + z[ridx]*F2[i][j];
+}
+
+// instance of "ransac_error_evaluation_function"
+static float epipolar_algebraic_error(float *fm, float *pair, void *usr)
+{
+	float p[3] = {pair[0], pair[1], 1};
+	float q[3] = {pair[2], pair[3], 1};
+	float fp[3] = {fm[0]*p[0] + fm[1]*p[1] + fm[2],
+		       fm[3]*p[0] + fm[4]*p[1] + fm[5],
+		       fm[6]*p[0] + fm[7]*p[1] + fm[8]};
+	float qfp = q[0]*fp[0] + q[1]*fp[1] + q[2]*fp[2];
+	return fabs(qfp);
+}

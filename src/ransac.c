@@ -203,7 +203,7 @@ int ransac(
 int main_cases(int c, char *v[])
 {
 	if (c != 5) {
-		fprintf(stderr, "usage:\n\t%s {line,aff,affn} "
+		fprintf(stderr, "usage:\n\t%s {line,aff,affn,fm} "
 		//                         0   1
 			"ntrials maxerr minliers <data\n", *v);
 		//       2       3      4
@@ -259,10 +259,9 @@ int main_cases(int c, char *v[])
 	} else if (0 == strcmp(model_id, "fm")) { // fundamental matrix
 		datadim = 4;
 		modeldim = 9;
-		nfit = 8;
-		fail("not yet implemented");
-		//model_evaluation = fundamental_matrix_match_error;
-		//model_generation = eight_point_algorithm;
+		nfit = 7;
+		model_evaluation = epipolar_algebraic_error;
+		model_generation = seven_point_algorithm;
 		//model_acceptation = fundamental_matrix_is_reasonable;
 
 	} else {
