@@ -202,11 +202,11 @@ int ransac(
 
 int main_cases(int c, char *v[])
 {
-	if (c != 5) {
+	if (c < 5) {
 		fprintf(stderr, "usage:\n\t%s {line,aff,affn,fm} "
 		//                         0   1
-			"ntrials maxerr minliers <data\n", *v);
-		//       2       3      4
+			"ntrials maxerr minliers [inliers] <data\n", *v);
+		//       2       3      4       5
 		return EXIT_FAILURE;
 	}
 
@@ -215,6 +215,7 @@ int main_cases(int c, char *v[])
 	int ntrials = atoi(v[2]);
 	float maxerr = atof(v[3]);
 	int minliers = atoi(v[4]);
+   FILE *inliers = c>=5? fopen(v[5],"w"):NULL;
 
 	// declare context variables
 	int modeldim, datadim, nfit;
@@ -289,8 +290,20 @@ int main_cases(int c, char *v[])
 		printf("parameters =");
 		for (int i = 0; i < modeldim; i++)
 			printf(" %g", model[i]);
-		printf("\n");
+      printf("\n");
+      // if the file is provided print the inliers
+      if (inliers) {
+         for(int i = 0; i < n; i++){
+            if( mask[i] ) {
+               for(int d = 0; d < datadim; d++)
+                  fprintf(inliers,"%g ",data[i*datadim+d]);
+               fprintf(inliers,"\n");
+            }
+         }
+      }
 	} else printf("RANSAC found no model\n");
+
+   if (inliers) fclose(inliers);
 
 	return EXIT_SUCCESS;
 }
