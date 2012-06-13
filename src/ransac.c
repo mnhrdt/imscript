@@ -104,10 +104,10 @@ static void fill_random_indices(int *idx, int n, int a, int b)
 	} while (safecount < 100 && !are_different(idx, n));
 	if (safecount == 100)
 		fail("could not generate any model");
-	fprintf(stderr, "fri");
-	for (int i = 0; i < n; i++)
-		fprintf(stderr, "\t%d", idx[i]);
-	fprintf(stderr, "\n");
+	//fprintf(stderr, "fri");
+	//for (int i = 0; i < n; i++)
+	//	fprintf(stderr, "\t%d", idx[i]);
+	//fprintf(stderr, "\n");
 }
 
 
@@ -190,6 +190,31 @@ int ransac(
 		}
 	}
 
+	fprintf(stderr, "RANSAC found this best model:");
+	for (int i = 0; i < modeldim; i++)
+		fprintf(stderr, " %g\n", best_model[i]);
+	fprintf(stderr, "\n");
+	//fprintf(stderr, "errors of outliers:");
+	//for (int i = 0; i < n; i++)
+	//	if (!best_mask[i]) {
+	//		float e = mev(best_model, data+i*datadim, usr);
+	//		fprintf(stderr, " %g", e);
+	//	}
+	//fprintf(stderr, "\n");
+	//fprintf(stderr, "errors of inliers:");
+	//for (int i = 0; i < n; i++)
+	//	if (best_mask[i]) {
+	//		float e = mev(best_model, data+i*datadim, usr);
+	//		fprintf(stderr, " %g", e);
+	//	}
+	//fprintf(stderr, "\n");
+	fprintf(stderr, "errors of data points:\n");
+	for (int i = 0; i < n; i++) {
+		float e = mev(best_model, data+i*datadim, usr);
+		fprintf(stderr, "\t%g\t%s\n", e, best_mask[i]?"GOOD":"bad");
+	}
+
+	int return_value = 0;
 	if (best_ninliers >= min_inliers)
 	{
 		if (out_model)
@@ -198,9 +223,12 @@ int ransac(
 		if (out_mask)
 			for(int j = 0; j < n; j++)
 				out_mask[j] = best_mask[j];
-		return best_ninliers;
+		return_value =  best_ninliers;
 	} else
-		return 0;
+		return_value = 0;
+
+
+	return return_value;
 }
 
 #ifndef OMIT_MAIN
@@ -351,11 +379,17 @@ int main_hack_fundamental_matrix(int c, char *v[])
 
 	// print a summary of the results
 	if (n_inliers > 0) {
-		printf("RANSAC found a model with %d inliers\n", n_inliers);
+		printf("RANSAC found a nmodel with %d inliers\n", n_inliers);
 		printf("parameters =");
 		for (int i = 0; i < modeldim; i++)
 			printf(" %g", model[i]);
 		printf("\n");
+		fprintf(stderr, "errors of data points:\n");
+		ransac_error_evaluation_function *ep = epipolar_algebraic_error;
+		for (int i = 0; i < n; i++) {
+			float e = ep(model, data+i*datadim, NULL);
+			fprintf(stderr, "\t%g\t%s\n", e, mask[i]?"GOOD":"bad");
+		}
 	} else printf("RANSAC found no model\n");
 
 	// if needed, print the inliers

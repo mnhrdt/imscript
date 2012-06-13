@@ -32,7 +32,7 @@ static FILE *xfopen(const char *s, const char *p)
 
 static void xfclose(FILE *f)
 {
-	if (f != stdout && f != stdin) {
+	if (f != stdout && f != stdin && f != stderr) {
 		int r = fclose(f);
 		if (r) fail("fclose error \"%s\"", "");//strerror(errno));
 	}
