@@ -4,6 +4,7 @@
 
 #include "fail.c"
 #include "xmalloc.c"
+#include "xfopen.c"
 
 // generic function
 // evaluate the error of a datapoint according to a model
@@ -100,9 +101,13 @@ static void fill_random_indices(int *idx, int n, int a, int b)
 		for (int i = 0; i < n; i++)
 			idx[i] = random_index(a, b);
 		safecount += 1;
-	} while (safecount < 10 && !are_different(idx, n));
-	if (safecount == 10)
+	} while (safecount < 100 && !are_different(idx, n));
+	if (safecount == 100)
 		fail("could not generate any model");
+	fprintf(stderr, "fri");
+	for (int i = 0; i < n; i++)
+		fprintf(stderr, "\t%d", idx[i]);
+	fprintf(stderr, "\n");
 }
 
 
@@ -143,6 +148,15 @@ int ransac(
 		void *usr
 		)
 {
+	fprintf(stderr, "running RANSAC over %d datapoints of dimension %d\n",
+			n, datadim);
+	fprintf(stderr, "will try to find a model of size %d from %d points\n",
+		       	modeldim, nfit);
+	fprintf(stderr, "we will make %d trials and keep the best with e<%g\n",
+			ntrials, max_error);
+	fprintf(stderr, "a model must have more than %d inliers\n",
+			min_inliers);
+
 	int best_ninliers = 0;
 	float best_model[modeldim];
 	bool *best_mask = xmalloc(n * sizeof*best_mask);
@@ -189,9 +203,6 @@ int ransac(
 		return 0;
 }
 
-
-
-
 #ifndef OMIT_MAIN
 
 #include <stdio.h>
@@ -215,7 +226,7 @@ int main_cases(int c, char *v[])
 	int ntrials = atoi(v[2]);
 	float maxerr = atof(v[3]);
 	int minliers = atoi(v[4]);
-   FILE *inliers = c>=5? fopen(v[5],"w"):NULL;
+	char *inliers_filename = v[5];
 
 	// declare context variables
 	int modeldim, datadim, nfit;
@@ -265,6 +276,9 @@ int main_cases(int c, char *v[])
 		model_generation = seven_point_algorithm;
 		//model_acceptation = fundamental_matrix_is_reasonable;
 
+	} else if (0 == strcmp(model_id, "fmn")) { // fundamental matrix
+		int main_hack_fundamental_matrix(int,char*[]);
+		return main_hack_fundamental_matrix(c-1, v+1);
 	} else {
 		printf("unrecognized model \"%s\"\n", model_id);
 		return EXIT_FAILURE;
@@ -290,23 +304,76 @@ int main_cases(int c, char *v[])
 		printf("parameters =");
 		for (int i = 0; i < modeldim; i++)
 			printf(" %g", model[i]);
-      printf("\n");
-      // if the file is provided print the inliers
-      if (inliers) {
-         for(int i = 0; i < n; i++){
-            if( mask[i] ) {
-               for(int d = 0; d < datadim; d++)
-                  fprintf(inliers,"%g ",data[i*datadim+d]);
-               fprintf(inliers,"\n");
-            }
-         }
-      }
+		printf("\n");
 	} else printf("RANSAC found no model\n");
 
-   if (inliers) fclose(inliers);
+	// if needed, print the inliers
+	if (inliers_filename) {
+		FILE *f = xfopen(inliers_filename, "w");
+		for (int i = 0; i < n; i++)
+			if (mask[i]) {
+				for(int d = 0; d < datadim; d++)
+					fprintf(f,"%g ",data[i*datadim+d]);
+				fprintf(f,"\n");
+			}
+		xfclose(f);
+	}
 
 	return EXIT_SUCCESS;
 }
+
+int main_hack_fundamental_matrix(int c, char *v[])
+{
+	if (c < 4) {
+		fprintf(stderr, "usage:\n\t%s fmn "
+		//                         -1   0
+			"ntrials maxerr minliers [inliers] <data\n", *v);
+		//       1       2      3        4
+		return EXIT_FAILURE;
+	}
+	int ntrials = atoi(v[1]);
+	float maxerr = atof(v[2]);
+	int minliers = atoi(v[3]);
+	char *inliers_filename = v[4];
+
+	fprintf(stderr, "WARNING: ignoring parameter minliers=%d\n", minliers);
+
+	int datadim = 4;
+	int modeldim = 9;
+	int n;
+	float *data = read_ascii_floats(stdin, &n);
+	n /= datadim;
+
+	float model[modeldim];
+	bool *mask = xmalloc(n * sizeof*mask);
+	int n_inliers = find_fundamental_matrix_by_ransac(mask, model,
+			data, n, ntrials, maxerr);
+
+	// print a summary of the results
+	if (n_inliers > 0) {
+		printf("RANSAC found a model with %d inliers\n", n_inliers);
+		printf("parameters =");
+		for (int i = 0; i < modeldim; i++)
+			printf(" %g", model[i]);
+		printf("\n");
+	} else printf("RANSAC found no model\n");
+
+	// if needed, print the inliers
+	if (inliers_filename) {
+		FILE *f = xfopen(inliers_filename, "w");
+		for (int i = 0; i < n; i++)
+			if (mask[i]) {
+				for(int d = 0; d < datadim; d++)
+					fprintf(f,"%g ",data[i*datadim+d]);
+				fprintf(f,"\n");
+			}
+		xfclose(f);
+	}
+
+	return EXIT_SUCCESS;
+}
+
+
 
 int main(int c, char *v[])
 {

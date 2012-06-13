@@ -227,6 +227,21 @@ static float epipolar_algebraic_error(float *fm, float *pair, void *usr)
 	return fabs(qfp);
 }
 
+static float mprod33(float *ab_out, float *a_in, float *b_in)
+{
+	float (*about)[3] = (void*)ab_out;
+	float (*a)[3] = (void*)a_in;
+	float (*b)[3] = (void*)b_in;
+	float ab[3][3] = {0};
+	for (int i = 0; i < 3; i++)
+	for (int j = 0; j < 3; j++)
+		for (int k = 0; k < 3; k++)
+			ab[i][j] += a[i][k] * b[k][j];
+	for (int i = 0; i < 3; i++)
+	for (int j = 0; j < 3; j++)
+		about[i][j] = ab[i][j];
+}
+
 int find_fundamental_matrix_by_ransac(bool *out_mask, float out_fm[9],
 		float *pairs, int npairs,
 		int ntrials, float max_err)
@@ -240,11 +255,24 @@ int find_fundamental_matrix_by_ransac(bool *out_mask, float out_fm[9],
 	for (int j = 0; j < 4; j++)
 		pdev[j] += (fabs(pairs[4*i+j]-pmean[j]))/npairs;
 
+	fprintf(stderr, "pmean = %g %g %g %g\n",
+			pmean[0], pmean[1], pmean[2], pmean[3]);
+	fprintf(stderr, "pdev = %g %g %g %g\n",
+			pdev[0], pdev[1], pdev[2], pdev[3]);
+
 	// normalize input
 	float *pairsn = xmalloc(4*npairs*sizeof*pairsn);
 	for (int i = 0; i < npairs; i++)
 	for (int j = 0; j < 4; j++)
 		pairsn[4*i+j] = (pairs[4*i+j]-pmean[j])/pdev[j];
+
+	for (int i = 0; i < npairs; i++)
+	for (int j = 0; j < 4; j++)
+		fprintf(stderr, "%g %g %g %g\n",
+				pairsn[4*i+0],
+				pairsn[4*i+1],
+				pairsn[4*i+2],
+				pairsn[4*i+3]);
 
 	// set up algorithm context
 	int datadim = 4;
@@ -255,16 +283,21 @@ int find_fundamental_matrix_by_ransac(bool *out_mask, float out_fm[9],
 	ransac_model_accepting_function  *f_acc = NULL;
 
 	// run algorithm on normalized data
-	float nfm[9];
+	float nfm[9], tmp[9];
 	int n_inliers = ransac(out_mask, nfm,
 			pairsn, datadim, npairs, modeldim,
 			f_err, f_gen, nfit, ntrials, nfit+1, max_err,
 			f_acc, NULL);
 
 	// un-normalize result
-	// TODO write code that copies nfm to fm, un-normalizing appropriately
-	for (int i = 0; i < 9; i++)
-		out_fm[i] = nfm[i];
+	float Atrans[9] = {1/pdev[0], 0, 0,
+		           0, 1/pdev[1], 0,
+			   -pmean[0]/pdev[0], -pmean[1]/pdev[1], 1};
+	float B[9] = {1/pdev[2], 0, -pmean[2]/pdev[2],
+		      0, 1/pdev[3], -pmean[3]/pdev[3],
+		      0, 0, 1};
+	mprod33(tmp, nfm, B);
+	mprod33(out_fm, Atrans, tmp);
 
 	free(pairsn);
 	return n_inliers;
