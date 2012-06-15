@@ -17,7 +17,8 @@ typedef float (ransac_error_evaluation_function)(
 
 // generic function
 // compute the model defined from a few data points
-typedef void (ransac_model_generating_function)(
+// (shall return 0 if no model could be computed)
+typedef int (ransac_model_generating_function)(
 		float *out_model,  // parameters of the computed model
 		float *data,       // data points
 		void *usr
@@ -92,9 +93,65 @@ static bool are_different(int *t, int n)
 	return true;
 }
 
+static int randombounds(int a, int b)
+{
+	if (b < a)
+		fail("the interval [%d, %d] is empty!", a, b);
+	if (b == a)
+		return b;
+	return a + rand()%(b - a + 1);
+}
+
+
+
+
+
+static void swap(void *a, void *b, size_t s)
+{
+#if 0
+#error "memcpy is way slower!"
+	char t[s];
+	memcpy(t, a, s);
+	memcpy(a, b, s);
+	memcpy(b, t, s);
+#else
+	char *x = a;
+	char *y = b;
+	for (unsigned int i = 0; i < s; i++, x++, y++)
+	{
+		char t = *x;
+		*x = *y;
+		*y = t;
+	}
+#endif
+}
+
+void shuffle(void *t, int n, size_t s)
+{
+	char *c = t;
+
+	for (int i = 0; i < n-1; i++)
+		swap(c + s*i, c + s*randombounds(i, n-1), s);
+}
+
+static void fill_random_shuffle(int *idx, int n, int a, int b)
+{
+	int m = b - a;
+	assert(n > 0);
+	assert(m > 0);
+	assert(m >= n);
+	int t[m];
+	for (int i = a; i < b; i++)
+		t[i] = i;
+	shuffle(t, m, sizeof*t);
+	for (int i = 0; i < n; i++)
+		idx[i] = t[i];
+}
+
 // generate a set of n different ints between a and b
 static void fill_random_indices(int *idx, int n, int a, int b)
 {
+	if (5*n > (b-a)) {fill_random_shuffle(idx, n, a, b);return;}
 	// TODO fisher yates shuffle and traverse it by blocks of length nfit
 	int safecount = 0;
 	do {
@@ -109,6 +166,8 @@ static void fill_random_indices(int *idx, int n, int a, int b)
 	//	fprintf(stderr, "\t%d", idx[i]);
 	//fprintf(stderr, "\n");
 }
+
+#define MAX_MODELS 10
 
 
 // RANSAC
@@ -172,8 +231,10 @@ int ransac(
 		for (int k = 0; k < datadim; k++)
 			x[datadim*j + k] = data[datadim*indices[j] + k];
 
-		float model[modeldim];
-		mgen(model, x, usr);
+		float model[modeldim*MAX_MODELS];
+		int nm = mgen(model, x, usr);
+		if (!nm)
+			continue;
 		if (macc && !macc(model, usr))
 			continue;
 
@@ -217,16 +278,19 @@ int ransac(
 	int return_value = 0;
 	if (best_ninliers >= min_inliers)
 	{
-		if (out_model)
-			for(int j = 0; j < modeldim; j++)
-				out_model[j] = best_model[j];
-		if (out_mask)
-			for(int j = 0; j < n; j++)
-				out_mask[j] = best_mask[j];
 		return_value =  best_ninliers;
 	} else
 		return_value = 0;
 
+	if (out_model)
+		for(int j = 0; j < modeldim; j++)
+			out_model[j] = best_model[j];
+	if (out_mask)
+		for(int j = 0; j < n; j++)
+			out_mask[j] = best_mask[j];
+
+	free(best_mask);
+	free(tmp_mask);
 
 	return return_value;
 }
@@ -300,7 +364,7 @@ int main_cases(int c, char *v[])
 		datadim = 4;
 		modeldim = 9;
 		nfit = 7;
-		model_evaluation = epipolar_algebraic_error;
+		model_evaluation = epipolar_error;
 		model_generation = seven_point_algorithm;
 		//model_acceptation = fundamental_matrix_is_reasonable;
 
@@ -374,6 +438,7 @@ int main_hack_fundamental_matrix(int c, char *v[])
 
 	float model[modeldim];
 	bool *mask = xmalloc(n * sizeof*mask);
+	for (int i = 0; i < n; i++) mask[i] = false;
 	int n_inliers = find_fundamental_matrix_by_ransac(mask, model,
 			data, n, ntrials, maxerr);
 
@@ -385,12 +450,29 @@ int main_hack_fundamental_matrix(int c, char *v[])
 			printf(" %g", model[i]);
 		printf("\n");
 		fprintf(stderr, "errors of data points:\n");
-		ransac_error_evaluation_function *ep = epipolar_algebraic_error;
+		ransac_error_evaluation_function *ep = epipolar_error;
 		for (int i = 0; i < n; i++) {
 			float e = ep(model, data+i*datadim, NULL);
 			fprintf(stderr, "\t%g\t%s\n", e, mask[i]?"GOOD":"bad");
 		}
 	} else printf("RANSAC found no model\n");
+
+#if 0
+	float gamod[9] = {2.8709e-09,  -4.3669e-08,   1.0966e-02,
+   4.0071e-08,   3.6767e-10,   3.4892e-03,
+  -1.2060e-02,  -4.3969e-03,   1.0000e+00};
+	printf("as a comparison, use a fixed model:");
+	printf("parameters =");
+	for (int i = 0; i < modeldim; i++)
+		printf(" %g", gamod[i]);
+	printf("\n");
+	fprintf(stderr, "errors of data points:\n");
+	ransac_error_evaluation_function *ep = epipolar_error;
+	for (int i = 0; i < n; i++) {
+		float e = ep(gamod, data+i*datadim, NULL);
+		fprintf(stderr, "\t%g\t%s\n", e,"unknown");
+	}
+#endif
 
 	// if needed, print the inliers
 	if (inliers_filename) {
@@ -403,6 +485,9 @@ int main_hack_fundamental_matrix(int c, char *v[])
 			}
 		xfclose(f);
 	}
+
+	free(mask);
+	free(data);
 
 	return EXIT_SUCCESS;
 }

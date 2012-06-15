@@ -1,3 +1,6 @@
+#include "vvector.h"
+
+
 // RANSAC INPUT EXAMPLES
 
 // ************************************
@@ -25,13 +28,14 @@ float distance_of_point_to_straight_line(float *line, float *point, void *usr)
 
 
 // instance of "ransac_model_generating_function"
-void straight_line_through_two_points(float *line, float *points, void *usr)
+int straight_line_through_two_points(float *line, float *points, void *usr)
 {
 	float ax = points[0];
 	float ay = points[1];
 	float bx = points[2];
 	float by = points[3];
 	float n = hypot(bx - ax, by - ay);
+	if (!n) return 0;
 	float dx = -(by - ay)/n;
 	float dy = (bx - ax)/n;
 	line[0] = dx;
@@ -42,6 +46,7 @@ void straight_line_through_two_points(float *line, float *points, void *usr)
 	float e1 = distance_of_point_to_straight_line(line, points, NULL);
 	float e2 = distance_of_point_to_straight_line(line, points+2, NULL);
 	assert(hypot(e1, e2) < 0.001);
+	return 1;
 }
 
 int find_straight_line_by_ransac(bool *out_mask, float line[3],
@@ -137,7 +142,7 @@ double find_affinity(double *A, double *x, double *y, double *xp, double *yp)
 }
 
 // instance of "ransac_model_generating_function"
-void affine_map_from_three_pairs(float *aff, float *pairs, void *usr)
+int affine_map_from_three_pairs(float *aff, float *pairs, void *usr)
 {
 	// call the function "find_affinity" from elsewhere
 	double x[3] = {pairs[0], pairs[4], pairs[8]};
@@ -148,6 +153,7 @@ void affine_map_from_three_pairs(float *aff, float *pairs, void *usr)
 	double r = find_affinity(A, x, y, xp, yp);
 	for (int i = 0; i < 6; i++)
 		aff[i] = A[i];
+	return 1;
 }
 
 // instance of "ransac_model_accepting_function"
@@ -197,22 +203,46 @@ int find_affinity_by_ransac(bool *out_mask, float affinity[6],
 // 	modeldim = 9 (fundamental matrix)
 // 	nfit = 7 (seven-point algorithm)
 
+
+static float fnorm(float *a, int n)
+{
+	if (n == 1)
+		return abs(*a);
+	if (n == 2)
+		return hypot(a[0], a[1]);
+	else
+		return hypot(*a, fnorm(a+1, n-1));
+}
+
 #include "moistiv_epipolar.c"
-void seven_point_algorithm(float *fm, float *p, void *usr)
+// instance of "ransac_model_generating_function"
+int seven_point_algorithm(float *fm, float *p, void *usr)
 {
 	int k[7] = {0, 1, 2, 3, 4, 5, 6};
 	float m1[14] = {p[0],p[1], p[4],p[5], p[8],p[9],   p[12],p[13],
 		          p[16],p[17], p[20],p[21], p[24],p[25] };
 	float m2[14] = {p[2],p[3], p[6],p[7], p[10],p[11], p[14],p[15],
 		          p[18],p[19], p[22],p[23], p[26],p[27] };
-	float z[3], F1[4][4], F2[4][4];
+	float z[3], F1[4][4]={0}, F2[4][4]={0};
 	// this is so braindead it's not funny
 	int r = moistiv_epipolar(m1, m2, k, z, F1, F2);
+	//MAT_PRINT_4X4(F1);
+	//MAT_PRINT_4X4(F2);
 	int ridx = 0;
 	if (r == 3) ridx = random_index(0, 3);
-	for (int i = 1; i <= 3; i++)
+	//fprintf(stderr, "z = %g\n", z[ridx]);
+	int cx = 0;
 	for (int j = 1; j <= 3; j++)
-		*fm++ = F1[i][j] + z[ridx]*F2[i][j];
+	for (int i = 1; i <= 3; i++)
+		fm[cx++] = F1[i][j] + z[ridx]*F2[i][j];
+	//fprintf(stderr, "\tspa = %g %g %g   %g %g %g   %g %g %g\n",
+	//		fm[0], fm[1], fm[2],
+	//		fm[3], fm[4], fm[5],
+	//		fm[6], fm[7], fm[8]);
+	float nfm = fnorm(fm, 9);
+	for (int i = 0; i < 9; i++)
+		fm[i] /= nfm;
+	return 1;
 }
 
 // instance of "ransac_error_evaluation_function"
@@ -227,14 +257,47 @@ static float epipolar_algebraic_error(float *fm, float *pair, void *usr)
 	return fabs(qfp);
 }
 
+// instance of "ransac_error_evaluation_function"
+static float epipolar_euclidean_error(float *fm, float *pair, void *usr)
+{
+	float p[3] = {pair[0], pair[1], 1};
+	float q[3] = {pair[2], pair[3], 1};
+	float pf[3] = {fm[0]*p[0] + fm[3]*p[1] + fm[6],
+		       fm[1]*p[0] + fm[4]*p[1] + fm[7],
+		       fm[2]*p[0] + fm[5]*p[1] + fm[8]};
+	float npf = hypot(pf[0], pf[1]);
+	pf[0] /= npf; pf[1] /= npf; pf[2] /= npf;
+	float pfq = pf[0]*q[0] + pf[1]*q[1] + pf[2]*q[2];
+	return fabs(pfq);
+}
+
+// instance of "ransac_error_evaluation_function"
+static float epipolar_symmetric_euclidean_error(float *fm, float *pair, void *u)
+{
+	fail("must transpose F!");
+	float rpair[4] = {pair[2], pair[3], pair[0], pair[1]};
+	float a = epipolar_euclidean_error(fm, pair, u);
+	float b = epipolar_euclidean_error(fm, rpair, u);
+	return hypot(a, b);
+}
+
+// instance of "ransac_error_evaluation_function"
+static float epipolar_error(float *fm, float *pair, void *usr)
+{
+	ransac_error_evaluation_function *f;
+	f = epipolar_euclidean_error;
+	return f(fm, pair, usr);
+}
+
+
 static float mprod33(float *ab_out, float *a_in, float *b_in)
 {
 	float (*about)[3] = (void*)ab_out;
 	float (*a)[3] = (void*)a_in;
 	float (*b)[3] = (void*)b_in;
 	float ab[3][3] = {0};
-	for (int i = 0; i < 3; i++)
 	for (int j = 0; j < 3; j++)
+	for (int i = 0; i < 3; i++)
 		for (int k = 0; k < 3; k++)
 			ab[i][j] += a[i][k] * b[k][j];
 	for (int i = 0; i < 3; i++)
@@ -254,50 +317,71 @@ int find_fundamental_matrix_by_ransac(bool *out_mask, float out_fm[9],
 	for (int i = 0; i < npairs; i++)
 	for (int j = 0; j < 4; j++)
 		pdev[j] += (fabs(pairs[4*i+j]-pmean[j]))/npairs;
+	float PDev = (pdev[0]+pdev[1]+pdev[2]+pdev[3])/4;
+	float pDev[4] = {PDev, PDev, PDev, PDev};
 
 	fprintf(stderr, "pmean = %g %g %g %g\n",
 			pmean[0], pmean[1], pmean[2], pmean[3]);
-	fprintf(stderr, "pdev = %g %g %g %g\n",
-			pdev[0], pdev[1], pdev[2], pdev[3]);
+	fprintf(stderr, "pdev = %g %g %g %g {%g}\n",
+			pdev[0], pdev[1], pdev[2], pdev[3], PDev);
 
 	// normalize input
 	float *pairsn = xmalloc(4*npairs*sizeof*pairsn);
 	for (int i = 0; i < npairs; i++)
 	for (int j = 0; j < 4; j++)
-		pairsn[4*i+j] = (pairs[4*i+j]-pmean[j])/pdev[j];
+		pairsn[4*i+j] = (pairs[4*i+j]-pmean[j])/PDev;
 
 	for (int i = 0; i < npairs; i++)
 	for (int j = 0; j < 4; j++)
 		fprintf(stderr, "%g %g %g %g\n",
-				pairsn[4*i+0],
-				pairsn[4*i+1],
-				pairsn[4*i+2],
-				pairsn[4*i+3]);
+				pairsn[4*i+0], pairsn[4*i+1],
+				pairsn[4*i+2], pairsn[4*i+3]);
 
 	// set up algorithm context
 	int datadim = 4;
 	int modeldim = 9;
 	int nfit = 7;
-	ransac_error_evaluation_function *f_err = epipolar_algebraic_error;
+	ransac_error_evaluation_function *f_err = epipolar_error;
 	ransac_model_generating_function *f_gen = seven_point_algorithm;
 	ransac_model_accepting_function  *f_acc = NULL;
 
 	// run algorithm on normalized data
-	float nfm[9], tmp[9];
+	float nfm[9];
 	int n_inliers = ransac(out_mask, nfm,
 			pairsn, datadim, npairs, modeldim,
 			f_err, f_gen, nfit, ntrials, nfit+1, max_err,
 			f_acc, NULL);
 
 	// un-normalize result
-	float Atrans[9] = {1/pdev[0], 0, 0,
-		           0, 1/pdev[1], 0,
-			   -pmean[0]/pdev[0], -pmean[1]/pdev[1], 1};
-	float B[9] = {1/pdev[2], 0, -pmean[2]/pdev[2],
-		      0, 1/pdev[3], -pmean[3]/pdev[3],
+	float Atrans[9] = {1/pDev[0], 0, 0,
+		           0, 1/pDev[1], 0,
+			   -pmean[0]/pDev[0], -pmean[1]/pDev[1], 1};
+	float B[9] = {1/pDev[2], 0, -pmean[2]/pDev[2],
+		      0, 1/pDev[3], -pmean[3]/pDev[3],
 		      0, 0, 1};
+	float tmp[9];
 	mprod33(tmp, nfm, B);
 	mprod33(out_fm, Atrans, tmp);
+
+	// print matrices
+	fprintf(stderr, "Atrans= [%g %g %g ; %g %g %g ; %g %g %g]\n",
+			Atrans[0],Atrans[1],Atrans[2],Atrans[3],Atrans[4],Atrans[5],Atrans[6],Atrans[7],Atrans[8]);
+	fprintf(stderr, "nfm= [%g %g %g ; %g %g %g ; %g %g %g]\n",
+			nfm[0],nfm[1],nfm[2],nfm[3],nfm[4],nfm[5],nfm[6],nfm[7],nfm[8]);
+	fprintf(stderr, "B= [%g %g %g ; %g %g %g ; %g %g %g]\n",
+			B[0],B[1],B[2],B[3],B[4],B[5],B[6],B[7],B[8]);
+	fprintf(stderr, "out_fm= [%g %g %g ; %g %g %g ; %g %g %g]\n",
+			out_fm[0],out_fm[1],out_fm[2],out_fm[3],out_fm[4],out_fm[5],out_fm[6],out_fm[7],out_fm[8]);
+
+	// for each pair, display its normalized and un-normalized errors
+	for (int i = 0; i < npairs; i++)
+	{
+		float en = f_err(nfm, pairsn+4*i, NULL);
+		float en2 = epipolar_algebraic_error(nfm, pairsn+4*i, NULL);
+		float eu = f_err(out_fm, pairs+4*i, NULL);
+		fprintf(stderr, "en,eu = %g\t%g\t{%g}\t%g\n", en, eu,eu/en,en2);
+	}
+
 
 	free(pairsn);
 	return n_inliers;
