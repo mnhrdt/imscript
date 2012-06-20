@@ -9,6 +9,7 @@
 #include "fail.c"
 #include "xmalloc.c"
 #include "bilinear_interpolation.c"
+#include "random.c"
 
 
 
@@ -61,7 +62,7 @@ static void print_cgi(FILE *f, struct control_grid *g)
 
 static void cgi_eval(float *out, struct control_grid *g, float x, float y)
 {
-	//fprintf(stderr, "cgi_eval(%g %g)\n", x, y);
+	//fprintf(stderr, "cgi_eval(%g %g)", x, y);
 	if (x < 0 || x > g->w-1 || y < 0 || y > g->h-1) {
 		out[0] = out[1] = 0;
 	} else {
@@ -70,6 +71,7 @@ static void cgi_eval(float *out, struct control_grid *g, float x, float y)
 		int ix = x/cellw;
 		int iy = y/cellh;
 		int idx = iy*g->ngridx + ix;
+		//fprintf(stderr, "[%d %d] {%g %g}", ix, iy, x/cellw-ix, y/cellh-iy);
 		assert(ix >= 0);
 		assert(iy >= 0);
 		assert(idx >= 0);
@@ -82,10 +84,11 @@ static void cgi_eval(float *out, struct control_grid *g, float x, float y)
 			float c = g->grid[idx+g->ngridx].u[l];
 			float d = g->grid[idx+1+g->ngridx].u[l];
 			float r = evaluate_bilinear_cell(a, b, c, d,
-					x-ix*cellw, y-iy*cellh);
+					x/cellw-ix, y/cellh-iy);
 			out[l] = r;
 		}
 	}
+	//fprintf(stderr, "\n");
 }
 
 static void densify_cgi(float *f, struct control_grid *g, int w, int h)
@@ -126,6 +129,13 @@ void cgi(float *f, float *a, float *b, int w, int h)
 		p->lopt = 0;
 	}
 	g->f = f; g->a = a; g->b = b; g->w = w; g->h = h;
+
+	for (int i = 0; i < g->ngrid; i++) {
+		struct control_point *p = g->grid + i;
+		if (p->nn != 4)
+			for (int l = 0; l < 2; l++)
+				p->u[l] = 1*random_normal();
+	}
 
 	print_cgi(stdout, g);
 
