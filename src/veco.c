@@ -156,7 +156,7 @@ int main(int c, char *v[])
 	for (int i = 0; i < n; i++)
 		x[i] = iio_read_image_float(v[i+2], w + i, h + i);
 	for (int i = 0; i < n; i++) {
-		if (w[i] != *w || h[i] != *w)
+		if (w[i] != *w || h[i] != *h)
 			fail("%dth image size mismatch\n", i);
 	}
 	float (*y) = xmalloc(*w * *h * sizeof*y);

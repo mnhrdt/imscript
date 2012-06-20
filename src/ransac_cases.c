@@ -153,7 +153,7 @@ int affine_map_from_three_pairs(float *aff, float *pairs, void *usr)
 	double r = find_affinity(A, x, y, xp, yp);
 	for (int i = 0; i < 6; i++)
 		aff[i] = A[i];
-	return 1;
+	return fabs(r) > 0.001;
 }
 
 // instance of "ransac_model_accepting_function"
@@ -184,6 +184,15 @@ int find_affinity_by_ransac(bool *out_mask, float affinity[6],
 			affine_map_is_reasonable, NULL);
 }
 
+// ************************************
+// ************************************
+// ************************************
+// ************************************
+//
+// 3. projective maps between pairs of points
+// 	datadim = 4 (coordinates of each pair of points)
+// 	modeldim = 9 (coefficients of the homographic map)
+// 	nfit = 4 (number of pairs that determine an homographic map)
 
 // ************************************
 // ************************************
@@ -192,6 +201,45 @@ int find_affinity_by_ransac(bool *out_mask, float affinity[6],
 //
 //
 // TODO: homograpy, fundamental matrix
+
+// utility function homographic map
+
+// instance of "ransac_error_evaluation_function"
+static float homographic_match_error(float *hom, float *pair, void *usr)
+{
+	double p[2] = {pair[0], pair[1]};
+	double q[2] = {pair[2], pair[3]};
+	const double H[3][3] = {{hom[0], hom[1], hom[2]},
+		{hom[3], hom[4], hom[5]},
+		{hom[6], hom[7], hom[8]}};
+	double Hp[2];
+	homography_transform(p, H, Hp);
+	double r = hypot(Hp[0] - q[0], Hp[1] - q[1]);
+	return r;
+}
+
+// instance of "ransac_model_generating_function"
+int homography_from_four(float *hom, float *pairs, void *usr)
+{
+	double a[2] = {pairs[0], pairs[1]};
+	double x[2] = {pairs[2], pairs[3]};
+	double b[2] = {pairs[4], pairs[5]};
+	double y[2] = {pairs[6], pairs[7]};
+	double c[2] = {pairs[8], pairs[9]};
+	double z[2] = {pairs[10], pairs[11]};
+	double d[2] = {pairs[12], pairs[13]};
+	double w[2] = {pairs[14], pairs[15]};
+	double R[3][3], *RR=R[0];
+	homography_from_4corresp(a, b, c, d, x, y, z, w, R);
+	int r = 1;
+	for (int i = 0; i < 9; i++)
+		if (isfinite(RR[i]))
+			hom[i] = RR[i];
+		else
+			r = 0;
+	return r;
+}
+
 
 // ************************************
 // ************************************

@@ -1,3 +1,5 @@
+#ifndef _RANDOM_C
+#define _RANDOM_C
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846264338328
@@ -26,3 +28,5 @@ int randombounds(int a, int b)
 		return b;
 	return a + rand()%(b - a + 1);
 }
+
+#endif//_RANDOM_C

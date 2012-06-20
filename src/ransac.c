@@ -6,6 +6,8 @@
 #include "xmalloc.c"
 #include "xfopen.c"
 
+#include "cmphomod.c"
+
 // generic function
 // evaluate the error of a datapoint according to a model
 typedef float (ransac_error_evaluation_function)(
@@ -57,6 +59,7 @@ int ransac_trial(
 	{
 		float *datai = data + i*datadim;
 		float e = mev(model, datai, usr);
+		if (!(e >= 0)) fprintf(stderr, "WARNING e = %g\n", e);
 		assert(e >= 0);
 		out_mask[i] = e < max_error;
 		if (out_mask[i])
@@ -355,10 +358,10 @@ int main_cases(int c, char *v[])
 		datadim = 4;
 		modeldim = 9;
 		nfit = 4;
-		fail("not yet implemented");
-		//model_evaluation = homographic_match_error;
-		//model_generation = homography_from_four;
+		model_evaluation = homographic_match_error;
+		model_generation = homography_from_four;
 		//model_acceptation = homography_is_reasonable;
+		model_acceptation = NULL;
 
 	} else if (0 == strcmp(model_id, "fm")) { // fundamental matrix
 		datadim = 4;
@@ -410,6 +413,15 @@ int main_cases(int c, char *v[])
 			}
 		xfclose(f);
 	}
+
+	if (true) {
+		FILE *f = xfopen("/tmp/omask.txt", "w");
+		for (int i = 0; i < n; i++)
+			fprintf(f, mask[i]?" 1":" 0");
+		fprintf(f, "\n");
+		xfclose(f);
+	}
+
 
 	return EXIT_SUCCESS;
 }
