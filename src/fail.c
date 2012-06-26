@@ -41,6 +41,7 @@ static const char *myname(void) { return ""; }
 
 static void print_trace(FILE *f)
 {
+	(void)f;
 #ifdef DOTRACE
 	void *array[BACKTRACE_SYMBOLS];
 	size_t size, i;

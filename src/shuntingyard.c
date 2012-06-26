@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -80,6 +81,7 @@ static int precedence(struct token *t)
 	case '^': return 5;
 	default: assert(false);
 	}
+	return -1;
 }
 
 
@@ -91,11 +93,12 @@ static void add_to_token(char *tok, int c)
 
 static void emit_token(char *tok)
 {
-	fprintf(stderr, "TOKEN \"tok\"\n", tok);
+	fprintf(stderr, "TOKEN \"%s\"\n", tok);
 	for (int i = 0; i < MAX_TOK_LEN; i++)
 		tok[i] = 0;
 }
 
+#if 0
 // hand-written naive lexer
 static void experimental_tokenization(char *input_string)
 {
@@ -152,7 +155,7 @@ static void experimental_tokenization(char *input_string)
 		A_NOP,
 		A_EMIT,
 		A_FAIL
-	}
+	};
 
 	// build state machine: default actions and transitions
 	int fsm[T_N][S_N][2];
@@ -188,11 +191,12 @@ static void experimental_tokenization(char *input_string)
 	}
 
 }
+#endif
 
 static int tokenize(struct token *t, char *str, int nmax)
 {
-	experimental_tokenization(str);
-	exit(2);
+	//experimental_tokenization(str);
+	//exit(77);
 	char s[1+strlen(str)];
 	strcpy(s, str);
 	char *spacing = " \n\t";
@@ -213,7 +217,7 @@ static int tokenize(struct token *t, char *str, int nmax)
 
 struct stack_of_operators {
 	int n;
-	struct token t[0];
+	struct token t[];
 };
 
 static void pstack(struct stack_of_operators *s)
@@ -303,7 +307,7 @@ static void shunting_yard(char *s)
 
 	//fprintf(stderr, "no more tokens\n");
 	//pstack(stack);
-	while (tt = pop(stack))
+	while ((tt = pop(stack)))
 		if (tt->type == TOK_LEFTPAR || tt->type == TOK_RIGHTPAR)
 			fail("unmatched parentheses\n");
 		else
