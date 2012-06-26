@@ -252,7 +252,7 @@ int main(int c, char *v[])
 	else if (0 == strcmp(v[1], "split")) return main_siftsplit(c-1, v+1);
 	//else if (0 == strcmp(v[1], "mask")) return main_siftmask(c-1, v+1);
 	else if (0 == strcmp(v[1], "clean")) return main_siftrr(c-1, v+1);
-	else if (0 == strcmp(v[1], "conveert")) return main_siftcon(c-1, v+1);
+	else if (0 == strcmp(v[1], "convert")) return main_siftcon(c-1, v+1);
 	else {
 	usage: fprintf(stderr, "usage:\n\t%s "
 				"[pair|trip|aff|split|clean|convert] params\n",
