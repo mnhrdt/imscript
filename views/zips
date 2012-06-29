@@ -1,1 +1,2 @@
 tar zchfv flowutils.tar.gz flowutils
+tar zchfv symflow.tar.gz symflow
