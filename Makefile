@@ -4,8 +4,8 @@ ENABLE_GSL = yes
 WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds
 
 CFLAGS = $(WFLAGS)
-CFLAGS = $(WFLAGS) -O3 -DNDEBUG
 CFLAGS = -g -rdynamic -DDOTRACE
+CFLAGS = $(WFLAGS) -O3 -DNDEBUG
 
 #end of compiler specific part
 

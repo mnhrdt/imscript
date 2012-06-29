@@ -225,13 +225,6 @@ static void fill_3dm_gaussian_image(float *gg, int w, int h, int d, float is[6])
 	FORK(d) FORJ(h) FORI(w) g[k][j][i] /= m;
 }
 
-static float average(float *x, int n)
-{
-	double r = 0;
-	FORI(n) r += x[i]/n;
-	return r;
-}
-
 // gaussian blur of a gray 2D image
 void gblur_gray(float *y, float *x, int w, int h, float s)
 {

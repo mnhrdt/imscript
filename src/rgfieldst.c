@@ -44,16 +44,6 @@ static double random_normal(void)
 	return y1;
 }
 
-//void fill_random_field(float *f, int w, int h, float sigma, float eta)
-//{
-//	for (int i = 0; i < w * h * 2; i++)
-//		f[i] = sigma*random_normal();
-//
-//	void gblur(float *y, float *x, int w, int h, int pd, float s);
-//	gblur(f, f, w, h, 2, eta);
-//
-//}
-
 
 void fill_random_fields(float *f, int w, int h, int d,
 		float sigma, float eta[6])

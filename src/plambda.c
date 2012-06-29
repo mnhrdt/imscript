@@ -130,7 +130,7 @@
 
 #define PLAMBDA_MAX_TOKENS 2049
 #define PLAMBDA_MAX_VARLEN 0x100
-#define PLAMBDA_MAX_PIXELDIM 6
+#define PLAMBDA_MAX_PIXELDIM 7
 
 
 
@@ -942,6 +942,9 @@ static void shrink_components(float *y, float *x, int n, int ypd, int xpd)
 			y[ypd*i + l] = x[xpd*i + l];
 }
 
+#include "smapa.h"
+SMART_PARAMETER(SRAND,0)
+
 int main(int c, char *v[])
 {
 	if (c < 2) {
@@ -969,6 +972,8 @@ int main(int c, char *v[])
 	FORI(n)
 		fprintf(stderr, "correspondence \"%s\" = \"%s\"\n",
 				p->var->t[i], v[i+1]);
+
+	srand(SRAND());
 
 	int pdmax = PLAMBDA_MAX_PIXELDIM;
 	float *out = xmalloc(*w * *h * pdmax * sizeof*out);

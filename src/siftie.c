@@ -116,7 +116,7 @@ void write_raw_siftsb(FILE *f, struct sift_keypoint *k, int n)
 		write_raw_siftb(f, k+i);
 }
 
-void *freadwhole_f(FILE *f, long *on)
+static void *freadwhole_f(FILE *f, long *on)
 {
 #if 0
 	int r = fseek(f, 0, SEEK_END);
@@ -151,7 +151,7 @@ void *freadwhole_f(FILE *f, long *on)
 #endif
 }
 
-void *freadwhole(const char *fname, long *on)
+static void *freadwhole(const char *fname, long *on)
 {
 	FILE *f = xfopen(fname, "r");
 	void *ret = freadwhole_f(f, on);
@@ -204,33 +204,7 @@ void write_raw_sift_gen(FILE *f, struct sift_keypoint *k)
 	SIFT_BINARY() ? write_raw_siftb(f, k) : write_raw_sift(f, k);
 }
 
-struct sift_keypoint *read_annotated_sifts(FILE *f, int *no)
-{
-	fail("I lost the original purpose of this function");
-	int n, N = 139;
-	float *t = read_ascii_floats(f, &n);
-	if (0 != n % N) fail("bad raw SIFT keypoints format");
-	n /= N;
-	struct sift_keypoint *r = xmalloc(n * sizeof * r);
-	FORI(n) {
-		int off = i*N;
-		r->pos[0] = t[0+off];
-		r->pos[1] = t[1+off];
-		r->scale = t[2+off];
-		r->orientation = t[3+off];
-		FORJ(6)
-			r->affinity[j] = t[4+j+off];
-		r->id = t[10+off];
-		FORJ(SIFT_LENGTH)
-			r->sift[j] = t[11+j+off];
-		r += 1;
-	}
-	xfree(t);
-	*no = n;
-	return r-n;
-}
-
-float emvdistppf(float *a, float *b, int n)
+static float emvdistppf(float *a, float *b, int n)
 {
 	//float ac = a[0];
 	//float bc = b[0];
@@ -251,7 +225,7 @@ static double sqr(double x)
 	return x*x;
 }
 
-float distppft(float *a, float *b, int n, float t)
+static float distppft(float *a, float *b, int n, float t)
 {
 	double tt = t * t;
 	double r = 0;
@@ -264,7 +238,7 @@ float distppft(float *a, float *b, int n, float t)
 	return r;//sqrt(r);
 }
 
-float distppf(float *a, float *b, int n)
+static float distppf(float *a, float *b, int n)
 {
 	double r = 0;
 	for (int i = 0; i < n; i++)
@@ -272,7 +246,7 @@ float distppf(float *a, float *b, int n)
 	return sqrt(r);
 }
 
-float distlpf(float *a, float *b, int n, float p)
+static float distlpf(float *a, float *b, int n, float p)
 {
 	double r = 0;
 	for (int i = 0; i < n; i++)

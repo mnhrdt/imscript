@@ -518,7 +518,12 @@ int moistiv_epipolar(float *m1, float *m2, int *k, float *z,
       F2[i][1]*F2[i2][2]*F1[i3][3];
     a[3] -= F2[i][1]*F2[i2][2]*F2[i3][3];
   }
-  
+
+
+  free_matrix(c,1,9,1,9);
+  free_matrix(v,1,9,1,9);
+  free_vector(w,1,9);
+
   return(FindCubicRoots(a,z));
 }
 

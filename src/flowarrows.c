@@ -114,6 +114,8 @@ int main(int c, char *v[])
 	for (int i = 0; i < w*h; i++)
 		y[i] = 255;
 	flowarrows(y, x, w, h, scale, gridsize);
+	for (int i = 0; i   < w*h; i++)
+		y[i] = (unsigned char)y[i];
 	iio_save_image_float_vec(outfile, y, w, h, 1);
 	return EXIT_SUCCESS;
 }

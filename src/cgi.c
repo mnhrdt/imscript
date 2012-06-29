@@ -39,13 +39,6 @@ struct control_grid {
 	int w, h;
 };
 
-static bool optimize_local_mv(struct control_grid *g, struct control_point *p)
-{
-	assert(p - g->grid >= 0);
-	assert(p - g->grid < g->ngrid);
-	return true;
-}
-
 static void print_cgi(FILE *f, struct control_grid *g)
 {
 	fprintf(f, "CGI %dx%d = %d points\n", g->ngridx, g->ngridy, g->ngrid);
@@ -60,35 +53,80 @@ static void print_cgi(FILE *f, struct control_grid *g)
 	}
 }
 
+// return the top_left control point of the corresponding cell
+static struct control_point *cgi_cell(struct control_grid *g, float x, float y,
+	       	float *z)
+{
+	if (x < 0 || x > g->w-1 || y < 0 || y > g->h-1)
+		return NULL;
+	//fprintf(stderr, "cgi cell (%g %g)\n", x, y);
+	float cellw = (g->w - 1)/(g->ngridx - 1);
+	float cellh = (g->h - 1)/(g->ngridy - 1);
+	int ix = x/cellw;
+	int iy = y/cellh;
+	int idx = iy*g->ngridx + ix;
+	//fprintf(stderr, "\tix = %d\n", ix);
+	//fprintf(stderr, "\tiy = %d\n", iy);
+	assert(ix >= 0);
+	assert(iy >= 0);
+	assert(idx >= 0);
+	assert(ix < g->ngridx);
+	assert(iy < g->ngridy);
+	assert(idx < g->ngrid);
+	struct control_point *p = g->grid + idx;
+	//assert(p->x[0] <= x);
+	//assert(p->x[1] <= y);
+	if (z) {
+		z[0] = x/cellw - ix;
+		z[1] = y/cellh - iy;
+	}
+	return p;
+}
+
+static struct control_point *cgi_neighbour(struct control_grid *g,
+		struct control_point *p, int dx, int dy)
+{
+	int gidx = p - g->grid;
+	assert(gidx >= 0);
+	assert(gidx < g->ngrid);
+	int x = gidx % g->ngridx;
+	int y = gidx / g->ngridx;
+	assert(x >= 0);
+	assert(y >= 0);
+	assert(x < g->ngridx);
+	assert(y < g->ngridy);
+	int rx = x + dx;
+	int ry = y + dy;
+	if (rx < 0 || rx >= g->ngridx) return NULL;
+	if (ry < 0 || ry >= g->ngridy) return NULL;
+	int ridx = ry * g->ngridx + rx;
+	assert(ridx < g->ngrid);
+	return g->grid + ridx;
+}
+
 static void cgi_eval(float *out, struct control_grid *g, float x, float y)
 {
-	//fprintf(stderr, "cgi_eval(%g %g)", x, y);
 	if (x < 0 || x > g->w-1 || y < 0 || y > g->h-1) {
 		out[0] = out[1] = 0;
 	} else {
-		float cellw = (g->w - 1.0)/(g->ngridx - 1);
-		float cellh = (g->h - 1.0)/(g->ngridy - 1);
-		int ix = x/cellw;
-		int iy = y/cellh;
-		int idx = iy*g->ngridx + ix;
-		//fprintf(stderr, "[%d %d] {%g %g}", ix, iy, x/cellw-ix, y/cellh-iy);
-		assert(ix >= 0);
-		assert(iy >= 0);
-		assert(idx >= 0);
-		assert(ix < g->ngridx-1);
-		assert(iy < g->ngridy-1);
-		assert(idx < g->ngrid);
+		float z[2];
+		struct control_point *pa = cgi_cell(g, x, y, z);
+		assert(pa);
+		struct control_point *pb = cgi_neighbour(g, pa, 1, 0);
+		struct control_point *pc = cgi_neighbour(g, pa, 0, 1);
+		struct control_point *pd = cgi_neighbour(g, pa, 1, 1);
+		if (!pb) pb = pa;
+		if (!pc) pc = pa;
+		if (!pd) pd = pa;
 		for (int l = 0; l < 2; l++) {
-			float a = g->grid[idx].u[l];
-			float b = g->grid[idx+1].u[l];
-			float c = g->grid[idx+g->ngridx].u[l];
-			float d = g->grid[idx+1+g->ngridx].u[l];
-			float r = evaluate_bilinear_cell(a, b, c, d,
-					x/cellw-ix, y/cellh-iy);
+			float a = pa->u[l];
+			float b = pb->u[l];
+			float c = pc->u[l];
+			float d = pd->u[l];
+			float r = evaluate_bilinear_cell(a, b, c, d, *z, z[1]);
 			out[l] = r;
 		}
 	}
-	//fprintf(stderr, "\n");
 }
 
 static void densify_cgi(float *f, struct control_grid *g, int w, int h)
@@ -100,6 +138,20 @@ static void densify_cgi(float *f, struct control_grid *g, int w, int h)
 		for (int i = 0; i < w; i++)
 			cgi_eval(f+2*(j*w+i), g, i*(1-eps), j*(1-eps));
 }
+
+static float eval_error_cell(struct control_grid *g, struct control_point *p)
+{
+	return 0;
+}
+
+static bool optimize_local_mv(struct control_grid *g, struct control_point *p)
+{
+	assert(p - g->grid >= 0);
+	assert(p - g->grid < g->ngrid);
+	return true;
+}
+
+
 
 void cgi(float *f, float *a, float *b, int w, int h)
 {
@@ -132,7 +184,7 @@ void cgi(float *f, float *a, float *b, int w, int h)
 
 	for (int i = 0; i < g->ngrid; i++) {
 		struct control_point *p = g->grid + i;
-		if (p->nn != 4)
+		if (p->nn == 4)
 			for (int l = 0; l < 2; l++)
 				p->u[l] = 1*random_normal();
 	}

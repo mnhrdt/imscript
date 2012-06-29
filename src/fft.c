@@ -94,7 +94,7 @@ static void ifft_2dfloat(float *ifx,  fftwf_complex *fx, int w, int h)
 	FORI(w*h) {
 		fftwf_complex z = b[i] * scale;
 		ifx[i] = crealf(z);
-		assert(cimagf(z) < 0.001);
+		//assert(cimagf(z) < 0.001);
 	}
 	fftwf_destroy_plan(p);
 	fftwf_free(a);

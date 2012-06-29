@@ -28,6 +28,7 @@ static void *xmalloc(size_t size)
 	return new;
 }
 
+inline // to avoid unused warnings
 static void *xrealloc(void *p, size_t s)
 {
 	void *r = realloc(p, s);
@@ -35,7 +36,8 @@ static void *xrealloc(void *p, size_t s)
 	return r;
 }
 
-static void xfree(void *p)
+inline // to avoid unused warnings
+static inline void xfree(void *p)
 {
 	if (!p)
 		fail("thou shalt not free a null pointer!");

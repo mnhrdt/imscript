@@ -29,7 +29,7 @@ void bicubic_interpolation(float *result,
 	x -= 1;
 	y -= 1;
 
-	getsample_operator p = getsample_1;
+	getsample_operator p = getsample_0;
 
 	int ix = floor(x);
 	int iy = floor(y);

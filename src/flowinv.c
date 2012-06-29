@@ -1,3 +1,5 @@
+// invert a vector field
+
 #include <assert.h>
 #include <math.h>
 #include <stdbool.h>
