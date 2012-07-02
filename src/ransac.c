@@ -241,22 +241,27 @@ int ransac(
 		if (macc && !macc(model, usr))
 			continue;
 
-		int n_inliers = ransac_trial(tmp_mask, data, model, max_error,
-				datadim, n, mev, usr);
-
-		if (n_inliers > best_ninliers)
+		// generally, nm=1
+		for (int j = 0; j < nm; j++)
 		{
-			best_ninliers = n_inliers;
-			for(int j = 0; j < modeldim; j++)
-				best_model[j] = model[j];
-			for(int j = 0; j < n; j++)
-				best_mask[j] = tmp_mask[j];
+			float *modelj = model + j*modeldim;
+			int n_inliers = ransac_trial(tmp_mask, data, modelj,
+					max_error, datadim, n, mev, usr);
+
+			if (n_inliers > best_ninliers)
+			{
+				best_ninliers = n_inliers;
+				for(int k = 0; k < modeldim; k++)
+					best_model[k] = modelj[k];
+				for(int k = 0; k < n; k++)
+					best_mask[k] = tmp_mask[k];
+			}
 		}
 	}
 
 	fprintf(stderr, "RANSAC found this best model:");
 	for (int i = 0; i < modeldim; i++)
-		fprintf(stderr, " %g\n", best_model[i]);
+		fprintf(stderr, " %g", best_model[i]);
 	fprintf(stderr, "\n");
 	//fprintf(stderr, "errors of outliers:");
 	//for (int i = 0; i < n; i++)
@@ -272,11 +277,11 @@ int ransac(
 	//		fprintf(stderr, " %g", e);
 	//	}
 	//fprintf(stderr, "\n");
-	fprintf(stderr, "errors of data points:\n");
-	for (int i = 0; i < n; i++) {
-		float e = mev(best_model, data+i*datadim, usr);
-		fprintf(stderr, "\t%g\t%s\n", e, best_mask[i]?"GOOD":"bad");
-	}
+	//fprintf(stderr, "errors of data points:\n");
+	//for (int i = 0; i < n; i++) {
+	//	float e = mev(best_model, data+i*datadim, usr);
+	//	fprintf(stderr, "\t%g\t%s\n", e, best_mask[i]?"GOOD":"bad");
+	//}
 
 	int return_value = 0;
 	if (best_ninliers >= min_inliers)
@@ -284,6 +289,10 @@ int ransac(
 		return_value =  best_ninliers;
 	} else
 		return_value = 0;
+
+	for (int j = 0; j < modeldim; j++)
+		if (!isfinite(best_model[j]))
+			fail("model_%d not finite", j);
 
 	if (out_model)
 		for(int j = 0; j < modeldim; j++)
@@ -459,17 +468,17 @@ int main_hack_fundamental_matrix(int c, char *v[])
 
 	// print a summary of the results
 	if (n_inliers > 0) {
-		printf("RANSAC found a nmodel with %d inliers\n", n_inliers);
+		printf("RANSAC found a model with %d inliers\n", n_inliers);
 		printf("parameters =");
 		for (int i = 0; i < modeldim; i++)
 			printf(" %g", model[i]);
 		printf("\n");
-		fprintf(stderr, "errors of data points:\n");
-		ransac_error_evaluation_function *ep = epipolar_error;
-		for (int i = 0; i < n; i++) {
-			float e = ep(model, data+i*datadim, NULL);
-			fprintf(stderr, "\t%g\t%s\n", e, mask[i]?"GOOD":"bad");
-		}
+		//fprintf(stderr, "errors of data points:\n");
+		//ransac_error_evaluation_function *ep = epipolar_error;
+		//for (int i = 0; i < n; i++) {
+		//	float e = ep(model, data+i*datadim, NULL);
+		//	fprintf(stderr, "\t%g\t%s\n", e, mask[i]?"GOOD":"bad");
+		//}
 	} else printf("RANSAC found no model\n");
 
 #if 0
@@ -508,15 +517,6 @@ int main_hack_fundamental_matrix(int c, char *v[])
 		xfclose(f);
 	}
 
-	if (n_inliers > 0) {
-		printf("RANSAC found a nmodel with %d inliers\n", n_inliers);
-		printf("parameters =");
-		for (int i = 0; i < modeldim; i++)
-			printf(" %g", model[i]);
-		printf("\n");
-	}
-
-
 	free(mask);
 	free(data);
 
@@ -553,17 +553,17 @@ int main_hack_fundamental_trimatrix(int c, char *v[])
 
 	// print a summary of the results
 	if (n_inliers > 0) {
-		printf("RANSAC found a nmodel with %d inliers\n", n_inliers);
+		printf("RANSAC found a model with %d inliers\n", n_inliers);
 		printf("parameters =");
 		for (int i = 0; i < modeldim; i++)
 			printf(" %g", model[i]);
 		printf("\n");
-		fprintf(stderr, "errors of data points:\n");
-		ransac_error_evaluation_function *ep = epipolar_error_triplet;
-		for (int i = 0; i < n; i++) {
-			float e = ep(model, data+i*datadim, NULL);
-			fprintf(stderr, "\t%g\t%s\n", e, mask[i]?"GOOD":"bad");
-		}
+		//fprintf(stderr, "errors of data points:\n");
+		//ransac_error_evaluation_function *ep = epipolar_error_triplet;
+		//for (int i = 0; i < n; i++) {
+		//	float e = ep(model, data+i*datadim, NULL);
+		//	fprintf(stderr, "\t%g\t%s\n", e, mask[i]?"GOOD":"bad");
+		//}
 	} else printf("RANSAC found no model\n");
 
 #if 0

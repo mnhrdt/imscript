@@ -266,31 +266,37 @@ static float fnorm(float *a, int n)
 // instance of "ransac_model_generating_function"
 int seven_point_algorithm(float *fm, float *p, void *usr)
 {
-	int k[7] = {0, 1, 2, 3, 4, 5, 6};
+	int K[7] = {0, 1, 2, 3, 4, 5, 6};
 	float m1[14] = {p[0],p[1], p[4],p[5], p[8],p[9],   p[12],p[13],
 		          p[16],p[17], p[20],p[21], p[24],p[25] };
 	float m2[14] = {p[2],p[3], p[6],p[7], p[10],p[11], p[14],p[15],
 		          p[18],p[19], p[22],p[23], p[26],p[27] };
-	float z[3], F1[4][4]={0}, F2[4][4]={0};
+	float z[3], F1[4][4]={{0}}, F2[4][4]={{0}};
 	// this is so braindead it's not funny
-	int r = moistiv_epipolar(m1, m2, k, z, F1, F2);
+	int r = moistiv_epipolar(m1, m2, K, z, F1, F2);
 	//MAT_PRINT_4X4(F1);
 	//MAT_PRINT_4X4(F2);
 	int ridx = 0;
-	if (r == 3) ridx = random_index(0, 3);
+	//if (r == 3) ridx = random_index(0, 3);
 	//fprintf(stderr, "z = %g\n", z[ridx]);
 	int cx = 0;
+	for (int k = 0; k < r; k++)
 	for (int j = 1; j <= 3; j++)
 	for (int i = 1; i <= 3; i++)
-		fm[cx++] = F1[i][j] + z[ridx]*F2[i][j];
+		fm[cx++] = F1[i][j] + z[k]*F2[i][j];
 	//fprintf(stderr, "\tspa = %g %g %g   %g %g %g   %g %g %g\n",
 	//		fm[0], fm[1], fm[2],
 	//		fm[3], fm[4], fm[5],
 	//		fm[6], fm[7], fm[8]);
-	float nfm = fnorm(fm, 9);
-	for (int i = 0; i < 9; i++)
-		fm[i] /= nfm;
-	return 1;
+	for (int k = 0; k < r; k++)
+	{
+		float *fmk = fm + 9*k;
+		float nfmk = fnorm(fmk, 9);
+		for (int i = 0; i < 9; i++)
+			fmk[i] /= nfmk;
+	}
+	assert(r==0 || r==1 || r==2 || r == 3);
+	return r;
 }
 
 // instance of "ransac_error_evaluation_function"
@@ -366,12 +372,29 @@ int two_seven_point_algorithms(float *fm, float *p, void *usr)
 		        p[24],p[25],p[28],p[29],
 		        p[30],p[31],p[34],p[35],
 		        p[36],p[37],p[40],p[41]};
-	seven_point_algorithm(fm, p1, usr);
-	seven_point_algorithm(fm+9, p2, usr);
-	for (int i = 0; i < 18; i++)
+	float fm1[27], fm2[27];
+	int r1 = seven_point_algorithm(fm1, p1, usr);
+	int r2 = seven_point_algorithm(fm2, p2, usr);
+	for (int i = 0; i < r1; i++)
+	for (int j = 0; j < r2; j++) {
+		float *fmij = fm + 18*(r1*i+j);
+		for (int k = 0; k < 9; k++) {
+			fmij[k] = fm1[9*i+k];
+			fmij[k+9] = fm2[9*i+k];
+		}
+	}
+	for (int i = 0; i < r1*r2*18; i++)
 		if (!isfinite(fm[i]))
-			return 0;
-	return 1;
+		//{
+		//	for (int j = 0; j < 9*r1; j++)
+		//		fprintf(stderr, "\tfm1[%d]=%g\n",
+		//				j, fm1[j]);
+		//	for (int j = 0; j < 9*r2; j++)
+		//		fprintf(stderr, "\tfm2[%d]=%g\n",
+		//				j, fm2[j]);
+			fail("not finite fm[%d]=%g\n", i, fm[i]);
+		//}
+	return r1 * r2;
 }
 
 static void mprod33(float *ab_out, float *a_in, float *b_in)
@@ -379,11 +402,17 @@ static void mprod33(float *ab_out, float *a_in, float *b_in)
 	float (*about)[3] = (void*)ab_out;
 	float (*a)[3] = (void*)a_in;
 	float (*b)[3] = (void*)b_in;
-	float ab[3][3] = {0};
+	float ab[3][3] = {{0}};
 	for (int j = 0; j < 3; j++)
 	for (int i = 0; i < 3; i++)
 		for (int k = 0; k < 3; k++)
+		{
+			if (!isfinite(a[i][k]))
+				fail("mprod A not finite %d %d", i, k);
+			if (!isfinite(b[k][j]))
+				fail("mprod B not finite %d %d", k, j);
 			ab[i][j] += a[i][k] * b[k][j];
+		}
 	for (int i = 0; i < 3; i++)
 	for (int j = 0; j < 3; j++)
 		about[i][j] = ab[i][j];
@@ -407,8 +436,9 @@ int find_fundamental_matrix_by_ransac(
 
 	fprintf(stderr, "pmean = %g %g %g %g\n",
 			pmean[0], pmean[1], pmean[2], pmean[3]);
-	fprintf(stderr, "pdev = %g %g %g %g {%g}\n",
-			pdev[0], pdev[1], pdev[2], pdev[3], PDev);
+	fprintf(stderr, "pdev = %g %g %g %g\n",
+			pdev[0], pdev[1], pdev[2], pdev[3]);
+	fprintf(stderr, "normalization factor = %g\n", PDev);
 
 	// normalize input
 	float *pairsn = xmalloc(4*npairs*sizeof*pairsn);
@@ -487,10 +517,9 @@ int find_fundamental_pair_by_ransac(bool *out_mask, float out_fm[18],
 	for (int j = 0; j < 6; j++)
 		tdev[j] += (fabs(trips[6*i+j]-tmean[j]))/ntrips;
 	float TDev = (tdev[0]+tdev[1]+tdev[2]+tdev[3]+tdev[4]+tdev[5])/6;
-	float tDev[6] = {TDev, TDev, TDev, TDev, TDev};
+	float tDev[6] = {TDev, TDev, TDev, TDev, TDev, TDev};
 
-
-	fprintf(stderr, "TDev = %g\n", TDev);
+	fprintf(stderr, "normalization factor = %g\n", TDev);
 
 	// normalize input
 	float *tripsn = xmalloc(6*ntrips*sizeof*tripsn);
@@ -515,7 +544,7 @@ int find_fundamental_pair_by_ransac(bool *out_mask, float out_fm[18],
 	ransac_model_accepting_function  *f_acc = NULL;
 
 	// run algorithm on normalized data
-	float nfm[18];
+	float nfm[modeldim];
 	int n_inliers = ransac(out_mask, nfm,
 			tripsn, datadim, ntrips, modeldim,
 			f_err, f_gen, nfit, ntrials, nfit+1, max_err_n,
@@ -539,6 +568,9 @@ int find_fundamental_pair_by_ransac(bool *out_mask, float out_fm[18],
 		      0, 0, 1};
 	mprod33(tmp, nfm+9, B2);
 	mprod33(out_fm+9, Atrans2, tmp);
+
+	//for(int i = 0; i < modeldim; i++)
+	//	fprintf(stderr, "model_norm[%d] = %g\n", i, out_fm[i]);
 
 	// print matrices
 	//fprintf(stderr, "Atrans= [%g %g %g ; %g %g %g ; %g %g %g]\n",
