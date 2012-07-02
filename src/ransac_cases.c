@@ -351,9 +351,26 @@ static float epipolar_error_triplet(float *fm, float *pair, void *usr)
 // instance of "ransac_model_generating_function"
 int two_seven_point_algorithms(float *fm, float *p, void *usr)
 {
-	float p2[4] = {p[0], p[1], p[4], p[5]};
-	seven_point_algorithm(fm, p, usr);
+	// p has 42 numbers
+	float p1[28] = {p[0],p[1],p[2],p[3],
+		        p[6],p[7],p[8],p[9],
+		        p[12],p[13],p[14],p[15],
+		        p[18],p[19],p[20],p[21],
+		        p[24],p[25],p[26],p[27],
+		        p[30],p[31],p[32],p[33],
+		        p[36],p[37],p[38],p[39]};
+	float p2[28] = {p[0],p[1],p[4],p[5],
+		        p[6],p[7],p[10],p[11],
+		        p[12],p[13],p[16],p[17],
+		        p[18],p[19],p[22],p[23],
+		        p[24],p[25],p[28],p[29],
+		        p[30],p[31],p[34],p[35],
+		        p[36],p[37],p[40],p[41]};
+	seven_point_algorithm(fm, p1, usr);
 	seven_point_algorithm(fm+9, p2, usr);
+	for (int i = 0; i < 18; i++)
+		if (!isfinite(fm[i]))
+			return 0;
 	return 1;
 }
 
@@ -520,7 +537,7 @@ int find_fundamental_pair_by_ransac(bool *out_mask, float out_fm[18],
 	float B2[9] = {1/tDev[4], 0, -tmean[4]/tDev[4],
 		      0, 1/tDev[5], -tmean[5]/tDev[5],
 		      0, 0, 1};
-	mprod33(tmp, nfm, B2);
+	mprod33(tmp, nfm+9, B2);
 	mprod33(out_fm+9, Atrans2, tmp);
 
 	// print matrices

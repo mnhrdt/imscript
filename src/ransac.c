@@ -508,6 +508,14 @@ int main_hack_fundamental_matrix(int c, char *v[])
 		xfclose(f);
 	}
 
+	if (n_inliers > 0) {
+		printf("RANSAC found a nmodel with %d inliers\n", n_inliers);
+		printf("parameters =");
+		for (int i = 0; i < modeldim; i++)
+			printf(" %g", model[i]);
+		printf("\n");
+	}
+
 
 	free(mask);
 	free(data);
