@@ -337,6 +337,25 @@ static float epipolar_error(float *fm, float *pair, void *usr)
 	return f(fm, pair, usr);
 }
 
+// instance of "ransac_error_evaluation_function"
+static float epipolar_error_triplet(float *fm, float *pair, void *usr)
+{
+	ransac_error_evaluation_function *f;
+	f = epipolar_euclidean_error;
+	float pair2[4] = {pair[0], pair[1], pair[4], pair[5]};
+	float fa = f(fm, pair, usr);
+	float fb = f(fm+9, pair2, usr);
+	return hypot(fa,fb);
+}
+
+// instance of "ransac_model_generating_function"
+int two_seven_point_algorithms(float *fm, float *p, void *usr)
+{
+	float p2[4] = {p[0], p[1], p[4], p[5]};
+	seven_point_algorithm(fm, p, usr);
+	seven_point_algorithm(fm+9, p2, usr);
+	return 1;
+}
 
 static void mprod33(float *ab_out, float *a_in, float *b_in)
 {
@@ -353,7 +372,8 @@ static void mprod33(float *ab_out, float *a_in, float *b_in)
 		about[i][j] = ab[i][j];
 }
 
-int find_fundamental_matrix_by_ransac(bool *out_mask, float out_fm[9],
+int find_fundamental_matrix_by_ransac(
+	bool *out_mask, float out_fm[9],
 		float *pairs, int npairs,
 		int ntrials, float max_err)
 {
@@ -435,3 +455,95 @@ int find_fundamental_matrix_by_ransac(bool *out_mask, float out_fm[9],
 	free(pairsn);
 	return n_inliers;
 }
+
+// finds a pair of fundamental matrices
+int find_fundamental_pair_by_ransac(bool *out_mask, float out_fm[18],
+		float *trips, int ntrips,
+		int ntrials, float max_err)
+{
+	// compute input statistics
+	double tmean[6] = {0, 0, 0, 0, 0, 0}, tdev[6] = {0, 0, 0, 0, 0, 0};
+	for (int i = 0; i < ntrips; i++)
+	for (int j = 0; j < 6; j++)
+		tmean[j] += (trips[6*i+j])/ntrips;
+	for (int i = 0; i < ntrips; i++)
+	for (int j = 0; j < 6; j++)
+		tdev[j] += (fabs(trips[6*i+j]-tmean[j]))/ntrips;
+	float TDev = (tdev[0]+tdev[1]+tdev[2]+tdev[3]+tdev[4]+tdev[5])/6;
+	float tDev[6] = {TDev, TDev, TDev, TDev, TDev};
+
+
+	fprintf(stderr, "TDev = %g\n", TDev);
+
+	// normalize input
+	float *tripsn = xmalloc(6*ntrips*sizeof*tripsn);
+	for (int i = 0; i < ntrips; i++)
+	for (int j = 0; j < 6; j++)
+		tripsn[6*i+j] = (trips[6*i+j]-tmean[j])/TDev;
+
+	//for (int i = 0; i < ntrips; i++)
+	//for (int j = 0; j < 6; j++)
+	//	fprintf(stderr, "%g %g  %g %g  %g %g\n",
+	//			pairsn[6*i+0], pairsn[6*i+1],
+	//			pairsn[6*i+2], pairsn[6*i+3],
+	//			pairsn[6*i+4], pairsn[6*i+5]);
+	float max_err_n = max_err / TDev;
+
+	// set up algorithm context
+	int datadim = 6;
+	int modeldim = 18;
+	int nfit = 7;
+	ransac_error_evaluation_function *f_err = epipolar_error_triplet;
+	ransac_model_generating_function *f_gen = two_seven_point_algorithms;
+	ransac_model_accepting_function  *f_acc = NULL;
+
+	// run algorithm on normalized data
+	float nfm[18];
+	int n_inliers = ransac(out_mask, nfm,
+			tripsn, datadim, ntrips, modeldim,
+			f_err, f_gen, nfit, ntrials, nfit+1, max_err_n,
+			f_acc, NULL);
+
+	// un-normalize result
+	float Atrans[9] = {1/tDev[0], 0, 0,
+		           0, 1/tDev[1], 0,
+			   -tmean[0]/tDev[0], -tmean[1]/tDev[1], 1};
+	float B[9] = {1/tDev[2], 0, -tmean[2]/tDev[2],
+		      0, 1/tDev[3], -tmean[3]/tDev[3],
+		      0, 0, 1};
+	float tmp[9];
+	mprod33(tmp, nfm, B);
+	mprod33(out_fm, Atrans, tmp);
+	float Atrans2[9] = {1/tDev[0], 0, 0,
+		           0, 1/tDev[1], 0,
+			   -tmean[0]/tDev[0], -tmean[1]/tDev[1], 1};
+	float B2[9] = {1/tDev[4], 0, -tmean[4]/tDev[4],
+		      0, 1/tDev[5], -tmean[5]/tDev[5],
+		      0, 0, 1};
+	mprod33(tmp, nfm, B2);
+	mprod33(out_fm+9, Atrans2, tmp);
+
+	// print matrices
+	//fprintf(stderr, "Atrans= [%g %g %g ; %g %g %g ; %g %g %g]\n",
+	//		Atrans[0],Atrans[1],Atrans[2],Atrans[3],Atrans[4],Atrans[5],Atrans[6],Atrans[7],Atrans[8]);
+	//fprintf(stderr, "nfm= [%g %g %g ; %g %g %g ; %g %g %g]\n",
+	//		nfm[0],nfm[1],nfm[2],nfm[3],nfm[4],nfm[5],nfm[6],nfm[7],nfm[8]);
+	//fprintf(stderr, "B= [%g %g %g ; %g %g %g ; %g %g %g]\n",
+	//		B[0],B[1],B[2],B[3],B[4],B[5],B[6],B[7],B[8]);
+	//fprintf(stderr, "out_fm= [%g %g %g ; %g %g %g ; %g %g %g]\n",
+	//		out_fm[0],out_fm[1],out_fm[2],out_fm[3],out_fm[4],out_fm[5],out_fm[6],out_fm[7],out_fm[8]);
+
+	// for each pair, display its normalized and un-normalized errors
+	//for (int i = 0; i < npairs; i++)
+	//{
+	//	float en = f_err(nfm, pairsn+4*i, NULL);
+	//	float en2 = epipolar_algebraic_error(nfm, pairsn+4*i, NULL);
+	//	float eu = f_err(out_fm, pairs+4*i, NULL);
+	//	fprintf(stderr, "en,eu = %g\t%g\t{%g}\t%g\n", en, eu,eu/en,en2);
+	//}
+
+
+	free(tripsn);
+	return n_inliers;
+}
+

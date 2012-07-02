@@ -374,6 +374,9 @@ int main_cases(int c, char *v[])
 	} else if (0 == strcmp(model_id, "fmn")) { // fundamental matrix
 		int main_hack_fundamental_matrix(int,char*[]);
 		return main_hack_fundamental_matrix(c-1, v+1);
+	} else if (0 == strcmp(model_id, "fmnt")) { // fundamental matrix
+		int main_hack_fundamental_trimatrix(int,char*[]);
+		return main_hack_fundamental_trimatrix(c-1, v+1);
 	} else {
 		printf("unrecognized model \"%s\"\n", model_id);
 		return EXIT_FAILURE;
@@ -463,6 +466,92 @@ int main_hack_fundamental_matrix(int c, char *v[])
 		printf("\n");
 		fprintf(stderr, "errors of data points:\n");
 		ransac_error_evaluation_function *ep = epipolar_error;
+		for (int i = 0; i < n; i++) {
+			float e = ep(model, data+i*datadim, NULL);
+			fprintf(stderr, "\t%g\t%s\n", e, mask[i]?"GOOD":"bad");
+		}
+	} else printf("RANSAC found no model\n");
+
+#if 0
+	float gamod[9] = {2.8709e-09,  -4.3669e-08,   1.0966e-02,
+   4.0071e-08,   3.6767e-10,   3.4892e-03,
+  -1.2060e-02,  -4.3969e-03,   1.0000e+00};
+	printf("as a comparison, use a fixed model:");
+	printf("parameters =");
+	for (int i = 0; i < modeldim; i++)
+		printf(" %g", gamod[i]);
+	printf("\n");
+	fprintf(stderr, "errors of data points:\n");
+	ransac_error_evaluation_function *ep = epipolar_error;
+	for (int i = 0; i < n; i++) {
+		float e = ep(gamod, data+i*datadim, NULL);
+		fprintf(stderr, "\t%g\t%s\n", e,"unknown");
+	}
+#endif
+
+	// if needed, print the inliers
+	if (inliers_filename) {
+		FILE *f = xfopen(inliers_filename, "w");
+		for (int i = 0; i < n; i++)
+			if (mask[i]) {
+				for(int d = 0; d < datadim; d++)
+					fprintf(f,"%g ",data[i*datadim+d]);
+				fprintf(f,"\n");
+			}
+		xfclose(f);
+	}
+	if (true) {
+		FILE *f = xfopen("/tmp/omask.txt", "w");
+		for (int i = 0; i < n; i++)
+			fprintf(f, mask[i]?" 1":" 0");
+		fprintf(f, "\n");
+		xfclose(f);
+	}
+
+
+	free(mask);
+	free(data);
+
+	return EXIT_SUCCESS;
+}
+
+int main_hack_fundamental_trimatrix(int c, char *v[])
+{
+	if (c < 4) {
+		fprintf(stderr, "usage:\n\t%s fmnt "
+		//                         -1   0
+			"ntrials maxerr minliers [inliers] <data\n", *v);
+		//       1       2      3        4
+		return EXIT_FAILURE;
+	}
+	int ntrials = atoi(v[1]);
+	float maxerr = atof(v[2]);
+	int minliers = atoi(v[3]);
+	char *inliers_filename = v[4];
+
+	fprintf(stderr, "WARNING: ignoring parameter minliers=%d\n", minliers);
+
+	int datadim = 6;
+	int modeldim = 18;
+	int n;
+	float *data = read_ascii_floats(stdin, &n);
+	n /= datadim;
+
+	float model[modeldim];
+	bool *mask = xmalloc(n * sizeof*mask);
+	for (int i = 0; i < n; i++) mask[i] = false;
+	int n_inliers = find_fundamental_pair_by_ransac(mask, model,
+			data, n, ntrials, maxerr);
+
+	// print a summary of the results
+	if (n_inliers > 0) {
+		printf("RANSAC found a nmodel with %d inliers\n", n_inliers);
+		printf("parameters =");
+		for (int i = 0; i < modeldim; i++)
+			printf(" %g", model[i]);
+		printf("\n");
+		fprintf(stderr, "errors of data points:\n");
+		ransac_error_evaluation_function *ep = epipolar_error_triplet;
 		for (int i = 0; i < n; i++) {
 			float e = ep(model, data+i*datadim, NULL);
 			fprintf(stderr, "\t%g\t%s\n", e, mask[i]?"GOOD":"bad");
