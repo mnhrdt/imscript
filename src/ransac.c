@@ -10,6 +10,7 @@
 
 // generic function
 // evaluate the error of a datapoint according to a model
+// (implementing this function is necessary for each ransac case)
 typedef float (ransac_error_evaluation_function)(
 		float *model,
 		float *datapoint,
@@ -20,6 +21,7 @@ typedef float (ransac_error_evaluation_function)(
 // generic function
 // compute the model defined from a few data points
 // (shall return 0 if no model could be computed)
+// (implementing this function is necessary for each ransac case)
 typedef int (ransac_model_generating_function)(
 		float *out_model,  // parameters of the computed model
 		float *data,       // data points
@@ -28,6 +30,7 @@ typedef int (ransac_model_generating_function)(
 
 // generic function
 // tell whether a given model is good enough (e.g., not severely distorted)
+// (this function is optional, and only serves as an optimization hint)
 typedef bool (ransac_model_accepting_function)(
 		float *model,
 		void  *usr);
@@ -105,10 +108,6 @@ static int randombounds(int a, int b)
 	return a + rand()%(b - a + 1);
 }
 
-
-
-
-
 static void swap(void *a, void *b, size_t s)
 {
 #if 0
@@ -129,6 +128,7 @@ static void swap(void *a, void *b, size_t s)
 #endif
 }
 
+// fisher-yates
 void shuffle(void *t, int n, size_t s)
 {
 	char *c = t;
@@ -497,6 +497,14 @@ int main_hack_fundamental_matrix(int c, char *v[])
 			}
 		xfclose(f);
 	}
+	if (true) {
+		FILE *f = xfopen("/tmp/omask.txt", "w");
+		for (int i = 0; i < n; i++)
+			fprintf(f, mask[i]?" 1":" 0");
+		fprintf(f, "\n");
+		xfclose(f);
+	}
+
 
 	free(mask);
 	free(data);

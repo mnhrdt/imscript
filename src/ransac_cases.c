@@ -73,7 +73,7 @@ int find_straight_line_by_ransac(bool *out_mask, float line[3],
 static void affine_map(float *y, float *A, float *x)
 {
 	y[0] = A[0]*x[0] + A[1]*x[1] + A[2];
-	y[1] = A[3]*x[4] + A[5]*x[1] + A[6];
+	y[1] = A[3]*x[0] + A[4]*x[1] + A[5];
 }
 
 // instance of "ransac_error_evaluation_function"
@@ -338,7 +338,7 @@ static float epipolar_error(float *fm, float *pair, void *usr)
 }
 
 
-static float mprod33(float *ab_out, float *a_in, float *b_in)
+static void mprod33(float *ab_out, float *a_in, float *b_in)
 {
 	float (*about)[3] = (void*)ab_out;
 	float (*a)[3] = (void*)a_in;
@@ -384,6 +384,7 @@ int find_fundamental_matrix_by_ransac(bool *out_mask, float out_fm[9],
 		fprintf(stderr, "%g %g %g %g\n",
 				pairsn[4*i+0], pairsn[4*i+1],
 				pairsn[4*i+2], pairsn[4*i+3]);
+	float max_err_n = max_err / PDev;
 
 	// set up algorithm context
 	int datadim = 4;
@@ -397,7 +398,7 @@ int find_fundamental_matrix_by_ransac(bool *out_mask, float out_fm[9],
 	float nfm[9];
 	int n_inliers = ransac(out_mask, nfm,
 			pairsn, datadim, npairs, modeldim,
-			f_err, f_gen, nfit, ntrials, nfit+1, max_err,
+			f_err, f_gen, nfit, ntrials, nfit+1, max_err_n,
 			f_acc, NULL);
 
 	// un-normalize result
