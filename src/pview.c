@@ -54,6 +54,13 @@ struct rgba_value {
 #define FORI(n) for(int i=0;i<(n);i++)
 #endif//FORI
 
+#ifndef BAD_MIN
+#define BAD_MIN(a,b)  (((a)<(b))? (a) : (b))
+#endif
+#ifndef BAD_MAX
+#define BAD_MAX(a,b)  (((a)<(b))? (b) : (a))
+#endif
+
 static bool inner_point(int w, int h, int x, int y)
 {
 	return (x>=0) && (y>=0) && (x<w) && (y<h);
@@ -126,8 +133,8 @@ int main_viewpairs(int c, char *v[])
 	n /= 4;
 	struct rgba_value (*o)[sizex] = xmalloc(sizex*sizey*4);
 	struct {int w, h; struct rgba_value *x; } usr = {sizex, sizey, o[0]};
-	bool bmask[n]; FORI(n) bmask[i] = c<13;
-	if (c>12) { FILE *f = xfopen(v[12], "r");
+	bool mask=c>12, bmask[n]; FORI(n) bmask[i] = !mask;
+	if (mask) { FILE *f = xfopen(v[12], "r");
 		FORI(n) {int t,q=fscanf(f, "%d", &t);bmask[i]=t;}
 		xfclose(f);
 	}
@@ -160,6 +167,55 @@ int main_viewpairs(int c, char *v[])
 				o[t[1]][t[0]] = RGBA_RED;
 				o[z[1]][z[0]] = RGBA_GREEN;
 			}
+		}
+	}
+	if (true) { // show statistics
+		int n_inliers = 0, n_outliers = 0;
+		//stats: min,max,avg
+		double instats[3]  = {INFINITY, -INFINITY, 0};
+		double outstats[3] = {INFINITY, -INFINITY, 0};
+		double allstats[3] = {INFINITY, -INFINITY, 0};
+		FORI(n) {
+			double tt[2]; projective_map(tt, A, p[i]);
+			double e = hypot(tt[0]-p[i][2], tt[1]-p[i][3]);
+			allstats[0] = BAD_MIN(allstats[0], e);
+			allstats[1] = BAD_MAX(allstats[1], e);
+			allstats[2] += e;
+			if (bmask[i]) {
+				instats[0] = BAD_MIN(instats[0], e);
+				instats[1] = BAD_MAX(instats[1], e);
+				instats[2] += e;
+				n_inliers += 1;
+			} else {
+				outstats[0] = BAD_MIN(outstats[0], e);
+				outstats[1] = BAD_MAX(outstats[1], e);
+				outstats[2] += e;
+				n_outliers += 1;
+			}
+		}
+		assert(n == n_inliers + n_outliers);
+		allstats[2] /= n;
+		instats[2] /= n_inliers;
+		outstats[2] /= n_outliers;
+		fprintf(stderr, "got %d points%c", n, mask?':':'\n');
+		if (mask)
+			fprintf(stderr, " %d inliers (%g%%) and "
+					"%d outliers (%g%%)\n",
+				       	n_inliers, n_inliers*100.0/n,
+					n_outliers, n_outliers*100.0/n);
+		fprintf(stderr, "errors: min=%g max=%g avg=%g\n",
+				allstats[0], allstats[1], allstats[2]);
+		if (mask) {
+			fprintf(stderr, "errors (inliers): "
+					"min=%g max=%g avg=%g\n",
+					instats[0], instats[1], instats[2]);
+			fprintf(stderr, "errors (outliers): "
+					"min=%g max=%g avg=%g\n",
+					outstats[0], outstats[1], outstats[2]);
+			if (outstats[0] < instats[2])
+				fprintf(stderr, "WARNING: there are outliers "
+					"with small error.\nProbably you are "
+				"looking at the wrong model or mask file.\n");
 		}
 	}
 	iio_save_image_uint8_vec("-", (uint8_t*)o, sizex, sizey, 4);
@@ -278,8 +334,8 @@ int main_viewepi(int c, char *v[])
 	n /= 4;
 	struct rgba_value (*o)[s[0]] = xmalloc(s[0]*s[1]*4);
 	struct {int w, h; struct rgba_value *x; } usr = {s[0], s[1], o[0]};
-	bool bmask[n]; FORI(n) bmask[i] = c<13;
-	if (c>12) { FILE *f = xfopen(v[12], "r");
+	bool mask=c>12, bmask[n]; FORI(n) bmask[i] = !mask;
+	if (mask) { FILE *f = xfopen(v[12], "r");
 		FORI(n) {int t,q=fscanf(f, "%d", &t);bmask[i]=t;}
 		xfclose(f);
 	}
@@ -322,6 +378,58 @@ int main_viewepi(int c, char *v[])
 				o[y[1]][y[0]] = RGBA_GREEN;
 			else
 				o[y[1]][y[0]] = RGBA_BLUE;
+		}
+	}
+
+	if (true) { // show statistics
+		int n_inliers = 0, n_outliers = 0;
+		//stats: min,max,avg
+		double instats[3]  = {INFINITY, -INFINITY, 0};
+		double outstats[3] = {INFINITY, -INFINITY, 0};
+		double allstats[3] = {INFINITY, -INFINITY, 0};
+		FORI(n) {
+			double L[3], Ly[2];
+			epipolar_line(L, A, p[i]);
+			project_point_to_line(Ly, L, p[i]+2);
+			double e = hypot(Ly[0]-p[i][2], Ly[1]-p[i][3]);
+			allstats[0] = BAD_MIN(allstats[0], e);
+			allstats[1] = BAD_MAX(allstats[1], e);
+			allstats[2] += e;
+			if (bmask[i]) {
+				instats[0] = BAD_MIN(instats[0], e);
+				instats[1] = BAD_MAX(instats[1], e);
+				instats[2] += e;
+				n_inliers += 1;
+			} else {
+				outstats[0] = BAD_MIN(outstats[0], e);
+				outstats[1] = BAD_MAX(outstats[1], e);
+				outstats[2] += e;
+				n_outliers += 1;
+			}
+		}
+		assert(n == n_inliers + n_outliers);
+		allstats[2] /= n;
+		instats[2] /= n_inliers;
+		outstats[2] /= n_outliers;
+		fprintf(stderr, "got %d points%c", n, mask?':':'\n');
+		if (mask)
+			fprintf(stderr, " %d inliers (%g%%) and "
+					"%d outliers (%g%%)\n",
+				       	n_inliers, n_inliers*100.0/n,
+					n_outliers, n_outliers*100.0/n);
+		fprintf(stderr, "errors: min=%g max=%g avg=%g\n",
+				allstats[0], allstats[1], allstats[2]);
+		if (mask) {
+			fprintf(stderr, "errors (inliers): "
+					"min=%g max=%g avg=%g\n",
+					instats[0], instats[1], instats[2]);
+			fprintf(stderr, "errors (outliers): "
+					"min=%g max=%g avg=%g\n",
+					outstats[0], outstats[1], outstats[2]);
+			if (outstats[0] < instats[2])
+				fprintf(stderr, "WARNING: there are outliers "
+					"with small error.\nProbably you are "
+				"looking at the wrong model or mask file.\n");
 		}
 	}
 	iio_save_image_uint8_vec("-", (uint8_t*)o, s[0], s[1], 4);
