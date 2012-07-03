@@ -56,7 +56,11 @@ static bool inner_point(int w, int h, int x, int y)
 
 static int main_viewp(int c, char *v[])
 {
-	if (c != 3) return EXIT_FAILURE;
+	if (c != 3) {
+		fprintf(stderr, "usage:\n\t%s sx sy < pairs.txt\n", *v);
+		//                         0  1  2
+		return EXIT_FAILURE;
+	}
 	int n;
 	float *t = read_ascii_floats(stdin, &n);
 	n /= 2;
@@ -319,7 +323,7 @@ int main(int c, char *v[])
 	else if (0 == strcmp(v[1], "epipolar")) return main_viewepi(c-1, v+1);
 	else {
 	usage: fprintf(stderr, "usage:\n\t%s "
-			       "[points|pairs|triplets|epipolar] params\n", *v);
+"[points|pairs|triplets|epipolar] params... < data.txt | display\n", *v);
 	       return EXIT_FAILURE;
 	}
 }
