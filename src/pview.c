@@ -41,7 +41,12 @@ struct rgba_value {
 #define RGBA_YELLOW  (struct rgba_value){.r=0xff,.g=0xff,.b=0x00,.a=0xff}
 #define RGBA_PHANTOM (struct rgba_value){.r=30,.g=20,.b=10,.a=0xff}
 #define RGBA_BRIGHT  (struct rgba_value){.r=129,.g=86,.b=43,.a=0xff}
-#define RGBA_DARKGRAY	(struct rgba_value){.r=0x30,.g=0x30,.b=0x30,.a=0xff}
+#define RGBA_DARKGRAY (struct rgba_value){.r=0x30,.g=0x30,.b=0x30,.a=0xff}
+#define RGBA_GRAY10 (struct rgba_value){.r=0x10,.g=0x10,.b=0x10,.a=0xff}
+#define RGBA_GRAY20 (struct rgba_value){.r=0x20,.g=0x20,.b=0x20,.a=0xff}
+#define RGBA_GRAY30 (struct rgba_value){.r=0x30,.g=0x30,.b=0x30,.a=0xff}
+#define RGBA_GRAY40 (struct rgba_value){.r=0x40,.g=0x40,.b=0x40,.a=0xff}
+#define RGBA_GRAY50 (struct rgba_value){.r=0x50,.g=0x50,.b=0x50,.a=0xff}
 
 
 
@@ -262,9 +267,9 @@ static void project_point_to_line(double px[2], double L[3], double x[2])
 
 int main_viewepi(int c, char *v[])
 {
-	if (c != 12) {
-		fprintf(stderr, "usage:\n\t%s f0 ... f8 sx sy\n", *v);
-		//                          0 1      9  10 11
+	if (c != 12 && c != 13) {
+		fprintf(stderr, "usage:\n\t%s f0 ... f8 sx sy [mask]\n", *v);
+		//                          0 1      9  10 11  12
 		return EXIT_FAILURE;
 	}
 	double A[9]; FORI(9) A[i] = atof(v[1+i]);
@@ -274,17 +279,20 @@ int main_viewepi(int c, char *v[])
 	struct rgba_value (*o)[s[0]] = xmalloc(s[0]*s[1]*4);
 	struct {int w, h; struct rgba_value *x; } usr = {s[0], s[1], o[0]};
 	bool bmask[n]; FORI(n) bmask[i] = c<13;
-	if (c>12) { FILE *f = xfopen(v[3], "r");
+	if (c>12) { FILE *f = xfopen(v[12], "r");
 		FORI(n) {int t,q=fscanf(f, "%d", &t);bmask[i]=t;}
 		xfclose(f);
 	}
 	FORI(s[0]*s[1]) o[0][i] = RGBA_BLACK;
 	// for each point p (=px) in image A
 	// 1. draw the epipolar line L of p
-	FORI(n) {
-		double L[3];
-		epipolar_line(L, A, p[i]);
-		overlay_line(L[0], L[1], L[2], o[0], s[0], s[1], RGBA_DARKGRAY);
+	FORI(n) { double L[3]; epipolar_line(L, A, p[i]);
+		if (!bmask[i])
+			overlay_line(L[0],L[1],L[2],o[0],s[0],s[1],RGBA_GRAY10);
+	}
+	FORI(n) { double L[3]; epipolar_line(L, A, p[i]);
+		if (bmask[i])
+			overlay_line(L[0],L[1],L[2],o[0],s[0],s[1],RGBA_GRAY50);
 	}
 	// 3. draw the projection line of q to L
 	FORI(n) {
@@ -298,16 +306,23 @@ int main_viewepi(int c, char *v[])
 		{
 			if (inner_point(s[0], s[1], y[0], y[1]))
 				traverse_segment(y[0], y[1], iLy[0], iLy[1],
-						draw_brighter_pixel, &usr);
-			o[iLy[1]][iLy[0]] = RGBA_RED;
+						bmask[i]?draw_brighter_pixel:
+						draw_phantom_pixel, &usr);
+			if (bmask[i])
+				o[iLy[1]][iLy[0]] = RGBA_MAGENTA;
+			else
+				o[iLy[1]][iLy[0]] = RGBA_RED;
 		}
 	}
 	// 2. draw the corresponding point q (py)
 	FORI(n) {
 		int y[2] = {lrint(p[i][2]), lrint(p[i][3])};
-		if (inner_point(s[0], s[1], y[0], y[1]))
-			o[y[1]][y[0]] = RGBA_GREEN;
-
+		if (inner_point(s[0], s[1], y[0], y[1])) {
+			if (bmask[i])
+				o[y[1]][y[0]] = RGBA_GREEN;
+			else
+				o[y[1]][y[0]] = RGBA_BLUE;
+		}
 	}
 	iio_save_image_uint8_vec("-", (uint8_t*)o, s[0], s[1], 4);
 	return EXIT_SUCCESS;
@@ -322,8 +337,8 @@ int main(int c, char *v[])
 	else if (0 == strcmp(v[1], "triplets")) return main_viewtrips(c-1, v+1);
 	else if (0 == strcmp(v[1], "epipolar")) return main_viewepi(c-1, v+1);
 	else {
-	usage: fprintf(stderr, "usage:\n\t%s "
-"[points|pairs|triplets|epipolar] params... < data.txt | display\n", *v);
+	usage: fprintf(stderr, "usage:\n\t%s [points|pairs|triplets|epipolar] "
+			       "params... < data.txt | display\n", *v);
 	       return EXIT_FAILURE;
 	}
 }
