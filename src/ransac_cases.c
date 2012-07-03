@@ -446,11 +446,11 @@ int find_fundamental_matrix_by_ransac(
 	for (int j = 0; j < 4; j++)
 		pairsn[4*i+j] = (pairs[4*i+j]-pmean[j])/PDev;
 
-	for (int i = 0; i < npairs; i++)
-	for (int j = 0; j < 4; j++)
-		fprintf(stderr, "%g %g %g %g\n",
-				pairsn[4*i+0], pairsn[4*i+1],
-				pairsn[4*i+2], pairsn[4*i+3]);
+	//for (int i = 0; i < npairs; i++)
+	//for (int j = 0; j < 4; j++)
+	//	fprintf(stderr, "%g %g %g %g\n",
+	//			pairsn[4*i+0], pairsn[4*i+1],
+	//			pairsn[4*i+2], pairsn[4*i+3]);
 	float max_err_n = max_err / PDev;
 
 	// set up algorithm context
@@ -479,24 +479,24 @@ int find_fundamental_matrix_by_ransac(
 	mprod33(tmp, nfm, B);
 	mprod33(out_fm, Atrans, tmp);
 
-	// print matrices
-	fprintf(stderr, "Atrans= [%g %g %g ; %g %g %g ; %g %g %g]\n",
-			Atrans[0],Atrans[1],Atrans[2],Atrans[3],Atrans[4],Atrans[5],Atrans[6],Atrans[7],Atrans[8]);
-	fprintf(stderr, "nfm= [%g %g %g ; %g %g %g ; %g %g %g]\n",
-			nfm[0],nfm[1],nfm[2],nfm[3],nfm[4],nfm[5],nfm[6],nfm[7],nfm[8]);
-	fprintf(stderr, "B= [%g %g %g ; %g %g %g ; %g %g %g]\n",
-			B[0],B[1],B[2],B[3],B[4],B[5],B[6],B[7],B[8]);
-	fprintf(stderr, "out_fm= [%g %g %g ; %g %g %g ; %g %g %g]\n",
-			out_fm[0],out_fm[1],out_fm[2],out_fm[3],out_fm[4],out_fm[5],out_fm[6],out_fm[7],out_fm[8]);
+	//// print matrices
+	//fprintf(stderr, "Atrans= [%g %g %g ; %g %g %g ; %g %g %g]\n",
+	//		Atrans[0],Atrans[1],Atrans[2],Atrans[3],Atrans[4],Atrans[5],Atrans[6],Atrans[7],Atrans[8]);
+	//fprintf(stderr, "nfm= [%g %g %g ; %g %g %g ; %g %g %g]\n",
+	//		nfm[0],nfm[1],nfm[2],nfm[3],nfm[4],nfm[5],nfm[6],nfm[7],nfm[8]);
+	//fprintf(stderr, "B= [%g %g %g ; %g %g %g ; %g %g %g]\n",
+	//		B[0],B[1],B[2],B[3],B[4],B[5],B[6],B[7],B[8]);
+	//fprintf(stderr, "out_fm= [%g %g %g ; %g %g %g ; %g %g %g]\n",
+	//		out_fm[0],out_fm[1],out_fm[2],out_fm[3],out_fm[4],out_fm[5],out_fm[6],out_fm[7],out_fm[8]);
 
-	// for each pair, display its normalized and un-normalized errors
-	for (int i = 0; i < npairs; i++)
-	{
-		float en = f_err(nfm, pairsn+4*i, NULL);
-		float en2 = epipolar_algebraic_error(nfm, pairsn+4*i, NULL);
-		float eu = f_err(out_fm, pairs+4*i, NULL);
-		fprintf(stderr, "en,eu = %g\t%g\t{%g}\t%g\n", en, eu,eu/en,en2);
-	}
+	//// for each pair, display its normalized and un-normalized errors
+	//for (int i = 0; i < npairs; i++)
+	//{
+	//	float en = f_err(nfm, pairsn+4*i, NULL);
+	//	float en2 = epipolar_algebraic_error(nfm, pairsn+4*i, NULL);
+	//	float eu = f_err(out_fm, pairs+4*i, NULL);
+	//	fprintf(stderr, "en,eu = %g\t%g\t{%g}\t%g\n", en, eu,eu/en,en2);
+	//}
 
 
 	free(pairsn);
