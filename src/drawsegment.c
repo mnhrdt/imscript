@@ -1,3 +1,9 @@
+#ifndef _DRAWSEGMENT_C
+#define _DRAWSEGMENT_C
+
+#include <assert.h>
+#include <math.h>
+
 // draw a segment between two points
 void traverse_segment(int px, int py, int qx, int qy,
 		void (*f)(int,int,void*), void *e)
@@ -99,3 +105,5 @@ void traverse_segment_aa2(float px, float py, float qx, float qy,
 		}
 	}
 }
+
+#endif//_DRAWSEGMENT_C

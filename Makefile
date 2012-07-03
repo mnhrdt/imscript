@@ -1,11 +1,11 @@
 # compiler specific part (may be removed with minor damage)
 #
 ENABLE_GSL = yes
-WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-unused -Wno-array-bounds
+WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-array-bounds -Wno-unused
 
 CFLAGS = $(WFLAGS)
-CFLAGS = -g -rdynamic -DDOTRACE
 CFLAGS = $(WFLAGS) -O3 -DNDEBUG
+CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE
 
 #end of compiler specific part
 
@@ -14,7 +14,7 @@ CFLAGS = $(WFLAGS) -O3 -DNDEBUG
 SRCDIR = src
 BINDIR = bin
 
-SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco vecov flowinv ghisto shuntingyard rpc overpoints periodize rpcflow ransac genk cgi zeropad siftu
+SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco vecov flowinv ghisto shuntingyard rpc overpoints periodize rpcflow ransac genk cgi zeropad siftu pview
 SRCFFT = gblur fft dct
 ifeq ($(ENABLE_GSL), yes)
 	SRCGSL = paraflow minimize
