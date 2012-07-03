@@ -39,7 +39,7 @@ struct rgba_value {
 #define RGBA_BLUE    (struct rgba_value){.r=0x00,.g=0x00,.b=0xff,.a=0xff}
 #define RGBA_MAGENTA (struct rgba_value){.r=0xff,.g=0x00,.b=0xff,.a=0xff}
 #define RGBA_YELLOW  (struct rgba_value){.r=0xff,.g=0xff,.b=0x00,.a=0xff}
-#define RGBA_PHANTOM (struct rgba_value){.r=30,.g=20,.b=10,.a=0xff}
+#define RGBA_PHANTOM (struct rgba_value){.r=0x30,.g=0x20,.b=0x10,.a=0xff}
 #define RGBA_BRIGHT  (struct rgba_value){.r=129,.g=86,.b=43,.a=0xff}
 #define RGBA_DARKGRAY (struct rgba_value){.r=0x30,.g=0x30,.b=0x30,.a=0xff}
 #define RGBA_GRAY10 (struct rgba_value){.r=0x10,.g=0x10,.b=0x10,.a=0xff}
@@ -56,16 +56,19 @@ struct rgba_value {
 
 #ifndef BAD_MIN
 #define BAD_MIN(a,b)  (((a)<(b))? (a) : (b))
-#endif
+#endif//BAD_MIN
 #ifndef BAD_MAX
 #define BAD_MAX(a,b)  (((a)<(b))? (b) : (a))
-#endif
+#endif//BAD_MAX
 
+// decide whether a point falls within the image domain
 static bool inner_point(int w, int h, int x, int y)
 {
 	return (x>=0) && (y>=0) && (x<w) && (y<h);
 }
 
+// CLI utility to view a set of planar points
+// (produces a transparent PNG image)
 static int main_viewp(int c, char *v[])
 {
 	if (c != 3) {
@@ -93,6 +96,7 @@ static int main_viewp(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
+// projective map
 void projective_map(double y[2], double A[9], double x[2])
 {
 	y[0] = A[0]*x[0] + A[1]*x[1] + A[2];
@@ -102,21 +106,81 @@ void projective_map(double y[2], double A[9], double x[2])
 	y[1] /= y2;
 }
 
-static void draw_phantom_pixel(int a, int b, void *pp)
+// argument for the "traverse_segment" function
+//static void put_pixel(int a, int b, void *pp)
+//{
+//	struct {int w, h; struct rgba_value *x, c;} *p = pp;
+//	if (inner_point(p->w, p->h, a, b))
+//		p->x[b*p->w+a] = p->c;
+//}
+
+#include "smapa.h"
+SMART_PARAMETER_SILENT(LINN,100)
+
+// linear combination of two intensities in linear intensity space
+static double lincombin(double a, double b, double t)
 {
-	struct {int w, h; struct rgba_value *x;} *p = pp;
-	if (inner_point(p->w, p->h, a, b))
-		p->x[b*p->w+a] = RGBA_PHANTOM;
+	assert(t >= 0 && t <= 1);
+	double linn = LINN();
+	double la = exp(a/linn);
+	double lb = exp(b/linn);
+	double lr = la*(1-t) + lb*t;
+	double r = linn*log(lr);
+	//if(!((a<=r && r<=b) || (b<=r && r<=a)))
+	//{
+	//	fprintf(stderr, "a b t = %g %g %g\n", a, b, t);
+	//	fprintf(stderr, "la lb lr = %g %g %g\n", la, lb, lr);
+	//	fprintf(stderr, "r = %g\n", r);
+	//}
+	//if (r <= 0) r = 0;
+	//if (r >= 255) r = 255;
+	return r;
 }
 
-static void draw_brighter_pixel(int a, int b, void *pp)
+// argument for the "traverse_segment_aa" function
+static void put_pixel_aa(int a, int b, float f, void *pp)
 {
-	struct {int w, h; struct rgba_value *x;} *p = pp;
+	struct {int w, h; struct rgba_value *x, c;} *p = pp;
 	if (inner_point(p->w, p->h, a, b))
-		p->x[b*p->w+a] = RGBA_BRIGHT;
+	{
+		struct rgba_value *g = p->x + b*p->w + a;
+		struct rgba_value *k = &p->c;
+		g->r = lincombin(g->r, k->r, f);
+		g->g = lincombin(g->g, k->g, f);
+		g->b = lincombin(g->b, k->b, f);
+		//g->r = g->r*(1-f) + k->r*f;
+		//g->g = g->g*(1-f) + k->g*f;
+		//g->b = g->b*(1-f) + k->b*f;
+	}
+}
+
+static void overlay_segment_color(struct rgba_value *x, int w, int h,
+		int px, int py, int qx, int qy, struct rgba_value c)
+{
+	struct {int w, h; struct rgba_value *x, c; } e = {w, h, x, c};
+	traverse_segment_aa(px, py, qx, qy, put_pixel_aa, &e);
+}
+
+static void overlay_line(double a, double b, double c,
+		struct rgba_value *x, int w, int h, struct rgba_value k)
+{
+	if (b == 0) {
+		int f[2] = {-c/a, 0};
+		int t[2] = {-c/a, h-1};
+		overlay_segment_color(x, w, h, f[0], f[1], t[0], t[1], k);
+	} else {
+		double alpha = -a/b;
+		double beta = -c/b;
+		int f[2] = {0, beta};
+		int t[2] = {w-1, alpha*(w-1)+beta};
+		overlay_segment_color(x, w, h, f[0], f[1], t[0], t[1], k);
+	}
 }
 
 
+// CLI utility to view a set of pairs of points,
+// the set of "left" points is transformed by the given homography
+// (produces a transparent PNG image)
 int main_viewpairs(int c, char *v[])
 {
 	if (c != 12 && c != 13) {
@@ -132,10 +196,9 @@ int main_viewpairs(int c, char *v[])
 	double (*p)[4] = (void*)read_ascii_doubles(stdin, &n);
 	n /= 4;
 	struct rgba_value (*o)[sizex] = xmalloc(sizex*sizey*4);
-	struct {int w, h; struct rgba_value *x; } usr = {sizex, sizey, o[0]};
 	bool mask=c>12, bmask[n]; FORI(n) bmask[i] = !mask;
 	if (mask) { FILE *f = xfopen(v[12], "r");
-		FORI(n) {int t,q=fscanf(f, "%d", &t);bmask[i]=t;}
+		FORI(n) {int t,q=fscanf(f, "%d", &t);bmask[i]=q&&t;}
 		xfclose(f);
 	}
 	FORI(sizex*sizey) o[0][i] = RGBA_BLACK;
@@ -148,8 +211,9 @@ int main_viewpairs(int c, char *v[])
 		if (inner_point(sizex, sizey, t[0], t[1]) &&
 				inner_point(sizex, sizey, z[0], z[1]))
 			if (!bmask[i]) {
-				traverse_segment(t[0], t[1], z[0], z[1],
-						draw_phantom_pixel, &usr);
+				overlay_segment_color(*o, sizex, sizey,
+						t[0], t[1], z[0], z[1],
+						RGBA_PHANTOM);
 				o[t[1]][t[0]] = RGBA_RED;
 				o[z[1]][z[0]] = RGBA_BLUE;
 			}
@@ -162,14 +226,15 @@ int main_viewpairs(int c, char *v[])
 				inner_point(sizex, sizey, z[0], z[1])
 		   ) {
 			if (bmask[i]) {
-				traverse_segment(t[0], t[1], z[0], z[1],
-						draw_brighter_pixel, &usr);
+				overlay_segment_color(*o, sizex, sizey,
+						t[0], t[1], z[0], z[1],
+						RGBA_BRIGHT);
 				o[t[1]][t[0]] = RGBA_RED;
 				o[z[1]][z[0]] = RGBA_GREEN;
 			}
 		}
 	}
-	if (true) { // show statistics
+	if (true) { // compute and show statistics
 		int n_inliers = 0, n_outliers = 0;
 		//stats: min,max,avg
 		double instats[3]  = {INFINITY, -INFINITY, 0};
@@ -222,6 +287,8 @@ int main_viewpairs(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
+// CLI utility to display a set of triplets of planar points
+// (produces a transparent PNG image)
 int main_viewtrips(int c, char *v[])
 {
 	if (c != 3 && c != 4) {
@@ -233,10 +300,9 @@ int main_viewtrips(int c, char *v[])
 	double (*p)[6] = (void*)read_ascii_doubles(stdin, &n);
 	n /= 6;
 	struct rgba_value (*o)[s[0]] = xmalloc(s[0]*s[1]*4);
-	struct {int w, h; struct rgba_value *x; } usr = {s[0], s[1], o[0]};
 	bool bmask[n]; FORI(n) bmask[i] = c<4;
 	if (c>3) { FILE *f = xfopen(v[3], "r");
-		FORI(n) {int t,q=fscanf(f, "%d", &t);bmask[i]=t;}
+		FORI(n) {int t,q=fscanf(f, "%d", &t);bmask[i]=q&&t;}
 		xfclose(f);
 	}
 	FORI(s[0]*s[1]) o[0][i] = RGBA_BLACK;
@@ -248,12 +314,14 @@ int main_viewtrips(int c, char *v[])
 				inner_point(s[0], s[1], z[0], z[1]) &&
 				inner_point(s[0], s[1], Z[0], Z[1]))
 		{
-			void (*pix)(int,int,void*) = (bmask[i]&&c>3)?
-				draw_brighter_pixel:draw_phantom_pixel;
-			traverse_segment(t[0], t[1], z[0], z[1],
-					pix, &usr);
-			traverse_segment(z[0], z[1], Z[0], Z[1],
-					pix, &usr);
+			//void (*pix)(int,int,void*) = (bmask[i]&&c>3)?
+			//	draw_brighter_pixel:draw_phantom_pixel;
+			struct rgba_value kk = (bmask[i]&&c>3)?
+				RGBA_BRIGHT:RGBA_PHANTOM;
+			overlay_segment_color(*o, s[0], s[1],
+					t[0], t[1], z[0], z[1], kk);
+			overlay_segment_color(*o, s[0], s[1],
+					z[0], z[1], Z[0], Z[1], kk);
 		}
 	}
 	FORI(n) {
@@ -273,35 +341,6 @@ int main_viewtrips(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
-static void put_pixel(int a, int b, void *pp)
-{
-	struct {int w, h; struct rgba_value *x, c;} *p = pp;
-	if (inner_point(p->w, p->h, a, b))
-		p->x[b*p->w+a] = p->c;
-}
-
-static void overlay_segment_color(struct rgba_value *x, int w, int h,
-		int px, int py, int qx, int qy, struct rgba_value c)
-{
-	struct {int w, h; struct rgba_value *x, c; } e = {w, h, x, c};
-	traverse_segment(px, py, qx, qy, put_pixel, &e);
-}
-
-static void overlay_line(double a, double b, double c,
-		struct rgba_value *x, int w, int h, struct rgba_value k)
-{
-	if (b == 0) {
-		int f[2] = {-c/a, 0};
-		int t[2] = {-c/a, h-1};
-		overlay_segment_color(x, w, h, f[0], f[1], t[0], t[1], k);
-	} else {
-		double alpha = -a/b;
-		double beta = -c/b;
-		int f[2] = {0, beta};
-		int t[2] = {w-1, alpha*(w-1)+beta};
-		overlay_segment_color(x, w, h, f[0], f[1], t[0], t[1], k);
-	}
-}
 
 static void epipolar_line(double L[3], double F[9], double x[2])
 {
@@ -333,10 +372,9 @@ int main_viewepi(int c, char *v[])
 	double (*p)[4] = (void*)read_ascii_doubles(stdin, &n);
 	n /= 4;
 	struct rgba_value (*o)[s[0]] = xmalloc(s[0]*s[1]*4);
-	struct {int w, h; struct rgba_value *x; } usr = {s[0], s[1], o[0]};
 	bool mask=c>12, bmask[n]; FORI(n) bmask[i] = !mask;
 	if (mask) { FILE *f = xfopen(v[12], "r");
-		FORI(n) {int t,q=fscanf(f, "%d", &t);bmask[i]=t;}
+		FORI(n) {int t,q=fscanf(f, "%d", &t);bmask[i]=q&&t;}
 		xfclose(f);
 	}
 	FORI(s[0]*s[1]) o[0][i] = RGBA_BLACK;
@@ -361,9 +399,9 @@ int main_viewepi(int c, char *v[])
 		if (inner_point(s[0], s[1], iLy[0], iLy[1]))
 		{
 			if (inner_point(s[0], s[1], y[0], y[1]))
-				traverse_segment(y[0], y[1], iLy[0], iLy[1],
-						bmask[i]?draw_brighter_pixel:
-						draw_phantom_pixel, &usr);
+				overlay_segment_color(*o, s[0], s[1],
+						y[0], y[1], iLy[0], iLy[1],
+					bmask[i]?RGBA_BRIGHT:RGBA_PHANTOM);
 			if (bmask[i])
 				o[iLy[1]][iLy[0]] = RGBA_MAGENTA;
 			else
