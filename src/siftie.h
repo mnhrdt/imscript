@@ -61,11 +61,20 @@ struct ann_pair *siftlike_get_accpairs(
 		struct sift_keypoint *, int,
 		struct sift_keypoint *, int,
 		int *, float);
+struct ann_pair *siftlike_get_accpairsrad(
+		struct sift_keypoint *, int,
+		struct sift_keypoint *, int,
+		int *, float, float, float);
 struct ann_trip *siftlike_get_triplets(
 		struct sift_keypoint *, int,
 		struct sift_keypoint *, int,
 		struct sift_keypoint *, int,
 		int *, float);
+struct ann_trip *siftlike_get_tripletsrad(
+		struct sift_keypoint *, int,
+		struct sift_keypoint *, int,
+		struct sift_keypoint *, int,
+		int *, float, float, float);
 
 void siftlike_maskpairs(bool *mask, struct ann_pair *t, int n);
 

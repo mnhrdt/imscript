@@ -340,6 +340,28 @@ static int fancynearestt(struct sift_keypoint *q,
 	return bestd < dmax ? besti : -1;
 }
 
+// returns i such that t[i] is as close as possible to q
+// if the distance is largest than dmax, return -1
+static int fancynearestt_rad(struct sift_keypoint *q,
+		struct sift_keypoint *t, int nt,
+		float *od, float dmax, float dx, float dy)
+{
+	int besti = -1;
+	float bestd = INFINITY;
+	FORI(nt) {
+		if (fabs(q->pos[0] - t[i].pos[0]) > dx) continue;
+		if (fabs(q->pos[1] - t[i].pos[1]) > dy) continue;
+		float nb = dist_descst(q, t+i, dmax);
+		if (nb < bestd) {
+			bestd = nb;
+			besti = i;
+		}
+	}
+	assert(besti >= 0);
+	*od = bestd;
+	return bestd < dmax ? besti : -1;
+}
+
 int (*siftlike_getpairs(
 		struct sift_keypoint *ka, int na, 
 		struct sift_keypoint *kb, int nb,
@@ -423,6 +445,36 @@ struct ann_pair *siftlike_get_accpairs(
 	return p;
 }
 
+// get two lists of points, and produce a list of pairs
+// (first nearest matches)
+struct ann_pair *siftlike_get_accpairsrad(
+		struct sift_keypoint *ka, int na,
+		struct sift_keypoint *kb, int nb,
+		int *onp,
+		float t, float dx, float dy
+		)
+{
+	if (na == 0 || nb == 0) { *onp=0; return NULL; }
+	struct ann_pair *p = xmalloc(na * sizeof * p);
+	int np = 0;
+	FORI(na) {
+		float d;
+		int j = fancynearestt_rad(ka + i, kb, nb, &d, t, dx, dy);
+		if (j >= 0) {
+			p[np].from = i;
+			p[np].to = j;
+			p[np].v[0] = d;
+			p[np].v[1] = NAN;
+			np += 1;
+		}
+	}
+	//FORI(na) fprintf(stderr, "BEFORE p[%d].from=%d\n", i, p[i].from);
+	sort_annpairs(p, np);
+	//FORI(na) fprintf(stderr, "AFTER p[%d].from=%d\n", i, p[i].from);
+	*onp = np;
+	return p;
+}
+
 // get three lists of points, and produce a list of matching triplets
 // (first nearest matches)
 struct ann_trip *siftlike_get_triplets(
@@ -440,6 +492,40 @@ struct ann_trip *siftlike_get_triplets(
 		float db, dc;
 		int jb = fancynearestt(ka + i, kb, nb, &db, t);
 		int jc = fancynearestt(ka + i, kc, nc, &dc, t);
+		if (jb >= 0 && jc >= 0) {
+			p[np].froma = i;
+			p[np].tob = jb;
+			p[np].toc = jc;
+			p[np].v[0] = hypot(db,dc);
+			p[np].v[1] = db;
+			p[np].v[2] = dc;
+			np += 1;
+		}
+	}
+	//FORI(na) fprintf(stderr, "BEFORE p[%d].from=%d\n", i, p[i].from);
+	//sort_annpairs(p, np);
+	//FORI(na) fprintf(stderr, "AFTER p[%d].from=%d\n", i, p[i].from);
+	*onp = np;
+	return p;
+}
+
+// get three lists of points, and produce a list of matching triplets
+// (first nearest matches)
+struct ann_trip *siftlike_get_tripletsrad(
+		struct sift_keypoint *ka, int na,
+		struct sift_keypoint *kb, int nb,
+		struct sift_keypoint *kc, int nc,
+		int *onp,
+		float t, float rx, float ry
+		)
+{
+	if (na == 0 || nb == 0 || nc == 0) { *onp=0; return NULL; }
+	struct ann_trip *p = xmalloc(na * sizeof * p);
+	int np = 0;
+	FORI(na) {
+		float db, dc;
+		int jb = fancynearestt_rad(ka + i, kb, nb, &db, t, rx, ry);
+		int jc = fancynearestt_rad(ka + i, kc, nc, &dc, t, rx, ry);
 		if (jb >= 0 && jc >= 0) {
 			p[np].froma = i;
 			p[np].tob = jb;

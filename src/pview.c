@@ -120,8 +120,9 @@ SMART_PARAMETER_SILENT(LINN,100)
 // linear combination of two intensities in linear intensity space
 static double lincombin(double a, double b, double t)
 {
-	assert(t >= 0 && t <= 1);
 	double linn = LINN();
+	if (linn < 0) return a*(1-t)+b*t;
+	assert(t >= 0 && t <= 1);
 	double la = exp(a/linn);
 	double lb = exp(b/linn);
 	double lr = la*(1-t) + lb*t;
@@ -154,6 +155,7 @@ static void put_pixel_aa(int a, int b, float f, void *pp)
 	}
 }
 
+// draw a color segment over a color image
 static void overlay_segment_color(struct rgba_value *x, int w, int h,
 		int px, int py, int qx, int qy, struct rgba_value c)
 {
@@ -161,6 +163,7 @@ static void overlay_segment_color(struct rgba_value *x, int w, int h,
 	traverse_segment_aa(px, py, qx, qy, put_pixel_aa, &e);
 }
 
+// draw a color line over a color image
 static void overlay_line(double a, double b, double c,
 		struct rgba_value *x, int w, int h, struct rgba_value k)
 {
@@ -342,6 +345,8 @@ int main_viewtrips(int c, char *v[])
 }
 
 
+// L := x' * F'
+// compute the F-epipolar line defined by the point x
 static void epipolar_line(double L[3], double F[9], double x[2])
 {
 	L[0] = x[0]*F[0] + x[1]*F[3] + F[6];
@@ -349,6 +354,7 @@ static void epipolar_line(double L[3], double F[9], double x[2])
 	L[2] = x[0]*F[2] + x[1]*F[5] + F[8];
 }
 
+// project point x to the line L
 static void project_point_to_line(double px[2], double L[3], double x[2])
 {
 	double a = L[0];
@@ -360,6 +366,9 @@ static void project_point_to_line(double px[2], double L[3], double x[2])
 	px[1] = (-b*c + a*e)/d;
 }
 
+
+// CLI utility to display a fundamental matrix and some matched points
+// (produces a transparent PNG image)
 int main_viewepi(int c, char *v[])
 {
 	if (c != 12 && c != 13) {
@@ -474,6 +483,8 @@ int main_viewepi(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
+// CLI utility to access some visualization programs
+// all programs read text file from stdin and write a transparent PNG to stdout
 int main(int c, char *v[])
 {
 	assert(4 == sizeof(struct rgba_value));
