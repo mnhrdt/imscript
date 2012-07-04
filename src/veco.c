@@ -60,7 +60,7 @@ int compare_floats(const void *a, const void *b)
 
 static float float_med(float *x, int n)
 {
-	if (!n) fail("empty list of pixel values!");
+	if (!n) return NAN;//fail("empty list of pixel values!");
 	if (n == 1) return x[0];
 	if (n == 2) return x[0];
 	qsort(x, n, sizeof*x, compare_floats);
