@@ -372,6 +372,13 @@ int main_cases(int c, char *v[])
 		//model_acceptation = homography_is_reasonable;
 		model_acceptation = NULL;
 
+	} else if (0 == strcmp(model_id, "aff3d")) {
+		datadim = 6;
+		modeldim = 12;
+		nfit = 4;
+		model_evaluation = affine3d_match_error;
+		model_generation = affine3d_map_from_four_pairs;
+
 	} else if (0 == strcmp(model_id, "fm")) { // fundamental matrix
 		datadim = 4;
 		modeldim = 9;

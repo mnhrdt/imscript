@@ -596,3 +596,117 @@ int find_fundamental_pair_by_ransac(bool *out_mask, float out_fm[18],
 	return n_inliers;
 }
 
+
+// ************************************
+// ************************************
+// ************************************
+// ************************************
+//
+// 6. affine maps between pairs of spatial points
+// 	datadim = 6 (coordinates of each pair of points)
+// 	modeldim = 12 (coefficients of the affine map)
+// 	nfit = 4 (number of pairs that determine an affine map)
+
+// utility function
+static void affine3d_eval(float y[3], float A[12], float x[3])
+{
+	y[0] = A[0]*x[0] + A[1]*x[1] + A[2]*x[2] + A[3];
+	y[1] = A[4]*x[0] + A[5]*x[1] + A[6]*x[2] + A[7];
+	y[2] = A[8]*x[0] + A[9]*x[1] + A[10]*x[2] + A[11];
+}
+
+// instance of "ransac_error_evaluation_function"
+static float affine3d_match_error(float *aff, float *pair, void *usr)
+{
+	float x[3] = {pair[0], pair[1], pair[2]};
+	float y[3] = {pair[3], pair[4], pair[5]};
+	float Ax[3]; affine3d_eval(Ax, aff, x);
+	float d[3] = {Ax[0] - y[0], Ax[1] - y[1], Ax[2] - y[2]};
+	float r = fnorm(d, 3);
+	return r;
+}
+
+// auxiliary function
+static void affine3d_map_from_canonical_basis(float A[12],
+		float o[3], float x[3], float y[3], float z[3])
+{
+	float r[12] = {
+		x[0], y[0], z[0], o[0],
+		x[1], y[1], z[1], o[1],
+		x[2], y[2], z[2], o[2]};
+	for (int i = 0; i < 12; i++)
+		A[i] = r[i];
+}
+
+// auxiliary function
+static void affine3d_map_compose(float AB[12], float A[12], float B[12])
+{
+	float a[4][4] = {
+		{A[0], A[1], A[2], A[3]},
+		{A[4], A[5], A[6], A[7]},
+		{A[8], A[9], A[10], A[11]},
+		{0,0,0,1}};
+	float b[4][4] = {
+		{B[0], B[1], B[2], B[3]},
+		{B[4], B[5], B[6], B[7]},
+		{B[8], B[9], B[10], B[11]},
+		{0,0,0,1}};
+	float ab[4][4];
+	MATRIX_PRODUCT_4X4(ab, a, b);
+	float r[12] = {
+		ab[0][0], ab[1][0], ab[2][0], ab[3][0],
+		ab[0][1], ab[1][1], ab[2][1], ab[3][1],
+		ab[0][2], ab[1][2], ab[2][2], ab[3][1]
+	};
+	for (int i = 0; i < 12; i++)
+		AB[i] = r[i];
+}
+
+// auxiliary function
+static float affine3d_map_invert(float iA[12], float A[12])
+{
+	float a[3][3] = {
+		{A[0], A[1], A[2]},
+		{A[4], A[5], A[6]},
+		{A[8], A[9], A[10]}
+	};
+	float t[3] = {A[3], A[7], A[11]};
+	float ia[3][3], det;
+	INVERT_3X3(ia, det, a);
+	float iat[3];
+	MAT_DOT_VEC_3X3(iat, ia, t);
+	float r[12] = {
+		ia[0][0], ia[1][0], ia[2][0], -iat[0],
+		ia[0][1], ia[1][1], ia[2][1], -iat[1],
+		ia[0][2], ia[1][2], ia[2][2], -iat[2]
+	};
+	for (int i = 0; i < 12; i++)
+		iA[i] = r[i];
+	return det;
+}
+
+// instance of "ransac_model_generating_function"
+static int affine3d_map_from_four_pairs(float *aff, float *pairs, void *usr)
+{
+	float x[4][3] = {
+		{pairs[0], pairs[1], pairs[2]},
+		{pairs[6], pairs[7], pairs[8]},
+		{pairs[12], pairs[13], pairs[14]},
+		{pairs[18], pairs[19], pairs[20]}
+	};
+	float y[4][3] = {
+		{pairs[3], pairs[4], pairs[5]},
+		{pairs[9], pairs[10], pairs[11]},
+		{pairs[15], pairs[16], pairs[17]},
+		{pairs[21], pairs[22], pairs[23]}
+	};
+	float A0X[12], A0Y[12], AX0[12], AXY[12];;
+	affine3d_map_from_canonical_basis(A0X, x[0], x[1], x[2], x[3]);
+	affine3d_map_from_canonical_basis(A0Y, y[0], y[1], y[2], y[3]);
+	float det = affine3d_map_invert(AX0, A0X);
+	affine3d_map_compose(AXY, A0Y, AX0);
+	for (int i = 0; i < 12; i++)
+		aff[i] = AXY[i];
+	return fabs(det) > 0.0001 ? 1 : 0;
+}
+
