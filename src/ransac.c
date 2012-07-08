@@ -154,6 +154,7 @@ static void fill_random_shuffle(int *idx, int n, int a, int b)
 // generate a set of n different ints between a and b
 static void fill_random_indices(int *idx, int n, int a, int b)
 {
+	if (b-a==n) {for(int i=0;i<n;i++)idx[i]=a+i;}
 	if (5*n > (b-a)) {fill_random_shuffle(idx, n, a, b);return;}
 	// TODO fisher yates shuffle and traverse it by blocks of length nfit
 	int safecount = 0;
@@ -263,6 +264,12 @@ int ransac(
 	for (int i = 0; i < modeldim; i++)
 		fprintf(stderr, " %g", best_model[i]);
 	fprintf(stderr, "\n");
+	if (1) {
+		FILE *f = xfopen("/tmp/ramo.txt", "w");
+		for (int i = 0; i < modeldim; i++)
+			fprintf(f,"%lf%c",best_model[i],i==modeldim-1?'\n':' ');
+		xfclose(f);
+	}
 	//fprintf(stderr, "errors of outliers:");
 	//for (int i = 0; i < n; i++)
 	//	if (!best_mask[i]) {

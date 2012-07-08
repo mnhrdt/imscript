@@ -631,11 +631,28 @@ static void affine3d_map_from_canonical_basis(float A[12],
 		float o[3], float x[3], float y[3], float z[3])
 {
 	float r[12] = {
-		x[0], y[0], z[0], o[0],
-		x[1], y[1], z[1], o[1],
-		x[2], y[2], z[2], o[2]};
+		x[0]-o[0], y[0]-o[0], z[0]-o[0], o[0],
+		x[1]-o[1], y[1]-o[1], z[1]-o[1], o[1],
+		x[2]-o[2], y[2]-o[2], z[2]-o[2], o[2]};
 	for (int i = 0; i < 12; i++)
 		A[i] = r[i];
+	if (0) { // check correctness
+		float X[3][3] = {
+			{x[0], x[1], x[2]},
+			{y[0], y[1], y[2]},
+			{z[0], z[1], z[2]}
+		};
+		for (int i = 0; i < 3; i++)
+		{
+			float oi[3] = {0}; oi[i] = 1;
+			float xi[3] = {X[i][0], X[i][1], X[i][2]};
+			float aoi[3];
+			affine3d_eval(aoi, A, oi);
+			float ddd[3] = {aoi[0]-xi[0],aoi[1]-xi[1],aoi[2]-xi[2]};
+			float eee = fnorm(ddd, 3);
+			fprintf(stderr, "oeee %d = %g\n", i, eee);
+		}
+	}
 }
 
 // auxiliary function
@@ -654,9 +671,9 @@ static void affine3d_map_compose(float AB[12], float A[12], float B[12])
 	float ab[4][4];
 	MATRIX_PRODUCT_4X4(ab, a, b);
 	float r[12] = {
-		ab[0][0], ab[1][0], ab[2][0], ab[3][0],
-		ab[0][1], ab[1][1], ab[2][1], ab[3][1],
-		ab[0][2], ab[1][2], ab[2][2], ab[3][1]
+		ab[0][0], ab[0][1], ab[0][2], ab[0][3],
+		ab[1][0], ab[1][1], ab[1][2], ab[1][3],
+		ab[2][0], ab[2][1], ab[2][2], ab[2][3]
 	};
 	for (int i = 0; i < 12; i++)
 		AB[i] = r[i];
@@ -676,9 +693,9 @@ static float affine3d_map_invert(float iA[12], float A[12])
 	float iat[3];
 	MAT_DOT_VEC_3X3(iat, ia, t);
 	float r[12] = {
-		ia[0][0], ia[1][0], ia[2][0], -iat[0],
-		ia[0][1], ia[1][1], ia[2][1], -iat[1],
-		ia[0][2], ia[1][2], ia[2][2], -iat[2]
+		ia[0][0], ia[0][1], ia[0][2], -iat[0],
+		ia[1][0], ia[1][1], ia[1][2], -iat[1],
+		ia[2][0], ia[2][1], ia[2][2], -iat[2]
 	};
 	for (int i = 0; i < 12; i++)
 		iA[i] = r[i];
@@ -707,6 +724,31 @@ static int affine3d_map_from_four_pairs(float *aff, float *pairs, void *usr)
 	affine3d_map_compose(AXY, A0Y, AX0);
 	for (int i = 0; i < 12; i++)
 		aff[i] = AXY[i];
-	return fabs(det) > 0.0001 ? 1 : 0;
+	int r = fabs(det) > 0.0001 ? 1 : 0;
+
+	if (0) { // check correctness
+		for (int i = 0; i < 4; i++)
+		{
+			float xi[3] = {x[i][0], x[i][1], x[i][2]};
+			float yi[3] = {y[i][0], y[i][1], y[i][2]};
+			float axi[3];
+			affine3d_eval(axi, aff, xi);
+			float ddd[3] = {axi[0]-yi[0],axi[1]-yi[1],axi[2]-yi[2]};
+			float eee = fnorm(ddd, 3);
+			fprintf(stderr, "eee %d = %g\n", i, eee);
+		}
+	}
+
+	if (0) { // verbose computation
+		fprintf(stderr, "aff3d four pairs:");
+		for (int i = 0; i < 24; i++)
+			fprintf(stderr, " %g", pairs[i]);
+		fprintf(stderr, "\naff3d model:");
+		for (int i = 0; i < 12; i++)
+			fprintf(stderr, " %g", aff[i]);
+		fprintf(stderr, "\n\n");
+	}
+
+	return r;
 }
 

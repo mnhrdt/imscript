@@ -90,9 +90,10 @@ void free_matrix(float **m, int nrl, int nrh, int ncl, int nch)
 
 /* Singular Value Decomposition routine */
 
-static float at,bt,ct;
-#define PYTHAG(a,b) ((at=fabs(a)) > (bt=fabs(b)) ? \
-(ct=bt/at,at*sqrt(1.0+ct*ct)) : (bt ? (ct=at/bt,bt*sqrt(1.0+ct*ct)): 0.0))
+//static float at,bt,ct;
+#define PYTHAG(a,b) hypot(a,b)
+//#define PYTHAG(a,b) ((at=fabs(a)) > (bt=fabs(b)) ?
+//(ct=bt/at,at*sqrt(1.0+ct*ct)) : (bt ? (ct=at/bt,bt*sqrt(1.0+ct*ct)): 0.0))
 
 static float maxarg1,maxarg2;
 #define MAX(a,b) (maxarg1=(a),maxarg2=(b),(maxarg1) > (maxarg2) ?\

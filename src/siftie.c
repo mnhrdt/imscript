@@ -357,6 +357,7 @@ static int fancynearestt_rad(struct sift_keypoint *q,
 			besti = i;
 		}
 	}
+	if (besti < 0) return -1;
 	assert(besti >= 0);
 	*od = bestd;
 	return bestd < dmax ? besti : -1;

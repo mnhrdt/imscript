@@ -400,7 +400,7 @@ int main(int c, char *v[])
 {
 	//return main_trial(c, v);
 	//return main_trial2(c, v);
-	return main_rpcline(c, v);
-	//return main_rpcpair(c, v);
+	//return main_rpcline(c, v);
+	return main_rpcpair(c, v);
 }
 #endif
