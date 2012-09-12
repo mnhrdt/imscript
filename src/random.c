@@ -8,7 +8,7 @@
 
 static double random_uniform(void)
 {
-	return rand()/(RAND_MAX+1.0);
+	return rand()/(1.0+RAND_MAX);
 }
 
 static double random_normal(void)
@@ -27,6 +27,30 @@ int randombounds(int a, int b)
 	if (b == a)
 		return b;
 	return a + rand()%(b - a + 1);
+}
+
+static double random_laplace(void)
+{
+	double x = random_uniform();
+	double y = random_uniform();
+	double r = log(x/y);
+}
+
+static double random_cauchy(void)
+{
+	double x1 = random_uniform();
+	double x2 = random_uniform();
+	double y1 = sqrt(-2*log(x1)) * cos(2*M_PI*x2);
+	double y2 = sqrt(-2*log(x1)) * sin(2*M_PI*x2);
+	return y1/y2;
+}
+
+static double random_exponential(void)
+{
+	//double u = random_uniform();
+	//double r = -log(1-u);
+	//return r;
+	return fabs(random_laplace());
 }
 
 #endif//_RANDOM_C
