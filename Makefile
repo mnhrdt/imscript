@@ -1,12 +1,12 @@
 # compiler specific part (may be removed with minor damage)
 #
 ENABLE_GSL = yes
-WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-array-bounds -Wno-unused
 WFLAGS=
+WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-array-bounds -Wno-unused
 
-CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE
 CFLAGS = $(WFLAGS) -O3 -DNDEBUG
 CFLAGS = $(WFLAGS)
+CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE
 
 #end of compiler specific part
 
@@ -15,7 +15,7 @@ CFLAGS = $(WFLAGS)
 SRCDIR = src
 BINDIR = bin
 
-SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco vecov flowinv ghisto shuntingyard rpc overpoints periodize rpcflow ransac genk cgi zeropad siftu pview homfilt rpchfilt uncrop maptp rpcparcheck rpc_errsingle rpc_errpair
+SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco vecov flowinv ghisto shuntingyard rpc overpoints periodize rpcflow ransac genk cgi zeropad siftu pview homfilt rpchfilt uncrop maptp rpcparcheck rpc_errsingle rpc_errpair cline
 SRCFFT = gblur fft dct
 ifeq ($(ENABLE_GSL), yes)
 	SRCGSL = paraflow minimize
@@ -66,6 +66,8 @@ PROGRAMS = $(addprefix $(BINDIR)/,$(SRC) flow_ms rgfield rgfields rgfieldst)
 
 .PHONY: default
 default: $(PROGRAMS)
+
+$(addprefix $(BINDIR)/,depend) : $(SRCDIR)/
 
 
 $(addprefix $(BINDIR)/,$(SRCIIO)) : $(BINDIR)/% : $(SRCDIR)/%.c $(SRCDIR)/iio.o
@@ -118,3 +120,5 @@ zipdate: clean
 .PHONY: zip
 zip: clean
 	(cd ..;tar --exclude-vcs -zchf imscript.tar.gz imscript)
+
+include src/dependencies
