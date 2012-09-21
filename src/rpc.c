@@ -23,6 +23,9 @@ struct rpc {
 	double inumy[20];
 	double ideny[20];
 	double iscale[3], ioffset[3];
+
+	double dmval[4];
+	double imval[4];
 };
 
 // set all the values of an rpc model to NAN
@@ -89,6 +92,14 @@ static void add_tag_to_rpc(struct rpc *p, char *tag, double x)
 	else if (0 <= (t=pix(tag, "iSAMP_DEN_COEFF_"))) p->idenx  [t] = x;
 	else if (0 <= (t=pix(tag, "iLINE_NUM_COEFF_"))) p->inumy  [t] = x;
 	else if (0 <= (t=pix(tag, "iLINE_DEN_COEFF_"))) p->ideny  [t] = x;
+	else if (0 == strhas(tag, "FIRST_ROW"))         p->dmval  [1] = x;
+	else if (0 == strhas(tag, "FIRST_COL"))         p->dmval  [0] = x;
+	else if (0 == strhas(tag, "LAST_ROW"))          p->dmval  [3] = x;
+	else if (0 == strhas(tag, "LAST_COL"))          p->dmval  [2] = x;
+	else if (0 == strhas(tag, "FIRST_LON"))         p->imval  [0] = x;
+	else if (0 == strhas(tag, "FIRST_LAT"))         p->imval  [1] = x;
+	else if (0 == strhas(tag, "LAST_LON"))          p->imval  [2] = x;
+	else if (0 == strhas(tag, "LAST_LAT"))          p->imval  [3] = x;
 }
 
 // process an input line
@@ -148,18 +159,54 @@ void print_rpc(FILE *f, struct rpc *p, char *n)
 double eval_pol20(double c[20], double x, double y, double z)
 {
 	// XXX WARNING: inversion here!
-	double col = y;
-	double lig = x;
-	double alt = z;
-	double m[20] = {1, lig, col, alt, lig*col,
-		lig*alt, col*alt, lig*lig, col*col, alt*alt,
-		col*lig*alt, lig*lig*lig, lig*col*col, lig*alt*alt, lig*lig*col,
-		col*col*col, col*alt*alt, lig*lig*alt, col*col*alt, alt*alt*alt
-	};
-	//double m[20] = {1, y, x, z, x*y,
-	//	y*z, x*z, y*y, x*x, z*z,
-	//	x*y*z, y*y*y, y*x*x, y*z*z, y*y*x,
-	//	x*x*x, x*z*z, y*y*z, x*x*z, z*z*z};
+	//double col = y;
+	//double lig = x;
+	//double alt = z;
+	//double m[20] = {1, lig, col, alt, lig*col,
+	//	lig*alt, col*alt, lig*lig, col*col, alt*alt,
+	//	col*lig*alt, lig*lig*lig, lig*col*col, lig*alt*alt, lig*lig*col,
+	//	col*col*col, col*alt*alt, lig*lig*alt, col*col*alt, alt*alt*alt
+	//};
+	double m[20] = {1, x, y, z, x*y,
+		x*z, y*z, x*x, y*y, z*z,
+		x*y*z, x*x*x, x*y*y, x*z*z, x*x*y,
+		y*y*y, y*z*z, x*x*z, y*y*z, z*z*z};
+	double r = 0;
+	for (int i = 0; i < 20; i++)
+		r += c[i]*m[i];
+	return r;
+}
+
+double eval_pol20_dx(double c[20], double x, double y, double z)
+{
+	double m[20] = {0, 1, 0, 0, y,
+		z, 0, 2*x, 0, 0,
+		y*z, 3*x*x, y*y, z*z, 2*x*y,
+		0, 0, 2*x*z, 0, 0};
+	double r = 0;
+	for (int i = 0; i < 20; i++)
+		r += c[i]*m[i];
+	return r;
+}
+
+double eval_pol20_dy(double c[20], double x, double y, double z)
+{
+	double m[20] = {0, 0, y, 0, x,
+		0, z, 0, 2*y, 0,
+		x*z, 0, x*2*y, 0, x*x,
+		3*y*y, z*z, 0, 2*y*z, 0};
+	double r = 0;
+	for (int i = 0; i < 20; i++)
+		r += c[i]*m[i];
+	return r;
+}
+
+double eval_pol20_dz(double c[20], double x, double y, double z)
+{
+	double m[20] = {0, 0, 0, z, 0,
+		x, y, 0, 0, 2*z,
+		x*y, 0, 0, x*2*z, 0,
+		0, y*2*z, x*x, y*y, 3*z*z};
 	double r = 0;
 	for (int i = 0; i < 20; i++)
 		r += c[i]*m[i];
@@ -230,6 +277,19 @@ void eval_rpc_pair(double xprime[2],
 	eval_rpci(xprime, pb, tmp[0], tmp[1], z);
 }
 
+// evaluate the derivative with respect to h of rpc_pair
+void eval_rpc_pair_dh(double dph[2],
+		struct rpc *pa, struct rpc *pb,
+		double x, double y, double h)
+{
+
+}
+
+#include "smapa.h"
+SMART_PARAMETER(HSTEP,1)
+//SMART_PARAMETER(A2TOP,1e-20)
+SMART_PARAMETER(LAMAX,1e-6)
+
 // compute the height of a point given its location inside two images
 double rpc_height(struct rpc *rpca, struct rpc *rpcb,
 		double xa, double ya, double xb, double yb, double *outerr)
@@ -238,16 +298,19 @@ double rpc_height(struct rpc *rpca, struct rpc *rpcb,
 	double y[2] = {xb, yb};
 
 	double h = 0;
-	for (int t = 0; t < 100; t++) {
-		double hstep = 1;
+	for (int t = 0; t < 1000; t++) {
+		double hstep = HSTEP();
 		double p[2], q[2];
 		eval_rpc_pair(p, rpca, rpcb, x[0], x[1], h);
 		eval_rpc_pair(q, rpca, rpcb, x[0], x[1], h + hstep);
 
 		double a[2] = {q[0] - p[0], q[1] - p[1]};
-		double b[2] = {y[0] - q[0], y[1] - p[1]};
+		double b[2] = {y[0] - p[0], y[1] - p[1]};
+		double a2 = a[0]*a[0] + a[1]*a[1];
 
-		double lambda = (a[0]*b[0] + a[1]*b[1])/(a[0]*a[0] + a[1]*a[1]);
+		//if (a2 < A2TOP()) break;
+
+		double lambda = (a[0]*b[0] + a[1]*b[1])/a2;
 
 		// projection of p2 to the line r1-r0
 		double z[2] = {p[0] + lambda*a[0], p[1] + lambda*a[1]};
@@ -255,9 +318,9 @@ double rpc_height(struct rpc *rpca, struct rpc *rpcb,
 		double err = hypot(z[0] - y[0], z[1] - y[1]);
 		if (outerr) *outerr=err;
 
-		h += lambda;
+		h += lambda*hstep;
 
-		if (fabs(lambda) < 0.00001)
+		if (fabs(lambda) < LAMAX())
 			break;
 	}
 	return h;
@@ -326,6 +389,10 @@ static int main_trial(int c, char *v[])
 	return 0;
 }
 
+#include "smapa.h"
+SMART_PARAMETER(RPCL_NH,21)
+SMART_PARAMETER(RPCL_EQUI,0)
+
 static int main_rpcline(int c, char *v[])
 {
 	if (c != 11) {
@@ -346,7 +413,7 @@ static int main_rpcline(int c, char *v[])
 	struct rpc rpcb[1]; read_rpc_file_xml(rpcb, filename_rpcb);
 	//print_rpc(stderr, rpca, "a");
 	//print_rpc(stderr, rpcb, "b");
-	int nh = 21;
+	int nh = RPCL_NH();
 
 	for (int i = 0; i < nh; i++)
 	{
@@ -355,7 +422,7 @@ static int main_rpcline(int c, char *v[])
 		double x = ix + offset_a[0];
 		double y = iy + offset_a[1];
 		double ni = i/(nh - 1.0);
-		ni = ni*ni;
+		if (!RPCL_EQUI()) ni = ni*ni;
 		double z = hrange[0] + ni * (hrange[1] - hrange[0]);
 		double r[2], rr[2];
 		//fprintf(stderr, "(%g %g %g) =>\t", ix, iy, z);
@@ -395,12 +462,13 @@ static int main_rpcpair(int c, char *v[])
 	return 0;
 }
 
+
 #ifndef DONT_USE_TEST_MAIN
 int main(int c, char *v[])
 {
 	//return main_trial(c, v);
 	//return main_trial2(c, v);
-	//return main_rpcline(c, v);
-	return main_rpcpair(c, v);
+	return main_rpcline(c, v);
+	//return main_rpcpair(c, v);
 }
 #endif
