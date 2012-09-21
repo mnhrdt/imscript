@@ -147,7 +147,11 @@
 #define FORL(n) for(int l=0;l<(n);l++)
 #endif
 
-#include "fragments.c"
+//#include "fragments.c"
+#include "fail.c"
+#include "xmalloc.c"
+#include "random.c"
+#include "colorcoords.c"
 
 
 #define PLAMBDA_CONSTANT 0   // numeric constant
@@ -259,6 +263,10 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(substract_two_doubles,"-",2),
 	REGISTER_FUNCTIONN(random_uniform,"randu",-1),
 	REGISTER_FUNCTIONN(random_normal,"randn",-1),
+	REGISTER_FUNCTIONN(random_cauchy,"randc",-1),
+	REGISTER_FUNCTIONN(random_laplace,"randl",-1),
+	REGISTER_FUNCTIONN(random_exponential,"rande",-1),
+	REGISTER_FUNCTIONN(random_pareto,"randp",-1),
 	//REGISTER_FUNCTIONN(rgb2hsv,"rgb2hsv",3),
 	//REGISTER_FUNCTIONN(hsv2rgb,"rgb2hsv",3),
 #undef REGISTER_FUNCTION
@@ -300,7 +308,7 @@ static float apply_function(struct predefined_function *f, float *v)
 	case 2: return ((double(*)(double,double))f->f)(v[1], v[0]);
 	case 3: return ((double(*)(double,double,double))f->f)(v[2],v[1],v[0]);
 	case -1: return ((double(*)())(f->f))();
-	default: error("bizarre");
+	default: fail("bizarre");
 	}
 	//return 0;
 }
@@ -318,7 +326,7 @@ static float eval_colonvar(int w, int h, int i, int j, int c)
 	case 'y': return (2.0/(h-1))*j - 1;
 	case 'r': return hypot((2.0/(h-1))*j-1,(2.0/(w-1))*i-1);
 	case 't': return atan2((2.0/(h-1))*j-1,(2.0/(w-1))*i-1);
-	default: error("unrecognized colonvar \":%c\"", c);
+	default: fail("unrecognized colonvar \":%c\"", c);
 	}
 }
 
@@ -472,7 +480,7 @@ static char *collection_of_varnames_add(struct collection_of_varnames *x,
 	int i = collection_of_varnames_find(x, s);
 	if (i < 0) {
 		if (x->n+1 >= PLAMBDA_MAX_TOKENS)
-			error("caca");
+			fail("caca");
 		r = xmalloc(1+strlen(s));
 		strcpy(r, s);
 		x->t[x->n] = r;
@@ -561,8 +569,8 @@ static void process_token(struct plambda_program *p, const char *tokke)
 			t->displacement[0] = disp[0];
 			t->displacement[1] = disp[1];
 		} else {
-			struct predefined_function *f =
-				global_table_of_predefined_functions + idx;
+			//struct predefined_function *f =
+			//	global_table_of_predefined_functions + idx;
 			t->type = PLAMBDA_OPERATOR;
 			t->index = idx;
 		}
@@ -585,7 +593,7 @@ static void unhack_varnames(struct plambda_program *p)
 			t->index = collection_of_varnames_find(p->var,
 								t->tmphack);
 			if (t->index < 0)
-				error("unexpected bad variable \"%s\"",
+				fail("unexpected bad variable \"%s\"",
 								t->tmphack);
 		}
 	}
@@ -686,7 +694,7 @@ static int vstack_pop_vector(float *val, struct value_vstack *s)
 		int d = s->d[s->n];
 		if (val) FORI(d) val[i] = s->t[s->n][i];
 		return d;
-	} else error("popping from empty stack");
+	} else fail("popping from empty stack");
 }
 
 static void vstack_push_vector(struct value_vstack *s, float *v, int n)
@@ -696,7 +704,7 @@ static void vstack_push_vector(struct value_vstack *s, float *v, int n)
 		FORI(n)
 			s->t[s->n][i] = v[i];
 		s->n += 1;
-	} else error("full stack");
+	} else fail("full stack");
 }
 
 static void vstack_push_scalar(struct value_vstack *s, float x)
@@ -705,18 +713,18 @@ static void vstack_push_scalar(struct value_vstack *s, float x)
 		s->d[s->n] = 1;
 		s->t[s->n][0] = x;
 		s->n += 1;
-	} else error("full stack");
+	} else fail("full stack");
 }
 
-static void vstack_print(FILE *f, struct value_vstack *s)
-{
-	FORI(s->n) {
-		fprintf(f, "STACK[%d/%d]: {%d}", 1+i, s->n, s->d[i]);
-		FORJ(s->d[i])
-			fprintf(f, " %g", s->t[i][j]);
-		fprintf(f, "\n");
-	}
-}
+//static void vstack_print(FILE *f, struct value_vstack *s)
+//{
+//	FORI(s->n) {
+//		fprintf(f, "STACK[%d/%d]: {%d}", 1+i, s->n, s->d[i]);
+//		FORJ(s->d[i])
+//			fprintf(f, " %g", s->t[i][j]);
+//		fprintf(f, "\n");
+//	}
+//}
 
 static void treat_strange_case(struct value_vstack *s,
 		struct predefined_function *f)
@@ -741,7 +749,7 @@ static void vstack_apply_function(struct value_vstack *s,
 		// TODO: solve commutativity issue here
 		if (d[i] != rd) {
 			if (rd > 1)
-				error("can not mix %d- and %d-vectors [%s]\n",
+				fail("can not mix %d- and %d-vectors [%s]\n",
 					rd, d[i], f->name);
 			else
 				rd = d[i];
@@ -787,7 +795,7 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 		int m = vstack_pop_vector(y, s);
 		int n = vstack_pop_vector(x, s);
 		if (n+m >= PLAMBDA_MAX_PIXELDIM)
-			error("merging vectors results in large vector");
+			fail("merging vectors results in large vector");
 		FORI(m)
 			x[n+i] = y[i];
 		vstack_push_vector(s, x, n+m);
@@ -801,7 +809,7 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 		int ny = vstack_pop_vector(y, s);
 		int nx = vstack_pop_vector(x, s);
 		if (nx+ny+nz >= PLAMBDA_MAX_PIXELDIM)
-			error("merging vectors results in large vector");
+			fail("merging vectors results in large vector");
 		FORI(ny) x[nx+i] = y[i];
 		FORI(nz) x[nx+ny+i] = z[i];
 		vstack_push_vector(s, x, nx+ny+nz);
@@ -810,7 +818,7 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 	case PLAMBDA_STACKOP_HSV2RGB: {
 		float x[PLAMBDA_MAX_PIXELDIM];
 		int n = vstack_pop_vector(x, s);
-		if (n != 3) error("hsv2rgb needs a 3-vector");
+		if (n != 3) fail("hsv2rgb needs a 3-vector");
 		double dx[3] = {x[0], x[1], x[2]};
 		double dy[3];
 		hsv_to_rgb_doubles(dy, dx);
@@ -821,7 +829,7 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 	case PLAMBDA_STACKOP_RGB2HSV: {
 		float x[PLAMBDA_MAX_PIXELDIM];
 		int n = vstack_pop_vector(x, s);
-		if (n != 3) error("rgb2hsv needs a 3-vector");
+		if (n != 3) fail("rgb2hsv needs a 3-vector");
 		double dx[3] = {x[0], x[1], x[2]};
 		double dy[3];
 		rgb_to_hsv_doubles(dy, dx);
@@ -846,10 +854,10 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 	//	vstack_pop_vector
 	//			    }
 	case PLAMBDA_STACKOP_VMERGEALL:
-		error("mergeall not implemented");
+		fail("mergeall not implemented");
 		break;
 	default:
-		error("impossible condition");
+		fail("impossible condition");
 	}
 }
 
@@ -911,7 +919,7 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 				     }
 			break;
 		default:
-			error("unknown tag type %d", t->type);
+			fail("unknown tag type %d", t->type);
 		}
 	}
 	return vstack_pop_vector(out, s);
@@ -960,14 +968,14 @@ int main(int c, char *v[])
 
 	int n = c - 2;
 	if (n != p->var->n)
-		error("the program expects %d variables but %d images "
+		fail("the program expects %d variables but %d images "
 					"were given", p->var->n, n);
 	int w[n], h[n], pd[n];
 	float *x[n];
 	FORI(n) x[i] = iio_read_image_float_vec(v[i+1], w + i, h + i, pd + i);
 	FORI(n-1)
 		if (w[0] != w[i+1] || h[0] != h[i+1])// || pd[0] != pd[i+1])
-			error("input images size mismatch");
+			fail("input images size mismatch");
 
 	FORI(n)
 		fprintf(stderr, "correspondence \"%s\" = \"%s\"\n",

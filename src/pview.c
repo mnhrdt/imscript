@@ -115,12 +115,13 @@ void projective_map(double y[2], double A[9], double x[2])
 //}
 
 #include "smapa.h"
-SMART_PARAMETER_SILENT(LINN,100)
+SMART_PARAMETER_SILENT(LINN,70)
 
 // linear combination of two intensities in linear intensity space
 static double lincombin(double a, double b, double t)
 {
 	double linn = LINN();
+	if (linn < -1) return t<0.5?a:b;
 	if (linn < 0) return a*(1-t)+b*t;
 	assert(t >= 0 && t <= 1);
 	double la = exp(a/linn);

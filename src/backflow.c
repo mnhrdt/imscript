@@ -66,6 +66,7 @@ static void bilinear_interpolation_at(float *result,
 }
 
 SMART_PARAMETER_SILENT(BACKDIV,0)
+SMART_PARAMETER_SILENT(BACKDET,0)
 
 static void compute_flow_div(float *d, float *u, int w, int h)
 {
@@ -77,6 +78,18 @@ static void compute_flow_div(float *d, float *u, int w, int h)
 	}
 }
 
+static void compute_flow_det(float *d, float *u, int w, int h)
+{
+	getsample_operator p = getsample_1;
+	FORJ(h) FORI(w) {
+		float ux = 0.5*(p(u,w,h,2, i+1, j, 0) - p(u,w,h,2, i-1, j, 0));
+		float vy = 0.5*(p(u,w,h,2, i, j+1, 1) - p(u,w,h,2, i, j-1, 1));
+		float uy = 0.5*(p(u,w,h,2, i, j+1, 0) - p(u,w,h,2, i, j-1, 0));
+		float vx = 0.5*(p(u,w,h,2, i+1, j, 1) - p(u,w,h,2, i-1, j, 1));
+		d[j*w+i] = (1+ux)*(1+vy) - uy*vx;;
+	}
+}
+
 
 static void invflow(float *ou, float *flo, float *pin, int w, int h, int pd)
 {
@@ -84,10 +97,16 @@ static void invflow(float *ou, float *flo, float *pin, int w, int h, int pd)
 	float (*in)[w][pd] = (void*)pin;
 	float (*flow)[w][2] = (void*)flo;
 	float *flowdiv = NULL;
+	float *flowdet = NULL;
 
 	if (BACKDIV() > 0) {
 		flowdiv = xmalloc(w * h * sizeof*flowdiv);
 		compute_flow_div(flowdiv, flo, w, h);
+	}
+
+	if (BACKDET() > 0) {
+		flowdet = xmalloc(w * h * sizeof*flowdiv);
+		compute_flow_det(flowdet, flo, w, h);
 	}
 
 	FORJ(h) FORI(w) {
@@ -101,6 +120,15 @@ static void invflow(float *ou, float *flo, float *pin, int w, int h, int pd)
 		FORL(pd)
 			out[j][i][l] = factor * result[l];
 			//out[j][i][l] = 100*log(factor * exp(result[l]/100));
+		if (flowdet) {
+			float bd = BACKDET();
+			float det = flowdet[j*w+i];
+			if (det > bd) det = bd;
+			//if (det < 1/bd) det = 1/bd;
+			FORL(pd)
+				out[j][i][l] = det*result[l];
+				//out[j][i][l] = bd*log(det*(exp((result[l])/bd)));
+		}
 	}
 
 	if (flowdiv)

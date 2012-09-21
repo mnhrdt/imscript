@@ -34,6 +34,7 @@ static double random_laplace(void)
 	double x = random_uniform();
 	double y = random_uniform();
 	double r = log(x/y);
+	return r;
 }
 
 static double random_cauchy(void)
@@ -51,6 +52,11 @@ static double random_exponential(void)
 	//double r = -log(1-u);
 	//return r;
 	return fabs(random_laplace());
+}
+
+static double random_pareto(void)
+{
+	return exp(random_exponential());
 }
 
 #endif//_RANDOM_C

@@ -47,4 +47,46 @@ static double *read_ascii_doubles(FILE *f, int *no)
 	return t;
 }
 
+//// utility function: parse a matrix of doubles from a text file
+//// returns a pointer to a malloc'ed array of the parsed doubles
+//// fills *nc with the number of cols and *nr with the number of rows
+//static double *read_ascii_matrix_doubles(FILE *f, int *nc, int *nl)
+//{
+//	int r, n = 0, nt = 0;
+//	double *t = NULL;
+//	while(1) {
+//		if (n >= nt)
+//		{
+//			nt = 2 * (nt + 1);
+//			t = xrealloc(t, nt * sizeof * t);
+//		}
+//		r = fscanf(f, "%lf", t+n);
+//		if (r != 1)
+//			break;
+//		n += 1;
+//	}
+//	*no = n;
+//	return t;
+//}
+
+static int parse_doubles(double *t, int nmax, const char *s)
+{
+	int i = 0, w;
+	while (i < nmax && 1 == sscanf(s, "%lg %n", t + i, &w)) {
+		i += 1;
+		s += w;
+	}
+	return i;
+}
+
+static int parse_floats(float *t, int nmax, const char *s)
+{
+	int i = 0, w;
+	while (i < nmax && 1 == sscanf(s, "%g %n", t + i, &w)) {
+		i += 1;
+		s += w;
+	}
+	return i;
+}
+
 #endif//_PARSENUMBERS_C

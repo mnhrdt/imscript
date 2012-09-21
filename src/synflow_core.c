@@ -253,8 +253,7 @@ static void invert_homography(double invH[9], double H[9])
 	double h[3][3] = { {H[0], H[1], H[2]},
 			{H[3], H[4], H[5]},
 			{H[6], H[7], H[8]}};
-	double det;
-	double ih[3][3];
+	double det, ih[3][3];
 	INVERT_3X3(ih, det, h);
 	FORI(9) invH[i] = ih[0][i];
 }

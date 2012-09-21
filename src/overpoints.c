@@ -13,6 +13,9 @@
 #include "xfopen.c"
 #include "xmalloc.c"
 
+#include "smapa.h"
+SMART_PARAMETER(OVERCROSS,1)
+
 
 int main(int c, char *v[])
 {
@@ -35,6 +38,7 @@ int main(int c, char *v[])
 		img_out[ioy][iox][0] = 255;
 		img_out[ioy][iox][1] = 0;
 		img_out[ioy][iox][2] = 0;
+		if (!OVERCROSS()) continue;
 		img_out[ioy-1][iox][0] = 255;
 		img_out[ioy-1][iox][1] = 0;
 		img_out[ioy-1][iox][2] = 0;
