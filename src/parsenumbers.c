@@ -89,4 +89,16 @@ static int parse_floats(float *t, int nmax, const char *s)
 	return i;
 }
 
+static float *alloc_parse_floats(int nmax, const char *s, int *n)
+{
+	float *r = xmalloc(nmax * sizeof*r);
+	int i = 0, w;
+	while (i < nmax && 1 == sscanf(s, "%g %n", r + i, &w)) {
+		i += 1;
+		s += w;
+	}
+	*n = i;
+	return r;
+}
+
 #endif//_PARSENUMBERS_C
