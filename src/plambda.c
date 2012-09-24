@@ -960,8 +960,8 @@ static void shrink_components(float *y, float *x, int n, int ypd, int xpd)
 }
 
 #include "smapa.h"
-SMART_PARAMETER(SRAND,0)
-SMART_PARAMETER(PLAMBDA_CALC,0)
+SMART_PARAMETER_SILENT(SRAND,0)
+SMART_PARAMETER_SILENT(PLAMBDA_CALC,0)
 
 int main_calc(int c, char *v[])
 {
@@ -983,11 +983,15 @@ int main_calc(int c, char *v[])
 	float *x[n];
 	FORI(n) x[i] = alloc_parse_floats(pdmax, v[i+1], pd+i);
 
+	FORI(n)
+		fprintf(stderr, "calculator correspondence \"%s\" = \"%s\"\n",
+				p->var->t[i], v[i+1]);
+
 	float out[pdmax];
 	int od = run_program_vectorially_at(out, p, x, 1, 1, pd, 0, 0);
 
 	for (int i = 0; i < od; i++)
-		fprintf(stderr, "result[%d] = %g\n", i, out[i]);
+		printf("%g%c", out[i], i==(od-1)?'\n':' ');
 
 	return EXIT_SUCCESS;
 }
@@ -1003,7 +1007,7 @@ int main_working(int c, char *v[])
 	struct plambda_program p[1];
 
 	plambda_compile_program(p, v[c-1]);
-	print_compiled_program(p);
+	//print_compiled_program(p);
 
 	int n = c - 2;
 	if (n != p->var->n)
@@ -1017,72 +1021,18 @@ int main_working(int c, char *v[])
 			fail("input images size mismatch");
 
 	FORI(n)
-		fprintf(stderr, "correspondence \"%s\" = \"%s\"\n",
-				p->var->t[i], v[i+1]);
-
-	srand(SRAND());
-
-	int pdmax = PLAMBDA_MAX_PIXELDIM;
-	float *out = xmalloc(*w * *h * pdmax * sizeof*out);
-	//fprintf(stderr, "w h pd = %d %d %d\n", *w, *h, *pd);
-	int opd = run_program_vectorially(out, pdmax, p, x, *w, *h, pd);
-	//fprintf(stderr, "opd = %d\n", opd);
-
-	float *rout = xmalloc(*w * *h *opd * sizeof*rout);
-	shrink_components(rout, out, *w * *h, opd, pdmax);
-
-	iio_save_image_float_vec("-", rout, *w, *h, opd);
-
-
-	FORI(n) free(x[i]);
-	free(out);
-	free(rout);
-	collection_of_varnames_end(p->var);
-
-	return EXIT_SUCCESS;
-}
-
-int main_working2(int c, char *v[])
-{
-	if (c < 2) {
-		fprintf(stderr, "usage:\n\t%s in1 in2 ... \"plambda\"\n", *v);
-		//                          0 1   2         c-1
-		return EXIT_FAILURE;
-	}
-
-	struct plambda_program p[1];
-
-	plambda_compile_program(p, v[c-1]);
-	print_compiled_program(p);
-
-	int n = c - 2;
-	if (n != p->var->n)
-		fail("the program expects %d variables but %d images "
-					"were given", p->var->n, n);
-	int w[n], h[n], pd[n];
-	float *x[n];
-	FORI(n) x[i] = iio_read_image_float_vec(v[i+1], w + i, h + i, pd + i);
-	FORI(n-1)
-		if (w[0] != w[i+1] || h[0] != h[i+1])// || pd[0] != pd[i+1])
-			fail("input images size mismatch");
-
-	FORI(n)
-		fprintf(stderr, "correspondence \"%s\" = \"%s\"\n",
+		fprintf(stderr, "plambda correspondence \"%s\" = \"%s\"\n",
 				p->var->t[i], v[i+1]);
 
 	srand(SRAND());
 
 	int pdreal = eval_dim(p, x, pd);
 
-	//int pdmax = PLAMBDA_MAX_PIXELDIM;
 	float *out = xmalloc(*w * *h * pdreal * sizeof*out);
-	//fprintf(stderr, "w h pd = %d %d %d\n", *w, *h, *pd);
 	int opd = run_program_vectorially(out, pdreal, p, x, *w, *h, pd);
 	assert(opd == pdreal);
-	//fprintf(stderr, "opd = %d\n", opd);
 
 	iio_save_image_float_vec("-", out, *w, *h, opd);
-
 
 	FORI(n) free(x[i]);
 	free(out);
@@ -1094,6 +1044,6 @@ int main_working2(int c, char *v[])
 int main(int c, char *v[])
 {
 	int (*f)(int c, char *v[]);
-       	f = PLAMBDA_CALC()>0 ? main_calc : main_working2;
+       	f = (PLAMBDA_CALC()>0 || **v=='c' || c==2) ? main_calc : main_working;
 	return f(c,v);
 }
