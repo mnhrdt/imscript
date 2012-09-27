@@ -20,6 +20,9 @@
 
 #include "smapa.h"
 
+SMART_PARAMETER_SILENT(NEAREST,0)
+SMART_PARAMETER_SILENT(BILINEAR,0)
+
 static float evaluate_bilinear_cell(float a, float b, float c, float d,
 							float x, float y)
 {
@@ -64,6 +67,19 @@ static void bilinear_interpolation_at(float *result,
 		result[l] = r;
 	}
 }
+
+static void interpolate_nearest(float *result,
+		float *x, int w, int h, int pd,
+		float p, float q)
+{
+	int ip = round(p);
+	int iq = round(q);
+	FORL(pd) {
+		float r = getsamplen(x, w, h, pd, ip  , iq  , l);
+		result[l] = r;
+	}
+}
+
 
 SMART_PARAMETER_SILENT(BACKDIV,0)
 SMART_PARAMETER_SILENT(BACKDET,0)
@@ -112,8 +128,15 @@ static void invflow(float *ou, float *flo, float *pin, int w, int h, int pd)
 	FORJ(h) FORI(w) {
 		float p[2] = {i + flow[j][i][0], j + flow[j][i][1]};
 		float result[pd];
-		//bilinear_interpolation_at(result, pin, w, h, pd, p[0], p[1]);
-		bicubic_interpolation(result, pin, w, h, pd, p[0], p[1]);
+      if (BILINEAR()) {
+   		bilinear_interpolation_at(result, pin, w, h, pd, p[0], p[1]);
+      } else { 
+         if (NEAREST()) {
+         interpolate_nearest(result, pin, w,h, pd, p[0], p[1]);
+         } else {
+   		   bicubic_interpolation(result, pin, w, h, pd, p[0], p[1]);
+         }
+      }
 		float factor = 1;
 		if (flowdiv)
 			factor = exp(BACKDIV() * flowdiv[j*w+i]);
