@@ -34,7 +34,7 @@ static double random_laplace(void)
 	double x = random_uniform();
 	double y = random_uniform();
 	double r = log(x/y);
-	return r;
+	return isfinite(r)?r:0;
 }
 
 static double random_cauchy(void)
@@ -43,7 +43,8 @@ static double random_cauchy(void)
 	double x2 = random_uniform();
 	double y1 = sqrt(-2*log(x1)) * cos(2*M_PI*x2);
 	double y2 = sqrt(-2*log(x1)) * sin(2*M_PI*x2);
-	return y1/y2;
+	double r = y1/y2;
+	return isfinite(r)?r:0;
 }
 
 static double random_exponential(void)
