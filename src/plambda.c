@@ -39,6 +39,7 @@
 //		:r	relative distance to the center of the image
 //		:t	relative angle from the center of the image
 //
+//
 //	Variable modifiers acting on regular variables:
 //
 //		TOKEN	MEANING
@@ -65,6 +66,20 @@
 //		split	split the vector ATTOTS into scalar components
 //		join	join the components of two vectors ATTOTS
 //		join3	join the components of three vectors ATTOTS
+//
+//	Magic variables (which can not be computed locally for each image):
+//
+//		x%i	value of the smallest sample of image "x"
+//		x%a	value of the largest sample
+//		x%v	average sample value
+//		x%m	median sample value
+//		x%I	value of the smallest pixel
+//		x%A	value of the largest pixel
+//		x%V	average pixel value
+//		x%M	median pixel value (not implemented)
+//		x%qn	nth sample percentile
+//		x%Qn	nth pixel percentile (not implemented)
+//
 //
 //	Other operators:
 //
@@ -101,7 +116,6 @@
 //		plambda lena.png "x split rot join join"
 //		plambda lena.png "x split rot join3"
 //
-//
 //	Merge the two components of a vector field into a single file
 //		plambda x.tiff y.tiff "x y join" > xy.tiff
 //
@@ -117,6 +131,7 @@
 // TODO: admit images of different number of channels
 // TODO: implement shunting-yard algorithm to admit infix notation
 // TODO: handle 3D and nD images
+// TODO: merge colonvars and magicvars (the only difficulty lies in naming)
 
 
 #include <assert.h>
@@ -131,7 +146,7 @@
 #define PLAMBDA_MAX_TOKENS 2049
 #define PLAMBDA_MAX_VARLEN 0x100
 #define PLAMBDA_MAX_PIXELDIM 0x100
-
+#define PLAMBDA_MAX_MAGIC 42
 
 
 #ifndef FORI
@@ -155,13 +170,15 @@
 #include "parsenumbers.c"
 
 
-#define PLAMBDA_CONSTANT 0   // numeric constant
-#define PLAMBDA_SCALAR 1     // pixel component
-#define PLAMBDA_VECTOR 2     // whole pixel
-#define PLAMBDA_OPERATOR 3   // function
-#define PLAMBDA_COLONVAR 4   // colon-type variable
-#define PLAMBDA_STACKOP 5    // stack operator
-#define PLAMBDA_VARDEF 6     // register variable definition (hacky)
+#define PLAMBDA_CONSTANT 0     // numeric constant
+#define PLAMBDA_SCALAR 1       // pixel component
+#define PLAMBDA_VECTOR 2       // whole pixel
+#define PLAMBDA_OPERATOR 3     // function
+#define PLAMBDA_COLONVAR 4     // colon-type variable
+#define PLAMBDA_STACKOP 5      // stack operator
+#define PLAMBDA_VARDEF 6       // register variable definition (hacky)
+#define PLAMBDA_MAGIC_SCALAR 7 // "magic" scalar (requiring cached global data)
+#define PLAMBDA_MAGIC_VECTOR 8 // "magic" vector (requiring cached global data)
 
 // local functions
 static double sum_two_doubles      (double a, double b) { return a + b; }
@@ -331,6 +348,116 @@ static float eval_colonvar(int w, int h, int i, int j, int c)
 	}
 }
 
+struct image_stats {
+	bool init_simple, init_vsimple, init_ordered, init_vordered;
+	float scalar_min, scalar_max, scalar_avg, scalar_med;
+	float vector_min[PLAMBDA_MAX_PIXELDIM];
+	float vector_max[PLAMBDA_MAX_PIXELDIM];
+	float vector_avg[PLAMBDA_MAX_PIXELDIM];
+	float vector_med[PLAMBDA_MAX_PIXELDIM];
+};
+
+static void compute_simple_sample_stats(struct image_stats *s,
+		float *x, int w, int h, int pd)
+{
+	if (s->init_simple) return;
+	if (w*h > 1) s->init_simple = true;
+	int ns = w * h * pd, rns = 0, rnz = 0, nnan = 0, ninf = 0;
+	float minsample = INFINITY, maxsample = -INFINITY;
+	long double avgsample = 0;
+	long double avgnzsample = 0;
+	for (int i = 0; i < ns; i++)
+	{
+		float y = x[i];
+		if (isnan(y)) {
+			nnan += 1;
+			continue;
+		}
+		if (!isfinite(y)) ninf += 1;
+		if (y < minsample) minsample = y;
+		if (y > maxsample) maxsample = y;
+		avgsample += y;
+		rns += 1;
+		if (y) {
+			avgnzsample += y;
+			rnz += 1;
+		}
+	}
+	avgsample /= rns;
+	avgnzsample /= rnz;
+	s->scalar_min = minsample;
+	s->scalar_max = maxsample;
+	s->scalar_avg = avgsample;
+	s->scalar_avg = avgsample;
+	//s->scalar_avgnz = avgnzsample;
+}
+
+static void compute_simple_vector_stats(struct image_stats *s,
+		float *x, int w, int h, int pd)
+{
+	fail("simple vector stats not implemented");
+	s->init_vsimple = true;
+}
+
+static void compute_ordered_sample_stats(struct image_stats *s,
+		float *x, int w, int h, int pd)
+{
+	fail("ordered sample stats not implemented");
+	s->init_ordered = true;
+}
+
+static void compute_ordered_vector_stats(struct image_stats *s,
+		float *x, int w, int h, int pd)
+{
+	fail("ordered vector stats not implemented");
+	s->init_vordered = true;
+}
+
+
+// the value of magic variables depends on some globally cached data
+static int eval_magicvar(float *out, int magic, int img_index,
+		float *x, int w, int h, int pd) // only needed on the first run
+{
+	static bool initt = false;
+	static struct image_stats t[PLAMBDA_MAX_MAGIC];
+	if (!initt) {
+		for (int i = 0; i < PLAMBDA_MAX_MAGIC; i++) {
+			t[i].init_simple = false;
+			t[i].init_ordered = false;
+			t[i].init_vordered = false;
+		}
+		initt = true;
+	}
+
+	if (img_index >= PLAMBDA_MAX_MAGIC)
+		fail("%d magic images is too much for me!", PLAMBDA_MAX_MAGIC);
+
+//		x%i	value of the smallest sample of image "x"
+//		x%a	value of the largest sample
+//		x%v	average sample value
+//		x%m	median sample value
+//		x%I	value of the smallest pixel
+//		x%A	value of the largest pixel
+//		x%V	average pixel value
+//		x%M	median pixel value (not implemented)
+//		x%qn	nth sample percentile
+//		x%Qn	nth pixel percentile (not implemented)
+
+	struct image_stats *ti = t + img_index;
+	if (magic=='i' || magic=='a' || magic=='v') {
+		compute_simple_sample_stats(ti, x, w, h, pd);
+		switch(magic) {
+		case 'i': *out = ti->scalar_min; break;
+		case 'a': *out = ti->scalar_max; break;
+		case 'v': *out = ti->scalar_avg; break;
+		}
+		return 1;
+	} else
+		fail("magic of kind '%c' is not yed implemented", magic);
+
+	return 0;
+}
+
 
 // if the token resolves to a numeric constant, store it in *x and return true
 // otherwise, return false
@@ -367,6 +494,7 @@ static int token_is_vardef(const char *t)
 		return -(t[1] - '0');
 	return 0;
 }
+
 
 #define PLAMBDA_STACKOP_NO 0
 #define PLAMBDA_STACKOP_DEL 1
@@ -413,7 +541,7 @@ static int token_is_word(const char *t, const char **endptr)
 	while (t[n]) {
 		if  (!isalnum(t[n])) {
 			*endptr = t+n;
-			return (t[n]=='(' || t[n]=='[') ? n : 0;
+			return (t[n]=='(' || t[n]=='[' || t[n]=='%') ? n : 0;
 		}
 		n += 1;
 	}
@@ -432,12 +560,15 @@ static int word_is_predefined(const char *id)
 }
 
 // fills the modifiers with their defined values, otherwise with the default
-static void parse_modifiers(const char *mods, int *ocomp, int *odx, int *ody)
+static void parse_modifiers(const char *mods,
+		int *ocomp, int *odx, int *ody, int *omagic)
 {
 	*ocomp = -1;
 	*odx = 0;
 	*ody = 0;
+	*omagic = 0;
 	int comp, dx, dy;
+	char magic;
 	if (!mods) {
 		return;
 	} else if (3 == sscanf(mods, "[%d](%d,%d)", &comp, &dx, &dy)) {
@@ -456,6 +587,9 @@ static void parse_modifiers(const char *mods, int *ocomp, int *odx, int *ody)
 	 	return;
 	} else if (1 == sscanf(mods, "[%d]", &comp)) {
 		*ocomp = comp;
+		return;
+	} else if (1 == sscanf(mods, "%%%c", &magic)) {
+		*omagic = magic;
 		return;
 	}
 }
@@ -562,10 +696,17 @@ static void process_token(struct plambda_program *p, const char *tokke)
 				varlen = PLAMBDA_MAX_VARLEN;
 			FORI(varlen) varname[i] = tok[i];
 			varname[varlen] = '\0';
-			int comp, disp[2];
+			int comp, disp[2], magic;
 			t->tmphack =collection_of_varnames_add(p->var, varname);
-			parse_modifiers(tok_end, &comp, disp, disp+1);
+			parse_modifiers(tok_end, &comp, disp, disp+1, &magic);
 			t->type = comp<0 ? PLAMBDA_VECTOR : PLAMBDA_SCALAR;
+			if (magic) {
+				if (isupper(magic))
+					t->type = PLAMBDA_MAGIC_VECTOR;
+				else
+					t->type = PLAMBDA_MAGIC_SCALAR;
+				t->colonvar = magic;
+			}
 			t->component = comp;
 			t->displacement[0] = disp[0];
 			t->displacement[1] = disp[1];
@@ -919,6 +1060,26 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			if (t->index < 0)
 				vstack_push_vector(s, p->regv[n], p->regn[n]);
 				     }
+			break;
+		case PLAMBDA_MAGIC_SCALAR: {
+			float *img = val[t->index];
+			int pdv = pd[t->index];
+			float x[pdv];
+			int rm = eval_magicvar(x, t->colonvar, t->index,
+					img, w, h, pdv);
+			assert(rm == 1);
+			vstack_push_scalar(s, x[0]);
+					   }
+			break;
+		case PLAMBDA_MAGIC_VECTOR: {
+			float *img = val[t->index];
+			int pdv = pd[t->index];
+			float x[pdv];
+			int rm = eval_magicvar(x, t->colonvar, t->index,
+					img, w, h, pdv);
+			assert(rm == pdv);
+			vstack_push_vector(s, x, pdv);
+					   }
 			break;
 		default:
 			fail("unknown tag type %d", t->type);
