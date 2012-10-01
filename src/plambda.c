@@ -513,10 +513,10 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp,
 		float *x, int w, int h, int pd) // only needed on the first run
 {
 	static bool initt = false;
-	static struct image_stats *t = 0;
+	//static struct image_stats *t = 0;
 	static struct image_stats t[PLAMBDA_MAX_MAGIC];
 	if (!initt) {
-		t = xmalloc(PLAMBDA_MAX_MAGIC * sizeof*t);
+		//t = xmalloc(PLAMBDA_MAX_MAGIC * sizeof*t);
 		for (int i = 0; i < PLAMBDA_MAX_MAGIC; i++) {
 			t[i].init_simple = false;
 			t[i].init_ordered = false;
