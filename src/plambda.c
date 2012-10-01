@@ -72,13 +72,15 @@
 //		x%i	value of the smallest sample of image "x"
 //		x%a	value of the largest sample
 //		x%v	average sample value
-//		x%m	median sample value
+//		x%m	median sample value (not implemented)
 //		x%I	value of the smallest pixel
 //		x%A	value of the largest pixel
 //		x%V	average pixel value
 //		x%M	median pixel value (not implemented)
-//		x%qn	nth sample percentile
+//		x%qn	nth sample percentile (not implemented)
 //		x%Qn	nth pixel percentile (not implemented)
+//		x%r	random sample of the image (not implemented)
+//		x%R	random pixel of the image (not implemented)
 //
 //
 //	Other operators:
@@ -141,7 +143,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include "iio.h"
 
 #define PLAMBDA_MAX_TOKENS 2049
 #define PLAMBDA_MAX_VARLEN 0x100
@@ -355,6 +356,11 @@ struct image_stats {
 	float vector_max[PLAMBDA_MAX_PIXELDIM];
 	float vector_avg[PLAMBDA_MAX_PIXELDIM];
 	float vector_med[PLAMBDA_MAX_PIXELDIM];
+	bool init_csimple, init_cordered;
+	float component_min[PLAMBDA_MAX_PIXELDIM];
+	float component_max[PLAMBDA_MAX_PIXELDIM];
+	float component_avg[PLAMBDA_MAX_PIXELDIM];
+	float component_med[PLAMBDA_MAX_PIXELDIM];
 };
 
 static void compute_simple_sample_stats(struct image_stats *s,
@@ -392,17 +398,71 @@ static void compute_simple_sample_stats(struct image_stats *s,
 	//s->scalar_avgnz = avgnzsample;
 }
 
+static void compute_simple_component_stats(struct image_stats *s,
+		float *x, int w, int h, int pd)
+{
+	fail("simple component stats not implemented");
+	(void)x;
+	(void)w;
+	(void)h;
+	(void)pd;
+}
+
+static float euclidean_norm_of_float_vector(const float *x, int n)
+{
+	if (n == 1) return fabs(x[0]);
+	else {
+		float r = 0;
+		for (int i = 0; i < n; i++)
+			r = hypot(r, x[i]);
+		return r;
+	}
+}
+
 static void compute_simple_vector_stats(struct image_stats *s,
 		float *x, int w, int h, int pd)
 {
-	fail("simple vector stats not implemented");
-	s->init_vsimple = true;
+	if (s->init_vsimple) return;
+	if (w*h > 1) s->init_vsimple = true;
+	int np = w * h, rnp = 0;
+	float minpixel = INFINITY, maxpixel = -INFINITY;
+	long double avgpixel[PLAMBDA_MAX_PIXELDIM] = {0}, avgnorm = 0;
+	int minidx=-1, maxidx=-1;
+	for (int j = 0; j < pd; j++)
+		avgpixel[j] = 0;
+	for (int i = 0; i < np; i++)
+	{
+		float xnorm = euclidean_norm_of_float_vector(x + pd*i, pd);
+		if (isnan(xnorm)) continue;
+		if (xnorm < minpixel) { minidx = i; minpixel = xnorm; }
+		if (xnorm > maxpixel) { maxidx = i; maxpixel = xnorm; }
+		for (int j = 0; j < pd; j++)
+			avgpixel[j] += x[pd*i+j];
+		avgnorm += xnorm;
+		rnp += 1;
+	}
+	//assert(rnp);
+	avgnorm /= rnp;
+	long double mipi[pd], mapi[pd];
+	for (int j = 0; j < pd; j++) {
+		mipi[j] = x[minidx*pd+j];
+		mapi[j] = x[maxidx*pd+j];
+		avgpixel[j] /= rnp;
+	}
+	FORI(pd) s->vector_min[i] = mipi[i];
+	FORI(pd) s->vector_max[i] = mapi[i];
+	FORI(pd) s->vector_avg[i] = avgpixel[i];
+	//setnumber(p, "error", avgnorm);
 }
 
 static void compute_ordered_sample_stats(struct image_stats *s,
 		float *x, int w, int h, int pd)
 {
 	fail("ordered sample stats not implemented");
+	(void)x;
+	(void)w;
+	(void)h;
+	(void)pd;
 	s->init_ordered = true;
 }
 
@@ -410,12 +470,16 @@ static void compute_ordered_vector_stats(struct image_stats *s,
 		float *x, int w, int h, int pd)
 {
 	fail("ordered vector stats not implemented");
+	(void)x;
+	(void)w;
+	(void)h;
+	(void)pd;
 	s->init_vordered = true;
 }
 
 
 // the value of magic variables depends on some globally cached data
-static int eval_magicvar(float *out, int magic, int img_index,
+static int eval_magicvar(float *out, int magic, int img_index, int comp,
 		float *x, int w, int h, int pd) // only needed on the first run
 {
 	static bool initt = false;
@@ -428,30 +492,42 @@ static int eval_magicvar(float *out, int magic, int img_index,
 		}
 		initt = true;
 	}
+	fprintf(stderr, "magic=%c index=%d comp=%d\n", magic, img_index, comp);
 
 	if (img_index >= PLAMBDA_MAX_MAGIC)
 		fail("%d magic images is too much for me!", PLAMBDA_MAX_MAGIC);
 
-//		x%i	value of the smallest sample of image "x"
-//		x%a	value of the largest sample
-//		x%v	average sample value
-//		x%m	median sample value
-//		x%I	value of the smallest pixel
-//		x%A	value of the largest pixel
-//		x%V	average pixel value
-//		x%M	median pixel value (not implemented)
-//		x%qn	nth sample percentile
-//		x%Qn	nth pixel percentile (not implemented)
-
 	struct image_stats *ti = t + img_index;
+
 	if (magic=='i' || magic=='a' || magic=='v') {
-		compute_simple_sample_stats(ti, x, w, h, pd);
-		switch(magic) {
-		case 'i': *out = ti->scalar_min; break;
-		case 'a': *out = ti->scalar_max; break;
-		case 'v': *out = ti->scalar_avg; break;
+		if (comp < 0) { // use all samples
+			compute_simple_sample_stats(ti, x, w, h, pd);
+			switch(magic) {
+				case 'i': *out = ti->scalar_min; break;
+				case 'a': *out = ti->scalar_max; break;
+				case 'v': *out = ti->scalar_avg; break;
+				default: fail("this can not happen");
+			}
+			return 1;
+		} else { // use samples from the specified component
+			compute_simple_component_stats(ti, x, w, h, pd);
+			switch(magic) {
+				case 'i': *out = ti->component_min[comp]; break;
+				case 'a': *out = ti->component_max[comp]; break;
+				case 'v': *out = ti->component_avg[comp]; break;
+				default: fail("this can not happen");
+			}
+			return 1;
 		}
-		return 1;
+	} else if (magic=='I' || magic=='A' || magic=='V') {
+		compute_simple_vector_stats(ti, x, w, h, pd);
+		switch(magic) {
+		case 'I': FORI(pd) out[i] = ti->vector_min[i]; break;
+		case 'A': FORI(pd) out[i] = ti->vector_max[i]; break;
+		case 'V': FORI(pd) out[i] = ti->vector_avg[i]; break;
+		default: fail("this can not happen");
+		}
+		return pd;
 	} else
 		fail("magic of kind '%c' is not yed implemented", magic);
 
@@ -569,6 +645,8 @@ static void parse_modifiers(const char *mods,
 	*omagic = 0;
 	int comp, dx, dy;
 	char magic;
+	// NOTE: the order of the following conditions is important for a
+	// correct parsing
 	if (!mods) {
 		return;
 	} else if (3 == sscanf(mods, "[%d](%d,%d)", &comp, &dx, &dy)) {
@@ -585,11 +663,15 @@ static void parse_modifiers(const char *mods,
 		*odx = dx;
 		*ody = dy;
 	 	return;
-	} else if (1 == sscanf(mods, "[%d]", &comp)) {
-		*ocomp = comp;
-		return;
 	} else if (1 == sscanf(mods, "%%%c", &magic)) {
 		*omagic = magic;
+		return;
+	} else if (2 == sscanf(mods, "[%d]%%%c", &comp, &magic)) {
+		*omagic = magic;
+		*ocomp = comp;
+		return;
+	} else if (1 == sscanf(mods, "[%d]", &comp)) {
+		*ocomp = comp;
 		return;
 	}
 }
@@ -1066,7 +1148,7 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			int pdv = pd[t->index];
 			float x[pdv];
 			int rm = eval_magicvar(x, t->colonvar, t->index,
-					img, w, h, pdv);
+					t->component, img, w, h, pdv);
 			assert(rm == 1);
 			vstack_push_scalar(s, x[0]);
 					   }
@@ -1076,7 +1158,7 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			int pdv = pd[t->index];
 			float x[pdv];
 			int rm = eval_magicvar(x, t->colonvar, t->index,
-					img, w, h, pdv);
+					-1, img, w, h, pdv);
 			assert(rm == pdv);
 			vstack_push_vector(s, x, pdv);
 					   }
@@ -1112,13 +1194,13 @@ static int run_program_vectorially(float *out, int pdmax,
 	return r;
 }
 
-static void shrink_components(float *y, float *x, int n, int ypd, int xpd)
-{
-	assert(ypd <= xpd);
-	FORI(n)
-		FORL(ypd)
-			y[ypd*i + l] = x[xpd*i + l];
-}
+//static void shrink_components(float *y, float *x, int n, int ypd, int xpd)
+//{
+//	assert(ypd <= xpd);
+//	FORI(n)
+//		FORL(ypd)
+//			y[ypd*i + l] = x[xpd*i + l];
+//}
 
 #include "smapa.h"
 SMART_PARAMETER_SILENT(SRAND,0)
@@ -1157,7 +1239,8 @@ int main_calc(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
-int main_working(int c, char *v[])
+#include "iio.h"
+int main_images(int c, char *v[])
 {
 	if (c < 2) {
 		fprintf(stderr, "usage:\n\t%s in1 in2 ... \"plambda\"\n", *v);
@@ -1205,6 +1288,6 @@ int main_working(int c, char *v[])
 int main(int c, char *v[])
 {
 	int (*f)(int c, char *v[]);
-       	f = (PLAMBDA_CALC()>0 || **v=='c' || c==2) ? main_calc : main_working;
+       	f = (PLAMBDA_CALC()>0 || **v=='c' || c==2) ? main_calc : main_images;
 	return f(c,v);
 }
