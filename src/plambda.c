@@ -394,18 +394,48 @@ static void compute_simple_sample_stats(struct image_stats *s,
 	s->scalar_min = minsample;
 	s->scalar_max = maxsample;
 	s->scalar_avg = avgsample;
-	s->scalar_avg = avgsample;
 	//s->scalar_avgnz = avgnzsample;
 }
 
 static void compute_simple_component_stats(struct image_stats *s,
 		float *x, int w, int h, int pd)
 {
-	fail("simple component stats not implemented");
-	(void)x;
-	(void)w;
-	(void)h;
-	(void)pd;
+	if (s->init_csimple) return;
+	if (w*h > 1) s->init_csimple = true;
+	int np = w * h, rns[pd], rnz[pd], nnan[pd], ninf[pd];
+	float minsample[pd], maxsample[pd];
+	long double avgsample[pd], avgnzsample[pd];
+	for (int l = 0; l < pd; l++) {
+		rns[l] = rnz[l] = nnan[l] = ninf[l] = 0;
+		minsample[l] = INFINITY;
+		maxsample[l] = -INFINITY;
+		avgsample[l] = avgnzsample[l] = 0;
+	}
+	for (int i = 0; i < np; i++)
+	for (int l = 0; l < pd; l++)
+	{
+		float y = x[i*pd+l];
+		if (isnan(y)) {
+			nnan[l] += 1;
+			continue;
+		}
+		if (!isfinite(y)) ninf[l] += 1;
+		if (y < minsample[l]) minsample[l] = y;
+		if (y > maxsample[l]) maxsample[l] = y;
+		avgsample[l] += y;
+		rns[l] += 1;
+		if (y) {
+			avgnzsample[l] += y;
+			rnz[l] += 1;
+		}
+	}
+	for (int l = 0; l < pd; l++) {
+		avgsample[l] /= rns[l];
+		avgnzsample[l] /= rnz[l];
+		s->component_min[l] = minsample[l];
+		s->component_max[l] = maxsample[l];
+		s->component_avg[l] = avgsample[l];
+	}
 }
 
 static float euclidean_norm_of_float_vector(const float *x, int n)
@@ -483,16 +513,21 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp,
 		float *x, int w, int h, int pd) // only needed on the first run
 {
 	static bool initt = false;
+	static struct image_stats *t = 0;
 	static struct image_stats t[PLAMBDA_MAX_MAGIC];
 	if (!initt) {
+		t = xmalloc(PLAMBDA_MAX_MAGIC * sizeof*t);
 		for (int i = 0; i < PLAMBDA_MAX_MAGIC; i++) {
 			t[i].init_simple = false;
 			t[i].init_ordered = false;
+			t[i].init_vsimple = false;
 			t[i].init_vordered = false;
+			t[i].init_csimple = false;
+			t[i].init_cordered = false;
 		}
 		initt = true;
 	}
-	fprintf(stderr, "magic=%c index=%d comp=%d\n", magic, img_index, comp);
+	//fprintf(stderr, "magic=%c index=%d comp=%d\n",magic,img_index,comp);
 
 	if (img_index >= PLAMBDA_MAX_MAGIC)
 		fail("%d magic images is too much for me!", PLAMBDA_MAX_MAGIC);
@@ -812,7 +847,9 @@ static void unhack_varnames(struct plambda_program *p)
 	FORI(p->n)
 	{
 		struct plambda_token *t = p->t + i;
-		if (t->type == PLAMBDA_SCALAR || t->type == PLAMBDA_VECTOR)
+		if (t->type == PLAMBDA_SCALAR || t->type == PLAMBDA_VECTOR
+				|| t->type == PLAMBDA_MAGIC_SCALAR
+				|| t->type == PLAMBDA_MAGIC_VECTOR)
 		{
 			t->index = collection_of_varnames_find(p->var,
 								t->tmphack);
