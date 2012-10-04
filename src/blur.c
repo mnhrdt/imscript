@@ -65,7 +65,7 @@ static void fft_2dfloat(fftwf_complex *fx, float *x, int w, int h)
 }
 
 #include "smapa.h"
-SMART_PARAMETER(FIWARN,1)
+SMART_PARAMETER_SILENT(FIWARN,1)
 
 // Wrapper around FFTW3 that computes the real-valued inverse Fourier transform
 // of a complex-valued frequantial image.
@@ -89,7 +89,11 @@ static void ifft_2dfloat(float *ifx,  fftwf_complex *fx, int w, int h)
 		fftwf_complex z = b[i] * scale;
 		ifx[i] = crealf(z);
 		if (FIWARN() > 0)
-			assert(cimagf(z) < 0.001);
+		{
+			if (cimagf(z) > 0.001)
+				fail("z is not real {cimagf(z)=%g} (set FIWARN=0 to run anyway)", cimagf(z));
+			//assert(cimagf(z) < 0.001);
+		}
 	}
 	fftwf_destroy_plan(p);
 	fftwf_free(a);
@@ -284,8 +288,13 @@ void blur_2d(float *y, float *x, int w, int h, int pd,
 	for (int i = 0; i < nparams; i++)
 		p[1+i] = param[i];
 	p[0] = nparams;
-	FORI(nparams+1)
-		fprintf(stderr, "p[%d:%d] = %g\n", i,nparams,p[i]);
+	//FORI(nparams+1) fprintf(stderr, "p[%d:%d] = %g\n", i,nparams,p[i]);
+
+	if (nparams == 1 && param[0] == 0) {
+		for (int i = 0; i < w*h*pd; i++)
+			y[i] = x[i];
+		return;
+	}
 
 	float (*f)(float,float,float*);
 	switch(kernel_id[0]) {
@@ -330,9 +339,9 @@ int main(int c, char *v[])
 	float param[maxparam];
 	int nparams = parse_floats(param, maxparam, kernel_params);
 	if (nparams < 1) fail("please, give at least one parameter");
-	fprintf(stderr, "nparams = %d\n", nparams);
-	FORI(nparams)
-		fprintf(stderr, "param[%d] = %g\n", i, param[i]);
+	//fprintf(stderr, "nparams = %d\n", nparams);
+	//FORI(nparams)
+	//	fprintf(stderr, "param[%d] = %g\n", i, param[i]);
 
 	int w, h, pd;
 	float *x = iio_read_image_float_vec(filename_in, &w, &h, &pd);
