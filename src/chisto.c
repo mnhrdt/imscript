@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include "iio.h"
 
 #include "xmalloc.c"
@@ -71,10 +72,14 @@ void dump_histograms(long double (*h[4])[2], int n[4])
 	printf("set format y \"\"\n");
 	printf("unset key\n");
 	printf("plot "
+			"\"-\" lw 1 lc rgb \"gray\", "
 			"\"-\" lw 1 lc rgb \"red\", "
 			"\"-\" lw 1 lc rgb \"green\", "
 			"\"-\" lw 1 lc rgb \"blue\"\n"
 	      );
+	for (int i = 0; i < n[3]; i++)
+		printf("\t%Lg\t%Lg\n", h[3][i][0], h[3][i][1]);
+	printf("end\n");
 	long double m = 0;
 	for (int l = 0; l < 3; l++) {
 		for (int i = 0; i < n[l]; i++) {
@@ -138,7 +143,7 @@ int main(int c, char *v[])
 		nh[l] = fill_histogram(his[l], tmp, w*h);
 	}
 	for (int i = 0; i < w*h; i++)
-		tmp[i] = RRR*x[3*i]+GGG*x[3*i+1]+BBB*x[3*i+2];
+		tmp[i] = round(RRR*x[3*i]+GGG*x[3*i+1]+BBB*x[3*i+2]);
 	nh[3] = fill_histogram(his[3], tmp, w*h);
 
 	dump_histograms(his, nh);

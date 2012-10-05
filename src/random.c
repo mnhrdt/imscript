@@ -15,9 +15,9 @@ static double random_normal(void)
 {
 	double x1 = random_uniform();
 	double x2 = random_uniform();
-	double y1 = sqrt(-2*log(x1)) * cos(2*M_PI*x2);
+	double y = sqrt(-2*log(x1)) * cos(2*M_PI*x2);
 	//double y2 = sqrt(-2*log(x1)) * sin(2*M_PI*x2);
-	return y1;
+	return y;
 }
 
 int randombounds(int a, int b)
@@ -41,9 +41,9 @@ static double random_cauchy(void)
 {
 	double x1 = random_uniform();
 	double x2 = random_uniform();
-	double y1 = sqrt(-2*log(x1)) * cos(2*M_PI*x2);
-	double y2 = sqrt(-2*log(x1)) * sin(2*M_PI*x2);
-	double r = y1/y2;
+	double y_1 = sqrt(-2*log(x1)) * cos(2*M_PI*x2);
+	double y_2 = sqrt(-2*log(x1)) * sin(2*M_PI*x2);
+	double r = y_1/y_2;
 	return isfinite(r)?r:0;
 }
 

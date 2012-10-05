@@ -67,7 +67,7 @@
 //		join	join the components of two vectors ATTOTS
 //		join3	join the components of three vectors ATTOTS
 //
-//	Magic variables (which can not be computed locally for each image):
+//	Magic modifiers (which can not be computed locally for each image):
 //
 //		x%i	value of the smallest sample of image "x"
 //		x%a	value of the largest sample
@@ -81,6 +81,9 @@
 //		x%Qn	nth pixel percentile (not implemented)
 //		x%r	random sample of the image (not implemented)
 //		x%R	random pixel of the image (not implemented)
+//
+//	Notice that the scalar "magic" modifiers may act upon individual
+//	components, e.g. x[2]%i is the minimum value of the blue component.
 //
 //
 //	Other operators:
@@ -210,6 +213,11 @@ static double quantize_easy(double x, double a, double b)
 	return quantize_255(255.0*(x-a)/(b-a));
 }
 
+static double range(double x, double a, double b)
+{
+	return (x-a)/(b-a);
+}
+
 
 // table of all functions (local and from math.h)
 struct predefined_function {
@@ -268,6 +276,7 @@ struct predefined_function {
 	REGISTER_FUNCTION(remainder,2),
 	REGISTER_FUNCTIONN(quantize_255,"q255",1),
 	REGISTER_FUNCTIONN(quantize_easy,"qe",3),
+	REGISTER_FUNCTIONN(range,"range",3),
 	REGISTER_FUNCTIONN(pow,"^",2),
 	REGISTER_FUNCTIONN(sum_two_doubles,"+",2),
 	REGISTER_FUNCTIONN(logic_g,">",2),
@@ -361,40 +370,52 @@ struct image_stats {
 	float component_max[PLAMBDA_MAX_PIXELDIM];
 	float component_avg[PLAMBDA_MAX_PIXELDIM];
 	float component_med[PLAMBDA_MAX_PIXELDIM];
+	float *sorted_samples, *sorted_components[PLAMBDA_MAX_PIXELDIM];
 };
+
+struct linear_statistics {
+	float min, max, avg, avgnz;
+	int n, rns, rnz, nnan, ninf;
+};
+
+static void compute_linstats(struct linear_statistics *s,
+		float *x, int n, int stride, int offset)
+{
+	int rns = 0, rnz = 0, nnan = 0, ninf = 0;
+	float min = INFINITY, max = -INFINITY;
+	long double avg = 0, avgnz = 0;
+	for (int i = 0; i < n; i++)
+	{
+		float y = x[i*stride + offset];
+		if (isnan(y)) {
+			nnan += 1;
+			continue;
+		}
+		if (!isfinite(y)) ninf += 1;
+		if (y < min) min = y;
+		if (y > max) max = y;
+		avg += y;
+		rns += 1;
+		if (y) {
+			avgnz += y;
+			rnz += 1;
+		}
+	}
+	avg /= rns; avgnz /= rnz;
+	s->min=min; s->max=max; s->avg=avg; s->avgnz=avgnz;
+	s->n=n; s->rns=rns; s->rnz=rnz; s->nnan=nnan; s->ninf=ninf;
+}
 
 static void compute_simple_sample_stats(struct image_stats *s,
 		float *x, int w, int h, int pd)
 {
 	if (s->init_simple) return;
 	if (w*h > 1) s->init_simple = true;
-	int ns = w * h * pd, rns = 0, rnz = 0, nnan = 0, ninf = 0;
-	float minsample = INFINITY, maxsample = -INFINITY;
-	long double avgsample = 0;
-	long double avgnzsample = 0;
-	for (int i = 0; i < ns; i++)
-	{
-		float y = x[i];
-		if (isnan(y)) {
-			nnan += 1;
-			continue;
-		}
-		if (!isfinite(y)) ninf += 1;
-		if (y < minsample) minsample = y;
-		if (y > maxsample) maxsample = y;
-		avgsample += y;
-		rns += 1;
-		if (y) {
-			avgnzsample += y;
-			rnz += 1;
-		}
-	}
-	avgsample /= rns;
-	avgnzsample /= rnz;
-	s->scalar_min = minsample;
-	s->scalar_max = maxsample;
-	s->scalar_avg = avgsample;
-	//s->scalar_avgnz = avgnzsample;
+	struct linear_statistics ls[1];
+	compute_linstats(ls, x, w*h*pd, 1, 0);
+	s->scalar_min = ls->min;
+	s->scalar_max = ls->max;
+	s->scalar_avg = ls->avg;
 }
 
 static void compute_simple_component_stats(struct image_stats *s,
@@ -402,39 +423,13 @@ static void compute_simple_component_stats(struct image_stats *s,
 {
 	if (s->init_csimple) return;
 	if (w*h > 1) s->init_csimple = true;
-	int np = w * h, rns[pd], rnz[pd], nnan[pd], ninf[pd];
-	float minsample[pd], maxsample[pd];
-	long double avgsample[pd], avgnzsample[pd];
-	for (int l = 0; l < pd; l++) {
-		rns[l] = rnz[l] = nnan[l] = ninf[l] = 0;
-		minsample[l] = INFINITY;
-		maxsample[l] = -INFINITY;
-		avgsample[l] = avgnzsample[l] = 0;
-	}
-	for (int i = 0; i < np; i++)
 	for (int l = 0; l < pd; l++)
 	{
-		float y = x[i*pd+l];
-		if (isnan(y)) {
-			nnan[l] += 1;
-			continue;
-		}
-		if (!isfinite(y)) ninf[l] += 1;
-		if (y < minsample[l]) minsample[l] = y;
-		if (y > maxsample[l]) maxsample[l] = y;
-		avgsample[l] += y;
-		rns[l] += 1;
-		if (y) {
-			avgnzsample[l] += y;
-			rnz[l] += 1;
-		}
-	}
-	for (int l = 0; l < pd; l++) {
-		avgsample[l] /= rns[l];
-		avgnzsample[l] /= rnz[l];
-		s->component_min[l] = minsample[l];
-		s->component_max[l] = maxsample[l];
-		s->component_avg[l] = avgsample[l];
+		struct linear_statistics ls[1];
+		compute_linstats(ls, x, w*h, pd, l);
+		s->component_min[l] = ls->min;
+		s->component_max[l] = ls->max;
+		s->component_avg[l] = ls->avg;
 	}
 }
 
@@ -485,15 +480,39 @@ static void compute_simple_vector_stats(struct image_stats *s,
 	//setnumber(p, "error", avgnorm);
 }
 
+static int compare_floats(const void *aa, const void *bb)
+{
+	const float *a = (const float *)aa;
+	const float *b = (const float *)bb;
+	return (*a > *b) - (*a < *b);
+}
+
 static void compute_ordered_sample_stats(struct image_stats *s,
 		float *x, int w, int h, int pd)
 {
-	fail("ordered sample stats not implemented");
-	(void)x;
-	(void)w;
-	(void)h;
-	(void)pd;
-	s->init_ordered = true;
+	if (s->init_ordered) return;
+	if (w*h > 1) s->init_ordered = true;
+	int ns = w * h * pd;
+	s->sorted_samples = xmalloc(ns*sizeof(float));
+	FORI(ns) s->sorted_samples[i] = x[i];
+	qsort(s->sorted_samples, ns, sizeof(float), compare_floats);
+	s->scalar_med = s->sorted_samples[ns/2];
+}
+
+static void compute_ordered_component_stats(struct image_stats *s,
+		float *x, int w, int h, int pd)
+{
+	if (s->init_cordered) return;
+	if (w*h > 1) s->init_cordered = true;
+	int ns = w * h;
+	float *t = xmalloc(pd*ns*sizeof(float));
+	for (int l = 0; l < pd; l++)
+	{
+		s->sorted_components[l] = t + l*ns;
+		FORI(ns) s->sorted_components[l][i] = x[i*pd+l];
+		qsort(s->sorted_components[l],ns,sizeof(float),compare_floats);
+		s->component_med[l] = s->sorted_components[l][ns/2];
+	}
 }
 
 static void compute_ordered_vector_stats(struct image_stats *s,
@@ -507,9 +526,17 @@ static void compute_ordered_vector_stats(struct image_stats *s,
 	s->init_vordered = true;
 }
 
+static int bound(int a, int x, int b)
+{
+	if (b < a) return bound(b, x, a);
+	if (x < a) return a;
+	if (x > b) return b;
+	return x;
+}
+
 
 // the value of magic variables depends on some globally cached data
-static int eval_magicvar(float *out, int magic, int img_index, int comp,
+static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 		float *x, int w, int h, int pd) // only needed on the first run
 {
 	static bool initt = false;
@@ -563,6 +590,32 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp,
 		default: fail("this can not happen");
 		}
 		return pd;
+	} else if (magic == 'm' || magic == 'q') {
+		if (comp < 0) { // use all samples
+			compute_ordered_sample_stats(ti, x, w, h, pd);
+			if (magic == 'm') {
+				*out = ti->scalar_med;
+				return 1;
+			}
+			if (magic == 'q') {
+				int qpos = round(qq*w*h*pd/100.0);
+				qpos = bound(0, qpos, w*h*pd-1);
+				*out = ti->sorted_samples[qpos];
+				return 1;
+			}
+		} else {
+			compute_ordered_component_stats(ti, x, w, h, pd);
+			if (magic == 'm') {
+				*out = ti->component_med[comp];
+				return 1;
+			}
+			if (magic == 'q') {
+				int qpos = round(qq*w*h/100.0);
+				qpos = bound(0, qpos, w*h-1);
+				*out = ti->sorted_components[comp][qpos];
+				return 1;
+			}
+		}
 	} else
 		fail("magic of kind '%c' is not yed implemented", magic);
 
@@ -698,8 +751,17 @@ static void parse_modifiers(const char *mods,
 		*odx = dx;
 		*ody = dy;
 	 	return;
+	} else if (2 == sscanf(mods, "%%%c%d", &magic, &dx)) {
+		*omagic = magic;
+		*odx = dx;
+		return;
 	} else if (1 == sscanf(mods, "%%%c", &magic)) {
 		*omagic = magic;
+		return;
+	} else if (3 == sscanf(mods, "[%d]%%%c%d", &comp, &magic, &dx)) {
+		*omagic = magic;
+		*ocomp = comp;
+		*odx = dx;
 		return;
 	} else if (2 == sscanf(mods, "[%d]%%%c", &comp, &magic)) {
 		*omagic = magic;
@@ -1185,7 +1247,8 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			int pdv = pd[t->index];
 			float x[pdv];
 			int rm = eval_magicvar(x, t->colonvar, t->index,
-					t->component, img, w, h, pdv);
+					t->component, t->displacement[0],
+					img, w, h, pdv);
 			assert(rm == 1);
 			vstack_push_scalar(s, x[0]);
 					   }
@@ -1195,7 +1258,8 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			int pdv = pd[t->index];
 			float x[pdv];
 			int rm = eval_magicvar(x, t->colonvar, t->index,
-					-1, img, w, h, pdv);
+					-1, t->displacement[0],
+					img, w, h, pdv);
 			assert(rm == pdv);
 			vstack_push_vector(s, x, pdv);
 					   }
@@ -1301,7 +1365,7 @@ int main_images(int c, char *v[])
 		if (w[0] != w[i+1] || h[0] != h[i+1])// || pd[0] != pd[i+1])
 			fail("input images size mismatch");
 
-	FORI(n)
+	if (n>1) FORI(n)
 		fprintf(stderr, "plambda correspondence \"%s\" = \"%s\"\n",
 				p->var->t[i], v[i+1]);
 

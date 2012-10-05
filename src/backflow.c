@@ -107,6 +107,19 @@ static void compute_flow_det(float *d, float *u, int w, int h)
 }
 
 
+
+static void env_interpolate_at(float *result,
+		float *x, int w, int h, int pd,
+		float p, float q)
+{
+	if (BILINEAR())
+		bilinear_interpolation_at(result, x, w, h, pd, p, q);
+	else if (NEAREST())
+		interpolate_nearest(result, x, w,h, pd, p, q);
+	else
+		bicubic_interpolation(result, x, w, h, pd, p, q);
+}
+
 static void invflow(float *ou, float *flo, float *pin, int w, int h, int pd)
 {
 	float (*out)[w][pd] = (void*)ou;
@@ -128,15 +141,9 @@ static void invflow(float *ou, float *flo, float *pin, int w, int h, int pd)
 	FORJ(h) FORI(w) {
 		float p[2] = {i + flow[j][i][0], j + flow[j][i][1]};
 		float result[pd];
-      if (BILINEAR()) {
-   		bilinear_interpolation_at(result, pin, w, h, pd, p[0], p[1]);
-      } else { 
-         if (NEAREST()) {
-         interpolate_nearest(result, pin, w,h, pd, p[0], p[1]);
-         } else {
-   		   bicubic_interpolation(result, pin, w, h, pd, p[0], p[1]);
-         }
-      }
+
+		env_interpolate_at(result, pin, w, h, pd, p[0], p[1]);
+
 		float factor = 1;
 		if (flowdiv)
 			factor = exp(BACKDIV() * flowdiv[j*w+i]);

@@ -630,7 +630,7 @@ static char *preprocess_arrobas(char *fmt)
 "pixeldim (\\%c):               %c\n"
 "numsamples (\\%n):             %n\n"
 "numpixels (\\%N):              %N\n"
-"smallest sample (\\%i):        %i\n"
+"min sample (\\%i):             %i\n"
 "average sample (\\%v):         %v\n"
 "median sample (\\%m):          %m\n"
 "max sample (\\%a):             %a\n"
