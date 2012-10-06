@@ -174,15 +174,14 @@
 #include "parsenumbers.c"
 
 
-#define PLAMBDA_CONSTANT 0     // numeric constant
-#define PLAMBDA_SCALAR 1       // pixel component
-#define PLAMBDA_VECTOR 2       // whole pixel
-#define PLAMBDA_OPERATOR 3     // function
-#define PLAMBDA_COLONVAR 4     // colon-type variable
-#define PLAMBDA_STACKOP 5      // stack operator
-#define PLAMBDA_VARDEF 6       // register variable definition (hacky)
-#define PLAMBDA_MAGIC_SCALAR 7 // "magic" scalar (requiring cached global data)
-#define PLAMBDA_MAGIC_VECTOR 8 // "magic" vector (requiring cached global data)
+#define PLAMBDA_CONSTANT 0 // numeric constant
+#define PLAMBDA_SCALAR 1   // pixel component
+#define PLAMBDA_VECTOR 2   // whole pixel
+#define PLAMBDA_OPERATOR 3 // function
+#define PLAMBDA_COLONVAR 4 // colon-type variable
+#define PLAMBDA_STACKOP 5  // stack operator
+#define PLAMBDA_VARDEF 6   // register variable definition (hacky)
+#define PLAMBDA_MAGIC 7    // "magic" modifier (requiring cached global data)
 
 // local functions
 static double sum_two_doubles      (double a, double b) { return a + b; }
@@ -218,6 +217,12 @@ static double range(double x, double a, double b)
 	return (x-a)/(b-a);
 }
 
+static double bound_double(double x, double a, double b)
+{
+	if (x < a) return a;
+	if (x > b) return b;
+	return x;
+}
 
 // table of all functions (local and from math.h)
 struct predefined_function {
@@ -277,6 +282,7 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(quantize_255,"q255",1),
 	REGISTER_FUNCTIONN(quantize_easy,"qe",3),
 	REGISTER_FUNCTIONN(range,"range",3),
+	REGISTER_FUNCTIONN(bound_double,"bound",3),
 	REGISTER_FUNCTIONN(pow,"^",2),
 	REGISTER_FUNCTIONN(sum_two_doubles,"+",2),
 	REGISTER_FUNCTIONN(logic_g,">",2),
@@ -361,8 +367,14 @@ static float eval_colonvar(int w, int h, int i, int j, int c)
 struct image_stats {
 	bool init_simple, init_vsimple, init_ordered, init_vordered;
 	float scalar_min, scalar_max, scalar_avg, scalar_med;
-	float vector_min[PLAMBDA_MAX_PIXELDIM];
-	float vector_max[PLAMBDA_MAX_PIXELDIM];
+	//float vector_cmin[PLAMBDA_MAX_PIXELDIM];  // component-wise min
+	float vector_n1min[PLAMBDA_MAX_PIXELDIM]; // exemplar with min L1
+	float vector_n2min[PLAMBDA_MAX_PIXELDIM]; // exemplar with min L2
+	float vector_nimin[PLAMBDA_MAX_PIXELDIM]; // exemplar with min Linf
+	//float vector_cmax[PLAMBDA_MAX_PIXELDIM];
+	float vector_n1max[PLAMBDA_MAX_PIXELDIM];
+	float vector_n2max[PLAMBDA_MAX_PIXELDIM];
+	float vector_nimax[PLAMBDA_MAX_PIXELDIM];
 	float vector_avg[PLAMBDA_MAX_PIXELDIM];
 	float vector_med[PLAMBDA_MAX_PIXELDIM];
 	bool init_csimple, init_cordered;
@@ -474,8 +486,8 @@ static void compute_simple_vector_stats(struct image_stats *s,
 		mapi[j] = x[maxidx*pd+j];
 		avgpixel[j] /= rnp;
 	}
-	FORI(pd) s->vector_min[i] = mipi[i];
-	FORI(pd) s->vector_max[i] = mapi[i];
+	FORI(pd) s->vector_n2min[i] = mipi[i];
+	FORI(pd) s->vector_n2max[i] = mapi[i];
 	FORI(pd) s->vector_avg[i] = avgpixel[i];
 	//setnumber(p, "error", avgnorm);
 }
@@ -584,9 +596,17 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 	} else if (magic=='I' || magic=='A' || magic=='V') {
 		compute_simple_vector_stats(ti, x, w, h, pd);
 		switch(magic) {
-		case 'I': FORI(pd) out[i] = ti->vector_min[i]; break;
-		case 'A': FORI(pd) out[i] = ti->vector_max[i]; break;
+		case 'I': FORI(pd) out[i] = ti->vector_n2min[i]; break;
+		case 'A': FORI(pd) out[i] = ti->vector_n2max[i]; break;
 		case 'V': FORI(pd) out[i] = ti->vector_avg[i]; break;
+		default: fail("this can not happen");
+		}
+		return pd;
+	} else if (magic=='Y' || magic=='E') {
+		compute_simple_component_stats(ti, x, w, h, pd);
+		switch(magic) {
+		case 'Y': FORI(pd) out[i] = ti->component_min[i]; break;
+		case 'E': FORI(pd) out[i] = ti->component_max[i]; break;
 		default: fail("this can not happen");
 		}
 		return pd;
@@ -880,10 +900,7 @@ static void process_token(struct plambda_program *p, const char *tokke)
 			parse_modifiers(tok_end, &comp, disp, disp+1, &magic);
 			t->type = comp<0 ? PLAMBDA_VECTOR : PLAMBDA_SCALAR;
 			if (magic) {
-				if (isupper(magic))
-					t->type = PLAMBDA_MAGIC_VECTOR;
-				else
-					t->type = PLAMBDA_MAGIC_SCALAR;
+				t->type = PLAMBDA_MAGIC;
 				t->colonvar = magic;
 			}
 			t->component = comp;
@@ -910,8 +927,7 @@ static void unhack_varnames(struct plambda_program *p)
 	{
 		struct plambda_token *t = p->t + i;
 		if (t->type == PLAMBDA_SCALAR || t->type == PLAMBDA_VECTOR
-				|| t->type == PLAMBDA_MAGIC_SCALAR
-				|| t->type == PLAMBDA_MAGIC_VECTOR)
+				|| t->type == PLAMBDA_MAGIC)
 		{
 			t->index = collection_of_varnames_find(p->var,
 								t->tmphack);
@@ -1032,11 +1048,12 @@ static void vstack_push_vector(struct value_vstack *s, float *v, int n)
 
 static void vstack_push_scalar(struct value_vstack *s, float x)
 {
-	if (s->n+1 < PLAMBDA_MAX_TOKENS) {
-		s->d[s->n] = 1;
-		s->t[s->n][0] = x;
-		s->n += 1;
-	} else fail("full stack");
+	vstack_push_vector(s, &x, 1);
+	//if (s->n+1 < PLAMBDA_MAX_TOKENS) {
+	//	s->d[s->n] = 1;
+	//	s->t[s->n][0] = x;
+	//	s->n += 1;
+	//} else fail("full stack");
 }
 
 //static void vstack_print(FILE *f, struct value_vstack *s)
@@ -1242,27 +1259,21 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 				vstack_push_vector(s, p->regv[n], p->regn[n]);
 				     }
 			break;
-		case PLAMBDA_MAGIC_SCALAR: {
+		case PLAMBDA_MAGIC: {
 			float *img = val[t->index];
 			int pdv = pd[t->index];
 			float x[pdv];
 			int rm = eval_magicvar(x, t->colonvar, t->index,
 					t->component, t->displacement[0],
 					img, w, h, pdv);
-			assert(rm == 1);
-			vstack_push_scalar(s, x[0]);
-					   }
-			break;
-		case PLAMBDA_MAGIC_VECTOR: {
-			float *img = val[t->index];
-			int pdv = pd[t->index];
-			float x[pdv];
-			int rm = eval_magicvar(x, t->colonvar, t->index,
-					-1, t->displacement[0],
-					img, w, h, pdv);
-			assert(rm == pdv);
-			vstack_push_vector(s, x, pdv);
-					   }
+			vstack_push_vector(s, x, rm);
+			//if (rm == 1)
+			//	vstack_push_scalar(s, x[0]);
+			//else if (rm > 1) {
+			//	assert(rm == pdv);
+			//	vstack_push_vector(s, x, pdv);
+			//}
+				    }
 			break;
 		default:
 			fail("unknown tag type %d", t->type);
