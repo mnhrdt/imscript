@@ -177,18 +177,18 @@ int main_backflow(int c, char *v[])
 
 	int w, h, pd;
 	float *flow = iio_read_image_float_vec(v[1], &w, &h, &pd);
-	fprintf(stderr, "w h pd P = %d %d %d %d\n", w, h, pd, w*h*pd);
+	//fprintf(stderr, "w h pd P = %d %d %d %d\n", w, h, pd, w*h*pd);
 
 	if (pd != 2)
 		fail("flow must have two-dimensional pixels\n");
 
 	int iw, ih;
 	float *in = iio_read_image_float_vec(inname, &iw, &ih, &pd);
-	fprintf(stderr, "w h pd P = %d %d %d %d\n", iw, ih, pd, iw*ih*pd);
+	//fprintf(stderr, "w h pd P = %d %d %d %d\n", iw, ih, pd, iw*ih*pd);
 	if (iw != w || ih != h)
 		fail("flow and image size mismatch\n");
 	float *out = xmalloc(w*h*pd*sizeof*out);
-	fprintf(stderr, "p = %p\n", (void*)out);
+	//fprintf(stderr, "p = %p\n", (void*)out);
 	invflow(out, flow, in, w, h, pd);
 	iio_save_image_float_vec(outname, out, w, h, pd);
 	return EXIT_SUCCESS;
