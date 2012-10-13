@@ -396,8 +396,7 @@ static void compute_linstats(struct linear_statistics *s,
 	int rns = 0, rnz = 0, nnan = 0, ninf = 0;
 	float min = INFINITY, max = -INFINITY;
 	long double avg = 0, avgnz = 0;
-	for (int i = 0; i < n; i++)
-	{
+	for (int i = 0; i < n; i++) {
 		float y = x[i*stride + offset];
 		if (isnan(y)) {
 			nnan += 1;
@@ -535,6 +534,7 @@ static void compute_ordered_vector_stats(struct image_stats *s,
 	(void)w;
 	(void)h;
 	(void)pd;
+	// there is some bizarre trickery waiting to be coded in here
 	s->init_vordered = true;
 }
 
@@ -551,6 +551,7 @@ static int bound(int a, int x, int b)
 static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 		float *x, int w, int h, int pd) // only needed on the first run
 {
+	// XXX WARNING : global variables here (leading to non-re-entrant code)
 	static bool initt = false;
 	//static struct image_stats *t = 0;
 	static struct image_stats t[PLAMBDA_MAX_MAGIC];
@@ -1260,19 +1261,12 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 				     }
 			break;
 		case PLAMBDA_MAGIC: {
-			float *img = val[t->index];
 			int pdv = pd[t->index];
-			float x[pdv];
+			float *img = val[t->index], x[pdv];
 			int rm = eval_magicvar(x, t->colonvar, t->index,
 					t->component, t->displacement[0],
 					img, w, h, pdv);
 			vstack_push_vector(s, x, rm);
-			//if (rm == 1)
-			//	vstack_push_scalar(s, x[0]);
-			//else if (rm > 1) {
-			//	assert(rm == pdv);
-			//	vstack_push_vector(s, x, pdv);
-			//}
 				    }
 			break;
 		default:
@@ -1366,7 +1360,7 @@ int main_images(int c, char *v[])
 	//print_compiled_program(p);
 
 	int n = c - 2;
-	if (n != p->var->n)
+	if (n != p->var->n && !(n == 1 && p->var->n == 0))
 		fail("the program expects %d variables but %d images "
 					"were given", p->var->n, n);
 	int w[n], h[n], pd[n];
