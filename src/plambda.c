@@ -38,6 +38,8 @@
 //		:y	relative horizontal coordinate of the pixel
 //		:r	relative distance to the center of the image
 //		:t	relative angle from the center of the image
+//		:I	horizontal coordinate of the pixel (centered)
+//		:J	vertical coordinate of the pixel (centered)
 //
 //
 //	Variable modifiers acting on regular variables:
@@ -224,6 +226,18 @@ static double bound_double(double x, double a, double b)
 	return x;
 }
 
+static void from_cartesian_to_polar(float *y, float *x)
+{
+	y[0] = hypot(x[0], x[1]);
+	y[1] = atan2(x[1], x[0]);
+}
+
+static void from_polar_to_cartesian(float *y, float *x)
+{
+	y[0] = x[0] * cos(x[1]);
+	y[1] = x[0] * sin(x[1]);
+}
+
 // table of all functions (local and from math.h)
 struct predefined_function {
 	void (*f)(void);
@@ -297,10 +311,14 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(substract_two_doubles,"-",2),
 	REGISTER_FUNCTIONN(random_uniform,"randu",-1),
 	REGISTER_FUNCTIONN(random_normal,"randn",-1),
+	REGISTER_FUNCTIONN(random_normal,"randg",-1),
 	REGISTER_FUNCTIONN(random_cauchy,"randc",-1),
 	REGISTER_FUNCTIONN(random_laplace,"randl",-1),
 	REGISTER_FUNCTIONN(random_exponential,"rande",-1),
 	REGISTER_FUNCTIONN(random_pareto,"randp",-1),
+	REGISTER_FUNCTIONN(random_raw,"rand",-1),
+	REGISTER_FUNCTIONN(from_cartesian_to_polar,"topolar", -2),
+	REGISTER_FUNCTIONN(from_polar_to_cartesian,"frompolar", -2),
 	//REGISTER_FUNCTIONN(rgb2hsv,"rgb2hsv",3),
 	//REGISTER_FUNCTIONN(hsv2rgb,"rgb2hsv",3),
 #undef REGISTER_FUNCTION
@@ -347,6 +365,15 @@ static float apply_function(struct predefined_function *f, float *v)
 	//return 0;
 }
 
+static int ct(int i, int m)
+{
+	assert( i >= 0 && i < m);
+	int r = 0;
+	if (i > m/2) r = i-m;
+	if (i < m/2) r = i;
+	return r;
+}
+
 // the value of colon variables depends on the position within the image
 static float eval_colonvar(int w, int h, int i, int j, int c)
 {
@@ -360,6 +387,8 @@ static float eval_colonvar(int w, int h, int i, int j, int c)
 	case 'y': return (2.0/(h-1))*j - 1;
 	case 'r': return hypot((2.0/(h-1))*j-1,(2.0/(w-1))*i-1);
 	case 't': return atan2((2.0/(h-1))*j-1,(2.0/(w-1))*i-1);
+	case 'I': return ct(i,w);
+	case 'J': return ct(j,w);
 	default: fail("unrecognized colonvar \":%c\"", c);
 	}
 }
@@ -1075,12 +1104,25 @@ static void treat_strange_case(struct value_vstack *s,
 	vstack_push_vector(s, &r, 1);
 }
 
+static void treat_strange_case2(struct value_vstack *s,
+		struct predefined_function *f)
+{
+	assert(f->nargs == -2);
+	float v[PLAMBDA_MAX_PIXELDIM];
+	float r[PLAMBDA_MAX_PIXELDIM];
+	int n = vstack_pop_vector(v, s);
+	if (n != 2) fail("function \"%s\" requires a 2-vector\n", f->name);
+	((void(*)(float*,float*))(f->f))(r, v);
+	vstack_push_vector(s, r, n);
+}
+
 // this function is complicated because it contains the scalar+vector
 // semantics, which is complicated
 static void vstack_apply_function(struct value_vstack *s,
 					struct predefined_function *f)
 {
 	if (f->nargs == -1) {treat_strange_case(s,f); return;}
+	if (f->nargs == -2) {treat_strange_case2(s,f); return;}
 	int d[f->nargs], rd = 1;
 	float v[f->nargs][PLAMBDA_MAX_PIXELDIM];
 	float r[PLAMBDA_MAX_PIXELDIM];
