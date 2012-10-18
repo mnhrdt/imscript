@@ -63,9 +63,4 @@ Setting the coefficients of the covariance matrix is general enough but
 admittedly non-intuitive.  By user request, I can provide a different and
 easier interface.
 
-
-
-
-
-
 Enric Meinardt-Llopis

@@ -11,16 +11,16 @@ static void cline(float *l, int n, float *x, int w, int h, float angle)
 	float s = sin(an);
 	float t[2] = {(fmin(w,h)-1)/2.0, 0};
 	float dir[2] = {c*t[0]+s*t[1], -s*t[0]+c*t[1]};
-	float zer[2] = {(w-1.0)/2, (w-1.0)/2};
+	float zer[2] = {(w-1.0)/2, (h-1.0)/2};
 	float from[2], toto[2];
 	for (int i = 0; i < 2; i++) {
 		from[i] = zer[i] - dir[i];
 		toto[i] = zer[i] + dir[i];
 	}
-	//fprintf(stderr, "c,s = %g %g\n", c, s);
-	//fprintf(stderr, "dir = %g %g\n", dir[0], dir[1]);
-	//fprintf(stderr, "zer = %g %g\n", zer[0], zer[1]);
-	//fprintf(stderr, "(%g %g)=>(%g %g)\n",from[0],from[1],toto[0],toto[1]);
+	fprintf(stderr, "c,s = %g %g\n", c, s);
+	fprintf(stderr, "dir = %g %g\n", dir[0], dir[1]);
+	fprintf(stderr, "zer = %g %g\n", zer[0], zer[1]);
+	fprintf(stderr, "(%g %g)=>(%g %g)\n",from[0],from[1],toto[0],toto[1]);
 	for (int i = 0; i < n; i++) {
 		float a = i/(n - 1.0);
 		float p[2];
@@ -58,6 +58,8 @@ int main(int c, char *v[])
 	int w, h;
 	float *x = iio_read_image_float(in_img, &w, &h);
 	int n = NFAC()*(2+hypot(w+2,h+2));
+	fprintf(stderr, "geometry = %dx%d\n", w, h);
+	fprintf(stderr, "n = %d\n", n);
 	float l[n];
 	cline(l, n, x, w, h, angle);
 	plot_cline(l, n, v[1]);

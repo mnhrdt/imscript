@@ -74,12 +74,12 @@
 //		x%i	value of the smallest sample of image "x"
 //		x%a	value of the largest sample
 //		x%v	average sample value
-//		x%m	median sample value (not implemented)
+//		x%m	median sample value
 //		x%I	value of the smallest pixel
 //		x%A	value of the largest pixel
 //		x%V	average pixel value
 //		x%M	median pixel value (not implemented)
-//		x%qn	nth sample percentile (not implemented)
+//		x%qn	nth sample percentile
 //		x%Qn	nth pixel percentile (not implemented)
 //		x%r	random sample of the image (not implemented)
 //		x%R	random pixel of the image (not implemented)
@@ -365,7 +365,7 @@ static float apply_function(struct predefined_function *f, float *v)
 	//return 0;
 }
 
-static int ct(int i, int m)
+static int symmetrize_index_inside(int i, int m)
 {
 	assert( i >= 0 && i < m);
 	int r = 0;
@@ -387,8 +387,8 @@ static float eval_colonvar(int w, int h, int i, int j, int c)
 	case 'y': return (2.0/(h-1))*j - 1;
 	case 'r': return hypot((2.0/(h-1))*j-1,(2.0/(w-1))*i-1);
 	case 't': return atan2((2.0/(h-1))*j-1,(2.0/(w-1))*i-1);
-	case 'I': return ct(i,w);
-	case 'J': return ct(j,w);
+	case 'I': return symmetrize_index_inside(i,w);
+	case 'J': return symmetrize_index_inside(j,w);
 	default: fail("unrecognized colonvar \":%c\"", c);
 	}
 }
