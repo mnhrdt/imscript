@@ -130,7 +130,10 @@
 //		plambda lena.png "x[0] 0 x[2] join3"
 //
 //	Naive Canny filter:
-//		cat lena.png | gblur 2 | plambda - "x(1,0) 2 * x(1,1) x(1,-1) + + x(-1,0) 2 * x(-1,1) x(-1,-1) + + - >1 x(0,1) 2 * x(1,1) x(-1,1) + + x(0,-1) 2 * x(1,-1) x(-1,-1) + + - >2 <1 <2 hypot <2 <1 atan2 join" | plambda - "x[0] 4 > >1 x[1] fabs pi 4 / > x[1] fabs pi 4 / 3 * < * >2 x[1] fabs pi 4 / < x[1] fabs pi 4 / 3 * > + >3 x[0] x[0](0,1) > x[0] x[0](0,-1) > * >4 x[0] x[0](1,0) > x[0] x[0](-1,0) > * >5 <1 <3 <5 * * <1 <2 <4 * * + x[0] *" | qauto | d
+//		cat lena.png | gblur 2 | plambda - "x(1,0) 2 * x(1,1) x(1,-1) + + x(-1,0) 2 * x(-1,1) x(-1,-1) + + - >1 x(0,1) 2 * x(1,1) x(-1,1) + + x(0,-1) 2 * x(1,-1) x(-1,-1) + + - >2 <1 <2 hypot <2 <1 atan2 join" | plambda - "x[0] 4 > >1 x[1] fabs pi 4 / > x[1] fabs pi 4 / 3 * < * >2 x[1] fabs pi 4 / < x[1] fabs pi 4 / 3 * > + >3 x[0] x[0](0,1) > x[0] x[0](0,-1) > * >4 x[0] x[0](1,0) > x[0] x[0](-1,0) > * >5 <1 <3 <5 * * <1 <2 <4 * * + x[0] *" | qauto | display
+//
+//	Anti-Lalpacian (solve Poisson equation):
+//		cat lena.png | fft 1 | plambda - "x  :I :I * :J :J * + / -1 *" | fft -1 | qauto | display
 //
 //
 //
