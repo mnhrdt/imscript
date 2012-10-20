@@ -102,6 +102,15 @@ static void ifft_2dfloat(float *ifx,  fftwf_complex *fx, int w, int h)
 	fftwf_cleanup();
 }
 
+// if it finds any strange number, sets it to zero
+static void normalize_float_array_inplace(float *x, int n)
+{
+	for (int i = 0; i < n; i++)
+		if (!isnormal(x[i]))
+			x[i] = 0;
+
+}
+
 
 static void fft_direct(float *y, float *x, int w, int h, int pd)
 {
@@ -152,6 +161,7 @@ int main(int c, char *v[])
 
 	int w, h, pd, pdout;
 	float *x = iio_read_image_float_vec(in, &w, &h, &pd);
+	normalize_float_array_inplace(x, w*h*pd);
 
 	if (direction < 0) {
 		pdout = pd/2;

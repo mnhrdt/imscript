@@ -201,6 +201,12 @@ static double logic_le     (double a, double b) { return a <= b; }
 static double logic_ne     (double a, double b) { return a != b; }
 static double logic_if (double a, double b, double c) { return a ? b : c; }
 
+static double function_isfinite  (double x) { return isfinite(x); }
+static double function_isinf     (double x) { return isinf(x);    }
+static double function_isnan     (double x) { return isnan(x);    }
+static double function_isnormal  (double x) { return isnormal(x); }
+static double function_signbit   (double x) { return signbit(x);  }
+
 static double quantize_255 (double x)
 {
 	int ix = x;
@@ -236,6 +242,12 @@ static void from_polar_to_cartesian(float *y, float *x)
 {
 	y[0] = x[0] * cos(x[1]);
 	y[1] = x[0] * sin(x[1]);
+}
+
+static void complex_product(float *xy, float *x, float *y)
+{
+	xy[0] = x[0]*y[0] - x[1]*y[1];
+	xy[1] = x[0]*y[1] + x[1]*y[0];
 }
 
 // table of all functions (local and from math.h)
@@ -306,6 +318,11 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(logic_le,"<=",2),
 	REGISTER_FUNCTIONN(logic_ne,"!=",2),
 	REGISTER_FUNCTIONN(logic_if,"if",3),
+	REGISTER_FUNCTIONN(function_isfinite,"isfinite",1),
+	REGISTER_FUNCTIONN(function_isinf,"isinf",1),
+	REGISTER_FUNCTIONN(function_isnan,"isnan",1),
+	REGISTER_FUNCTIONN(function_isnormal,"isnormal",1),
+	REGISTER_FUNCTIONN(function_signbit,"signbit",1),
 	REGISTER_FUNCTIONN(divide_two_doubles,"/",2),
 	REGISTER_FUNCTIONN(multiply_two_doubles,"*",2),
 	REGISTER_FUNCTIONN(substract_two_doubles,"-",2),
@@ -319,10 +336,28 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(random_raw,"rand",-1),
 	REGISTER_FUNCTIONN(from_cartesian_to_polar,"topolar", -2),
 	REGISTER_FUNCTIONN(from_polar_to_cartesian,"frompolar", -2),
+	REGISTER_FUNCTIONN(complex_product,"cprod", -3),
 	//REGISTER_FUNCTIONN(rgb2hsv,"rgb2hsv",3),
 	//REGISTER_FUNCTIONN(hsv2rgb,"rgb2hsv",3),
 #undef REGISTER_FUNCTION
-	{NULL, "pi", 0, M_PI}
+	{NULL, "pi", 0, M_PI},
+#ifdef M_E
+#define REGISTER_CONSTANT(x) {NULL, #x, 0, x}
+	REGISTER_CONSTANT(M_E),
+	REGISTER_CONSTANT(M_LOG2E),
+	REGISTER_CONSTANT(M_LOG10E),
+	REGISTER_CONSTANT(M_LN2),
+	REGISTER_CONSTANT(M_LN10),
+	REGISTER_CONSTANT(M_PI),
+	REGISTER_CONSTANT(M_PI_2),
+	REGISTER_CONSTANT(M_PI_4),
+	REGISTER_CONSTANT(M_1_PI),
+	REGISTER_CONSTANT(M_2_PI),
+	REGISTER_CONSTANT(M_2_SQRTPI),
+	REGISTER_CONSTANT(M_SQRT2),
+	REGISTER_CONSTANT(M_SQRT1_2),
+#undef REGISTER_CONSTANT
+#endif
 };
 
 
@@ -1002,6 +1037,8 @@ static const char *arity(struct predefined_function *f)
 	case 2: return "binary";
 	case 3: return "ternary";
 	case -1: return "strange";
+	case -2: return "strange2";
+	case -3: return "strange3";
 	default: return "unrecognized";
 	}
 }
@@ -1096,6 +1133,11 @@ static void vstack_push_scalar(struct value_vstack *s, float x)
 //	}
 //}
 
+
+
+// XXX TODO: refactor the following strange cases into the general setup
+
+// a function that takes no arguments but must be called nonetheless
 static void treat_strange_case(struct value_vstack *s,
 		struct predefined_function *f)
 {
@@ -1104,6 +1146,7 @@ static void treat_strange_case(struct value_vstack *s,
 	vstack_push_vector(s, &r, 1);
 }
 
+// pop a 2-vector x from the stack and push f(x) as a 2-vector
 static void treat_strange_case2(struct value_vstack *s,
 		struct predefined_function *f)
 {
@@ -1111,10 +1154,35 @@ static void treat_strange_case2(struct value_vstack *s,
 	float v[PLAMBDA_MAX_PIXELDIM];
 	float r[PLAMBDA_MAX_PIXELDIM];
 	int n = vstack_pop_vector(v, s);
-	if (n != 2) fail("function \"%s\" requires a 2-vector\n", f->name);
+	if (n != 2) fail("function \"%s\" requires a 2-vector", f->name);
 	((void(*)(float*,float*))(f->f))(r, v);
 	vstack_push_vector(s, r, n);
 }
+
+// pop two 2-vectors x,y from the stack and push f(x,y) as a 2-vector
+static void treat_strange_case3(struct value_vstack *s,
+		struct predefined_function *f)
+{
+	assert(f->nargs == -3);
+	float a[PLAMBDA_MAX_PIXELDIM];
+	float b[PLAMBDA_MAX_PIXELDIM];
+	float r[PLAMBDA_MAX_PIXELDIM];
+	int na = vstack_pop_vector(a, s);
+	int nb = vstack_pop_vector(b, s);
+	if (na != 2) fail("function \"%s\" requires two 2-vectors", f->name);
+	if (nb != 2) fail("function \"%s\" requires two 2-vectors", f->name);
+	if (na != nb) fail("this can not happen");
+	((void(*)(float*,float*,float*))(f->f))(r, a, b);
+	vstack_push_vector(s, r, na);
+}
+
+// pop a 3-vector x from the stack and push f(x) as a 3-vector
+static void treat_strange_case4(struct value_vstack *s,
+		struct predefined_function *f)
+{
+	fail("color space conversions not implemented");
+}
+
 
 // this function is complicated because it contains the scalar+vector
 // semantics, which is complicated
@@ -1123,6 +1191,7 @@ static void vstack_apply_function(struct value_vstack *s,
 {
 	if (f->nargs == -1) {treat_strange_case(s,f); return;}
 	if (f->nargs == -2) {treat_strange_case2(s,f); return;}
+	if (f->nargs == -3) {treat_strange_case3(s,f); return;}
 	int d[f->nargs], rd = 1;
 	float v[f->nargs][PLAMBDA_MAX_PIXELDIM];
 	float r[PLAMBDA_MAX_PIXELDIM];
