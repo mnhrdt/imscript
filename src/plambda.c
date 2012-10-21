@@ -40,6 +40,8 @@
 //		:t	relative angle from the center of the image
 //		:I	horizontal coordinate of the pixel (centered)
 //		:J	vertical coordinate of the pixel (centered)
+//		:W	width of the image divided by 2*pi
+//		:H	height of the image divided by 2*pi
 //
 //
 //	Variable modifiers acting on regular variables:
@@ -427,6 +429,8 @@ static float eval_colonvar(int w, int h, int i, int j, int c)
 	case 't': return atan2((2.0/(h-1))*j-1,(2.0/(w-1))*i-1);
 	case 'I': return symmetrize_index_inside(i,w);
 	case 'J': return symmetrize_index_inside(j,w);
+	case 'W': return w/(2*M_PI);
+	case 'H': return h/(2*M_PI);
 	default: fail("unrecognized colonvar \":%c\"", c);
 	}
 }
@@ -1162,7 +1166,15 @@ static void treat_strange_case2(struct value_vstack *s,
 	vstack_push_vector(s, r, n);
 }
 
+#ifndef ODDP
+#define ODDP(x) ((x)&1)
+#endif
+#ifndef EVENP
+#define EVENP(x) (!((x)&1))
+#endif
+
 // pop two 2-vectors x,y from the stack and push f(x,y) as a 2-vector
+// NOTE: works also on vectors of even length, doing the "obvious" thing
 static void treat_strange_case3(struct value_vstack *s,
 		struct predefined_function *f)
 {
@@ -1172,11 +1184,30 @@ static void treat_strange_case3(struct value_vstack *s,
 	float r[PLAMBDA_MAX_PIXELDIM];
 	int na = vstack_pop_vector(a, s);
 	int nb = vstack_pop_vector(b, s);
-	if (na != 2) fail("function \"%s\" requires two 2-vectors", f->name);
-	if (nb != 2) fail("function \"%s\" requires two 2-vectors", f->name);
-	if (na != nb) fail("this can not happen");
-	((void(*)(float*,float*,float*))(f->f))(r, a, b);
-	vstack_push_vector(s, r, na);
+	if (ODDP(na)) fail("function \"%s\" requires 2-vectors", f->name);
+	if (ODDP(nb)) fail("function \"%s\" requires 2-vectors", f->name);
+	void (*ff)(float*,float*,float*) = (void(*)(float*,float*,float*))f->f;
+	int ca = na / 2;
+	int cb = nb / 2;
+	int n = 0;
+	if (ca == cb) {
+		n = na;
+		for (int i = 0; i < ca; i++)
+			ff(r+2*i, a+2*i, b+2*i);
+	} else if (ca == 1) {
+		n = nb;
+		for (int i = 0; i < cb; i++)
+			ff(r+2*i, a, b+2*i);
+	} else if (cb == 1) {
+		n = na;
+		for (int i = 0; i < ca; i++)
+			ff(r+2*i, a+2*i, b);
+	} else fail("function \"%s\" can not operate on lengths (%d,%d)",
+			f->name, na, nb);
+	assert(n);
+	//if (na != nb) fail("this can not happen");
+	//((void(*)(float*,float*,float*))(f->f))(r, a, b);
+	vstack_push_vector(s, r, n);
 }
 
 // pop a 3-vector x from the stack and push f(x) as a 3-vector
