@@ -101,11 +101,27 @@ static void ifft_2dfloat(float *ifx,  fftwf_complex *fx, int w, int h)
 	fftwf_cleanup();
 }
 
+SMART_PARAMETER_SILENT(BLUR_INVERSE,0)
+SMART_PARAMETER_SILENT(BLUR_INVERSE_WIENER,0)
+#define UGLY_HACK_FOR_WIENER_FILTERING 1
+
 static void pointwise_complex_multiplication(fftwf_complex *w,
 		fftwf_complex *z, fftwf_complex *x, int n)
 {
-	FORI(n)
-		w[i] = z[i] * x[i];
+#ifdef UGLY_HACK_FOR_WIENER_FILTERING
+	if (BLUR_INVERSE() > 0) {
+		if (BLUR_INVERSE_WIENER() > 0) {
+			float t = BLUR_INVERSE_WIENER();
+			FORI(n)
+				w[i] = z[i] * x[i]/(cabs(x[i])*cabs(x[i])+t);
+		} else
+			FORI(n)
+				w[i] = z[i] / x[i];
+	}
+	else
+#endif//UGLY_HACK_FOR_WIENER_FILTERING
+		FORI(n)
+			w[i] = z[i] * x[i];
 }
 
 static void fill_2d_gaussian_image(float *gg, int w, int h, float inv_s)
