@@ -765,6 +765,7 @@ static int token_is_vardef(const char *t)
 #define PLAMBDA_STACKOP_NMERGE 10
 #define PLAMBDA_STACKOP_INTERLEAVE 11
 #define PLAMBDA_STACKOP_DEINTERLEAVE 12
+#define PLAMBDA_STACKOP_HALVE 13
 
 // if token is a stack operation, return its id
 // otherwise, return zero
@@ -786,6 +787,7 @@ static int token_is_stackop(const char *t)
 	if (0 == strcmp(t, "nmerge")) return PLAMBDA_STACKOP_NMERGE;
 	if (0 == strcmp(t, "interleave")) return PLAMBDA_STACKOP_INTERLEAVE;
 	if (0 == strcmp(t, "deinterleave")) return PLAMBDA_STACKOP_DEINTERLEAVE;
+	if (0 == strcmp(t, "halve")) return PLAMBDA_STACKOP_HALVE;
 	return 0;
 }
 
@@ -1367,7 +1369,7 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 		vstack_push_vector(s, y, sdi);
 		break;
 				     }
-	case PLAMBDA_STACKOP_INTERLEAVE: { // strictly speaking, not a stackop
+	case PLAMBDA_STACKOP_INTERLEAVE: {
 		float x[PLAMBDA_MAX_PIXELDIM];
 		float y[PLAMBDA_MAX_PIXELDIM];
 		int n = vstack_pop_vector(x, s);
@@ -1379,7 +1381,7 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 		vstack_push_vector(s, y, n);
 		break;
 					 }
-	case PLAMBDA_STACKOP_DEINTERLEAVE: { // strictly speaking, not a stackop
+	case PLAMBDA_STACKOP_DEINTERLEAVE: {
 		float x[PLAMBDA_MAX_PIXELDIM];
 		float y[PLAMBDA_MAX_PIXELDIM];
 		int n = vstack_pop_vector(x, s);
@@ -1389,6 +1391,17 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 			y[i+n/2] = x[2*i+1];
 		}
 		vstack_push_vector(s, y, n);
+		break;
+					 }
+	case PLAMBDA_STACKOP_HALVE: {
+		float x[PLAMBDA_MAX_PIXELDIM];
+		float y[PLAMBDA_MAX_PIXELDIM];
+		int n = vstack_pop_vector(x, s);
+		if (ODDP(n)) fail("can not a vector of odd length %d!", n);
+		FORI(n/2)
+			y[i] = x[i+n/2];
+		vstack_push_vector(s, x, n/2);
+		vstack_push_vector(s, y, n/2);
 		break;
 					 }
 	default:
