@@ -762,6 +762,9 @@ static int token_is_vardef(const char *t)
 #define PLAMBDA_STACKOP_VMERGEALL 7
 #define PLAMBDA_STACKOP_HSV2RGB 8
 #define PLAMBDA_STACKOP_RGB2HSV 9
+#define PLAMBDA_STACKOP_NMERGE 10
+#define PLAMBDA_STACKOP_INTERLEAVE 11
+#define PLAMBDA_STACKOP_DEINTERLEAVE 12
 
 // if token is a stack operation, return its id
 // otherwise, return zero
@@ -779,6 +782,10 @@ static int token_is_stackop(const char *t)
 	if (0 == strcmp(t, "joinall")) return PLAMBDA_STACKOP_VMERGEALL;
 	if (0 == strcmp(t, "hsv2rgb")) return PLAMBDA_STACKOP_HSV2RGB;
 	if (0 == strcmp(t, "rgb2hsv")) return PLAMBDA_STACKOP_RGB2HSV;
+	if (0 == strcmp(t, "njoin")) return PLAMBDA_STACKOP_NMERGE;
+	if (0 == strcmp(t, "nmerge")) return PLAMBDA_STACKOP_NMERGE;
+	if (0 == strcmp(t, "interleave")) return PLAMBDA_STACKOP_INTERLEAVE;
+	if (0 == strcmp(t, "deinterleave")) return PLAMBDA_STACKOP_DEINTERLEAVE;
 	return 0;
 }
 
@@ -1339,8 +1346,53 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 	case PLAMBDA_STACKOP_VMERGEALL:
 		fail("mergeall not implemented");
 		break;
+	case PLAMBDA_STACKOP_NMERGE: {
+		float nn[PLAMBDA_MAX_PIXELDIM];
+		int n = vstack_pop_vector(nn, s);
+		if (n != 1 || nn[0] < 1 || round(nn[0]) != nn[0]
+				|| nn[0] >= PLAMBDA_MAX_PIXELDIM)
+			fail("can not nmerge \"%d\" things", nn[0]);
+		n = nn[0];
+		float x[n][PLAMBDA_MAX_PIXELDIM], y[PLAMBDA_MAX_PIXELDIM];
+		int d[n], sdi = 0;
+		FORI(n) {
+			d[i] = vstack_pop_vector(x[i], s);
+			sdi + d[i];
+		}
+		if (sdi >= PLAMBDA_MAX_PIXELDIM)
+			fail("merging vectors results in large vector");
+		int cx = 0;
+		FORI(n) FORJ(d[i]) y[cx++] = x[i][j];
+		assert(cx == sdi);
+		vstack_push_vector(s, y, sdi);
+		break;
+				     }
+	case PLAMBDA_STACKOP_INTERLEAVE: { // strictly speaking, not a stackop
+		float x[PLAMBDA_MAX_PIXELDIM];
+		float y[PLAMBDA_MAX_PIXELDIM];
+		int n = vstack_pop_vector(x, s);
+		if (ODDP(n)) fail("can not interleave an odd number %d!", n);
+		FORI(n/2) {
+			y[2*i] = x[i];
+			y[2*i+1] = x[i+n/2];
+		}
+		vstack_push_vector(s, y, n);
+		break;
+					 }
+	case PLAMBDA_STACKOP_DEINTERLEAVE: { // strictly speaking, not a stackop
+		float x[PLAMBDA_MAX_PIXELDIM];
+		float y[PLAMBDA_MAX_PIXELDIM];
+		int n = vstack_pop_vector(x, s);
+		if (ODDP(n)) fail("can not deinterleave an odd number %d!", n);
+		FORI(n/2) {
+			y[i] = x[2*i];
+			y[i+n/2] = x[2*i+1];
+		}
+		vstack_push_vector(s, y, n);
+		break;
+					 }
 	default:
-		fail("impossible condition");
+		fail("impossible condition (stackop %d)", opid);
 	}
 }
 
