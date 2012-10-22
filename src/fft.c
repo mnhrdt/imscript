@@ -149,12 +149,12 @@ static void fft_inverse(float *y, float *x, int w, int h, int pd)
 #ifndef OMIT_FFT_MAIN
 int main(int c, char *v[])
 {
-	if (c != 2 && c != 3 && c != 4) {
+	if (c != 1 && c != 2 && c != 3 && c != 4) {
 		fprintf(stderr, "usage:\n\t%s {1|-1} [in [out]]\n", *v);
 		//                          0  1      2   3
 		return EXIT_FAILURE;
 	}
-	int direction = atoi(v[1]);
+	int direction = c > 1 ? atoi(v[1]) : (v[0][0]=='i'?-1:1);
 	if (!direction) fail("bad direction");
 	char *in = c > 2 ? v[2] : "-";
 	char *out = c > 3 ? v[3] : "-";
