@@ -1357,7 +1357,7 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 		int d[n], sdi = 0;
 		FORI(n) {
 			d[i] = vstack_pop_vector(x[i], s);
-			sdi + d[i];
+			sdi += d[i];
 		}
 		if (sdi >= PLAMBDA_MAX_PIXELDIM)
 			fail("merging vectors results in large vector");
