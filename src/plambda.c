@@ -1217,10 +1217,9 @@ static void treat_strange_case4(struct value_vstack *s,
 	fail("color space conversions not implemented");
 }
 
-
 // this function is complicated because it contains the scalar+vector
 // semantics, which is complicated
-static void vstack_apply_function(struct value_vstack *s,
+static void vstack_apply_function_new(struct value_vstack *s,
 					struct predefined_function *f)
 {
 	if (f->nargs == -1) {treat_strange_case(s,f); return;}
@@ -1231,12 +1230,11 @@ static void vstack_apply_function(struct value_vstack *s,
 	float r[PLAMBDA_MAX_PIXELDIM];
 	FORI(f->nargs)
 		d[i] = vstack_pop_vector(v[i], s);
+	// the d[i] which are larger than one must be equal
 	FORI(f->nargs)
-		// TODO: solve commutativity issue here
-		if (d[i] != rd) {
-			if (rd > 1)
-				fail("can not mix %d- and %d-vectors [%s]\n",
-					rd, d[i], f->name);
+		if (d[i] > 1) {
+			if (rd > 1 && d[i] != rd)
+				fail("can not vectorize (%d %d)", rd, d[i]);
 			else
 				rd = d[i];
 		}
@@ -1251,7 +1249,6 @@ static void vstack_apply_function(struct value_vstack *s,
 			a[i] = v[i][l];
 		r[l] = apply_function(f, a);
 	}
-
 	vstack_push_vector(s, r, rd);
 }
 
