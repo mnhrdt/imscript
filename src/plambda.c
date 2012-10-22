@@ -1219,7 +1219,7 @@ static void treat_strange_case4(struct value_vstack *s,
 
 // this function is complicated because it contains the scalar+vector
 // semantics, which is complicated
-static void vstack_apply_function_new(struct value_vstack *s,
+static void vstack_apply_function(struct value_vstack *s,
 					struct predefined_function *f)
 {
 	if (f->nargs == -1) {treat_strange_case(s,f); return;}
