@@ -205,12 +205,20 @@ static double logic_ge     (double a, double b) { return a >= b; }
 static double logic_le     (double a, double b) { return a <= b; }
 static double logic_ne     (double a, double b) { return a != b; }
 static double logic_if (double a, double b, double c) { return a ? b : c; }
+static double logic_or (double a, double b) { return a || b; }
+static double logic_and (double a, double b) { return a && b; }
 
 static double function_isfinite  (double x) { return isfinite(x); }
 static double function_isinf     (double x) { return isinf(x);    }
 static double function_isnan     (double x) { return isnan(x);    }
 static double function_isnormal  (double x) { return isnormal(x); }
 static double function_signbit   (double x) { return signbit(x);  }
+
+static double inftozero (double x) { return isinf(x) ? 0 : x; }
+static double nantozero (double x) { return isnan(x) ? 0 : x; }
+static double notfintozero (double x) { return isfinite(x) ? x : 0; }
+static double force_finite (double x) { return isfinite(x) ? x : 0; }
+static double force_normal (double x) { return isnormal(x) ? x : 0; }
 
 static double quantize_255 (double x)
 {
@@ -297,6 +305,11 @@ struct predefined_function {
 	REGISTER_FUNCTION(tanh,1),
 	REGISTER_FUNCTION(tgamma,1),
 	REGISTER_FUNCTION(trunc,1),
+	REGISTER_FUNCTION(inftozero,1),
+	REGISTER_FUNCTION(nantozero,1),
+	REGISTER_FUNCTION(notfintozero,1),
+	REGISTER_FUNCTION(force_finite,1),
+	REGISTER_FUNCTION(force_normal,1),
 	REGISTER_FUNCTION(atan2,2),
 	REGISTER_FUNCTION(copysign,2),
 	REGISTER_FUNCTION(fdim,2),
@@ -323,6 +336,8 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(logic_le,"<=",2),
 	REGISTER_FUNCTIONN(logic_ne,"!=",2),
 	REGISTER_FUNCTIONN(logic_if,"if",3),
+	REGISTER_FUNCTIONN(logic_and,"and",2),
+	REGISTER_FUNCTIONN(logic_or,"or",2),
 	REGISTER_FUNCTIONN(function_isfinite,"isfinite",1),
 	REGISTER_FUNCTIONN(function_isinf,"isinf",1),
 	REGISTER_FUNCTIONN(function_isnan,"isnan",1),
@@ -409,7 +424,7 @@ static int symmetrize_index_inside(int i, int m)
 {
 	assert( i >= 0 && i < m);
 	int r = 0;
-	if (i > m/2) r = i-m;
+	if (i >= m/2) r = i-m;
 	if (i < m/2) r = i;
 	return r;
 }
@@ -428,7 +443,7 @@ static float eval_colonvar(int w, int h, int i, int j, int c)
 	case 'r': return hypot((2.0/(h-1))*j-1,(2.0/(w-1))*i-1);
 	case 't': return atan2((2.0/(h-1))*j-1,(2.0/(w-1))*i-1);
 	case 'I': return symmetrize_index_inside(i,w);
-	case 'J': return symmetrize_index_inside(j,w);
+	case 'J': return symmetrize_index_inside(j,h);
 	case 'W': return w/(2*M_PI);
 	case 'H': return h/(2*M_PI);
 	default: fail("unrecognized colonvar \":%c\"", c);
@@ -708,6 +723,14 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 				return 1;
 			}
 		}
+	} else if (magic == 'O') {
+		compute_ordered_component_stats(ti, x, w, h, pd);
+		FORI(pd) {
+			int qposi = round(qq*w*h/100.0);
+			qposi = bound(0, qposi, w*h-1);
+			out[i] = ti->sorted_components[i][qposi];
+		}
+		return pd;
 	} else
 		fail("magic of kind '%c' is not yed implemented", magic);
 
