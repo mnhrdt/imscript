@@ -109,7 +109,7 @@ static void pointwise_complex_multiplication(fftwf_complex *w,
 		fftwf_complex *z, fftwf_complex *x, int n)
 {
 #ifdef UGLY_HACK_FOR_WIENER_FILTERING
-	if (BLUR_INVERSE() > 0) {
+	if (BLUR_INVERSE() > 0 || BLUR_INVERSE_WIENER() > 0) {
 		if (BLUR_INVERSE_WIENER() > 0) {
 			float t = BLUR_INVERSE_WIENER();
 			FORI(n)
@@ -225,7 +225,7 @@ static float kernel_2d_gaussian(float x, float y, float *p)
 	float sigma = p[1];
 
 	float a = x*x + y*y;
-	float r = exp(-a/(sigma*sigma));
+	float r = exp(-a/(2*sigma*sigma));
 	return r;
 }
 

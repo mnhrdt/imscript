@@ -24,6 +24,8 @@
 // %e         average absolute value
 // %y         quantity of infinite samples
 // %Y         quantity of NaN samples
+// %s         sum of all samples
+// %S         sum of all pixels
 // \%         literal %
 // \n         newline
 // \t         tab
@@ -195,6 +197,7 @@ static void compute_stuff_basic(struct printable_data *p,
 	float minsample = INFINITY, maxsample = -INFINITY;
 	long double avgsample = 0;
 	long double avgnzsample = 0;
+	long double sumsamples = 0;
 	for (int i = 0; i < ns; i++)
 	{
 		float y = x[i];
@@ -205,6 +208,7 @@ static void compute_stuff_basic(struct printable_data *p,
 		if (!isfinite(y)) ninf += 1;
 		if (y < minsample) minsample = y;
 		if (y > maxsample) maxsample = y;
+		sumsamples += y;
 		avgsample += y;
 		rns += 1;
 		if (y) {
@@ -218,6 +222,7 @@ static void compute_stuff_basic(struct printable_data *p,
 	setnumber(p, "maxsample", maxsample);
 	setnumber(p, "avgsample", avgsample);
 	setnumber(p, "avgnzsample", avgnzsample);
+	setnumber(p, "sumsamples", sumsamples);
 	setnumber(p, "nnan", nnan);
 	setnumber(p, "ninf", ninf);
 
@@ -241,6 +246,7 @@ static void compute_stuff_basic(struct printable_data *p,
 		rnp += 1;
 	}
 	//assert(rnp);
+	setnumbers(p, "sumpixels", avgpixel, pd);
 	avgnorm /= rnp;
 	long double mipi[pd], mapi[pd];
 	for (int j = 0; j < pd; j++) {
@@ -645,7 +651,9 @@ static char *preprocess_arrobas(char *fmt)
 "root mean square (\\%r):       %r\n"
 "average absolute value (\\%e): %e\n"
 "infinite samples (\\%y):       %y\n"
-"nan samples (\\%Y):            %Y\n";
+"nan samples (\\%Y):            %Y\n"
+"sum of samples (\\%s):         %s\n"
+"sum of pixels (\\%S):          %S\n";
 	default: return fmt;
 	}
 }
@@ -682,6 +690,8 @@ static void imprintf_2d(FILE *f, char *fmt, float *x, int w, int h, int pd)
 			{"error",      "e", REQ_BASIC,   1, {0}, 0, {0}, false},
 			{"ninf",       "y", REQ_BASIC,   1, {0}, 0, {0}, false},
 			{"nnan",       "Y", REQ_BASIC,   1, {0}, 0, {0}, false},
+			{"sumsamples", "s", REQ_BASIC,   1, {0}, 0, {0}, false},
+			{"sumpixels",  "S", REQ_BASIC,   1, {0}, 0, {0}, false},
 //			{"l1norm",     "1", REQ_SQUARES, 1, {0}, 0, {0}, false},
 //			{"l2norm",     "2", REQ_SQUARES, 1, {0}, 0, {0}, false},
 			{NULL, NULL, 0, 0, {0}, 0, {0}, false} },
