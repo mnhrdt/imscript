@@ -1,0 +1,69 @@
+SUMMARY
+-------
+
+This archive contains an implementation of the algorithm for burst denoising
+described on the IPOL paper "How to blend several photographs of a painting
+into one".
+
+
+
+REQUIREMENTS
+------------
+
+A standard Unix or Unix-like environment with a C compiler and the following
+libraries:
+
+	* libfftw3
+	* libpng
+	* libtiff
+	* libjpg
+	* netpbm
+
+Moreover, an external program that computes SIFT keypoints on gray images must
+be installed (for example, the executable that can be downloaded from Lowe's
+webpage).  The location of this program must be configured inside the file
+"bin/graysift.sh"
+
+
+
+COMPILATION
+-----------
+
+Run the "build.sh" script.
+
+
+
+
+TEST
+----
+
+First make sure that the compilation has run correctly and that you have
+the "bin" subdirectory on your PATH.
+
+The subdirectory "test" contains an example of input data.  Convert the "jpg"
+files to the "png" by runing, for example "for i in *.png; do iion $i `basename
+$i .png`.jpg".
+
+To run the algorithm on this data, execute the following two commands:
+
+burst_registration.sh i%02d.png reg_i%02d.png 0 5
+burst_combination.sh i%02d.png 0 5 denoised.png
+
+The first command produces the images "reg_i*.png", which are registered to the
+first one.  The second command produces an image "denoised.png" which is a
+weighted linear combination of registered images.
+
+The input and output images are denoted by a printf-like pattern, and their
+filenames are internally produced spanning the two given indices.
+
+Several intermediary files are produced, which are useful for visualization.
+For example, the files view_opairs_reg_i*.png contain a visaulization of the
+SIFT matches between each image and the first one.
+
+
+
+
+AUTHORS
+-------
+
+Enric Meinhardt-Llopis <enric.meinhardt@cmla.ens-cachan.fr>
