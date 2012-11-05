@@ -370,7 +370,6 @@ int main(int c, char *v[])
 {
 	if (c == 2 && 0 == strcmp(v[1], "--version")) return print_version();
 	if (c == 2 && 0 == strcmp(v[1], "--help")) return print_help();
-	fprintf(stderr, "got here\n");
 	if (c != 5 && c != 3 && c != 4) {
 		fprintf(stderr, "usage:\n\t"
 				"%s kernel \"params\" [in [out]]\n", *v);
