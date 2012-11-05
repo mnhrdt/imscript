@@ -3,13 +3,13 @@
 #include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include <complex.h>
 #include <fftw3.h>
 
-#include "iio.h"
 
 
 #ifndef M_PI
@@ -336,10 +336,41 @@ void blur_2d(float *y, float *x, int w, int h, int pd,
 }
 
 #ifndef OMIT_BLUR_MAIN
-//#include "iio.h"
+
+static int print_version(void)
+{
+	printf("blur 1.0\n\n"
+	"Written by Enric Meinhardt-Llopis\n");
+	return 0;
+}
+
+static int print_help(void)
+{
+	printf(
+	"Smooth a 2D image using the selected kernel\n"
+	"\n"
+	"Usage: blur KERNEL SIZE [input [output]]\n"
+	"\n"
+	"Options:\n"
+	"\tKERNEL\tthe name of the kernel.\n\tPossible values: "
+	"gaussian, laplace, cauchy, disk, square\n\n"
+	"\tSIZE\tthe width of the kernel\n"
+	"\n"
+	"Examples:\n"
+	"blur gaussian 1.6 in.png out.png\n"
+	"\n"
+	"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>.\n"
+	);
+	return 0;
+}
+
+#include "iio.h"
 #include "parsenumbers.c"
 int main(int c, char *v[])
 {
+	if (c == 2 && 0 == strcmp(v[1], "--version")) return print_version();
+	if (c == 2 && 0 == strcmp(v[1], "--help")) return print_help();
+	fprintf(stderr, "got here\n");
 	if (c != 5 && c != 3 && c != 4) {
 		fprintf(stderr, "usage:\n\t"
 				"%s kernel \"params\" [in [out]]\n", *v);

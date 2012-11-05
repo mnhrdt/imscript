@@ -740,3 +740,46 @@ int siftsplit(struct sift_keypoint *p, int n,
 	}
 	return r;
 }
+
+static void affine_mapf(float y[2], float A[6], float x[2])
+{
+	y[0] = A[0]*x[0] + A[1]*x[1] + A[2];
+	y[1] = A[3]*x[0] + A[4]*x[1] + A[5];
+}
+
+static void homographic_mapf(float y[2], float H[9], float x[2])
+{
+	float z = H[6]*x[0] + H[7]*x[1] + H[8];
+	y[0] = (H[0]*x[0] + H[1]*x[1] + H[2])/z;
+	y[1] = (H[3]*x[0] + H[4]*x[1] + H[5])/z;
+	//y[0] = x[0];
+	//y[1] = x[1];
+}
+
+void siftaff(struct sift_keypoint *t, int n, float A[9])
+{
+	float det = A[0]*A[4] - A[1]*A[3];
+	fprintf(stderr, "det = %g\n", det);
+	FORI(n) {
+		struct sift_keypoint *k = t+i;
+		float vec[2] = {cos(k->orientation), sin(k->orientation)};
+		float x[2], rvec[2];
+		affine_mapf(x, A, k->pos);
+		rvec[0] = A[0]*vec[0] + A[1]*vec[1];
+		rvec[1] = A[3]*vec[0] + A[4]*vec[1];
+		FORJ(2) k->pos[j] = x[j];
+		k->scale *= det;
+		k->orientation = atan2(rvec[1], rvec[0]);
+	}
+}
+
+void sifthom(struct sift_keypoint *t, int n, float H[9])
+{
+	// TODO XXX ERROR FIXME : update the scale and orientation accordingly!
+	FORI(n) {
+		struct sift_keypoint *k = t+i;
+		float x[2];
+		homographic_mapf(x, H, k->pos);
+		FORJ(2) k->pos[j] = x[j];
+	}
+}

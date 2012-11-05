@@ -731,6 +731,30 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 			out[i] = ti->sorted_components[i][qposi];
 		}
 		return pd;
+	} else if (magic == 'W') {
+		compute_ordered_component_stats(ti, x, w, h, pd);
+		FORI(pd) {
+			int qposi = round(qq*w*h/1000000.0);
+			qposi = bound(0, qposi, w*h-1);
+			out[i] = ti->sorted_components[i][qposi];
+		}
+		return pd;
+	} else if (magic == '0') {
+		compute_ordered_component_stats(ti, x, w, h, pd);
+		FORI(pd) {
+			int qposi = qq;//round(qq*w*h/1000000.0);
+			qposi = bound(0, qposi, w*h-1);
+			out[i] = ti->sorted_components[i][qposi];
+		}
+		return pd;
+	} else if (magic == '9') {
+		compute_ordered_component_stats(ti, x, w, h, pd);
+		FORI(pd) {
+			int qposi = w*h-1-qq;//round(qq*w*h/1000000.0);
+			qposi = bound(0, qposi, w*h-1);
+			out[i] = ti->sorted_components[i][qposi];
+		}
+		return pd;
 	} else
 		fail("magic of kind '%c' is not yed implemented", magic);
 

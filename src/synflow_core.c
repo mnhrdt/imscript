@@ -267,6 +267,12 @@ static double produce_homography(double H[9], int w, int h,
 		FORI(9) H[i] = v[i];
 	} else if (0 == strcmp(homtype, "homi")) {
 		invert_homography(H, v);
+	} else if (0 == strcmp(homtype, "shomi")) {
+		invert_homography(H, 1+v);
+		H[2] *= *v;
+		H[5] *= *v;
+		H[6] /= *v;
+		H[7] /= *v;
 	} else if (0 == strcmp(homtype, "hom4p")) {
 		// absolute displacement of the image corners
 		double corner[4][2] = {{0,0}, {w,0}, {0,h}, {w,h}};
@@ -615,9 +621,10 @@ static int parse_flow_name(int *vp, int *hidden_id, char *model_name)
 		{"aff12",         12, 6, FLOWMODEL_HIDDEN_AFFINE},
 //		{"aff12r",        12, 6, FLOWMODEL_HIDDEN_AFFINE},
 		{"aff12rc",       12, 6, FLOWMODEL_HIDDEN_AFFINE},
-		{"colorwheel",     1, 6, FLOWMODEL_HIDDEN_AFFINE},
+		{"colorwheel",    1, 6, FLOWMODEL_HIDDEN_AFFINE},
 		{"hom",           9, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
 		{"homi",          9, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
+		{"shomi",         10, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
 		{"hom4p",         8, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
 //		{"hom4pr",        8, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
 		{"hom4prc",       8, 9, FLOWMODEL_HIDDEN_PROJECTIVE},
@@ -765,6 +772,10 @@ static void apply_flow(float y[2], struct flow_model *f, float x[2], bool inv)
 	case FLOWMODEL_HIDDEN_PROJECTIVE: {
 		assert(f->nh == 9);
 		double *p = inv ? f->iH : f->H;
+		//fprintf(stderr, "H = %g %g %g %g %g %g %g %g %g\n",
+		//	       	p[0], p[1], p[2],
+		//	       	p[3], p[4], p[5],
+		//	       	p[6], p[7], p[8]);
 		apply_flowmodel_projective(y, x, p);
 		break;
 					  }

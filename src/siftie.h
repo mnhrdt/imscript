@@ -88,4 +88,6 @@ int siftsplit(struct sift_keypoint *p, int n,
 		float rx, float ry, float ox, float oy,
 		int (*mask)[5]);
 
+void sifthom(struct sift_keypoint *t, int n, float h[9]);
+
 #endif//_SIFTIE_H
