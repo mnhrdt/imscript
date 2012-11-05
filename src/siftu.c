@@ -253,28 +253,28 @@ static void affine_inversion(float invA[6], float A[6])
 	invA[5] = c*p-a*q;
 	FORI(6) invA[i] /= det;
 }
-static void affine_mapf(float y[2], float A[6], float x[2])
-{
-	y[0] = A[0]*x[0] + A[1]*x[1] + A[2];
-	y[1] = A[3]*x[0] + A[4]*x[1] + A[5];
-}
+//static void affine_mapf(float y[2], float A[6], float x[2])
+//{
+//	y[0] = A[0]*x[0] + A[1]*x[1] + A[2];
+//	y[1] = A[3]*x[0] + A[4]*x[1] + A[5];
+//}
 
-static void siftaff(struct sift_keypoint *t, int n, float A[6])
-{
-	float det = A[0]*A[4] - A[1]*A[3];
-	fprintf(stderr, "det = %g\n", det);
-	FORI(n) {
-		struct sift_keypoint *k = t+i;
-		float vec[2] = {cos(k->orientation), sin(k->orientation)};
-		float x[2], rvec[2];
-		affine_mapf(x, A, k->pos);
-		rvec[0] = A[0]*vec[0] + A[1]*vec[1];
-		rvec[1] = A[3]*vec[0] + A[4]*vec[1];
-		FORJ(2) k->pos[j] = x[j];
-		k->scale *= det;
-		k->orientation = atan2(rvec[1], rvec[0]);
-	}
-}
+//static void siftaff(struct sift_keypoint *t, int n, float A[6])
+//{
+//	float det = A[0]*A[4] - A[1]*A[3];
+//	fprintf(stderr, "det = %g\n", det);
+//	FORI(n) {
+//		struct sift_keypoint *k = t+i;
+//		float vec[2] = {cos(k->orientation), sin(k->orientation)};
+//		float x[2], rvec[2];
+//		affine_mapf(x, A, k->pos);
+//		rvec[0] = A[0]*vec[0] + A[1]*vec[1];
+//		rvec[1] = A[3]*vec[0] + A[4]*vec[1];
+//		FORJ(2) k->pos[j] = x[j];
+//		k->scale *= det;
+//		k->orientation = atan2(rvec[1], rvec[0]);
+//	}
+//}
 
 SMART_PARAMETER_SILENT(SIFTAFF_INV,0)
 
