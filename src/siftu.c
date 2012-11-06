@@ -382,5 +382,4 @@ int main(int c, char *v[])
 				*v);
 		return EXIT_FAILURE;
 	}
-	return EXIT_SUCCESS;
 }

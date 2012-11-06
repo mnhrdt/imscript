@@ -11,7 +11,6 @@ SIFT_EXECUTABLE_VEDALDI=sift_executable_vedaldi
 SIFT_EXECUTABLE_SURF=sift_executable_surf
 SIFT_EXECUTABLE_RIDA=sift_executable_rida
 
-
 set -e
 
 IFILE=$2
@@ -43,15 +42,17 @@ sift_from_cao() {
 sift_from_lowe() {
 	testex $SIFT_EXECUTABLE_LOWE
 	testex lowe_join
-	testex qnm
-	qnm pgmbin <$1 | $SIFT_EXECUTABLE_LOWE | lowe_join | qnm siftaff 0 1 0 1 0 0|sort -n -k 3
+	testex plambda
+	testex siftu
+	qeasy 0 255 $1 | $SIFT_EXECUTABLE_LOWE | lowe_join | siftu aff 0 1 0 1 0 0 | sort -n -k 3
 }
 
 sift_from_zerofrog() {
 	testex $SIFT_EXECUTABLE_ZEROFROG
 	testex lowe_join
-	testex qnm
-	qnm pgmbin <$1 | $SIFT_EXECUTABLE_ZEROFROG | lowe_join | qnm siftaff 0 1 0 1 0 0|sort -n -k 3
+	testex plambda
+	testex siftu
+	qeasy 0 255 $1 | $SIFT_EXECUTABLE_ZEROFROG | lowe_join | siftu aff 0 1 0 1 0 0 | sort -n -k 3
 }
 
 sift_from_vedaldi() {

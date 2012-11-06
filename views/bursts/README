@@ -17,12 +17,12 @@ libraries:
 	* libpng
 	* libtiff
 	* libjpg
-	* netpbm
 
 Moreover, an external program that computes SIFT keypoints on gray images must
 be installed (for example, the executable that can be downloaded from Lowe's
 webpage).  The location of this program must be configured inside the file
-"bin/graysift.sh"
+"bin/graysift.sh".  The provided script "bin/download_lowe_sift.sh" will try to
+download this program for linux.
 
 
 
@@ -40,14 +40,12 @@ TEST
 First make sure that the compilation has run correctly and that you have
 the "bin" subdirectory on your PATH.
 
-The subdirectory "test" contains an example of input data.  Convert the "jpg"
-files to the "png" by runing, for example "for i in *.png; do iion $i `basename
-$i .png`.jpg".
+The subdirectory "test" contains an example of input data.  Run the simple
+script "do_test.sh" inside this directory to run the algorithm on this data.
+This script runs eht folllwing two commands:
 
-To run the algorithm on this data, execute the following two commands:
-
-burst_registration.sh i%02d.png reg_i%02d.png 0 5
-burst_combination.sh i%02d.png 0 5 denoised.png
+	burst_registration.sh i%02d.png reg_i%02d.png 0 5
+	burst_combination.sh reg_i%02d.png 0 5 denoised.png
 
 The first command produces the images "reg_i*.png", which are registered to the
 first one.  The second command produces an image "denoised.png" which is a

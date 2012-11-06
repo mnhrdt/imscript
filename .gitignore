@@ -1,2 +1,4 @@
 src/*.o
 bin/*
+doc
+stuff/lena.png

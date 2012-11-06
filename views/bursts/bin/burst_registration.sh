@@ -44,10 +44,6 @@ testex seq
 testex basename
 testex printf
 
-# required infrastructure from NETPBM
-testex ppmtopgm
-testex pngtopnm
-
 # required infrastructure for SIFT
 testex graysift.sh
 
@@ -92,9 +88,9 @@ compute_sift_from_png() {
 	if [ -s $SIFTFILE ]; then
 		echo "using cached \"$SIFTFILE\" as sift of image \"$PNGFILE\""
 	else
-		PGMFILE=`basename $PNGFILE`.pgm
-		pngtopnm $PNGFILE | ppmtopgm > $PGMFILE
-		graysift.sh zero $PGMFILE > $SIFTFILE
+		PGMFILE=`basename $PNGFILE .png`.pgm
+		plambda $PNGFILE "x split + + 3 /" | qeasy 0 255 - $PGMFILE
+		graysift.sh lowe $PGMFILE > $SIFTFILE
 	fi
 }
 

@@ -615,13 +615,13 @@ static void compute_ordered_component_stats(struct image_stats *s,
 static void compute_ordered_vector_stats(struct image_stats *s,
 		float *x, int w, int h, int pd)
 {
-	fail("ordered vector stats not implemented");
 	(void)x;
 	(void)w;
 	(void)h;
 	(void)pd;
+	fail("ordered vector stats not implemented");
 	// there is some bizarre trickery waiting to be coded in here
-	s->init_vordered = true;
+	//s->init_vordered = true;
 }
 
 static int bound(int a, int x, int b)

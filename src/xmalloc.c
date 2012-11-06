@@ -37,7 +37,7 @@ static void *xrealloc(void *p, size_t s)
 }
 
 inline // to avoid unused warnings
-static inline void xfree(void *p)
+static void xfree(void *p)
 {
 	if (!p)
 		fail("thou shalt not free a null pointer!");
