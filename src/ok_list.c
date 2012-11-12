@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 
-#include "okupa.h"
+#include "ok_list.h"
 
 #include "fail.c"
 #include "xmalloc.c"
@@ -26,7 +26,7 @@
 #define INULL (-42)
 #define REMOVED (-4300)
 
-void ok_display_tables(ok_list *l)
+void ok_display_tables(struct ok_list *l)
 {
 	printf("r:");
 	FORI(l->number_of_regions)
@@ -42,7 +42,7 @@ void ok_display_tables(ok_list *l)
 	printf("\n");
 }
 
-static void ok_assert_consistency(ok_list *l)
+static void ok_assert_consistency(struct ok_list *l)
 {
 	//fail("caqueta");
 	DEBUG("\nASSERTING CONSISTENCY...\n");
@@ -67,9 +67,10 @@ static void ok_assert_consistency(ok_list *l)
 		}
 	DEBUG("...ASSERTED!\n");
 }
-void ok_hack_assert_consistency(ok_list *l){ok_assert_consistency(l);/*fprintf(stderr,"...");*/}
+void ok_hack_assert_consistency(struct ok_list *l){ok_assert_consistency(l);
+	/*fprintf(stderr,"...");*/}
 
-void ok_init(ok_list *l, int nr, int np)
+void ok_init(struct ok_list *l, int nr, int np)
 {
 	l->number_of_regions = nr;
 	l->number_of_points = np;
@@ -88,7 +89,7 @@ void ok_init(ok_list *l, int nr, int np)
 	//ok_assert_consistency(l);
 }
 
-void ok_free(ok_list *l)
+void ok_free(struct ok_list *l)
 {
 	xfree(l->r);
 	xfree(l->p);
@@ -98,7 +99,7 @@ void ok_free(ok_list *l)
 }
 
 // TODO: optimize this so that it skips the removed elements
-int ok_which_points(ok_list *l, int r)
+int ok_which_points(struct ok_list *l, int r)
 {
 	DEBUG("going to list the points of region %d\n", r);
 	assert(r >= 0);
@@ -121,7 +122,7 @@ int ok_which_points(ok_list *l, int r)
 	return cx;
 }
 
-int ok_which_region(ok_list *l, int p)
+int ok_which_region(struct ok_list *l, int p)
 {
 	assert(p >= 0);
 	assert(p < l->number_of_points);
@@ -137,7 +138,7 @@ int ok_which_region(ok_list *l, int p)
 }
 
 //static
-void ok_display(ok_list *l)
+void ok_display(struct ok_list *l)
 {
 	printf("ok_list %p\n", (void *)l);
 	FORI(l->number_of_regions)
@@ -164,7 +165,7 @@ void ok_display(ok_list *l)
 
 //TODO: optimize this function so that it always leaves a non-removed element
 //as a representatitve
-void ok_remove_point(ok_list *l, int p)
+void ok_remove_point(struct ok_list *l, int p)
 {
 	assert(p >= 0);
 	assert(p < l->number_of_points);
@@ -184,7 +185,7 @@ void ok_remove_point(ok_list *l, int p)
 #endif
 }
 
-void ok_add_point(ok_list *l, int r, int p)
+void ok_add_point(struct ok_list *l, int r, int p)
 {
 	assert(r >= 0);
 	assert(r < l->number_of_regions);
@@ -215,7 +216,7 @@ void ok_add_point(ok_list *l, int r, int p)
 //#ifdef USE_IMAGE_STRUCTURES
 
 // input: fill x0, dx and nx
-void ok_init_grid(ok_list *l, int np)
+void ok_init_grid(struct ok_list *l, int np)
 //float x0[3], float dx[3], int nx[3], int np)
 {
 	assert(l->dx[0] > 0 && l->dx[1] > 0 && l->dx[2] > 0);
@@ -233,7 +234,7 @@ void ok_init_grid(ok_list *l, int np)
 }
 
 // fills buf[0], buf[1], buf[2] with integer coordinates of the region
-int ok_regionindex(ok_list *l, float x[3])
+int ok_regionindex(struct ok_list *l, float x[3])
 {
 
 	bool ass = true;
@@ -279,13 +280,13 @@ ridxerr:
 	return -1;
 }
 
-static bool ok_innerP(ok_list *l, int x[3])
+static bool ok_innerP(struct ok_list *l, int x[3])
 {
 	FORI(3) if (x[i] < 0 || x[i] >= l->nx[i]) return false;
 	return true;
 }
 
-static int ok_idx(ok_list *l, int x[3])
+static int ok_idx(struct ok_list *l, int x[3])
 {
 	FORI(3) assert(x[i] < l->nx[i]);
 	int r = x[0] + x[1] * (l->nx[0]) + x[2] * (l->nx[0] * l->nx[1]);
@@ -306,7 +307,7 @@ int ok_regionindex_neigs(ok_list *l, float x[3])
 }
 #else
 //THIS IS INCOMPREHENSIBLE
-int ok_regionindex_neigs(ok_list *l, float x[3])
+int ok_regionindex_neigs(struct ok_list *l, float x[3])
 {
 	DEBUG("OK_RIDX_N: treating point %f,%f,%f...\n", x[0], x[1], x[2]);
 	int ridx = ok_regionindex(l, x);
@@ -338,7 +339,7 @@ int ok_regionindex_neigs(ok_list *l, float x[3])
 }
 #endif
 
-int ok_add_geo_point(ok_list *l, float x[3], int p)
+int ok_add_geo_point(struct ok_list *l, float x[3], int p)
 {
 	{
 		DEBUG("OKUPA: agp[%d %d][%g %g %g][%g %g %g] [%d %d %d]"
@@ -355,7 +356,7 @@ int ok_add_geo_point(ok_list *l, float x[3], int p)
 }
 //#endif /* USE_IMAGE_STRUCTURES */
 
-void ok_svg_layer(void *ff, ok_list *l)
+void ok_svg_layer(void *ff, struct ok_list *l)
 {
 	FILE *f = ff;
 	FORI(l->nx[0]) // segments verticals, en variant la x
@@ -425,7 +426,7 @@ void ok_svg_layer(void *ff, ok_list *l)
 static void programa_interactiu()
 {
 	int c, r, p;
-	ok_list l;
+	struct ok_list l;
 	printf("introduce number of regions and number of points\n");
 	scanf("%d %d", &r, &p);
 	fflush(stdin);
@@ -462,7 +463,7 @@ ent:
 }
 int main()
 {
-	ok_list l;
+	struct ok_list l;
 	ok_init(&l, 3, 10);
 	ok_display(&l); printf("\n");
 	ok_add_point(&l, 1, 3); ok_display(&l); printf("\n");

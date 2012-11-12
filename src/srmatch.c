@@ -90,7 +90,8 @@ static struct ann_pair *srmatch(
 	if (top < tmp_nb) tmp_nb = top;
 
 	struct ann_pair *p0;
-	p0 = siftlike_get_accpairs(ka, tmp_na, kb, tmp_nb, &npairs, t);
+	p0 = compute_sift_matches(&npairs, ka, tmp_na, kb, tmp_nb, t,
+			INFINITY, INFINITY);
 
 	// build a temporary list with these pairs of coordinates
 	float *tp0 = xmalloc(npairs*4*sizeof*tp0);
@@ -125,7 +126,8 @@ static struct ann_pair *srmatch(
 	fprintf(stderr, "running the second round of matches {%g %g}...\n",
 			radx, rady);
 	struct ann_pair *p1;
-	p1 = siftlike_get_accpairsrad(ka, na, hkb, nb, &npairs, t, radx, rady);
+
+	p1 = compute_sift_matches(&npairs, ka, na, hkb, nb, t, radx, rady);
 	fprintf(stderr, "the second rund of matches found %d pairs\n", npairs);
 
 	for (int i = 0; i < npairs; i++)

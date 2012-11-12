@@ -325,15 +325,15 @@ static float epipolar_euclidean_error(float *fm, float *pair, void *usr)
 	return fabs(pfq);
 }
 
-// instance of "ransac_error_evaluation_function"
-static float epipolar_symmetric_euclidean_error(float *fm, float *pair, void *u)
-{
-	fail("must transpose F!");
-	float rpair[4] = {pair[2], pair[3], pair[0], pair[1]};
-	float a = epipolar_euclidean_error(fm, pair, u);
-	float b = epipolar_euclidean_error(fm, rpair, u);
-	return hypot(a, b);
-}
+//// instance of "ransac_error_evaluation_function"
+//static float epipolar_symmetric_euclidean_error(float *fm, float *pair, void *u)
+//{
+//	fail("must transpose F!");
+//	float rpair[4] = {pair[2], pair[3], pair[0], pair[1]};
+//	float a = epipolar_euclidean_error(fm, pair, u);
+//	float b = epipolar_euclidean_error(fm, rpair, u);
+//	return hypot(a, b);
+//}
 
 // instance of "ransac_error_evaluation_function"
 static float epipolar_error(float *fm, float *pair, void *usr)

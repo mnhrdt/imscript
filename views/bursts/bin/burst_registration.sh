@@ -6,9 +6,12 @@
 M_MATCH=290
 M_RANGE=200
 
+SRM_FIRST=600
+SRM_E=4
+
 # parameters for ransac
 RANSAC_N=10000
-RANSAC_E=0.5
+RANSAC_E=0.9
 RANSAC_M=30
 
 
@@ -90,7 +93,7 @@ compute_sift_from_png() {
 	else
 		PGMFILE=`basename $PNGFILE .png`.pgm
 		plambda $PNGFILE "x split + + 3 /" | qeasy 0 255 - $PGMFILE
-		graysift.sh lowe $PGMFILE > $SIFTFILE
+		graysift.sh zero $PGMFILE > $SIFTFILE
 	fi
 }
 
@@ -114,7 +117,7 @@ for i in `seq $FIRST $LAST`; do
 		true
 	else
 		if [ ! -s $PAIRS0i ]; then
-		srmatch $M_MATCH $SIFT0 $SIFTi 200 2 $PAIRS0i /dev/null /dev/null
+		srmatch $M_MATCH $SIFT0 $SIFTi $SRM_FIRST $SRM_E $PAIRS0i /dev/null /dev/null
 		pview pairs 1 0 0 0 1 0 0 0 1 $GEOMETRY < $PAIRS0i > $VPAIRS0i
 		#siftu pairr $M_MATCH $SIFT0 $SIFTi $M_RANGE $M_RANGE $PAIRS0i
 		fi

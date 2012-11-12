@@ -251,6 +251,8 @@ static void overlay_level_line_in_black(uint8_t (**y)[3],
 	free(s);
 }
 
+SMART_PARAMETER(NOVERLINES,51)
+
 static void overlines(uint8_t (**y)[3], float (**x)[2], int w, int h, float s)
 {
 	assert(s > 0);
@@ -258,7 +260,8 @@ static void overlines(uint8_t (**y)[3], float (**x)[2], int w, int h, float s)
 	FORJ(h) FORI(w)
 		scalar[j][i] = hypot(x[j][i][0], x[j][i][1]);
 
-	FORI(51)
+	int nl = NOVERLINES();
+	FORI(nl)
 		overlay_level_line_in_black(y, scalar, w, h, s*i);
 }
 

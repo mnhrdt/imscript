@@ -283,6 +283,25 @@ static double dist_descst(struct sift_keypoint *a, struct sift_keypoint *b,
 		return distppft(a->sift, b->sift, SIFT_LENGTH, t);
 }
 
+static float euclidean_distance_topped(float *a, float *b, int n, float top)
+{
+	double r = 0;
+	for (int i = 0; i < n; i++)
+		if (r > top)
+			return top + 1;
+		else
+			r = hypot(r, b[i] - a[i]);
+	return r;
+}
+
+static double sift_distance_topped(
+		struct sift_keypoint *a,
+		struct sift_keypoint *b,
+		float top)
+{
+	return euclidean_distance_topped(a->sift, b->sift, SIFT_LENGTH, top);
+}
+
 static int nearestone(struct sift_keypoint *q, struct sift_keypoint *t, int nt, double *od)
 {
 	int bi = -1;
@@ -329,6 +348,7 @@ static int fancynearestt(struct sift_keypoint *q,
 	int besti = -1;
 	float bestd = INFINITY;
 	FORI(nt) {
+		// TODO: be bold and change "dmax" to "bestd" in the call below
 		float nb = dist_descst(q, t+i, dmax);
 		if (nb < bestd) {
 			bestd = nb;
@@ -352,6 +372,29 @@ static int fancynearestt_rad(struct sift_keypoint *q,
 		if (fabs(q->pos[0] - t[i].pos[0]) > dx) continue;
 		if (fabs(q->pos[1] - t[i].pos[1]) > dy) continue;
 		float nb = dist_descst(q, t+i, dmax);
+		if (nb < bestd) {
+			bestd = nb;
+			besti = i;
+		}
+	}
+	if (besti < 0) return -1;
+	assert(besti >= 0);
+	*od = bestd;
+	return bestd < dmax ? besti : -1;
+}
+
+// returns i such that t[i] is as close as possible to q
+// if the distance is largest than dmax, return -1
+static int find_closest_keypoint(struct sift_keypoint *q,
+		struct sift_keypoint *t, int nt,
+		float *od, float dmax, float dx, float dy)
+{
+	int besti = -1;
+	float bestd = dmax;
+	FORI(nt) {
+		if (fabs(q->pos[0] - t[i].pos[0]) > dx) continue;
+		if (fabs(q->pos[1] - t[i].pos[1]) > dy) continue;
+		float nb = sift_distance_topped(q, t+i, bestd);
 		if (nb < bestd) {
 			bestd = nb;
 			besti = i;
@@ -396,7 +439,7 @@ static void sort_annpairs(struct ann_pair *t, int n)
 // get two lists of points, and produce a list of pairs
 // (nearest match from a to b)
 struct ann_pair *siftlike_get_annpairs(
-		struct sift_keypoint *ka, int na, 
+		struct sift_keypoint *ka, int na,
 		struct sift_keypoint *kb, int nb,
 		int *np
 		)
@@ -475,6 +518,31 @@ struct ann_pair *siftlike_get_accpairsrad(
 	*onp = np;
 	return p;
 }
+
+struct ann_pair *compute_sift_matches(int *onp,
+		struct sift_keypoint *ka, int na,
+		struct sift_keypoint *kb, int nb,
+		float t, float dx, float dy)
+{
+	if (na == 0 || nb == 0) { *onp=0; return NULL; }
+	struct ann_pair *p = xmalloc(na * sizeof * p);
+	int np = 0;
+	for (int i = 0; i < na; i++) {
+		float d;
+		int j = find_closest_keypoint(ka + i, kb, nb, &d, t, dx, dy);
+		if (j >= 0) {
+			p[np].from = i;
+			p[np].to = j;
+			p[np].v[0] = d;
+			p[np].v[1] = NAN;
+			np += 1;
+		}
+	}
+	sort_annpairs(p, np);
+	*onp = np;
+	return p;
+}
+
 
 // get three lists of points, and produce a list of matching triplets
 // (first nearest matches)

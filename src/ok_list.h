@@ -1,12 +1,12 @@
-#ifndef _OKUPA_H
-#define _OKUPA_H
+#ifndef _OK_LIST_H
+#define _OK_LIST_H
 
 /* data structure and operations to maintain a finite set of points belonging
  * to a finite set of disjoint squares (or cubes).  Points and regions are
  * identified only by their inidices. */
 
 
-typedef struct {
+struct ok_list {
 	int number_of_regions;
 	int number_of_points;	// (including the removed points!)
 	int *r;		// gives the representative point of each region
@@ -21,27 +21,29 @@ typedef struct {
 	int nx[3];
 	// even more optional: a pointer to the coordinates of the points
 //	float (*px)[3];
-} ok_list;
+};
 
-void ok_init(ok_list *, int nr, int np);
-void ok_free(ok_list *);
-void ok_add_point(ok_list *, int r, int p);
-void ok_remove_point(ok_list *, int p);	// the point p will never be returned
-int ok_which_region(ok_list *, int p);	// returns the index of the region
-int ok_which_points(ok_list *, int r);	// returns the number of points
-					// (and fills buf)
+void ok_init(struct ok_list *, int nr, int np);
+void ok_free(struct ok_list *);
+void ok_add_point(struct ok_list *, int r, int p);
+void ok_remove_point(struct ok_list *, int p); // the point p will never be returned
+int ok_which_region(struct ok_list *, int p); // returns the index of the region
+int ok_which_points(struct ok_list *, int r); // returns the number of points
+					      // (and fills buf)
 
 //#ifdef USE_IMAGE_STRUCTURES
 //#include "image3d.h"
-void ok_init_grid(ok_list *, int);// float [3], float [3], int [3], int);
-int ok_add_geo_point(ok_list *, float [3], int); // just like add_point, but
+void ok_init_grid(struct ok_list *, int);
+int ok_add_geo_point(struct ok_list *, float [3], int);
+						// just like add_point, but
 						// the region index is
 						// implicit from the
 						// coordinates
-int ok_regionindex_neigs(ok_list *, float [3]);
+						//
+int ok_regionindex_neigs(struct ok_list *, float [3]);
 //#endif /* USE_IMAGE_STRUCTURES */
-void ok_svg_layer(void *, ok_list *);
-void ok_hack_assert_consistency(ok_list *);
+void ok_svg_layer(void *, struct ok_list *);
+void ok_hack_assert_consistency(struct ok_list *);
 
 
 /* data structure for non-necessarily disjoint regions
@@ -58,19 +60,19 @@ void ok_hack_assert_consistency(ok_list *);
  *
  */
 
-struct mok_list {
-	int number_of_regions;
-	int number_of_points;
-	int maximum_occupancy;
-	/* ...  */
-	int *rbuf;
-	int *pbuf;
-};
-void mok_init(struct mok_list *, int nr, int np, int mocc);
-void mok_free(struct mok_list *);
-void mok_add_point(struct mok_list *, int r, int p);
-int mok_which_regions(struct mok_list *, int p);
-int mok_which_points(struct mok_list *, int r);
+//struct mok_list {
+//	int number_of_regions;
+//	int number_of_points;
+//	int maximum_occupancy;
+//	/* ...  */
+//	int *rbuf;
+//	int *pbuf;
+//};
+//void mok_init(struct mok_list *, int nr, int np, int mocc);
+//void mok_free(struct mok_list *);
+//void mok_add_point(struct mok_list *, int r, int p);
+//int mok_which_regions(struct mok_list *, int p);
+//int mok_which_points(struct mok_list *, int r);
 
 
-#endif /* _OKUPA_H */
+#endif /* _OK_LIST_H */

@@ -98,6 +98,21 @@ int grid_locate_overlapping(int *buf, struct grid *g, float *x)
 		no[i] = locate_widened_interval_1d(ox[i],
 				g->x0[i], g->dx[i], g->n[i], x[i]);
 		ret *= no[i];
-
 	}
+	// TODO write a proper "for" loop here (if possible, which I'm not sure)
+	int cx = 0;
+	switch (g->dim) {
+	case 2:
+		for (int j = 0; j < no[1]; j++)
+		for (int i = 0; i < no[0]; i++)
+		{
+			int p[2] = {i, j};
+			buf[cx] = grid_index_of_cell(g, p);
+			cx += 1;
+		}
+		break;
+	default: fail("undexined grid overlaps in dimension %d", g->dim);
+	}
+	assert(cx == ret);
+	return ret;
 }
