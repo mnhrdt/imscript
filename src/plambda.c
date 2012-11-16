@@ -1543,6 +1543,9 @@ static int run_program_vectorially(float *out, int pdmax,
 		float **val, int w, int h, int *pd)
 {
 	int r = 0;
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
 	FORJ(h) FORI(w) {
 		float result[pdmax];
 		r = run_program_vectorially_at(result, p,val, w,h,pd, i,j);
