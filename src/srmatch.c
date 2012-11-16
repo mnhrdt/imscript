@@ -35,6 +35,12 @@ static void invert_homography(float invH[9], float H[9])
 	for (int i = 0; i < 9; i++) invH[i] = ih[0][i];
 }
 
+#include "smapa.h"
+
+SMART_PARAMETER(MR_NTRIALS,10000)
+SMART_PARAMETER(MR_MINLIERS,30)
+SMART_PARAMETER(MR_MAXERR,2)
+
 static int find_homographic_model_among_pairs(float *model, bool *omask,
 		float *data, int n)
 {
@@ -52,9 +58,10 @@ static int find_homographic_model_among_pairs(float *model, bool *omask,
 	//model_acceptation = homography_is_reasonable;
 	model_acceptation = NULL;
 
-	int ntrials = 10000;
-	int minliers = 30;
-	float maxerr = 2;
+
+	int ntrials = MR_NTRIALS();
+	int minliers = MR_MINLIERS();
+	float maxerr = MR_MAXERR();
 
 	int n_inliers = ransac(omask, model, data, datadim, n, modeldim,
 			model_evaluation, model_generation,
@@ -127,7 +134,13 @@ static struct ann_pair *srmatch(
 			radx, rady);
 	struct ann_pair *p1;
 
-	p1 = compute_sift_matches(&npairs, ka, na, hkb, nb, t, radx, rady);
+	//p1 = compute_sift_matches(&npairs, ka, na, hkb, nb, t, radx, rady);
+	int wtop = 2, htop = 2;
+	for (int i = 0; i < na; i++) {
+		if (ka[i].pos[0] > wtop) wtop = ka[i].pos[0];
+		if (ka[i].pos[1] > htop) htop = ka[i].pos[1];
+	}
+	p1 = compute_sift_matches_locally(&npairs, ka, na, hkb, nb, t, radx, rady, wtop, htop);
 	fprintf(stderr, "the second rund of matches found %d pairs\n", npairs);
 
 	for (int i = 0; i < npairs; i++)

@@ -1,9 +1,9 @@
 CC="cc -std=c99"
-LFLAGS="-lpng -ltiff"
+LFLAGS="-lpng -ltiff -lfftw3f"
 
-$CC -D_XOPEN_SOURCE=700 -c iio.c
-$CC backflow.c iio.o -o backflow $LFLAGS
-$CC flowarrows.c iio.o -o flowarrows $LFLAGS
-$CC flowinv.c iio.o -o flowinv $LFLAGS
-$CC viewflow.c iio.o -o viewflow $LFLAGS
-$CC qeasy.c iio.o -o qeasy $LFLAGS
+PROGRAMS="backflow flowarrows flowinv viewflow qeasy plambda blur"
+
+$CC -D_XOPEN_SOURCE=700 -c src/iio.c -o bin/iio.o
+for i in $PROGRAMS; do
+	$CC src/$i.c bin/iio.o -o bin/$i $LFLAGS
+done

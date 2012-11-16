@@ -96,6 +96,13 @@ static int main_viewp(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
+bool identityP(double A[9])
+{
+	return A[0]==1 && A[1]==0 && A[2]==0 &&
+	       A[3]==0 && A[4]==1 && A[5]==0 &&
+	       A[6]==0 && A[7]==0 && A[8]==1;
+}
+
 // projective map
 void projective_map(double y[2], double A[9], double x[2])
 {
@@ -274,7 +281,7 @@ int main_viewpairs(int c, char *v[])
 					n_outliers, n_outliers*100.0/n);
 		fprintf(stderr, "errors: min=%g max=%g avg=%g\n",
 				allstats[0], allstats[1], allstats[2]);
-		if (mask) {
+		if (mask & !identityP(A)) {
 			fprintf(stderr, "errors (inliers): "
 					"min=%g max=%g avg=%g\n",
 					instats[0], instats[1], instats[2]);
@@ -467,7 +474,7 @@ int main_viewepi(int c, char *v[])
 					n_outliers, n_outliers*100.0/n);
 		fprintf(stderr, "errors: min=%g max=%g avg=%g\n",
 				allstats[0], allstats[1], allstats[2]);
-		if (mask) {
+		if (mask && !identityP(A)) {
 			fprintf(stderr, "errors (inliers): "
 					"min=%g max=%g avg=%g\n",
 					instats[0], instats[1], instats[2]);

@@ -2,3 +2,5 @@ src/*.o
 bin/*
 doc
 stuff/lena.png
+views/bursts/bin/*
+views/bursts/test/tmp/*

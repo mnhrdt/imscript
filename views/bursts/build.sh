@@ -1,7 +1,7 @@
 #!/bin/sh
 
 
-CC="c99"
+CC="icc -std=c99 -O3"
 
 #other possibilities for the compiler:
 # CC="clang"

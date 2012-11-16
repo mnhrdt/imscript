@@ -10,7 +10,7 @@ SRM_FIRST=600
 SRM_E=4
 
 # parameters for ransac
-RANSAC_N=10000
+RANSAC_N=1000
 RANSAC_E=0.9
 RANSAC_M=30
 
@@ -68,7 +68,12 @@ testex imprintf
 SIFTPAT=`basename $INPAT .png`
 REGPAT=`basename $OUTPAT .png`
 FIRSTIMAGE=`printf $INPAT $FIRST`
-GEOMETRY=`imprintf '%w %h' $FIRSTIMAGE`
+GEOFILE=.geometry
+
+if [ ! -s $GEOFILE ]; then
+	imprintf "%w %h\n" $FIRSTIMAGE > $GEOFILE
+fi
+GEOMETRY=`cat $GEOFILE`
 
 # print the file names for debugging
 for i in `seq $FIRST $LAST`; do
@@ -102,51 +107,69 @@ for i in `seq $FIRST $LAST`; do
 	INPNG=`printf $INPAT $i`
 	OUTPNG=`printf $OUTPAT $i`
 	INSIFT=`printf $SIFTPAT $i`.sift
-	compute_sift_from_png $INPNG $INSIFT
+	compute_sift_from_png $INPNG $INSIFT #&
 done
+#wait
 
 # STEP 2: match the keypoints of each image to those of the first one
 for i in `seq $FIRST $LAST`; do
 	SIFT0=`printf $SIFTPAT $FIRST`.sift
 	SIFTi=`printf $SIFTPAT $i`.sift
-	PAIRS0i=`printf $REGPAT $i`.pairs
-	VPAIRS0i=view_pairs_`printf $REGPAT $i`.png
-	echo "matching image \"$i\" to image \"$FIRST\""
+	PAIRSi=`printf $REGPAT $i`.pairs
+	VPAIRSi=view_pairs_`printf $REGPAT $i`.png
+	echo "roughly matching image \"$i\" to image \"$FIRST\""
 	if [ "$i" = "$FIRST" ] ; then
 		#echo "\tthey are the same, do nothing here"
 		true
 	else
-		if [ ! -s $PAIRS0i ]; then
-		srmatch $M_MATCH $SIFT0 $SIFTi $SRM_FIRST $SRM_E $PAIRS0i /dev/null /dev/null
-		pview pairs 1 0 0 0 1 0 0 0 1 $GEOMETRY < $PAIRS0i > $VPAIRS0i
-		#siftu pairr $M_MATCH $SIFT0 $SIFTi $M_RANGE $M_RANGE $PAIRS0i
+		if [ ! -s $PAIRSi ]; then
+		srmatch $M_MATCH $SIFT0 $SIFTi $SRM_FIRST $SRM_E $PAIRSi /dev/null /dev/null &
+		#pview pairs 1 0 0 0 1 0 0 0 1 $GEOMETRY < $PAIRSi > $VPAIRSi
+		#siftu pairr $M_MATCH $SIFT0 $SIFTi $M_RANGE $M_RANGE $PAIRSi
 		fi
 	fi
 done
+wait
 
 # STEP 3: find homographies among the pairs of keypoints above
 for i in `seq $FIRST $LAST`; do
 	PNGi=`printf $INPAT $i`
 	SIFT0=`printf $SIFTPAT $FIRST`.sift
 	SIFTi=`printf $SIFTPAT $i`.sift
-	PAIRS0i=`printf $REGPAT $i`.pairs
-	HOM0i=`printf $REGPAT $i`.hom
-	OMASK0i=`printf $REGPAT $i`.omask
-	VOPAIRS0i=view_opairs_`printf $REGPAT $i`.png
-	RR0i=`printf $REGPAT $i`.png
+	PAIRSi=`printf $REGPAT $i`.pairs
+	HOMi=`printf $REGPAT $i`.hom
+	MASKi=`printf $REGPAT $i`.omask
+	VOPAIRSi=view_opairs_`printf $REGPAT $i`.png
+	RRi=`printf $REGPAT $i`.png
 	echo "matching image \"$i\" to image \"$FIRST\""
 	if [ "$i" = "$FIRST" ] ; then
 		#echo "\tthey are the same, do nothing here"
-		echo "1 0 0 0 1 0 0 0 1" > $HOM0i
-		cp $PNGi $RR0i
+		echo "1 0 0 0 1 0 0 0 1" > $HOMi
+		cp $PNGi $RRi
 	else
-		if [ ! -s $HOM0i ]; then
-		ransac hom $RANSAC_N $RANSAC_E $RANSAC_M < $PAIRS0i
-		cp /tmp/omask.txt $OMASK0i
-		cp /tmp/ramo.txt $HOM0i
-		pview pairs 1 0 0 0 1 0 0 0 1 $GEOMETRY $OMASK0i < $PAIRS0i > $VOPAIRS0i
-		synflow homi "`cat $HOM0i`" $PNGi $RR0i /dev/null
+		if [ ! -s $HOMi ]; then
+		ransac hom $RANSAC_N $RANSAC_E $RANSAC_M $HOMi $MASKi < $PAIRSi &
+		pview pairs 1 0 0 0 1 0 0 0 1 $GEOMETRY $MASKi < $PAIRSi > $VOPAIRSi &
+		#echo "\tRESAMPLING"
+		#synflow homi "`cat $HOMi`" $PNGi $RRi /dev/null #&
 		fi
 	fi
 done
+wait
 
+# STEP 4: resample the images by the obtained homographies
+for i in `seq $FIRST $LAST`; do
+	PNGi=`printf $INPAT $i`
+	HOMi=`printf $REGPAT $i`.hom
+	RRi=`printf $REGPAT $i`.png
+	echo "moving image \"$i\" to image \"$FIRST\""
+	if [ "$i" = "$FIRST" ] ; then
+		#echo "\tthey are the same, do nothing here"
+		cp $PNGi $RRi
+	else
+		if [ ! -s $RRi ]; then
+			synflow homi "`cat $HOMi`" $PNGi $RRi /dev/null &
+		fi
+	fi
+done
+wait

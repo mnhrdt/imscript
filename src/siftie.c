@@ -519,6 +519,129 @@ struct ann_pair *siftlike_get_accpairsrad(
 	return p;
 }
 
+#include "ok_list.c"
+#include "grid.c"
+
+struct ok_grid {
+	struct ok_list l[1];
+	struct grid g[1];
+	int *buf;
+};
+
+static void ok_grid_init(struct ok_grid *o, int nr, int np,
+		float x0[2], float dx[2], int n[2])
+{
+	assert(nr == n[0] * n[1]);
+	ok_init(o->l, nr, np);
+	grid_init(o->g, 2, x0, dx, n);
+	o->buf = xmalloc(np*sizeof*o->buf);
+}
+
+static void ok_grid_free(struct ok_grid *o)
+{
+	ok_free(o->l);
+	free(o->buf);
+}
+
+static int ok_grid_add_point(struct ok_grid *o, int p, float x[2])
+{
+	int r = grid_locate(o->g, x);
+	ok_add_point(o->l, r, p);
+	return r;
+}
+
+static int ok_neighboring_points(struct ok_grid *o, float x[2])
+{
+	int r[4], nr = grid_locate_overlapping(r, o->g, x);
+	assert(nr <= 4);
+	//for (int i=0;i<nr;i++) fprintf(stderr, "\trglos{%g %g} [%d:%d] = %d\n", x[0], x[1], i, nr, r[i]);
+	int cx = 0;
+	for (int i = 0; i < nr; i++)
+	{
+		int nri = ok_which_points(o->l, r[i]);
+		for (int j = 0; j < nri; j++)
+			o->buf[cx++] = o->l->buf[j];
+	}
+	return cx;
+}
+
+// returns i such that t[i] is as close as possible to q
+// if the distance is largest than dmax, return -1
+static int find_closest_in_grid(struct sift_keypoint *q,
+		struct sift_keypoint *t, int nt,
+		float *od, float dmax, struct ok_grid *g)
+{
+	// build the list of neighbors to traverse
+	int nn = ok_neighboring_points(g, q->pos);
+	int *nbuf = g->buf;
+	//fprintf(stderr, "site ( %g , %g ) has %d neighbors\n", q->pos[0], q->pos[1], nn);
+	//for(int i = 0; i < nn; i++) fprintf(stderr, "\t%d\n", nbuf[i]);
+	
+	// compute the closest point on this list
+	int besti = -1;
+	float bestd = dmax;
+	FORI(nn) {
+		int idx = nbuf[i];
+		if (fabs(q->pos[0] - t[idx].pos[0]) > g->g->dx[0]) continue;
+		if (fabs(q->pos[1] - t[idx].pos[1]) > g->g->dx[1]) continue;
+		float nb = sift_distance_topped(q, t+idx, bestd);
+		if (nb < bestd) {
+			bestd = nb;
+			besti = idx;
+		}
+	}
+	if (besti < 0) return -1;
+	assert(besti >= 0);
+	*od = bestd;
+	return bestd < dmax ? besti : -1;
+}
+
+struct ann_pair *compute_sift_matches_locally(int *onp,
+		struct sift_keypoint *ka, int na,
+		struct sift_keypoint *kb, int nb,
+		float t, float dx, float dy, int w, int h)
+{
+	if (na == 0 || nb == 0) { *onp=0; return NULL; }
+
+	// build a grid structure for each list of keypoints
+	// NOTE: only the grid of "ka" is actually used
+	float x0[2] = {0, 0};
+	float dxy[2] = {dx, dy};
+	int n[2] = {1+(w-1)/dx, 1+(h-1)/dy};
+	int nr = n[0] * n[1];
+	//struct ok_grid ga[1]; ok_grid_init(ga, nr, na, x0, dxy, n);
+	struct ok_grid gb[1]; ok_grid_init(gb, nr, nb, x0, dxy, n);
+	//for (int i = 0; i < na; i++) ok_grid_add_point(ga, i, ka[i].pos);
+	for (int i = 0; i < nb; i++) ok_grid_add_point(gb, i, kb[i].pos);
+	//ok_display_tables(gb->l);
+	//ok_assert_consistency(gb->l);
+
+	// compute the pairs
+	struct ann_pair *p = xmalloc(na * sizeof * p);
+	int np = 0;
+	for (int i = 0; i < na; i++) {
+		float d;
+		int j = find_closest_in_grid(ka + i, kb, nb, &d, t, gb);
+		if (j >= 0) {
+			p[np].from = i;
+			p[np].to = j;
+			p[np].v[0] = d;
+			p[np].v[1] = NAN;
+			np += 1;
+		}
+	}
+	sort_annpairs(p, np);
+
+	// free the grid structures
+	//ok_grid_free(ga);
+	ok_grid_free(gb);
+
+	// return values
+	*onp = np;
+	return p;
+}
+
+
 struct ann_pair *compute_sift_matches(int *onp,
 		struct sift_keypoint *ka, int na,
 		struct sift_keypoint *kb, int nb,

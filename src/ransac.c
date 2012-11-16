@@ -324,11 +324,11 @@ int ransac(
 
 int main_cases(int c, char *v[])
 {
-	if (c < 5) {
+	if (c != 6 && c != 7 && c != 8) {
 		fprintf(stderr, "usage:\n\t%s {line,aff,affn,fm} "
 		//                         0   1
-			"ntrials maxerr minliers [inliers] <data\n", *v);
-		//       2       3      4       5
+		"ntrials maxerr minliers omodel [omask [oinliers]] <data\n",*v);
+		//2      3      4        5       6      7
 		return EXIT_FAILURE;
 	}
 
@@ -337,7 +337,9 @@ int main_cases(int c, char *v[])
 	int ntrials = atoi(v[2]);
 	float maxerr = atof(v[3]);
 	int minliers = atoi(v[4]);
-	char *inliers_filename = v[5];
+	char *filename_omodel = c > 5 ? v[5] : 0;
+	char *filename_omask = c > 6 ? v[6] : 0;
+	char *filename_inliers = c > 7 ? v[7] : 0;
 
 	// declare context variables
 	int modeldim, datadim, nfit;
@@ -428,9 +430,9 @@ int main_cases(int c, char *v[])
 		printf("\n");
 	} else printf("RANSAC found no model\n");
 
-	// if needed, print the inliers
-	if (inliers_filename) {
-		FILE *f = xfopen(inliers_filename, "w");
+	// if requested, save the inlying data points
+	if (filename_inliers) {
+		FILE *f = xfopen(filename_inliers, "w");
 		for (int i = 0; i < n; i++)
 			if (mask[i]) {
 				for(int d = 0; d < datadim; d++)
@@ -440,11 +442,20 @@ int main_cases(int c, char *v[])
 		xfclose(f);
 	}
 
-	if (true) {
-		FILE *f = xfopen("/tmp/omask.txt", "w");
+	// if requested, save the inlier mask
+	if (filename_omask) {
+		FILE *f = xfopen(filename_omask, "w");
 		for (int i = 0; i < n; i++)
 			fprintf(f, mask[i]?" 1":" 0");
 		fprintf(f, "\n");
+		xfclose(f);
+	}
+
+	// if requested, save the model
+	if (filename_omodel) {
+		FILE *f = xfopen(filename_omodel, "w");
+		for (int i = 0; i < modeldim; i++)
+			fprintf(f, "%lf%c", model[i], i==modeldim-1?'\n':' ');
 		xfclose(f);
 	}
 

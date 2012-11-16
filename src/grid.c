@@ -56,7 +56,7 @@ int locate_interval_1d(float x0, float dx, int n, float x)
 }
 
 static
-int locate_widened_interval_1d(int *ox, float x0, float dx, int n, float x)
+int locate_widened_interval_1d(int ox[2], float x0, float dx, int n, float x)
 {
 	int r[3];
 	r[0] = locate_interval_1d(x0, dx, n, x - dx/2);
@@ -69,6 +69,7 @@ int locate_widened_interval_1d(int *ox, float x0, float dx, int n, float x)
 	assert(r[2] - r[0] <= 1);
 	ox[0] = r[0];
 	ox[1] = r[2];
+	//fprintf(stderr, "\t\tlwi %g = %d %d %d\n", x, r[0], r[1], r[2]);
 	return r[0] == r[2] ? 1 : 2;
 }
 
@@ -87,7 +88,7 @@ int grid_locate(struct grid *g, float *x)
 	return grid_index_of_cell(g, ix);
 }
 
-// computes the indeces of the cells that may contain neighbors
+// computes the indexes of the cells that may contain neighbors
 // of the given point
 int grid_locate_overlapping(int *buf, struct grid *g, float *x)
 {
@@ -99,20 +100,23 @@ int grid_locate_overlapping(int *buf, struct grid *g, float *x)
 				g->x0[i], g->dx[i], g->n[i], x[i]);
 		ret *= no[i];
 	}
+	//fprintf(stderr, "ret = %d\n", ret);
 	// TODO write a proper "for" loop here (if possible, which I'm not sure)
 	int cx = 0;
 	switch (g->dim) {
 	case 2:
-		for (int j = 0; j < no[1]; j++)
-		for (int i = 0; i < no[0]; i++)
+		for (int j = ox[1][0]; j <= ox[1][1]; j++)
+		for (int i = ox[0][0]; i <= ox[0][1]; i++)
 		{
 			int p[2] = {i, j};
 			buf[cx] = grid_index_of_cell(g, p);
+			//fprintf(stderr, "\t\tbuf[%d] = grioc(%d %d)=%d\n",cx,i,j,buf[cx]);
 			cx += 1;
 		}
 		break;
 	default: fail("undexined grid overlaps in dimension %d", g->dim);
 	}
+	//fprintf(stderr, "cx ret = %d %d\n", cx, ret);
 	assert(cx == ret);
 	return ret;
 }

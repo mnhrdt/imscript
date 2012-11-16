@@ -76,9 +76,10 @@ for i in `seq $FIRST $LAST`; do
 	ALL_W="$ALL_W $wPNGi"
 	if [ ! -s $wPNGi ]; then
 		echo "computing weights for image \"$PNGi\""
-		plambda $PNGi "$NGRAD" | blur square $W_WINSIZE | qeasy 0 $W_TOPQ - $wPNGi
+		plambda $PNGi "$NGRAD" | blur square $W_WINSIZE | qeasy 0 $W_TOPQ - $wPNGi &
 	fi
 done
+wait
 
 # pixelwise sum of all the weights
 vecov sum $ALL_W > sum_wD
@@ -91,9 +92,10 @@ for i in `seq $FIRST $LAST`; do
 	xwPNGi=xwD_`printf $INPAT $i`
 	ALL_XW="$ALL_XW $xwPNGi"
 	if [ ! -s $xwPNGi ]; then
-		plambda $PNGi $wPNGi "x y *" > $xwPNGi
+		plambda $PNGi $wPNGi "x y *" > $xwPNGi &
 	fi
 done
+wait
 
 # unnormalized sum of all the weighted images
 vecov sum $ALL_XW > sum_xwD

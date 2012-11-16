@@ -43,6 +43,15 @@ static void setsample_0(float *x, int w, int h, int pd, int i, int j, int l,
 	x[(i+j*w)*pd + l] = v;
 }
 
+inline
+static void setsample_segf(float *x, int w, int h, int pd, int i, int j, int l,
+		float v)
+{
+	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
+		*(volatile int*)0 = 0;
+	x[(i+j*w)*pd + l] = v;
+}
+
 //static float getpixel(float *x, int w, int h, int i, int j)
 //{
 //	if (i < 0 || i >= w || j < 0 || j >= h)
