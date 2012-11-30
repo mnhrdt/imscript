@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "bicubic.c"
+#include "bilinear_interpolation.c"
 
 static void cline(float *l, int n, float *x, int w, int h, float angle)
 {
@@ -26,7 +27,8 @@ static void cline(float *l, int n, float *x, int w, int h, float angle)
 		float p[2];
 		for (int j = 0; j < 2; j++)
 			p[j] = (1-a)*from[j] + a*toto[j];
-		bicubic_interpolation(l + i, x, w, h, 1, p[0], p[1]);
+		//bicubic_interpolation(l + i, x, w, h, 1, p[0], p[1]);
+		bilinear_interpolation_vec_at(l + i, x, w, h, 1, p[0], p[1]);
 	}
 }
 

@@ -197,6 +197,9 @@ static int main_vec(int c, char *v[])
 	void *data = iio_read_image_float_matrix_vec(v[3], &w, &h, &pd);
 	float (**x)[pd] = data;
 
+	if (ow == -1 && oh == -1) ow = 400;
+	else if (oh == -1) oh = (h*ow)/w;
+	else if (ow == -1) ow = (w*oh)/h;
 
 	float (**y)[pd] = matrix_build(ow, oh, sizeof**y);
 	bilinear_interpolation(pd, y, ow, oh, x, w, h);
@@ -206,6 +209,7 @@ static int main_vec(int c, char *v[])
 	free(x);
 	free(y);
 
+	fprintf(stderr, "%g %g\n", w/(1.0*ow), h/(1.0*oh));
 	return EXIT_SUCCESS;
 }
 

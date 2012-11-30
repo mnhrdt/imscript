@@ -7,6 +7,7 @@ WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-array-bounds -Wno-unused
 
 CFLAGS = $(WFLAGS)
 CFLAGS = $(WFLAGS) -O3 -DNDEBUG
+CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE -fopenmp
 CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE
 
 #end of compiler specific part
@@ -16,7 +17,7 @@ CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE
 SRCDIR = src
 BINDIR = bin
 
-SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco vecov flowinv ghisto shuntingyard rpc overpoints periodize rpcflow ransac genk cgi zeropad siftu pview homfilt rpchfilt uncrop maptp rpcparcheck rpc_errsingle rpc_errpair cline rpc_angpair rpc_curvpair chisto fftper srmatch croparound
+SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco vecov flowinv ghisto shuntingyard rpc overpoints periodize rpcflow ransac genk cgi zeropad siftu pview homfilt rpchfilt uncrop maptp rpcparcheck rpc_errsingle rpc_errpair cline rpc_angpair rpc_curvpair chisto fftper srmatch croparound zoombil flowh
 SRCFFT = gblur fft dct blur
 ifeq ($(ENABLE_GSL), yes)
 	SRCGSL = paraflow minimize

@@ -1,18 +1,61 @@
 #ifndef _RANDOM_C
 #define _RANDOM_C
 
+
+
+
+#ifdef RNG_SPECIFIC_WELL1024
+#include "well1024.c"
+#else
+#include <stdlib.h>
+#endif
+
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846264338328
 #endif
 
+
+static void xsrand(unsigned int seed)
+{
+#ifdef RNG_SPECIFIC_WELL1024
+	well1024_seed(seed);
+#else
+	srand(seed);
+#endif
+}
+
+static int xrand(void)
+{
+#ifdef RNG_SPECIFIC_WELL1024
+	int r;
+# ifdef _OPENMP
+# pragma omp critical
+# endif
+	r = RAND_MAX * well1024();
+	return r;
+#else
+	return rand();
+#endif
+}
+
 static double random_raw(void)
 {
-	return rand();
+	return xrand();
 }
 
 static double random_uniform(void)
 {
+#ifdef RNG_SPECIFIC_WELL1024
+	double r;
+# ifdef _OPENMP
+# pragma omp critical
+# endif
+	r = well1024();
+	return r;
+#else
 	return rand()/(1.0+RAND_MAX);
+#endif
 }
 
 static double random_normal(void)

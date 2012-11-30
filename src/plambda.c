@@ -173,6 +173,7 @@
 #define FORL(n) for(int l=0;l<(n);l++)
 #endif
 
+//#define RNG_SPECIFIC_WELL1024
 //#include "fragments.c"
 #include "fail.c"
 #include "xmalloc.c"
@@ -207,6 +208,7 @@ static double logic_ne     (double a, double b) { return a != b; }
 static double logic_if (double a, double b, double c) { return a ? b : c; }
 static double logic_or (double a, double b) { return a || b; }
 static double logic_and (double a, double b) { return a && b; }
+static double logic_not (double a) { return !a; }
 
 static double function_isfinite  (double x) { return isfinite(x); }
 static double function_isinf     (double x) { return isinf(x);    }
@@ -338,6 +340,7 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(logic_if,"if",3),
 	REGISTER_FUNCTIONN(logic_and,"and",2),
 	REGISTER_FUNCTIONN(logic_or,"or",2),
+	REGISTER_FUNCTIONN(logic_not,"not",1),
 	REGISTER_FUNCTIONN(function_isfinite,"isfinite",1),
 	REGISTER_FUNCTIONN(function_isinf,"isinf",1),
 	REGISTER_FUNCTIONN(function_isnan,"isnan",1),
@@ -1542,19 +1545,18 @@ static int run_program_vectorially(float *out, int pdmax,
 		struct plambda_program *p,
 		float **val, int w, int h, int *pd)
 {
-	int r = 0;
 #ifdef _OPENMP
-#pragma omp parallel for
+#pragma omp parallel for default(none)
 #endif
 	FORJ(h) FORI(w) {
 		float result[pdmax];
-		r = run_program_vectorially_at(result, p,val, w,h,pd, i,j);
+		int r = run_program_vectorially_at(result, p,val, w,h,pd, i,j);
 		assert(r == pdmax);
-		FORL(r) {
+		if (r != pdmax) fail("r != pdmax");
+		FORL(r)
 			setsample_0(out, w, h, pdmax, i, j, l, result[l]);
-		}
 	}
-	return r;
+	return pdmax;
 }
 
 //static void shrink_components(float *y, float *x, int n, int ypd, int xpd)
@@ -1631,7 +1633,7 @@ int main_images(int c, char *v[])
 		fprintf(stderr, "plambda correspondence \"%s\" = \"%s\"\n",
 				p->var->t[i], v[i+1]);
 
-	srand(SRAND());
+	xsrand(SRAND());
 
 	int pdreal = eval_dim(p, x, pd);
 

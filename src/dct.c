@@ -67,6 +67,15 @@ static void dct(float *y, float *x, int w, int h, int pd)
 	free(gc);
 }
 
+// if it finds any strange number, sets it to zero
+static void normalize_float_array_inplace(float *x, int n)
+{
+	for (int i = 0; i < n; i++)
+		if (!isnormal(x[i]))
+			x[i] = 0;
+
+}
+
 #ifndef OMIT_FFT_MAIN
 int main(int c, char *v[])
 {
@@ -80,6 +89,7 @@ int main(int c, char *v[])
 
 	int w, h, pd;
 	float *x = iio_read_image_float_vec(in, &w, &h, &pd);
+	normalize_float_array_inplace(x, w*h*pd);
 
 	float *y = xmalloc(w*h*pd*sizeof*y);
 
