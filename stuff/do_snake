@@ -1,0 +1,1 @@
+plambda zero:13x8 "x del :i 2 fmod :i 0 > :i :w 1 - < and and :j 0 > and :j :h 1 - < and    :j 1 = :i 2 - 4 fmod not and or   :j :h 2 - = :i 4 fmod not and :i 0 > and :i :w 1 - < and or    0 > :i :w * :j + * :n fmin"|ntiply 10|qauto|d

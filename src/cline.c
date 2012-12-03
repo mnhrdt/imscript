@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "fail.c"
 #include "bicubic.c"
 #include "bilinear_interpolation.c"
 
@@ -30,6 +31,34 @@ static void cline(float *l, int n, float *x, int w, int h, float angle)
 		//bicubic_interpolation(l + i, x, w, h, 1, p[0], p[1]);
 		bilinear_interpolation_vec_at(l + i, x, w, h, 1, p[0], p[1]);
 	}
+}
+
+static void clineh(float *l, int n, float *x, int w, int h)
+{
+	if (w != h) fail("clineh only works over square images");
+	int lc[n];
+	for (int i = 0; i < n; i++)
+		lc[i] = l[i] = 0;
+
+	float zer[2] = {(w-1.0)/2, (h-1.0)/2};
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		float rp[2] = {(i - zer[0])/zer[0], (j - zer[1])/zer[1]};
+		float rpn = hypot(rp[0], rp[1])/sqrt(2);
+		float rpa = 180*atan2(rp[1], rp[0])/3.1416;
+		if (rpa < 0) rpn = -rpn;
+		//fprintf(stderr, "(%d %d) => (%g %g) => (%g _ %g)\n",
+		//		i, j, rp[0], rp[1], rpn, rpa);
+		int lidx = n*(rpn + 1)/2;
+		if (lidx < 0) lidx = 0;
+		if (lidx >= n) lidx = n-1;
+		lc[lidx] += 1;
+		l[lidx] += x[w*j+i];
+	}
+	for (int i = 0; i < n; i++)
+		if (lc[i] > 0)
+			l[i] /= lc[i];
 }
 
 static void plot_cline(float *l, int n, char *title)
@@ -63,7 +92,10 @@ int main(int c, char *v[])
 	fprintf(stderr, "geometry = %dx%d\n", w, h);
 	fprintf(stderr, "n = %d\n", n);
 	float l[n];
-	cline(l, n, x, w, h, angle);
+	if (isfinite(angle))
+		cline(l, n, x, w, h, angle);
+	else
+		clineh(l, n, x, w, h);
 	plot_cline(l, n, v[1]);
 	free(x);
 	return 0;
