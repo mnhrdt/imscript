@@ -16,10 +16,10 @@ static void crop(float *out, int *cw, int *ch, float *in, int w, int h, int pd,
 {
 	if (xf < 0) xf = w - xf;
 	if (yf < 0) yf = h - yf;
-	x0 = bound(x0, 0, w-1);
-	xf = bound(xf, 0, w-1);
-	y0 = bound(y0, 0, h-1);
-	yf = bound(yf, 0, h-1);
+	x0 = bound(x0, 0, w);
+	xf = bound(xf, 0, w);
+	y0 = bound(y0, 0, h);
+	yf = bound(yf, 0, h);
 	if (x0 >= xf) fail("bad crop x");
 	if (y0 >= yf) fail("bad crop y");
 
