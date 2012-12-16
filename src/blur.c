@@ -16,6 +16,10 @@
 #define M_PI		3.14159265358979323846	/* pi */
 #endif
 
+#ifndef M_SQRT2
+#define M_SQRT2	1.41421356237309504880	/* sqrt(2) */
+#endif
+
 #include "fail.c"
 #include "xmalloc.c"
 
@@ -242,7 +246,7 @@ static float kernel_2d_laplace(float x, float y, float *p)
 {
 	float sigma = p[1];
 
-	float r = exp(-hypot(x,y)/sigma);
+	float r = exp(-M_SQRT2*hypot(x,y)/sigma);
 	return r;
 }
 
