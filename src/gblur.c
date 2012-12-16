@@ -136,7 +136,7 @@ static void ifft_3dfloat(float *ifx,  fftwf_complex *fx, int w, int h, int d)
 	FORI(w*h*d) {
 		fftwf_complex z = b[i] * scale;
 		ifx[i] = crealf(z);
-		assert(cimagf(z) < 0.001);
+		//assert(cimagf(z) < 0.001);
 	}
 	fftwf_destroy_plan(p);
 	fftwf_free(a);
