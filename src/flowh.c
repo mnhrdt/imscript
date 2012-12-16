@@ -2,8 +2,11 @@
 
 #include <assert.h>
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "iio.h"
 
 #include "fail.c"
 #include "xmalloc.c"
@@ -13,6 +16,27 @@ static int closed_bound(int a, int x, int b)
 	if (x < a) return a;
 	if (x <= b) return x;
 	return b;
+}
+
+static bool unmasked(int idx)
+{
+	static bool initialized = false;
+	static int w, h;
+	static float *x = NULL;
+	if (!initialized)
+	{
+		initialized = true;
+		char *fname = getenv("FLOWH_MASK");
+		if (!fname) goto endif;
+		x = iio_read_image_float(fname, &w, &h);
+		if (x) fprintf(stderr, "using mask file \"%s\"\n", fname);
+	}
+endif:
+	if (x) {
+		assert(idx >= 0);
+		assert(idx < w*h);
+	}
+	return !x || (x[idx] > 0);
 }
 
 void flowh(float *y, int ow, int oh, float *x, int w, int h, int nbu, int nu)
@@ -34,12 +58,12 @@ void flowh(float *y, int ow, int oh, float *x, int w, int h, int nbu, int nu)
 		int idx = fi[1]*ow + fi[0];
 		assert(idx >= 0);
 		assert(idx < ow*oh);
-		y[idx] += 1;
+		if (unmasked(i))
+			y[idx] += 1;
 	}
 }
 
 #ifndef OMIT_MAIN
-#include "iio.h"
 int main(int c, char *v[])
 {
 	if (c != 3 && c != 4 && c != 5) {
