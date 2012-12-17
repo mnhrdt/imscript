@@ -121,7 +121,7 @@ void silly_lucky_region(float **y, float **x, int n, int w, int h, int pd,
 	//      3.3. write the corresponding sorted values into the output video
 		int idx = j*w + i;
 		for (int k = 0; k < n; k++)
-			for (int l = 0; l < n; l++)
+			for (int l = 0; l < pd; l++)
 				y[k][idx*pd+l] = x[v[k].i][idx*pd+l];
 	}
 	}
