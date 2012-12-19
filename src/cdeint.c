@@ -18,14 +18,14 @@ int main(int c, char *v[])
 	float (*y)[w][pd] = calloc(w*h*pd,sizeof(float));
 	float (*z)[w][pd] = calloc(w*h*pd,sizeof(float));
 
-	for (int j = 0; j < h-1; j += 2) {
+	for (int j = 1; j < h; j += 2) {
 		for (int i = 0; i < w; i++)
 		for (int l = 0; l < pd; l++)
-			z[j][i][l] = x[j+1][i][l];
-		if (j+3 < h)
+			z[j][i][l] = x[j][i][l];
+		if (j+2 < h)
 			for (int i = 0; i < w; i++)
 			for (int l = 0; l < pd; l++)
-				z[j+1][i][l] = (x[j+1][i][l] + x[j+3][i][l])/2;
+				z[j+1][i][l] = (x[j][i][l] + x[j+2][i][l])/2;
 	}
 	for (int j = 0; j < h; j += 2) {
 		for (int i = 0; i < w; i++)
@@ -36,6 +36,26 @@ int main(int c, char *v[])
 			for (int l = 0; l < pd; l++)
 				y[j+1][i][l] = (x[j][i][l] + x[j+2][i][l])/2;
 	}
+
+	// the other way to interpet it:
+//	for (int j = 0; j < h-1; j += 2) {
+//		for (int i = 0; i < w; i++)
+//		for (int l = 0; l < pd; l++)
+//			z[j][i][l] = x[j+1][i][l];
+//		if (j+3 < h)
+//			for (int i = 0; i < w; i++)
+//			for (int l = 0; l < pd; l++)
+//				z[j+1][i][l] = (x[j+1][i][l] + x[j+3][i][l])/2;
+//	}
+//	for (int j = 0; j < h; j += 2) {
+//		for (int i = 0; i < w; i++)
+//		for (int l = 0; l < pd; l++)
+//			y[j][i][l] = x[j][i][l];
+//		if (j+2 < h)
+//			for (int i = 0; i < w; i++)
+//			for (int l = 0; l < pd; l++)
+//				y[j+1][i][l] = (x[j][i][l] + x[j+2][i][l])/2;
+//	}
 
 	iio_save_image_float_vec(v[2], y[0][0], w, h, pd);
 	iio_save_image_float_vec(v[3], z[0][0], w, h, pd);
