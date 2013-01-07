@@ -35,10 +35,7 @@ static double mean_square_error(float *x, float *y, int n)
 {
 	double r = 0;
 	for (int i = 0; i < n; i++)
-	{
-		double t = x[i] - y[i];
-		r += t*t;
-	}
+		r += (x[i] - y[i]) * (x[i] - y[i]);
 	r /= n;
 	return r;
 }
@@ -68,10 +65,7 @@ static void meanvar(double *mean, double *var, float *x, int n)
 		*mean += x[i];
 	*mean /= n;
 	for (int i = 0; i < n; i++)
-	{
-		double t = x[i] - *mean;
-		*var += t*t;
-	}
+		*var += (x[i] - *mean) * (x[i] - *mean);
 	*var /= n - 1;
 }
 
@@ -154,6 +148,28 @@ static bool string_is_lp(char *s, double *p)
 	return false;
 }
 
+static double ncc(float *x, float *y, int n)
+{
+	double mx = 0, my = 0;
+	for (int i = 0; i < n; i++) {
+		mx += x[i];
+		my += y[i];
+	}
+	mx /= n;
+	my /= n;
+
+	double sx = 0, sy = 0, sxy = 0;
+	for (int i = 0; i < n; i++) {
+		sx  += (x[i] - mx) * (x[i] - mx);
+		sy  += (y[i] - my) * (y[i] - my);
+		sxy += (x[i] - mx) * (y[i] - my);
+	}
+	sx = sqrt(sx/n);
+	sy = sqrt(sy/n);
+
+	return sxy/(n*sx*sy);
+}
+
 #include "fail.c"
 
 static double imgerr(char *m, float *x, float *y, int n)
@@ -166,6 +182,7 @@ static double imgerr(char *m, float *x, float *y, int n)
 	else if (0 == strcmp(m, "UIQI"))  r = uiqi(x, y, n);
 	else if (0 == strcmp(m, "SSIM"))  r = ssim(x, y, n);
 	else if (0 == strcmp(m, "PSNR"))  r = psnr(x, y, n);
+	else if (0 == strcmp(m, "NCC"))   r = ncc(x, y, n);
 	else if (string_is_lp(m, &r))     r = ell_pee_distance(x, y, n, r);
 	else fail("unrecognized metric \"%s\"", m);
 	return r;
