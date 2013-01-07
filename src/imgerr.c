@@ -6,7 +6,6 @@
 
 static double ell_pee_distance(float *x, float *y, int n, float p)
 {
-	fprintf(stderr, "p = %lf\n", p);
 	double r = 0;
 	if (isinf(p)) {
 		r = -INFINITY;
@@ -137,6 +136,11 @@ static double ssim(float *x, float *y, int n)
 	return r;
 }
 
+static double psnr(float *x, float *y, int n)
+{
+	return 20 * log10(dynamic_range(x, n)/root_mean_square_error(x, y, n));
+}
+
 static bool string_is_lp(char *s, double *p)
 {
 	if (s[0] == 'L') {
@@ -161,6 +165,7 @@ static double imgerr(char *m, float *x, float *y, int n)
 	else if (0 == strcmp(m, "MAE"))   r = mean_absolute_error(x, y, n);
 	else if (0 == strcmp(m, "UIQI"))  r = uiqi(x, y, n);
 	else if (0 == strcmp(m, "SSIM"))  r = ssim(x, y, n);
+	else if (0 == strcmp(m, "PSNR"))  r = psnr(x, y, n);
 	else if (string_is_lp(m, &r))     r = ell_pee_distance(x, y, n, r);
 	else fail("unrecognized metric \"%s\"", m);
 	return r;
