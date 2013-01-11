@@ -67,6 +67,8 @@ static float wpatch_distance(float *x, float *y, int w, int h, int pd,
 #define OMIT_BLUR_MAIN
 #include "blur.c"
 
+static void get_reference_image(float *, float **, int, int, int, int);
+
 void silly_lucky_region(float **y, float **x, int n, int w, int h, int pd,
 		float W, float S)
 {
@@ -81,13 +83,7 @@ void silly_lucky_region(float **y, float **x, int n, int w, int h, int pd,
 	// 1. compute the average image
 	fprintf(stderr, "computing the average image...\n");
 	float *mx = xmalloc(w*h*pd*sizeof*mx);
-	for (int i = 0; i < w*h*pd; i++)
-	{
-		long double m = 0;
-		for (int j = 0; j < n; j++)
-			m += x[j][i];
-		mx[i] = m/n;
-	}
+	get_reference_image(mx, x, n, w, h, pd);
 
 	// 2. compute the sigma-blurred version of each input frame
 	fprintf(stderr, "computing the blurry input frames...\n");
@@ -136,6 +132,32 @@ void silly_lucky_region(float **y, float **x, int n, int w, int h, int pd,
 
 #include "fail.c"
 #include "xmalloc.c"
+
+static void get_reference_image(float *mx,
+		float **x, int n, int w, int h, int pd)
+{
+	char *fname_refimg = getenv("LURE_REFIMG");
+	if (fname_refimg) { // use the provided file
+		int rw, rh, rd;
+		float *t = iio_read_image_float_vec(fname_refimg, &rw,&rh, &rd);
+		if (!t)
+			fail("could not open refimg \"%s\"", fname_refimg);
+		if (rw != w || rh != h || rd != pd)
+			fail("reference image size mismatch");
+		for (int i = 0; i < w*h*pd; i++)
+			mx[i] = t[i];
+		free(t);
+	} else { // compute the average
+		for (int i = 0; i < w*h*pd; i++)
+		{
+			long double m = 0;
+			for (int j = 0; j < n; j++)
+				m += x[j][i];
+			mx[i] = m/n;
+		}
+	}
+}
+
 
 int main(int c, char *v[])
 {

@@ -1,3 +1,4 @@
+// bullshit replaced by "imgerr.c"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>

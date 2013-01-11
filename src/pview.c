@@ -96,6 +96,34 @@ static int main_viewp(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
+// histogram of points
+static int main_viewhp(int c, char *v[])
+{
+	if (c != 3) {
+		fprintf(stderr, "usage:\n\t%s sx sy < pairs.txt\n", *v);
+		//                         0  1  2
+		return EXIT_FAILURE;
+	}
+	int n;
+	float *t = read_ascii_floats(stdin, &n);
+	n /= 2;
+	int sizex = atoi(v[1]);
+	int sizey = atoi(v[2]);
+	float (*x)[sizex] = xmalloc(sizex*sizey*sizeof(float));
+	FORI(sizex*sizey)
+		x[0][i] = 0;;
+	FORI(n)
+	{
+		int a = t[2*i+0];
+		int b = t[2*i+1];
+		if (inner_point(sizex, sizey, a, b))
+			x[b][a] += 1;
+	}
+	iio_save_image_float("-", x[0], sizex, sizey);
+	free(t); free(x);
+	return EXIT_SUCCESS;
+}
+
 bool identityP(double A[9])
 {
 	return A[0]==1 && A[1]==0 && A[2]==0 &&
@@ -498,6 +526,7 @@ int main(int c, char *v[])
 	assert(4 == sizeof(struct rgba_value));
 	if (c < 2) goto usage;
 	else if (0 == strcmp(v[1], "points")) return main_viewp(c-1, v+1);
+	else if (0 == strcmp(v[1], "hpoints")) return main_viewhp(c-1, v+1);
 	else if (0 == strcmp(v[1], "pairs")) return main_viewpairs(c-1, v+1);
 	else if (0 == strcmp(v[1], "triplets")) return main_viewtrips(c-1, v+1);
 	else if (0 == strcmp(v[1], "epipolar")) return main_viewepi(c-1, v+1);
