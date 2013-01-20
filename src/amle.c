@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <math.h>
@@ -9,21 +10,23 @@
 #include "smapa.h"
 
 
-static int get_nvals(float *v, float *wv, float *x, int w, int h, int i, int j)
+static int get_nvals(float *v, float *wv2, float *x, int w, int h, int i, int j)
 {
-	int r = 0, n[8][2] = {
-		{1,0}, {0,1}, {-1,0}, {0,-1},
-		{1,1}, {-1,1}, {-1,-1}, {1,-1}
+	int r = 0, n[][3] = {
+		{+1,0,1}, {0,+1,1}, {-1,0,1}, {0,-1,1},
+		{+1,+1,2}, {-1,+1,2}, {-1,-1,2}, {+1,-1,2},
+		{+2,0,4}, {0,+2,4}, {-2,0,4}, {0,-2,4},
+		{+4,0,16}, {0,+4,16}, {-4,0,16}, {0,-4,16}
 	};
-	for (int p = 0; p < 4; p++)
+	for (int p = 0; p < 8; p++)
 	{
 		int ii = i + n[p][0];
 		int jj = j + n[p][1];
 		if (ii >= 0 && jj >= 0 && ii < w && jj < h)
 		{
 			v[r] = x[w*jj+ii];
-			if (wv)
-				wv[r] = hypot(ii,jj);
+			if (wv2)
+				wv2[r] = n[p][2];
 			r += 1;
 		}
 	}
@@ -32,19 +35,159 @@ static int get_nvals(float *v, float *wv, float *x, int w, int h, int i, int j)
 
 static void get_minmax(float *min, float *max, float *x, int n)
 {
-	*min = *max = x[0];
-	for (int i = 1; i < n; i++)
+	*min = INFINITY;
+	*max = -INFINITY;
+	for (int i = 0; i < n; i++)
 	{
 		if (x[i] < *min) *min = x[i];
 		if (x[i] > *max) *max = x[i];
 	}
 }
 
+static void get_minmax_idx(int *min, int *max, float *x, int n)
+{
+	*min = *max = 0;
+	for (int i = 1; i < n; i++)
+	{
+		if (x[i] < x[*min]) *min = i;
+		if (x[i] > x[*max]) *max = i;
+	}
+}
+
+static float amle_iteration(float *x, int w, int h, int (*mask)[2], int nmask)
+{
+	float actus = 0;
+	for (int p = 0; p < nmask; p++)
+	{
+		int i = mask[p][0];
+		int j = mask[p][1];
+		int idx = j*w + i, min, max;
+		float value[0x100], weight[0x100];
+		int nv = get_nvals(value, weight, x, w, h, i, j);
+		get_minmax_idx(&min, &max, value, nv);
+		float a = weight[max];
+		float b = weight[min];
+		float newx = (a*value[min] + b*value[max]) / (a + b);
+		actus += fabs(x[idx] - newx);
+		//if (fabs(x[idx]-newx) > actumax)
+		//	actumax = fabs(x[idx]-newx);
+		x[idx] = newx;
+	}
+	return actus;
+}
+
+static void amle_init(float *tinf, float *tsup, float *x, int w, int h)
+{
+	float min, max;
+	get_minmax(&min, &max, x, w*h);
+	for (int i = 0; i < w*h; i++)
+	{
+		if (isnan(x[i])) {
+			tinf[i] = min;
+			tsup[i] = max;
+		} else {
+			tinf[i] = x[i];
+			tsup[i] = x[i];
+		}
+	}
+}
+
+static float absolute_difference(float *a, float *b, int w, int h,
+		int (*mask)[2], int nmask)
+{
+	float r = 0;
+	for (int p = 0; p < nmask; p++)
+	{
+		int i = mask[p][0];
+		int j = mask[p][1];
+		int idx = j*w + i;
+		float t = fabs(a[idx] - b[idx]);
+		if (t > r)
+			r = t;
+	}
+	return r;
+}
+
+static float mean_difference(float *a, float *b, int w, int h,
+		int (*mask)[2], int nmask)
+{
+	float r = 0;
+	for (int p = 0; p < nmask; p++)
+	{
+		int i = mask[p][0];
+		int j = mask[p][1];
+		int idx = j*w + i;
+		r += fabs(a[idx] - b[idx]);
+	}
+	return r/nmask;
+}
+
+SMART_PARAMETER(AMLE_TAU,0.25)
+
+static void amle_refine(float *a, float *b, int w, int h,
+		int (*mask)[2], int nmask)
+{
+	float t = AMLE_TAU();
+	assert(t >= 0);
+	assert(t < 0.5);
+	for (int p = 0; p < nmask; p++)
+	{
+		int i = mask[p][0];
+		int j = mask[p][1];
+		int idx = j*w + i;
+		float newa = (1-t)*a[idx] + t*b[idx];
+		float newb = (1-t)*b[idx] + t*a[idx];
+		a[idx] = newa;
+		b[idx] = newb;
+	}
+}
 
 SMART_PARAMETER(AMLE_NITER,100)
 
-// the input mask is coded by nans
 void amle(float *y, float *x, int w, int h)
+{
+	int nmask = 0;
+	for (int i = 0; i < w*h; i++)
+		if (isnan(x[i]))
+			nmask += 1;
+	int (*mask)[2] = xmalloc(w*h*2*sizeof(int)), cx = 0;
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+		if (isnan(x[j*w + i])) {
+			mask[cx][0] = i;
+			mask[cx][1] = j;
+			cx += 1;
+		}
+
+	float *tinf = xmalloc(w*h*sizeof(float));
+	float *tsup = xmalloc(w*h*sizeof(float));
+	amle_init(tinf, tsup, x, w, h);
+
+	for (int iter = 0 ; iter < AMLE_NITER(); iter++)
+	{
+		float actus_inf = amle_iteration(tinf, w, h, mask, nmask);
+		float actus_sup = amle_iteration(tsup, w, h, mask, nmask);
+		float e = absolute_difference(tinf, tsup, w, h, mask, nmask);
+		float ea = mean_difference(tinf, tsup, w, h, mask, nmask);
+
+		if (0 == iter % 10)
+			fprintf(stderr,
+				"iter %d, e = {%g %g}, eactus = {%g %g}\n",
+				iter, e, ea, actus_inf, actus_sup);
+
+		//if (0 == iter % 10)
+		//	amle_refine(tinf, tsup, w, h, mask, nmask);
+	}
+
+	free(mask);
+
+	for (int i = 0; i < w*h; i++)
+		y[i] = (tinf[i] + tsup[i])/2;
+}
+
+// the input mask is coded by nans
+#if 0
+void amle_old(float *y, float *x, int w, int h)
 {
 	int nmask = 0;
 	for (int i = 0; i < w*h; i++)
@@ -60,7 +203,7 @@ void amle(float *y, float *x, int w, int h)
 			mask[cx][0] = i;
 			mask[cx][1] = j;
 			cx += 1;
-			y[idx] = 0;
+			y[idx] = AMLE_INIT();
 		} else
 			y[idx] = x[idx];
 	}
@@ -72,11 +215,13 @@ void amle(float *y, float *x, int w, int h)
 		{
 			int i = mask[p][0];
 			int j = mask[p][1];
-			int idx = j*w + i;
-			float v[0x100], wv[0x100], mi, ma;
-			int nv = get_nvals(v, NULL, y, w, h, i, j);
-			get_minmax(&mi, &ma, v, nv);
-			float newy = (mi + ma)/2;
+			int idx = j*w + i, mi, ma;
+			float v[0x100], wv[0x100];
+			int nv = get_nvals(v, wv, y, w, h, i, j);
+			get_minmax_idx(&mi, &ma, v, nv);
+			//float newy = (mi + ma)/2;
+			float newy = wv[ma]*v[mi] + wv[mi]*v[ma];
+			newy /= wv[mi] + wv[ma];
 			if (fabs(newy - y[idx]) > actumax)
 				actumax = fabs(newy - y[idx]);
 			y[idx] = newy;
@@ -87,6 +232,7 @@ void amle(float *y, float *x, int w, int h)
 
 	free(mask);
 }
+#endif
 
 #include "iio.h"
 
