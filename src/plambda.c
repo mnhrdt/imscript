@@ -389,10 +389,40 @@ static int matrix_determinant(float *r, float *a, int n)
 	case 4: *r = a[0]*a[3] - a[1]*a[2]; break;
 	case 6: *r = a[0]*a[4] - a[1]*a[3]; break;
 	case 9: *r = a[0]*a[4]*a[8] + a[2]*a[3]*a[7] + a[1]*a[5]*a[6]
-		   - a[2]*a[4]*a[6] + a[1]*a[3]*a[8] + a[0]*a[5]*a[7]; break;
+		   - a[2]*a[4]*a[6] - a[1]*a[3]*a[8] - a[0]*a[5]*a[7]; break;
 	default: fail("can not compute determinant of object of size %d", n);
 	}
 	return 1;
+}
+
+// instance of "univector_function"
+static int matrix_inverse(float *r, float *a, int n)
+{
+	float det;
+	matrix_determinant(&det, a, n);
+	switch(n) {
+	case 1:
+		r[0] = 1/a[0];
+		return 1;
+	case 4:
+		r[0] = a[3]/det;
+		r[1] = -a[1]/det;
+		r[2] = -a[2]/det;
+		r[3] = a[0]/det;
+		return 4;
+	case 9:
+		r[0] = (a[4]*a[8]-a[5]*a[7])/det;
+		r[1] = (a[2]*a[7]-a[1]*a[8])/det;
+		r[2] = (a[1]*a[5]-a[2]*a[4])/det;
+		r[3] = (a[5]*a[6]-a[3]*a[8])/det;
+		r[4] = (a[0]*a[8]-a[2]*a[6])/det;
+		r[5] = (a[2]*a[3]-a[0]*a[5])/det;
+		r[6] = (a[3]*a[7]-a[4]*a[6])/det;
+		r[7] = (a[1]*a[6]-a[0]*a[7])/det;
+		r[8] = (a[0]*a[4]-a[1]*a[3])/det;
+		return 9;
+	default: fail("can not compute inversion of object of size %d", n);
+	}
 }
 
 // instance of "univector_function"
@@ -530,6 +560,7 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(scalar_product,"sprod",-5),
 	REGISTER_FUNCTIONN(matrix_determinant,"mdet",-6),
 	REGISTER_FUNCTIONN(matrix_transpose,"mtrans",-6),
+	REGISTER_FUNCTIONN(matrix_inverse,"minv",-6),
 	REGISTER_FUNCTIONN(matrix_trace,"mtrace",-6),
 	//REGISTER_FUNCTIONN(rgb2hsv,"rgb2hsv",3),
 	//REGISTER_FUNCTIONN(hsv2rgb,"rgb2hsv",3),
