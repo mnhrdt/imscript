@@ -285,6 +285,126 @@ static void complex_product(float *xy, float *x, float *y)
 	xy[1] = x[0]*y[1] + x[1]*y[0];
 }
 
+static void matrix_product_clean(
+		float *ab, int *ab_nrows, int *ab_ncols,
+		float *a, int a_nrows, int a_ncols,
+		float *b, int b_nrows, int b_ncols)
+{
+	if (a_ncols != b_nrows)
+		fail("impossible matrix product (%d %d) * (%d %d)",
+				a_nrows, a_ncols, b_nrows, b_ncols);
+	*ab_nrows = a_nrows;
+	*ab_ncols = b_ncols;
+	float (*A)[a_ncols] = (void*)a;
+	float (*B)[b_ncols] = (void*)b;
+	float (*AB)[*ab_ncols] = (void*)ab;
+	for (int i = 0; i < *ab_nrows; i++)
+	for (int j = 0; j < *ab_ncols; j++)
+	{
+		AB[j][i] = 0;
+		for (int k = 0; k < a_ncols; k++)
+			AB[j][i] += A[i][k] * B[k][j];
+	}
+}
+
+// instance of "bivector_function"
+static int matrix_product(float *ab, float *a, float *b, int na, int nb)
+{
+	int a_nrows, a_ncols, b_nrows, b_ncols;
+	if (na == 4 && nb == 4) {
+		a_nrows = a_ncols = b_nrows = b_ncols = 2;
+	} else if (na == 9 && nb == 9) {
+		a_nrows = a_ncols = b_nrows = b_ncols = 3;
+	} else if (na == 9 && nb == 3) {
+		a_nrows = a_ncols = b_nrows = 3;
+		b_ncols = 1;
+	} else if (na == 4 && nb == 2) {
+		a_nrows = a_ncols = b_nrows = 2;
+		b_ncols = 1;
+	} else if (na == 6 && nb == 2) {
+		ab[0] = a[0]*b[0] + a[1]*b[1] + a[2];
+		ab[1] = a[3]*b[0] + a[4]*b[1] + a[5];
+		return 2;
+	} else fail("bad matrix product (%d %d)", na, nb);
+	assert(a_ncols == b_nrows);
+
+	int ab_nrows, ab_ncols;
+	matrix_product_clean(ab, &ab_nrows, &ab_ncols,
+			a, a_nrows, a_ncols, b, b_nrows, b_ncols);
+	return ab_nrows * ab_ncols;
+}
+
+// instance of "bivector_function"
+static int vector_product(float *ab, float *a, float *b, int na, int nb)
+{
+	if (na != 3 || nb != 3)
+		fail("bad vector product (%d %d)", na, nb);
+	ab[0] = a[1]*b[2] - a[2]*b[1];
+	ab[1] = a[2]*b[0] - a[0]*b[2];
+	ab[2] = a[0]*b[1] - a[1]*b[0];
+	return 3;
+}
+
+// instance of "bivector_function"
+static int scalar_product(float *ab, float *a, float *b, int na, int nb)
+{
+	if (na != nb)
+		fail("bad scalar product (%d %d)", na, nb);
+	*ab = 0;
+	for (int i = 0 ; i < na; i++)
+		*ab += a[i] * b[i];
+	return 1;
+}
+
+// instance of "univector_function"
+static int matrix_determinant(float *r, float *a, int n)
+{
+	switch(n) {
+	case 1: *r = *a; break;
+	case 4: *r = a[0]*a[3] - a[1]*a[2]; break;
+	case 6: *r = a[0]*a[4] - a[1]*a[3]; break;
+	case 9: *r = a[0]*a[4]*a[8] + a[2]*a[3]*a[7] + a[1]*a[5]*a[6]
+		   - a[2]*a[4]*a[6] + a[1]*a[3]*a[8] + a[0]*a[5]*a[7]; break;
+	default: fail("can not compute determinant of object of size %d", n);
+	}
+	return 1;
+}
+
+// instance of "univector_function"
+static int matrix_trace(float *r, float *a, int nn)
+{
+	int n;
+	switch(nn) {
+	case 1: n = 1; break;
+	case 4: n = 2; break;
+	case 9: n = 3; break;
+	default: fail("can not compute trace of object of size %d", nn);
+	}
+	assert(n*n == nn);
+	*r = 0;
+	for (int i = 0; i < n; i++)
+		*r += a[i*n+i];
+	return 1;
+}
+
+// instance of "univector_function"
+static int matrix_transpose(float *r, float *a, int nn)
+{
+	int n;
+	switch(nn) {
+	case 1: n = 1; break;
+	case 4: n = 2; break;
+	case 9: n = 3; break;
+	default: fail("can not transpose object of size %d", nn);
+	}
+	assert(n*n == nn);
+	for (int i = 0; i < n; i++)
+	for (int j = 0; j < n; j++)
+		r[i*n+j] = a[j*n+i];
+	return nn;
+}
+
+
 // table of all functions (local and from math.h)
 struct predefined_function {
 	void (*f)(void);
@@ -380,6 +500,12 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(from_cartesian_to_polar,"topolar", -2),
 	REGISTER_FUNCTIONN(from_polar_to_cartesian,"frompolar", -2),
 	REGISTER_FUNCTIONN(complex_product,"cprod", -3),
+	REGISTER_FUNCTIONN(matrix_product,"mprod",-5),
+	REGISTER_FUNCTIONN(vector_product,"vprod",-5),
+	REGISTER_FUNCTIONN(scalar_product,"sprod",-5),
+	REGISTER_FUNCTIONN(matrix_determinant,"mdet",-6),
+	REGISTER_FUNCTIONN(matrix_transpose,"mtrans",-6),
+	REGISTER_FUNCTIONN(matrix_trace,"mtrace",-6),
 	//REGISTER_FUNCTIONN(rgb2hsv,"rgb2hsv",3),
 	//REGISTER_FUNCTIONN(hsv2rgb,"rgb2hsv",3),
 #undef REGISTER_FUNCTION
@@ -438,7 +564,7 @@ static float apply_function(struct predefined_function *f, float *v)
 	case 2: return ((double(*)(double,double))f->f)(v[1], v[0]);
 	case 3: return ((double(*)(double,double,double))f->f)(v[2],v[1],v[0]);
 	case -1: return ((double(*)())(f->f))();
-	default: fail("bizarre");
+	default: fail("bizarre{%d}", f->nargs);
 	}
 	//return 0;
 }
@@ -1296,6 +1422,66 @@ static void treat_strange_case4(struct value_vstack *s,
 	fail("color space conversions not implemented");
 }
 
+//#define PACK_THREE_INTS(a,b,c) (142+(a)*10000+(b)*100+(c))
+//static void unpack_three_ints(int *abc, int x)
+//{
+//	x -= 142; abc[2] = x % 100;
+//	x /= 100; abc[1] = x % 100;
+//	x /= 100; abc[0] = x % 100;
+//}
+
+// codifies a function R^a x R^b -> R^c
+// if a = 0, this is a function R^b -> R^c
+// the dimensions must be smaller than, say, 40
+//static void non_vectorialized_vectorial_operation(struct value_vstack *s,
+//		struct predefined_function *f)
+//{
+//	int abc[3];
+//	unpack_three_ints(abc, -f->nargs);
+//	assert(abc[0] >= 0);
+//	assert(abc[1] > 0);
+//	assert(abc[2] > 0);
+//	if (abc[0] == 0) {
+//		// pop a b-vector and push the resulting c-vector
+//	} else {
+//		// pop an a-vector and a b-vector and push a c-vector
+//		float a[PLAMBDA_MAX_PIXELDIM];
+//		float b[PLAMBDA_MAX_PIXELDIM];
+//		float c[PLAMBDA_MAX_PIXELDIM];
+//		int na = vstack_pop_vector(a, s);
+//		int nb = vstack_pop_vector(b, s);
+//		int nc = vstack_pop_vector(b, s);
+//	}
+//}
+
+// codifies a function R^a x R^b -> R^c
+// the dimensions must be smaller than, say, 40
+static void treat_bivector_function(struct value_vstack *s,
+		struct predefined_function *f)
+{
+	assert(f->nargs == -5);
+	float a[PLAMBDA_MAX_PIXELDIM];
+	float b[PLAMBDA_MAX_PIXELDIM];
+	float r[PLAMBDA_MAX_PIXELDIM];
+	int nb = vstack_pop_vector(b, s);
+	int na = vstack_pop_vector(a, s);
+	int nr = ((int(*)(float*,float*,float*,int,int))(f->f))(r,a,b,na,nb);
+	vstack_push_vector(s, r, nr);
+}
+
+// codifies a function R^a -> R^b
+// the dimensions must be smaller than, say, 40
+static void treat_univector_function(struct value_vstack *s,
+		struct predefined_function *f)
+{
+	assert(f->nargs == -6);
+	float a[PLAMBDA_MAX_PIXELDIM];
+	float r[PLAMBDA_MAX_PIXELDIM];
+	int na = vstack_pop_vector(a, s);
+	int nr = ((int(*)(float*,float*,int))(f->f))(r,a,na);
+	vstack_push_vector(s, r, nr);
+}
+
 // this function is complicated because it contains the scalar+vector
 // semantics, which is complicated
 static void vstack_apply_function(struct value_vstack *s,
@@ -1304,6 +1490,9 @@ static void vstack_apply_function(struct value_vstack *s,
 	if (f->nargs == -1) {treat_strange_case(s,f); return;}
 	if (f->nargs == -2) {treat_strange_case2(s,f); return;}
 	if (f->nargs == -3) {treat_strange_case3(s,f); return;}
+	//if (f->nargs < 0) {non_vectorialized_vectorial_operation(s,f);return;}
+	if (f->nargs == -5) {treat_bivector_function(s,f); return;}
+	if (f->nargs == -6) {treat_univector_function(s,f); return;}
 	int d[f->nargs], rd = 1;
 	float v[f->nargs][PLAMBDA_MAX_PIXELDIM];
 	float r[PLAMBDA_MAX_PIXELDIM];
