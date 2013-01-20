@@ -23,6 +23,8 @@
 // 	must be as many variables as input images, and they are assigned to
 // 	images in alphabetical order.
 //
+// 	All operators (unary, binary and ternary) are vectorializable.
+//
 //	Some "sugar" is added to the language:
 //
 //	Predefined variables (always preceeded by a colon):
@@ -60,6 +62,7 @@
 //
 //		x(1,-1)[2] value of third component of pixel (i+1,j-1)
 //
+//
 //	Stack operators (allow direct manipulation of the stack):
 //
 //		TOKEN	MEANING
@@ -70,8 +73,10 @@
 //		split	split the vector ATTOTS into scalar components
 //		join	join the components of two vectors ATTOTS
 //		join3	join the components of three vectors ATTOTS
+//		n join	join the components of n vectors ATTOTS
 //
-//	Magic modifiers (which can not be computed locally for each image):
+//
+//	Magic modifiers (which are not computed locally for each image):
 //
 //		x%i	value of the smallest sample of image "x"
 //		x%a	value of the largest sample
@@ -90,10 +95,28 @@
 //	components, e.g. x[2]%i is the minimum value of the blue component.
 //
 //
-//	Other operators:
+//	Vectorial operators (non-vectorializable):
 //
 //		TOKEN	MEANING
-//		vmprod3x3 
+//		randu	push a random number U(0,1)
+//		randn	push a random number N(0,1)
+//		randg	push a random number N(0,1)
+//		randc	push a random number C(0,1)
+//		randl	push a random number L(0,1)
+//		rande	push a random number E(1)
+//		randp	push a random number P(1)
+//		rand	push a random integer returned from "rand()"
+//		topolar	convert a 2-vector from cartesian to polar
+//		frompolar
+//		cprod	multiply two 2-vectors as complex numbers
+//		mprod	multiply two vectors as matrices (4vector=2x2 matrix...)
+//		vprod	vector product of two 3-vectors
+//		sprod	scalar product of two n-vectors
+//		mdet	determinant of a n-matrix (a n*n-vector)
+//		mtrans	transpose of a matrix
+//		mtrace	trace of a matrix
+//		minv	inverse of a matrix
+//
 //
 // EXAMPLES
 // 	Sum two images:
@@ -321,6 +344,8 @@ static int matrix_product(float *ab, float *a, float *b, int na, int nb)
 	} else if (na == 4 && nb == 2) {
 		a_nrows = a_ncols = b_nrows = 2;
 		b_ncols = 1;
+	} else if (na == 1 && nb == 1) {
+		a_nrows = a_ncols = b_nrows = b_ncols = 1;
 	} else if (na == 6 && nb == 2) {
 		ab[0] = a[0]*b[0] + a[1]*b[1] + a[2];
 		ab[1] = a[3]*b[0] + a[4]*b[1] + a[5];
@@ -509,6 +534,7 @@ struct predefined_function {
 	//REGISTER_FUNCTIONN(rgb2hsv,"rgb2hsv",3),
 	//REGISTER_FUNCTIONN(hsv2rgb,"rgb2hsv",3),
 #undef REGISTER_FUNCTION
+#undef REGISTER_FUNCTIONN
 	{NULL, "pi", 0, M_PI},
 #ifdef M_E
 #define REGISTER_CONSTANT(x) {NULL, #x, 0, x}
@@ -517,7 +543,7 @@ struct predefined_function {
 	REGISTER_CONSTANT(M_LOG10E),
 	REGISTER_CONSTANT(M_LN2),
 	REGISTER_CONSTANT(M_LN10),
-	REGISTER_CONSTANT(M_PI),
+	//REGISTER_CONSTANT(M_PI),
 	REGISTER_CONSTANT(M_PI_2),
 	REGISTER_CONSTANT(M_PI_4),
 	REGISTER_CONSTANT(M_1_PI),
@@ -1000,7 +1026,7 @@ static int token_is_word(const char *t, const char **endptr)
 	}
 	int n = 1;
 	while (t[n]) {
-		if  (!isalnum(t[n])) {
+		if  (!(isalnum(t[n])||t[n]=='_')) {
 			*endptr = t+n;
 			return (t[n]=='(' || t[n]=='[' || t[n]=='%') ? n : 0;
 		}
@@ -1109,7 +1135,6 @@ static void collection_of_varnames_end(struct collection_of_varnames *x)
 	x->n = 0;
 }
 
-
 static int strcmp_for_qsort(const void *aa, const void *bb)
 {
 	const char **a = (const char **)aa;
@@ -1198,7 +1223,7 @@ endtok:
 
 // this function updates the indexes of a
 // collection of variables which is sorted in alphabetical order
-static void unhack_varnames(struct plambda_program *p)
+static void update_variable_indices(struct plambda_program *p)
 {
 	FORI(p->n)
 	{
@@ -1217,9 +1242,8 @@ static void unhack_varnames(struct plambda_program *p)
 
 static void plambda_compile_program(struct plambda_program *p, const char *str)
 {
-	char s[1+strlen(str)];
+	char s[1+strlen(str)], *spacing = " \n\t";
 	strcpy(s, str);
-	char *spacing = " \n\t";
 
 	FORI(10) p->regn[i] = 0;
 
@@ -1235,10 +1259,7 @@ static void plambda_compile_program(struct plambda_program *p, const char *str)
 	}
 
 	collection_of_varnames_sort(p->var);
-
-	// the "sort" above does not update the variable indices
-	// the following function updates them
-	unhack_varnames(p);
+	update_variable_indices(p);
 }
 
 static const char *arity(struct predefined_function *f)
@@ -1776,6 +1797,16 @@ static int run_program_vectorially(float *out, int pdmax,
 //			y[ypd*i + l] = x[xpd*i + l];
 //}
 
+
+static void add_hidden_variables(char *out, int maxplen, int newvars, char *in)
+{
+	int pos = 0;
+	for (int i = 0; i < newvars; i++)
+		pos += snprintf(out + pos, maxplen - pos, "hidden_%02d ", i);
+	snprintf(out + pos, maxplen - pos, "%s", in);
+	//fprintf(stderr, "HIVA: %s\n", out);
+}
+
 #include "smapa.h"
 SMART_PARAMETER_SILENT(SRAND,0)
 SMART_PARAMETER_SILENT(PLAMBDA_CALC,0)
@@ -1790,9 +1821,14 @@ int main_calc(int c, char *v[])
 
 	struct plambda_program p[1];
 	plambda_compile_program(p, v[c-1]);
-	//print_compiled_program(p);
 
 	int n = c - 2, pd[n], pdmax = PLAMBDA_MAX_PIXELDIM;
+	if (n > 0 && p->var->n == 0) {
+		int maxplen = n*20 + strlen(v[c-1]) + 100;
+		char newprogram[maxplen];
+		add_hidden_variables(newprogram, maxplen, n, v[c-1]);
+		plambda_compile_program(p, newprogram);
+	}
 	if (n != p->var->n)
 		fail("the program expects %d variables but %d vectors "
 					"were given", p->var->n, n);
@@ -1800,7 +1836,7 @@ int main_calc(int c, char *v[])
 	float *x[n];
 	FORI(n) x[i] = alloc_parse_floats(pdmax, v[i+1], pd+i);
 
-	FORI(n)
+	FORI(n) if (!strstr(p->var->t[i], "hidden"))
 		fprintf(stderr, "calculator correspondence \"%s\" = \"%s\"\n",
 				p->var->t[i], v[i+1]);
 
@@ -1809,6 +1845,10 @@ int main_calc(int c, char *v[])
 
 	for (int i = 0; i < od; i++)
 		printf("%g%c", out[i], i==(od-1)?'\n':' ');
+
+	collection_of_varnames_end(p->var);
+	FORI(n) free(x[i]);
+
 
 	return EXIT_SUCCESS;
 }
@@ -1825,9 +1865,14 @@ int main_images(int c, char *v[])
 	struct plambda_program p[1];
 
 	plambda_compile_program(p, v[c-1]);
-	//print_compiled_program(p);
 
 	int n = c - 2;
+	if (n > 0 && p->var->n == 0) {
+		int maxplen = n*10 + strlen(v[c-1]) + 100;
+		char newprogram[maxplen];
+		add_hidden_variables(newprogram, maxplen, n, v[c-1]);
+		plambda_compile_program(p, newprogram);
+	}
 	if (n != p->var->n && !(n == 1 && p->var->n == 0))
 		fail("the program expects %d variables but %d images "
 					"were given", p->var->n, n);
@@ -1838,12 +1883,13 @@ int main_images(int c, char *v[])
 		if (w[0] != w[i+1] || h[0] != h[i+1])// || pd[0] != pd[i+1])
 			fail("input images size mismatch");
 
-	if (n>1) FORI(n)
+	if (n>1) FORI(n) if (!strstr(p->var->t[i], "hidden"))
 		fprintf(stderr, "plambda correspondence \"%s\" = \"%s\"\n",
 				p->var->t[i], v[i+1]);
 
 	xsrand(SRAND());
 
+	//print_compiled_program(p);
 	int pdreal = eval_dim(p, x, pd);
 
 	float *out = xmalloc(*w * *h * pdreal * sizeof*out);
@@ -1863,5 +1909,12 @@ int main(int c, char *v[])
 {
 	int (*f)(int c, char *v[]);
        	f = (PLAMBDA_CALC()>0 || **v=='c' || c==2) ? main_calc : main_images;
+	if (f == main_images && c > 2 && 0 == strcmp(v[1], "-c"))
+	{
+		for (int i = 1; i <= c; i++)
+			v[i] = v[i+1];
+		f = main_calc;
+		c -= 1;
+	}
 	return f(c,v);
 }
