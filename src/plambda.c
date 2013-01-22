@@ -1875,7 +1875,7 @@ int main_calc(int c, char *v[])
 	int od = run_program_vectorially_at(out, p, x, 1, 1, pd, 0, 0);
 
 	for (int i = 0; i < od; i++)
-		printf("%g%c", out[i], i==(od-1)?'\n':' ');
+		printf("%.15lf%c", out[i], i==(od-1)?'\n':' ');
 
 	collection_of_varnames_end(p->var);
 	FORI(n) free(x[i]);
@@ -1936,8 +1936,153 @@ int main_images(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
+static int print_version(void)
+{
+	printf("plambda 1.0\n\n"
+	"Written by Enric Meinhardt-Llopis\n");
+	return 0;
+}
+
+static int print_help(char *v, int verbosity)
+{
+	printf(
+	"Plambda evaluates an expression with images as variables.\n"
+	"\n"
+	"The resulting image is printed to standard output.  The expression\n"
+	"should be written in reverse polish notation using common operators\n"
+	"and functions from `math.h'.  The variables appearing on the\n"
+	"expression are assigned to each input image in alphabetical order.\n"
+	"%s"
+	"\n"
+	"Usage: %s image1.png image2.png image3.png ... \"EXPRESSION\"\n"
+	"   or: %s -c number1 number2 number3  ... \"EXPRESSION\"\n"
+	"\n"
+	"Options:\n"
+	" -c\tact as a symbolic calculator\n"
+	" -h\tdisplay short help message\n"
+	" --help\tdisplay longer help message\n"
+	//" --version\tdisplay version\n"
+	" --man\tdisplay manpage\n"
+	"\n"
+	"Examples:\n"
+	" plambda a.tiff b.tiff \"x y +\" > sum.tiff\tCompute the sum of two images.\n"
+	" plambda -c \"1 atan 4 *\"\t\t\tPrint pi\n"
+	"%s"
+	"\n"
+	"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>.\n",
+	verbosity>0?
+	"\n"
+	"EXPRESSIONS:\n\n"
+	"A \"plambda\" expression is a sequence of tokens.\nTokens may be constants,\n"
+	"variables, or operators.  Constants and variables get their value\n"
+	"computed and pushed to the stack.  Operators pop values from the stack,\n"
+	"apply a function to them, and push back the results.\n"
+	"\n"
+"CONSTANTS: numeric constants written in scientific notation, and \"pi\"\n"
+"\n"
+"OPERATORS: +, -, *, ^, /, and all the functions from math.h\n"
+"\n"
+"VARIABLES: anything not recognized as a constant or operator.  There\n"
+"must be as many variables as input images, and they are assigned to\n"
+"images in alphabetical order.\n"
+"\n"
+"All operators (unary, binary and ternary) are vectorizable.\n"
+"\n"
+"Some \"sugar\" is added to the language:\n"
+"\n"
+"Predefined variables (always preceeded by a colon):\n"
+" :i\thorizontal coordinate of the pixel\n"
+" :j\tvertical coordinate of the pixel\n"
+" :w\twidth of the image\n"
+" :h\theigth of the image\n"
+" :n\tnumber of pixels in the image\n"
+" :x\trelative horizontal coordinate of the pixel\n"
+" :y\trelative horizontal coordinate of the pixel\n"
+" :r\trelative distance to the center of the image\n"
+" :t\trelative angle from the center of the image\n"
+" :I\thorizontal coordinate of the pixel (centered)\n"
+" :J\tvertical coordinate of the pixel (centered)\n"
+" :W\twidth of the image divided by 2*pi\n"
+" :H\theight of the image divided by 2*pi\n"
+//
+// 	All operators (unary, binary and ternary) are vectorializable.
+//
+//	Some "sugar" is added to the language:
+//
+//	Predefined variables (always preceeded by a colon):
+//
+//		TOKEN	MEANING
+//
+//		:i	horizontal coordinate of the pixel
+//		:j	vertical coordinate of the pixel
+//		:w	width of the image
+//		:h	heigth of the image
+//		:n	number of pixels in the image
+//		:x	relative horizontal coordinate of the pixel
+//		:y	relative horizontal coordinate of the pixel
+//		:r	relative distance to the center of the image
+//		:t	relative angle from the center of the image
+//		:I	horizontal coordinate of the pixel (centered)
+//		:J	vertical coordinate of the pixel (centered)
+//		:W	width of the image divided by 2*pi
+//		:H	height of the image divided by 2*pi
+//
+//
+//	Variable modifiers acting on regular variables:
+//
+//		TOKEN	MEANING
+//
+//		x	value of pixel (i,j)
+//		x(0,0)	value of pixel (i,j)
+//		x(1,0)	value of pixel (i+1,j)
+//		x(0,-1)	value of pixel (i,j-1)
+//		...
+//
+//		x	value of pixel (i,j)
+//		x[0]	value of first component of pixel (i,j)
+//		x[1]	value of second component of pixel (i,j)
+//
+//		x(1,-1)[2] value of third component of pixel (i+1,j-1)
+//
+//
+//	Stack operators (allow direct manipulation of the stack):
+//
+//		TOKEN	MEANING
+//
+//		del	remove the value at the top of the stack (ATTOTS)
+//		dup	duplicate the value ATTOTS
+//		rot	swap the two values ATTOTS
+//		split	split the vector ATTOTS into scalar components
+//		join	join the components of two vectors ATTOTS
+//		join3	join the components of three vectors ATTOTS
+//		n join	join the components of n vectors ATTOTS
+	//"Expressions:\n"
+	//" a -c p q\n\n"
+	//" a -c p q\n"
+	//" a -c p q\n"
+	:
+	"See the manual page for details on the syntax for expressions.\n"
+	,
+	v, v,
+	verbosity < 1 ? "" :
+	" plambda -c \"355 113 /\"\t\t\t\tPrint an approximation of pi\n"
+		);
+	return 0;
+}
+
+static int do_man(void)
+{
+	system("help2man -N -S imscript -n \"evaluate an expression with images as variables\" plambda|man -l -");
+	return 0;
+}
+
 int main(int c, char *v[])
 {
+	if (c == 2 && 0 == strcmp(v[1], "-h")) return print_help(*v,0);
+	if (c == 2 && 0 == strcmp(v[1], "--help")) return print_help(*v,1);
+	if (c == 2 && 0 == strcmp(v[1], "--version")) return print_version();
+	if (c == 2 && 0 == strcmp(v[1], "--man")) return do_man();
+
 	int (*f)(int c, char *v[]);
        	f = (PLAMBDA_CALC()>0 || **v=='c' || c==2) ? main_calc : main_images;
 	if (f == main_images && c > 2 && 0 == strcmp(v[1], "-c"))
