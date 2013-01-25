@@ -410,6 +410,14 @@ static int matrix_inverse(float *r, float *a, int n)
 		r[2] = -a[2]/det;
 		r[3] = a[0]/det;
 		return 4;
+	case 6:
+		r[0] = a[4]/det;
+		r[1] = -a[1]/det;
+		r[2] = (a[1]*a[5]-a[2]*a[4])/det;
+		r[3] = -a[3]/det;
+		r[4] = a[0]/det;
+		r[5] = (a[2]*a[3]-a[0]*a[5])/det;
+		return 6;
 	case 9:
 		r[0] = (a[4]*a[8]-a[5]*a[7])/det;
 		r[1] = (a[2]*a[7]-a[1]*a[8])/det;

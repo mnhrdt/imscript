@@ -4,6 +4,7 @@
 #include <math.h>
 
 
+#include "iio.h"
 
 #include "fail.c"
 #include "xmalloc.c"
@@ -12,11 +13,18 @@
 
 static int get_nvals(float *v, float *wv2, float *x, int w, int h, int i, int j)
 {
-	int r = 0, n[][3] = {
-		{+1,0,1}, {0,+1,1}, {-1,0,1}, {0,-1,1},
-		{+1,+1,2}, {-1,+1,2}, {-1,-1,2}, {+1,-1,2},
-		{+2,0,4}, {0,+2,4}, {-2,0,4}, {0,-2,4},
-		{+4,0,16}, {0,+4,16}, {-4,0,16}, {0,-4,16}
+	int r = 0, n[][3] = { // {x, y, x*x+y*y}
+		{+1,0,1}, {0,+1,1}, {-1,0,1}, {0,-1,1}, // 4-connexity
+		{+1,+1,2}, {-1,-1,2}, // 6-connexity
+		{-1,+1,2}, {+1,-1,2}, // 8-connexity
+		{+2,+1,5}, {+1,+2,5}, {+2,-1,5}, {+1,-2,5},
+		{-2,-1,5}, {-1,-2,5}, {-2,+1,5}, {-1,+2,5}, // 16-neighbors
+		{+3,+1,10}, {+1,+3,10}, {+3,-1,10}, {+1,-3,10},
+		{-3,-1,10}, {-1,-3,10}, {-3,+1,10}, {-1,+3,10}, // 24-neighbors
+		{+3,+2,13}, {+2,+3,13}, {+3,-2,13}, {+2,-3,13},
+		{-3,-2,13}, {-2,-3,13}, {-3,+2,13}, {-2,+3,13}, // 32-neighbors
+		//{+2,0,4}, {0,+2,4}, {-2,0,4}, {0,-2,4}, (non-primitive)
+		//{+4,0,16}, {0,+4,16}, {-4,0,16}, {0,-4,16} (non-primitive)
 	};
 	for (int p = 0; p < 8; p++)
 	{
@@ -90,6 +98,16 @@ static void amle_init(float *tinf, float *tsup, float *x, int w, int h)
 			tsup[i] = x[i];
 		}
 	}
+	char *filename_init = getenv("AMLE_INIT");
+	if (filename_init) {
+		int ww, hh;
+		float *ini = iio_read_image_float(filename_init, &ww, &hh);
+		if (w*h != ww*hh) fail("init size mismatch");
+		for (int i = 0; i < w*h; i++)
+			if (isnan(x[i]))
+				tsup[i] = ini[i];
+		free(ini);
+	}
 }
 
 static float absolute_difference(float *a, float *b, int w, int h,
@@ -142,6 +160,43 @@ static void amle_refine(float *a, float *b, int w, int h,
 	}
 }
 
+static int randombounds(int a, int b)
+{
+	if (b < a)
+		return randombounds(b, a);
+	if (b == a)
+		return b;
+	return a + rand()%(b - a + 1);
+}
+
+static void swap(void *a, void *b, size_t s)
+{
+#if 0
+#error "memcpy is way slower!"
+	char t[s];
+	memcpy(t, a, s);
+	memcpy(a, b, s);
+	memcpy(b, t, s);
+#else
+	char *x = a;
+	char *y = b;
+	for (unsigned int i = 0; i < s; i++, x++, y++)
+	{
+		char t = *x;
+		*x = *y;
+		*y = t;
+	}
+#endif
+}
+
+static void shuffle(void *t, int n, size_t s)
+{
+	char *c = t;
+
+	for (int i = 0; i < n-1; i++)
+		swap(c + s*i, c + s*randombounds(i, n-1), s);
+}
+
 SMART_PARAMETER(AMLE_NITER,100)
 
 void amle(float *y, float *x, int w, int h)
@@ -175,6 +230,9 @@ void amle(float *y, float *x, int w, int h)
 				"iter %d, e = {%g %g}, eactus = {%g %g}\n",
 				iter, e, ea, actus_inf, actus_sup);
 
+		if (0 == iter % 33)
+			shuffle(mask, nmask, sizeof*mask);
+
 		//if (0 == iter % 10)
 		//	amle_refine(tinf, tsup, w, h, mask, nmask);
 	}
@@ -182,7 +240,8 @@ void amle(float *y, float *x, int w, int h)
 	free(mask);
 
 	for (int i = 0; i < w*h; i++)
-		y[i] = (tinf[i] + tsup[i])/2;
+		//y[i] = (tinf[i] + tsup[i])/2;
+		y[i] = tsup[i];
 }
 
 // the input mask is coded by nans
@@ -234,7 +293,6 @@ void amle_old(float *y, float *x, int w, int h)
 }
 #endif
 
-#include "iio.h"
 
 int main(int c, char *v[])
 {
