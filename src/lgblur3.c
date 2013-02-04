@@ -88,8 +88,8 @@ void apply_general_model(float *oy, float *sigma, float *uv, float *px,
 	{
 		float s = sigma[j*w+i];
 		int sidx = scale_to_index(npyr, sfirst, slast, s);
-		float dx = uv[j][i][0];
-		float dy = uv[j][i][1];
+		float dx = f[j][i][0];
+		float dy = f[j][i][1];
 		float v[pd];
 		bicubic_interpolation(v, p[sidx][0][0], w, h, pd, i+dx, j+dy);
 		for (int l = 0; l < pd; l++)
@@ -103,7 +103,7 @@ void apply_general_model(float *oy, float *sigma, float *uv, float *px,
 
 int main(int c, char *v[])
 {
-	if (c != 6) {
+	if (c != 7) {
 		fprintf(stderr, "usage:\n\t"
 			"%s in.png varpat uvpat outpat FIRST LAST\n", *v);
 		//        0 1      2      3     4      5     6
@@ -139,7 +139,7 @@ int main(int c, char *v[])
 		float *sigma = iio_read_image_float(filename_var, &ww, &hh);
 		if (w != ww || h != hh)
 			fail("variances and image sizes mismatch");
-		float *uv = iio_read_image_float(filename_flo, &ww, &hh, &ppdd);
+		float *uv =iio_read_image_float_vec(filename_flo,&ww,&hh,&ppdd);
 		if (ppdd != 2)
 			fail("expect vector field on file \"%s\"",filename_flo);
 		if (w != ww || h != hh)
