@@ -60,62 +60,66 @@ void build_gaussian_pyramid(float *p, int npyr, float sfirst, float slast,
 	}
 }
 
-void apply_local_blur(float *oy, float *sigma, float *px,
-		int npyr, float sfirst, float slast, int w, int h, int pd)
+static float imgdist_l1(float *a, float *b, int w, int h, int pd)
 {
-	float (*p)[h][w][pd] = (void*)px;
-	float (*y)[w][pd] = (void*)oy;
-	for (int l = 0; l < pd; l++)
-	for (int j = 0; j < h; j++)
-	for (int i = 0; i < w; i++)
-	{
-		float s = sigma[j*w+i];
-		int sidx = scale_to_index(npyr, sfirst, slast, s);
-		y[j][i][l] = p[sidx][j][i][l];
-	}
+	long double r = 0;
+	for (int i = 0; i < w*h*pd; i++)
+		r += fabs(a[i] - b[i]);
+	return r;
+}
+
+static float imgdist_l2(float *a, float *b, int w, int h, int pd)
+{
+	long double r = 0;
+	for (int i = 0; i < w*h*pd; i++)
+		r = hypot(r, a[i] - b[i]);
+	return r;
+}
+
+static float imgdist_l3(float *a, float *b, int w, int h, int pd)
+{
+	long double r = 0;
+	for (int i = 0; i < w*h*pd; i++)
+		r += pow(fabs(a[i]-b[i]), 3);
+	return pow(r, 1.0/3);
+}
+
+
+static void tryblur(float *sharp, float *blur, int w, int h, int pd, float s)
+{
+	float *bs = xmalloc(w*h*pd*sizeof*bs);
+	gblur(bs, sharp, w, h, pd, s);
+	float l1 = imgdist_l1(bs, blur, w, h, pd);
+	float l2 = imgdist_l2(bs, blur, w, h, pd);
+	float l3 = imgdist_l3(bs, blur, w, h, pd);
+	fprintf(stderr, "%.9lf\tL1=%.9lf\tL2=%.9lf %.9lf\n", s, l1, l2, l3);
+	free(bs);
 }
 
 int main(int c, char *v[])
 {
-	if (c != 6) {
-		fprintf(stderr, "usage:\n\t"
-				"%s in.png varpat outpat FIRST LAST\n", *v);
-		//                0 1      2      3      4     5
+	if (c != 5) {
+		fprintf(stderr, "usage:\n\t%s sharp blur first last\n", *v);
+		//                          0 1     2    3     4
 		return 1;
 	}
-	char *filename_in = v[1];
-	char *filepattern_var = v[2];
-	char *filepattern_out = v[3];
-	int first = atoi(v[4]);
-	int last = atoi(v[5]);
+	char *filename_sharp = v[1];
+	char *filename_blur = v[2];
+	float first = atof(v[3]);
+	float last = atof(v[4]);
 
-	int npyr = 60;
-	float sfirst = 0.0001;
-	float slast = 30;
+	int w[2], h[2], pd[2];
+	float *sharp = iio_read_image_float_vec(filename_sharp, w, h, pd);
+	float *blur = iio_read_image_float_vec(filename_blur, w+1, h+1, pd+1);
+	if (w[0] != w[1] || h[0] != h[1] || pd[0] != pd[1])
+		fail("input images size mismatch");
 
-	int w, h, pd;
-	float *x = iio_read_image_float_vec(filename_in, &w, &h, &pd);
-	float *px = xmalloc(w*h*pd*npyr*sizeof*px);
-	build_gaussian_pyramid(px, npyr, sfirst, slast, x, w, h, pd);
-	float *y = xmalloc(w*h*pd*sizeof*y);
-
-	for (int i = first; i <= last; i++)
+	int ntry = 10;
+	for (int i = 0; i < ntry; i++)
 	{
-		char filename_var[FILENAME_MAX];
-		char filename_out[FILENAME_MAX];
-		snprintf(filename_var, FILENAME_MAX, filepattern_var, i);
-		snprintf(filename_out, FILENAME_MAX, filepattern_out, i);
-
-		int ww, hh;
-		float *sigma = iio_read_image_float(filename_var, &ww, &hh);
-		if (w != ww || h != hh)
-			fail("variances and image sizes mismatch");
-
-		apply_local_blur(y, sigma, px, npyr, sfirst, slast, w, h, pd);
-		iio_save_image_float_vec(filename_out, y, w, h, pd);
-		free(sigma);
+		float s = first + (i/(ntry-1.0)) * (last - first);
+		tryblur(sharp, blur, *w, *h, *pd, s);
 	}
 
-	free(x); free(y);
 	return 0;
 }

@@ -158,16 +158,17 @@ static void pointwise_complex_multiplication(fftwf_complex *w,
 		w[i] = z[i] * x[i];
 }
 
-static void fill_2d_gaussian_image(float *gg, int w, int h, float inv_s)
+static void fill_2d_gaussian_image(float *gg, int w, int h, float s)
 {
 	float (*g)[w] = (void *)gg;
-	float alpha = inv_s*inv_s/(M_PI);
+	//float alpha = inv_s*inv_s/(M_PI);
+	float alpha = 1.0/(s*s*M_PI);
 
 	FORJ(h) FORI(w) {
 		float x = i < w/2 ? i : i - w;
 		float y = j < h/2 ? j : j - h;
 		float r = hypot(x, y);
-		g[j][i] = alpha * exp(-r*r*inv_s*inv_s);
+		g[j][i] = alpha * exp(-r*r/(2*s*s));
 	}
 
 	// if the kernel is too large, it escapes the domain, so the
@@ -228,7 +229,7 @@ static void fill_3dm_gaussian_image(float *gg, int w, int h, int d, float is[6])
 // gaussian blur of a gray 2D image
 void gblur_gray(float *y, float *x, int w, int h, float s)
 {
-	s = 1/s;
+	//s = 1/s;
 
 	fftwf_complex *fx = fftwf_xmalloc(w*h*sizeof*fx);
 	fft_2dfloat(fx, x, w, h);

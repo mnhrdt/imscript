@@ -63,7 +63,7 @@ static void cline(float *musigma,
 
 static void clineh(float *musigma, float *l, int n, float *x, int w, int h)
 {
-	if (w != h) fail("clineh only works over square images");
+	//if (w != h) fail("clineh only works over square images");
 	double mu = 0, sigma = 0, nn = 0;
 	int lc[n];
 	for (int i = 0; i < n; i++)

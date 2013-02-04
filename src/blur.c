@@ -242,6 +242,16 @@ static float kernel_2d_cauchy(float x, float y, float *p)
 	return r;
 }
 
+static float kernel_2d_powerlaw2(float x, float y, float *p)
+{
+	float sigma = p[1];
+	float power = 2;
+
+	float a = (x*x + y*y)/(sigma*sigma);
+	float r = 1.0/(1.0 + a*a);
+	return r;
+}
+
 static float kernel_2d_laplace(float x, float y, float *p)
 {
 	float sigma = p[1];
@@ -323,11 +333,13 @@ void blur_2d(float *y, float *x, int w, int h, int pd,
 	case 'c': f = kernel_2d_cauchy;   break;
 	case 'd': f = kernel_2d_disk;     break;
 	case 's': f = kernel_2d_square;   break;
+	case 'p': f = kernel_2d_powerlaw2;   break;
 	default: fail("unrecognized kernel name \"%s\"", kernel_id);
 	}
 
 	float *k = xmalloc(w*h*sizeof*k);
 	fill_kernel_image(k, w, h, f, p);
+	//void iio_save_image_float(char*,float*,int,int);
 	//iio_save_image_float("/tmp/blurk.tiff", k, w, h);
 
 	fftwf_complex *fk = fftwf_xmalloc(w*h*sizeof*fk);

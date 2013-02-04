@@ -5,11 +5,11 @@
 
 #include "xmalloc.c"
 
-struct floatint { float f; int i; } ;
-static int compare_struct_floatint(const void *aa, const void *bb)
+struct floatintpos { float f; int i; int p[2]; } ;
+static int compare_struct_floatintpos(const void *aa, const void *bb)
 {
-	const struct floatint *a = (const struct floatint *)aa;
-	const struct floatint *b = (const struct floatint *)bb;
+	const struct floatintpos *a = (const struct floatintpos *)aa;
+	const struct floatintpos *b = (const struct floatintpos *)bb;
 	return (a->f - b->f) - (a->f < b->f);
 }
 
@@ -55,12 +55,13 @@ static float patchdistance(float *p, float *q, int n)
 
 // compute the distance between two patches of size "W"
 static float wpatch_distance(float *x, float *y, int w, int h, int pd,
-                                                 int i, int j, float W)
+                                                 int i, int j, int ii, int jj,
+						 float W)
 {
 	int nW = winpatch_length(pd, W);
 	float px[nW], py[nW];
 	getpatch(px, x, w, h, pd, i, j, W);
-	getpatch(py, y, w, h, pd, i, j, W);
+	getpatch(py, y, w, h, pd, ii, jj, W);
 	return patchdistance(px, py, nW);
 }
 
@@ -69,8 +70,8 @@ static float wpatch_distance(float *x, float *y, int w, int h, int pd,
 
 static void get_reference_image(float *, float **, int, int, int, int);
 
-void silly_lucky_region(float **y, float **x, int n, int w, int h, int pd,
-		float W, float S, float *init_img)
+void silly_lucky_regions(float **y, float **x, int n, int w, int h, int pd,
+		float W, float S, float R, float *init_img)
 {
 	// 1. compute or get the reference image
 	// 2. compute the S-blurred version of each input frame
@@ -98,6 +99,20 @@ void silly_lucky_region(float **y, float **x, int n, int w, int h, int pd,
 	//	for (int j = 0; j < w*h*pd; j++)
 	//		bx[i][j] = x[i][j];  // TODO: do the blur
 
+	// 3.-1 (build a table of neighbors)
+	int nn = 0, RR = R;
+	if (RR < 0) RR = 0;
+	if (RR > 30) RR = 30;
+	int neigs[(2*RR+1)*(2*RR+1)][2];
+	for (int i = -RR; i <= RR; i++)
+	for (int j = -RR; j <= RR; j++)
+	{
+		neigs[nn][0] = i;
+		neigs[nn][1] = j;
+		nn += 1;
+	}
+	assert(nn == (2*RR+1)*(2*RR+1));
+
 	// 3. for each pixel location
 	fprintf(stderr, "processing lines...\n");
 	for (int j = 0; j < h; j++) {
@@ -107,21 +122,38 @@ void silly_lucky_region(float **y, float **x, int n, int w, int h, int pd,
 	{
 	//      3.1. compute the vector of winsize-patch-distances between
 	//          the average image and each frame
-		struct floatint v[n];
+		struct floatintpos v[n*nn];
+		int cx = 0;
 		for (int k = 0; k < n; k++)
+		for (int l = 0; l < nn; l++)
 		{
-			v[k].i = k;
-			v[k].f = wpatch_distance(mx, bx[k], w, h, pd, i, j, W);
+			int ii = i + neigs[l][0];
+			int jj = j + neigs[l][1];
+			if (ii >= 0 && jj >= 0 && ii < w && jj < h)
+			{
+				v[cx].i = k;
+				v[cx].p[0] = ii;
+				v[cx].p[1] = jj;
+				v[cx].f = wpatch_distance(mx, bx[k], w, h, pd,
+						i, j, ii, jj, W);
+				cx += 1;
+			}
 		}
+		assert(cx >= n);
+		assert(cx < n*nn);
 
 	//      3.2. sort the vector of distances, with their frame indices
-		qsort(v, n, sizeof*v, compare_struct_floatint);
+		qsort(v, cx, sizeof*v, compare_struct_floatintpos);
 
 	//      3.3. write the corresponding sorted values into the output video
-		int idx = j*w + i;
+		//int idx = j*w + i;
 		for (int k = 0; k < n; k++)
 			for (int l = 0; l < pd; l++)
-				y[k][idx*pd+l] = x[v[k].i][idx*pd+l];
+			{
+				int idx = j*w + i;
+				int idx2 = v[k].p[1]*w + v[k].p[0];
+				y[k][idx*pd+l] = x[v[k].i][idx2*pd+l];
+			}
 	}
 	}
 
@@ -165,19 +197,20 @@ static void get_reference_image(float *mx,
 
 int main(int c, char *v[])
 {
-	if (c != 7 && c != 8) {
+	if (c != 8 && c != 9) {
 		fprintf(stderr, "usage:\n\t"
-			"%s winsize ker inpat outpat first last [init]\n", *v);
-		//        0 1       2   3     4      5     6     7
+			"%s wize ker rad inpat outpat first last [init]\n", *v);
+		//        0 1    2   3   4     5      6     7     8
 		return 1;
 	}
 	float winsize = atof(v[1]);
 	float kersigma = atof(v[2]);
-	char *filepattern_in = v[3];
-	char *filepattern_out = v[4];
-	int idx_first = atoi(v[5]);
-	int idx_last = atoi(v[6]);
-	char *filename_init = c > 7 ? v[7] : NULL;
+	float searchrad = atof(v[3]);
+	char *filepattern_in = v[4];
+	char *filepattern_out = v[5];
+	int idx_first = atoi(v[6]);
+	int idx_last = atoi(v[7]);
+	char *filename_init = c > 8 ? v[8] : NULL;
 
 	int n = idx_last - idx_first + 1;
 	if (n < 3 || n > 1000) fail("weird n = %d\n", n);
@@ -219,7 +252,9 @@ int main(int c, char *v[])
 
 	// do stuff
 	fprintf(stderr, "computing stuff...\n");
-	silly_lucky_region(y, x, n, w, h, pd, winsize, kersigma, init_img);
+	silly_lucky_regions(y, x, n, w, h, pd,
+			winsize, kersigma, searchrad,
+			init_img);
 
 	// save output images
 	fprintf(stderr, "saving output images...\n");

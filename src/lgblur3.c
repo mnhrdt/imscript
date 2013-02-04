@@ -126,7 +126,7 @@ int main(int c, char *v[])
 	build_gaussian_pyramid(px, npyr, sfirst, slast, x, w, h, pd);
 	float *y = xmalloc(w*h*pd*sizeof*y);
 
-	for (int i = first; i < last; i++)
+	for (int i = first; i <= last; i++)
 	{
 		char filename_var[FILENAME_MAX];
 		char filename_flo[FILENAME_MAX];
