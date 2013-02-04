@@ -75,19 +75,46 @@ void apply_local_blur(float *oy, float *sigma, float *px,
 	}
 }
 
+#include "bicubic.c"
+
+void apply_general_model(float *oy, float *sigma, float *uv, float *px,
+		int npyr, float sfirst, float slast, int w, int h, int pd)
+{
+	float (*p)[h][w][pd] = (void*)px;
+	float (*y)[w][pd] = (void*)oy;
+	float (*f)[w][2] = (void*)uv;
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		float s = sigma[j*w+i];
+		int sidx = scale_to_index(npyr, sfirst, slast, s);
+		float dx = uv[j][i][0];
+		float dy = uv[j][i][1];
+		float v[pd];
+		bicubic_interpolation(v, p[sidx][0][0], w, h, pd, i+dx, j+dy);
+		for (int l = 0; l < pd; l++)
+			y[j][i][l] = v[l];
+	}
+	for (int l = 0; l < pd; l++)
+
+	{
+	}
+}
+
 int main(int c, char *v[])
 {
 	if (c != 6) {
 		fprintf(stderr, "usage:\n\t"
-				"%s in.png varpat outpat FIRST LAST\n", *v);
-		//                0 1      2      3      4     5
+			"%s in.png varpat uvpat outpat FIRST LAST\n", *v);
+		//        0 1      2      3     4      5     6
 		return 1;
 	}
 	char *filename_in = v[1];
 	char *filepattern_var = v[2];
-	char *filepattern_out = v[3];
-	int first = atoi(v[4]);
-	int last = atoi(v[5]);
+	char *filepattern_flo = v[3];
+	char *filepattern_out = v[4];
+	int first = atoi(v[5]);
+	int last = atoi(v[6]);
 
 	int npyr = 60;
 	float sfirst = 0.0001;
@@ -102,16 +129,24 @@ int main(int c, char *v[])
 	for (int i = first; i < last; i++)
 	{
 		char filename_var[FILENAME_MAX];
+		char filename_flo[FILENAME_MAX];
 		char filename_out[FILENAME_MAX];
 		snprintf(filename_var, FILENAME_MAX, filepattern_var, i);
+		snprintf(filename_flo, FILENAME_MAX, filepattern_flo, i);
 		snprintf(filename_out, FILENAME_MAX, filepattern_out, i);
 
-		int ww, hh;
+		int ww, hh, ppdd;
 		float *sigma = iio_read_image_float(filename_var, &ww, &hh);
 		if (w != ww || h != hh)
 			fail("variances and image sizes mismatch");
+		float *uv = iio_read_image_float(filename_flo, &ww, &hh, &ppdd);
+		if (ppdd != 2)
+			fail("expect vector field on file \"%s\"",filename_flo);
+		if (w != ww || h != hh)
+			fail("flow and image sizes mismatch");
 
-		apply_local_blur(y, sigma, px, npyr, sfirst, slast, w, h, pd);
+		apply_general_model(y, sigma,uv, px, npyr,sfirst,slast, w,h,pd);
+		//apply_local_blur(y, sigma, px, npyr, sfirst, slast, w, h, pd);
 		iio_save_image_float_vec(filename_out, y, w, h, pd);
 		free(sigma);
 	}
