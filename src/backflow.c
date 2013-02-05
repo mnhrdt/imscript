@@ -83,6 +83,7 @@ static void interpolate_nearest(float *result,
 
 SMART_PARAMETER_SILENT(BACKDIV,0)
 SMART_PARAMETER_SILENT(BACKDET,0)
+SMART_PARAMETER_SILENT(BFBOUND,0)
 
 static void compute_flow_div(float *d, float *u, int w, int h)
 {
@@ -108,16 +109,16 @@ static void compute_flow_det(float *d, float *u, int w, int h)
 
 
 
-static void env_interpolate_at(float *result,
+static void env_interpolate_at(float *out,
 		float *x, int w, int h, int pd,
 		float p, float q)
 {
 	if (BILINEAR())
-		bilinear_interpolation_at(result, x, w, h, pd, p, q);
+		bilinear_interpolation_at(out, x, w, h, pd, p, q);
 	else if (NEAREST())
-		interpolate_nearest(result, x, w,h, pd, p, q);
+		interpolate_nearest(out, x, w,h, pd, p, q);
 	else
-		bicubic_interpolation(result, x, w, h, pd, p, q);
+		bicubic_interpolation_boundary(out, x, w,h,pd, p,q, BFBOUND());
 }
 
 static void invflow(float *ou, float *flo, float *pin, int w, int h, int pd)

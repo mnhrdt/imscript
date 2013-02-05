@@ -43,4 +43,33 @@ void bicubic_interpolation(float *result,
 	}
 }
 
+void bicubic_interpolation_boundary(float *result,
+		float *img, int w, int h, int pd, float x, float y,
+		int boundary)
+{
+	x -= 1;
+	y -= 1;
+
+	getsample_operator p;
+	switch(boundary)
+	{
+	default:
+	case 0: p = getsample_0; break;
+	case 1: p = getsample_1; break;
+	case 2: p = getsample_2; break;
+	case -1: p = getsample_error; break;
+	}
+
+	int ix = floor(x);
+	int iy = floor(y);
+	for (int l = 0; l < pd; l++) {
+		float c[4][4];
+		for (int j = 0; j < 4; j++)
+			for (int i = 0; i < 4; i++)
+				c[i][j] = p(img, w, h, pd, ix + i, iy + j, l);
+		float r = bicubic_interpolation_cell(c, x - ix, y - iy);
+		result[l] = r;
+	}
+}
+
 #endif//_BICUBIC_C
