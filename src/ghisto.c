@@ -1,12 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include "iio.h"
 
 #include "xmalloc.c"
 #include "smapa.h"
 
 SMART_PARAMETER_SILENT(HISMOTTH,0)
+SMART_PARAMETER_SILENT(SHOWSTATS,0)
 
 static void smooth_histogram_rw(long double (*h)[2], int n, int w)
 {
@@ -66,8 +68,22 @@ void dump_histogram(long double (*h)[2], int n)
 	printf("set xrange [%Lg:%Lg]\n", h[0][0], h[n-1][0]);
 	printf("set yrange [0:]\n");
 	printf("set format y \"\"\n");
-	printf("unset key\n");
-	printf("plot \"-\" w impulses, \"-\" w lines\n");
+	if (SHOWSTATS() > 0) {
+		printf("set samples 1000\nset key left\n");
+		printf("N(m,s,x)=exp(-(x-m)**2/(2*s*s))/(s*sqrt(2*pi))\n");
+		printf("L(m,s,x)=exp(-sqrt(2)*abs(x-m)/s)/(s*sqrt(2))\n");
+		printf("U0(a,b,x)=x<a?0:(x>b?0:1/(b-a))\n");
+		printf("U(m,s,x)=U0(m-s*sqrt(3),m+s*sqrt(3),x)\n");
+		//printf("C(m,s,x)=1/((1+((x-m)/s)**2)*(pi*s))\n");
+	}
+	else
+		printf("unset key\n");
+	printf("plot \"-\" w impulses title \"histogram\", \"-\" w lines title \"accumulated histogram\"");
+	if (SHOWSTATS() > 0) {
+		void print_gnuplot_stats_string(long double (*)[2], int, float);
+		print_gnuplot_stats_string(h, n, SHOWSTATS());
+	}
+	printf("\n");
 	long double m = 0;
 	for (int i = 0; i < n; i++)
 	{
@@ -103,4 +119,33 @@ int main(int c, char *v[])
 	free(x);
 	free(his);
 	return EXIT_SUCCESS;
+}
+
+void print_gnuplot_stats_string(long double (*h)[2], int n, float bs)
+{
+	long double mass = 0, avg = 0, var = 0;
+	for (int i = 0; i < n; i++)
+		if (isfinite(h[i][1]))
+			mass += h[i][1];
+	for (int i = 0; i < n; i++)
+		if (isfinite(h[i][1]))
+			avg += h[i][0] * h[i][1];
+	avg /= mass;
+	for (int i = 0; i < n; i++)
+		if (isfinite(h[i][1]))
+			var += (h[i][0] - avg) * (h[i][0] - avg) * h[i][1];
+	var /= mass;
+	fprintf(stderr, "mass = %g\n", (double)mass);
+	fprintf(stderr, "nmass = %g\n", (double)mass/n);
+	fprintf(stderr, "mu = %g\n", (double)avg);
+	fprintf(stderr, "sigma = %g\n", sqrt(var));
+	printf(", %g*N(%g,%g,x) w lines title \"gaussian\"",
+			(double)mass*bs, (double)avg, sqrt(var));
+	printf(", %g*L(%g,%g,x) w lines title \"laplacian\"",
+			(double)mass*bs, (double)avg, sqrt(var));
+	printf(", %g*U(%g,%g,x) w lines title \"uniform\"",
+			(double)mass*bs, (double)avg, sqrt(var));
+	//printf(", %g*C(%g,%g,x) w lines title \"cauchy\"",
+	//		(double)mass*bs, (double)avg, sqrt(var));
+	//note: Cauchy estimation is much hairier ("avg" and "var" do not work)
 }
