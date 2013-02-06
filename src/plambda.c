@@ -1035,6 +1035,7 @@ static int token_is_vardef(const char *t)
 #define PLAMBDA_STACKOP_INTERLEAVE 11
 #define PLAMBDA_STACKOP_DEINTERLEAVE 12
 #define PLAMBDA_STACKOP_HALVE 13
+#define PLAMBDA_STACKOP_NSPLIT 14
 
 // if token is a stack operation, return its id
 // otherwise, return zero
@@ -1057,6 +1058,7 @@ static int token_is_stackop(const char *t)
 	if (0 == strcmp(t, "interleave")) return PLAMBDA_STACKOP_INTERLEAVE;
 	if (0 == strcmp(t, "deinterleave")) return PLAMBDA_STACKOP_DEINTERLEAVE;
 	if (0 == strcmp(t, "halve")) return PLAMBDA_STACKOP_HALVE;
+	if (0 == strcmp(t, "nsplit")) return PLAMBDA_STACKOP_NSPLIT;
 	return 0;
 }
 
@@ -1680,7 +1682,7 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 		int n = vstack_pop_vector(nn, s);
 		if (n != 1 || nn[0] < 1 || round(nn[0]) != nn[0]
 				|| nn[0] >= PLAMBDA_MAX_PIXELDIM)
-			fail("can not nmerge \"%d\" things", nn[0]);
+			fail("can not nmerge \"%g\" things", nn[0]);
 		n = nn[0];
 		float x[n][PLAMBDA_MAX_PIXELDIM], y[PLAMBDA_MAX_PIXELDIM];
 		int d[n], sdi = 0;
@@ -1724,13 +1726,33 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 		float x[PLAMBDA_MAX_PIXELDIM];
 		float y[PLAMBDA_MAX_PIXELDIM];
 		int n = vstack_pop_vector(x, s);
-		if (ODDP(n)) fail("can not a vector of odd length %d!", n);
+		if (ODDP(n))
+			fail("can not halve a vector of odd length %d!", n);
 		FORI(n/2)
 			y[i] = x[i+n/2];
 		vstack_push_vector(s, x, n/2);
 		vstack_push_vector(s, y, n/2);
 		break;
 					 }
+	case PLAMBDA_STACKOP_NSPLIT: {
+		float nn[PLAMBDA_MAX_PIXELDIM];
+		int n = vstack_pop_vector(nn, s);
+		if (n != 1 || nn[0] < 1 || round(nn[0]) != nn[0])
+			fail("can not split into \"%g\" things", nn[0]);
+		int nparts = nn[0];
+		float x[PLAMBDA_MAX_PIXELDIM];
+		n = vstack_pop_vector(x, s);
+		if (0 != n % nparts)
+			fail("can not split \"%d\" in \"%d\" parts", n, nparts);
+		int partsize = n/nparts;
+		assert(n == nparts*partsize);
+		float y[nparts][partsize];
+		FORI(nparts) FORJ(partsize)
+			y[i][j] = x[i*partsize+j];
+		FORI(nparts)
+			vstack_push_vector(s, y[i], partsize);
+				     }
+		break;
 	default:
 		fail("impossible condition (stackop %d)", opid);
 	}
