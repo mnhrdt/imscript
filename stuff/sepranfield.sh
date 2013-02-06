@@ -25,26 +25,39 @@ if [ "$GRAINTYPE" != "g" ]; then
 	false
 fi
 
-case "$DIST" in
-"g") RANDSOURCE="randn" ;;
-"u") RANDSOURCE="randn" ;;
-"U") RANDSOURCE="randn" ;;
-"c") RANDSOURCE="randc" ;;
-"l") RANDSOURCE="randn randn randn randn 4 njoin" ;;
-*)   echo -e "ERROR($0): unrecognized dist '$DIST'" >&2 ; false ;;
-esac
-PLAMBDA_FIRST="$RANDSOURCE pi sqrt * 2 * $GRAINSIZE *"
+if [ "$DIM" == "1" ]; then
+	case "$DIST" in
+	"g")	RANDSOURCE="randn"
+		PLAMBDA_SECOND="" ;;
+	"u")	RANDSOURCE="randn"
+		PLAMBDA_SECOND="2 sqrt / erf 3 sqrt *" ;;
+	"c")	RANDSOURCE="randc"
+		PLAMBDA_SECOND="0.01 *" ;;
+	"l")	RANDSOURCE="randn randn randn randn 4 njoin"
+		PLAMBDA_SECOND="split * >1 * <1 - 2 sqrt /" ;;
+	*)	echo -e "ERROR($0): unrecognized dist '$DIST'" >&2 false ;;
+	esac
+	PLAMBDA_FIRST="$RANDSOURCE pi sqrt * 2 * $GRAINSIZE *"
+	PLAMBDA_SECOND="$PLAMBDA_SECOND $STRENGTH *"
+elif [ "$DIM" == "2" ]; then
+	case "$DIST" in
+	"g")	RANDSOURCE="randn"
+		PLAMBDA_SECOND="" ;;
+	"u")	RANDSOURCE="randn"
+		PLAMBDA_SECOND="2 sqrt / erf 3 sqrt *" ;;
+	"c")	RANDSOURCE="randc"
+		PLAMBDA_SECOND="0.01 *" ;;
+	"l")	RANDSOURCE="randn randn randn randn 4 njoin"
+		PLAMBDA_SECOND="x[0] x[1] * x[2] x[3] * - x[4] x[5] * x[6] x[7] * - join 2 sqrt /" ;;
+	*)	echo -e "ERROR($0): unrecognized dist '$DIST'" >&2 false ;;
+	esac
+	PLAMBDA_FIRST="$RANDSOURCE $RANDSOURCE join pi sqrt * 2 * $GRAINSIZE *"
+	PLAMBDA_SECOND="$PLAMBDA_SECOND $STRENGTH *"
+else
+	echo -e "ERROR($0): dimension \"$DIM\" not supported" >&2
+	false
+fi
 
-case "$DIST" in
-"g") PLAMBDA_SECOND="" ;;
-"u") PLAMBDA_SECOND="2 sqrt / erf 3 sqrt *" ;;
-"U") PLAMBDA_SECOND="2 sqrt / erf" ;;
-"c") PLAMBDA_SECOND="0.01 *" ;;
-"l") PLAMBDA_SECOND="x[0] x[1] * x[2] x[3] * - 2 sqrt /" ;;
-"l") RANDSOURCE="randn randn randn randn 4 njoin" ;;
-*)   echo -e "ERROR($0): unrecognized dist '$DIST'" >&2 ; false ;;
-esac
-PLAMBDA_SECOND="$PLAMBDA_SECOND $STRENGTH *"
 
 echo -e "PLAMBDA_FIRST=\"$PLAMBDA_FIRST\"" >&2
 echo -e "PLAMBDA_SECOND=\"$PLAMBDA_SECOND\"" >&2
