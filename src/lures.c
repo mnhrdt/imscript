@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "xmalloc.c"
 
@@ -115,9 +116,13 @@ void silly_lucky_regions(float **y, float **x, int n, int w, int h, int pd,
 
 	// 3. for each pixel location
 	fprintf(stderr, "processing lines...\n");
+	time_t timeref = time(NULL);
 	for (int j = 0; j < h; j++) {
-		if (0==j%10)
-			fprintf(stderr, "\tline %d/%d\n", j,h-1);
+		if (0==j%10) {
+			int timtim = time(NULL) - timeref;
+			fprintf(stderr, "\tline %d/%d {%d}\n", j, h-1, timtim);
+			//fprintf(stderr, "\tline %d/%d\n", j,h-1);
+		}
 	for (int i = 0; i < w; i++)
 	{
 	//      3.1. compute the vector of winsize-patch-distances between
