@@ -170,13 +170,13 @@
 //
 //	Generate a U(-1,1) scalar field with gaussian grain
 //		GRAINSIZE=7
-//		plambda zero:WxH "x del randn"|blur g $GRAINSIZE|plambda - "x $GRAINSIZE * pi sqrt * 2 * 2 sqrt / erf"
+//		plambda zero:WxH "randn"|blur g $GRAINSIZE|plambda - "x $GRAINSIZE * pi sqrt * 2 * 2 sqrt / erf"
 //
 //	Generate a N(0,1) scalar field with gaussian grain
-//		plambda zero:WxH "x del randn randn join"|blur g $GRAINSIZE|plambda - "x $GRAINSIZE * pi sqrt * 2 * 2 sqrt / erf"
+//		plambda zero:WxH "randn"|blur g $GRAINSIZE|plambda - "x $GRAINSIZE * pi sqrt * 2 *"
 //
 //	Generate a L(0,sigma=1) scalar field with gaussian grain
-//		plambda zero:WxH "x del randn randn randn randn  4 njoin $GRAINSIZE * pi sqrt * 2 *"|blur g $GRAINSIZE|plambda - "x[0] x[1] * x[2] x[3] * - 2 sqrt /"
+//		plambda zero:WxH "randn randn randn randn  4 njoin $GRAINSIZE * pi sqrt * 2 *"|blur g $GRAINSIZE|plambda - "x[0] x[1] * x[2] x[3] * - 2 sqrt /"
 //
 //	Periodic component of an image
 //		  cat image|fftper|fft|plambda - "x :I :I * :J :J * + *"|ifft|crop 0 0 `imprintf "%w %h"`|fft|plambda - "x :I :I * :J :J * + /"|ifft >pcomponent
