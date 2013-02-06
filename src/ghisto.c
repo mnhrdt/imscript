@@ -81,7 +81,7 @@ void dump_histogram(long double (*h)[2], int n)
 	printf("plot \"-\" w impulses title \"histogram\", \"-\" w lines title \"accumulated histogram\"");
 	if (SHOWSTATS() > 0) {
 		void print_gnuplot_stats_string(long double (*)[2], int, float);
-		print_gnuplot_stats_string(h, n, SHOWSTATS());
+		print_gnuplot_stats_string(h, n, 1/SHOWSTATS());
 	}
 	printf("\n");
 	long double m = 0;
