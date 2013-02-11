@@ -191,6 +191,10 @@ static double imgerr(char *m, float *x, float *y, int n)
 
 #include "iio.h"
 
+#include "smapa.h"
+#include "xmalloc.c"
+SMART_PARAMETER_SILENT(IMGERR_PPT,0)
+
 int main(int c, char *v[])
 {
 	if (c != 3 && c != 4) {
@@ -208,8 +212,22 @@ int main(int c, char *v[])
 	if (w[0] != w[1] || h[0] != h[1] || pd[0] != pd[1])
 		fail("input image sizes mismatch (%g %g %g) != (%g %g %g)",
 					w[0], h[0], pd[0], w[1], h[1], pd[1]);
+	float *xx = x, *yy = y;
+	int m = IMGERR_PPT();
+	if (m > 0 && 2*m+1<*w && 2*m+1<*h) {
+		xx = xmalloc((*w-2*m)*(*h-2*m)*sizeof*xx);
+		yy = xmalloc((*w-2*m)*(*h-2*m)*sizeof*yy);
+		for (int i = 0; i < *w-2*m; i++)
+		for (int j = 0; j < *h-2*m; j++)
+		{
+			xx[(*w-2*m)*j + i] = x[*w*(j+m)+(i+m)];
+			yy[(*w-2*m)*j + i] = y[*w*(j+m)+(i+m)];
+		}
+		*w -= 2*m;
+		*h -= 2*m;
+	}
 
-	double e = imgerr(metric_id, x, y, *w**h**pd);
+	double e = imgerr(metric_id, xx, yy, *w**h**pd);
 
 	printf("%g\n", e);
 	return 0;
