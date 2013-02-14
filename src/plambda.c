@@ -1340,6 +1340,8 @@ static void print_compiled_program(struct plambda_program *p)
 					t->index, p->var->t[t->index]);
 			fprintf(stderr, ", displacement (%d,%d)",
 					t->displacement[0], t->displacement[1]);
+			if (t->component < -1)
+				fprintf(stderr, ", component %d", t->component);
 		}
 		if (t->type == PLAMBDA_SCALAR) {
 			fprintf(stderr, "variable scalar %d \"%s\"",
@@ -1797,9 +1799,20 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			int daj = aj + t->displacement[1];
 			int pdv = pd[t->index];
 			float x[pdv];
-			FORL(pdv)
+			if (t->component == -1) { // regular vector
+				FORL(pdv)
 				x[l] = getsample_1(img, w, h, pdv, dai, daj, l);
-			vstack_push_vector(s, x, pdv);
+				vstack_push_vector(s, x, pdv);
+			} else if (t->component == -2 && 0==pdv%2) {// 1st half
+				FORL(pdv/2)
+				x[l] = getsample_1(img, w, h, pdv, dai, daj, l);
+				vstack_push_vector(s, x, pdv/2);
+			} else if (t->component == -3 && 0==pdv%2) {// 2nd half
+				FORL(pdv/2)
+				x[l] = getsample_1(img, w, h, pdv, dai, daj,
+						pdv/2+l);
+				vstack_push_vector(s, x, pdv/2);
+			}
 				     }
 			break;
 		case PLAMBDA_OPERATOR: {
