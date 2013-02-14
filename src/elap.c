@@ -43,7 +43,7 @@ inline static float getpixel_1(float *x, int w, int h, int i, int j)
 // evaluate the laplacian of image x at point i, j
 inline static float laplacian(float *x, int w, int h, int i, int j)
 {
-	getpixel_operator p = getpixel_0;
+	getpixel_operator p = getpixel_1;
 
 	float r = -4 * p(x, w, h, i  , j  )
 		     + p(x, w, h, i+1, j  )
@@ -55,7 +55,7 @@ inline static float laplacian(float *x, int w, int h, int i, int j)
 }
 
 
-// return the largest change performed all over the image
+// returns the largest change performed all over the image
 static float perform_one_iteration(float *x, int w, int h,
 		int (*mask)[2], int nmask, float tstep)
 {
