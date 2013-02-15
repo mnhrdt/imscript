@@ -7,8 +7,8 @@ WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wno-array-bounds -Wno-unused
 
 CFLAGS = $(WFLAGS)
 CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE -fopenmp
-CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE
 CFLAGS = $(WFLAGS) -O3 -DNDEBUG
+CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE
 
 #end of compiler specific part
 
@@ -17,7 +17,7 @@ CFLAGS = $(WFLAGS) -O3 -DNDEBUG
 SRCDIR = src
 BINDIR = bin
 
-SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco vecov flowinv ghisto shuntingyard rpc overpoints periodize rpcflow ransac genk cgi zeropad siftu pview homfilt rpchfilt uncrop maptp rpcparcheck rpc_errsingle rpc_errpair cline rpc_angpair rpc_curvpair chisto fftper srmatch croparound zoombil flowh harris lgblur rpc_eval cutrecombine cdeint imgerr amle elap imspread replicate
+SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco vecov flowinv ghisto shuntingyard rpc overpoints periodize rpcflow ransac genk cgi zeropad siftu pview homfilt rpchfilt uncrop maptp rpcparcheck rpc_errsingle rpc_errpair cline rpc_angpair rpc_curvpair chisto fftper srmatch croparound zoombil flowh harris lgblur rpc_eval cutrecombine cdeint imgerr amle elap imspread replicate disp_to_corr distance printmask colormesh
 SRCFFT = gblur fft dct blur lgblur2 lure lgblur3 testgblur lures
 ifeq ($(ENABLE_GSL), yes)
 	SRCGSL = paraflow minimize
@@ -63,7 +63,7 @@ endif
 
 
 SRC = $(SRCIIO) $(SRCFFT) $(SRCGSL)
-PROGRAMS = $(addprefix $(BINDIR)/,$(SRC) flow_ms rgfield rgfields rgfieldst)
+PROGRAMS = $(addprefix $(BINDIR)/,$(SRC) flow_ms rgfield rgfields rgfieldst elap2)
 
 
 .PHONY: default
@@ -99,6 +99,9 @@ $(SRCDIR)/flow_ms.o: $(SRCDIR)/flow_ms.c
 $(SRCDIR)/flowarrows.o: $(SRCDIR)/flowarrows.c
 	$(CC) $(CFLAGS) $(OFLAGS) -DOMIT_MAIN -c $< -o $@
 
+$(SRCDIR)/distance.o: $(SRCDIR)/distance.c
+	$(CC) $(CFLAGS) $(OFLAGS) -DOMIT_DISTANCE_MAIN -c $< -o $@
+
 $(BINDIR)/flow_ms: $(addprefix $(SRCDIR)/,flow_ms.c gblur.o hs.o lk.o iio.o)
 	$(CC) $(CFLAGS) $(OFLAGS) -DUSE_MAINAPI $^ -o $@ $(IIOFLAGS) $(FFTFLAGS)
 
@@ -110,6 +113,9 @@ $(BINDIR)/rgfields: $(addprefix $(SRCDIR)/,rgfields.c gblur.o iio.o)
 
 $(BINDIR)/rgfieldst: $(addprefix $(SRCDIR)/,rgfieldst.c gblur.o iio.o)
 	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS) $(FFTFLAGS)
+
+$(BINDIR)/elap2: $(addprefix $(SRCDIR)/,elap2.c distance.o iio.o)
+	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS)
 
 .PHONY: clean
 clean:
