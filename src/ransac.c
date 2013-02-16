@@ -264,7 +264,7 @@ int ransac(
 	for (int i = 0; i < modeldim; i++)
 		fprintf(stderr, " %g", best_model[i]);
 	fprintf(stderr, "\n");
-	if (1) {
+	if (0) {
 		FILE *f = xfopen("/tmp/ramo.txt", "w");
 		for (int i = 0; i < modeldim; i++)
 			fprintf(f,"%lf%c",best_model[i],i==modeldim-1?'\n':' ');
@@ -534,7 +534,7 @@ int main_hack_fundamental_matrix(int c, char *v[])
 			}
 		xfclose(f);
 	}
-	if (true) {
+	if (false) {
 		FILE *f = xfopen("/tmp/omask.txt", "w");
 		for (int i = 0; i < n; i++)
 			fprintf(f, mask[i]?" 1":" 0");
@@ -619,7 +619,7 @@ int main_hack_fundamental_trimatrix(int c, char *v[])
 			}
 		xfclose(f);
 	}
-	if (true) {
+	if (false) {
 		FILE *f = xfopen("/tmp/omask.txt", "w");
 		for (int i = 0; i < n; i++)
 			fprintf(f, mask[i]?" 1":" 0");
