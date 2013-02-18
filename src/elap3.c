@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 
 // utility function that always returns a valid pointer to memory
@@ -163,10 +164,16 @@ int main(int argc, char *argv[])
 	// initialization constant.
 	// If it is a real filename, use the corresponding image.
 	float *init, constant = atof(filename_ini);
-	if (0 != constant) {
+	if (isnan(constant) || 0 != constant || 0 == strcmp(filename_ini, "0"))
+	{
 		init = xmalloc(*w * *h * sizeof*init);
-		for (int i = 0; i < *w**h; i++)
-			init[i] = constant;
+		if (isnan(constant))
+			for (int i = 0; i < *w**h; i++)
+				init[i] = 255*(rand()/(1.0+RAND_MAX));
+		else
+			for (int i = 0; i < *w**h; i++)
+				init[i] = constant;
+
 	} else {
 		int ww, hh;
 		init = iio_read_image_float(filename_ini, &ww, &hh);

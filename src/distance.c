@@ -3,6 +3,7 @@ void fill_distance_slow(float *distimage, int width, int height, float *points, 
 
 
 #include <assert.h>
+#include <stdlib.h>
 #include <math.h>
 
 void fill_distance_slow(float *dist, int w, int h, float *p, int n)
@@ -71,7 +72,17 @@ struct dist_state {
 // 	3. s'actualitzen els vòxels TRIAL adjacents
 // 	4. s'afegeien nous TRIAL adjacents
 
-#include "xmalloc.c"
+// utility function that always returns a valid pointer to memory
+static void *xmalloc(size_t n)
+{
+	void *new = malloc(n);
+	if (!new)
+	{
+		fprintf(stderr, "xmalloc: can not malloc %zu bytes\n", n);
+		exit(1);
+	}
+	return new;
+}
 
 static void start_heap(struct dist_state *e)
 {
@@ -275,6 +286,7 @@ void fill_distance_fast(
 
 #include "iio.h"
 
+#define _XMALLOC_C
 #include "fail.c"
 #include "xfopen.c"
 #include "parsenumbers.c"

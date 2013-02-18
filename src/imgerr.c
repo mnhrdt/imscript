@@ -229,6 +229,6 @@ int main(int c, char *v[])
 
 	double e = imgerr(metric_id, xx, yy, *w**h**pd);
 
-	printf("%g\n", e);
+	printf("%.16lf\n", e);
 	return 0;
 }

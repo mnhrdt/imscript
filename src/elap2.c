@@ -84,7 +84,7 @@ static float perform_one_iteration(float *x, int w, int h,
 		int j = mask[p][1];
 		int idx = j*w + i;
 
-		float new = x[idx] + tstep * laplacian8(x, w, h, i, j);
+		float new = x[idx] + tstep * laplacian(x, w, h, i, j);
 
 		float update = fabs(x[idx] - new);
 		if (update > maxupdate)
