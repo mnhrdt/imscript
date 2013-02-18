@@ -30,6 +30,9 @@ static void getxyz(double xyz[3], struct rpc *r, int i, int j, double h)
 	xyz[2] = h;
 }
 
+#include "smapa.h"
+SMART_PARAMETER_SILENT(IJMESH,0)
+
 int main(int c, char *v[])
 {
 	if (c != 6) {
@@ -54,6 +57,7 @@ int main(int c, char *v[])
 
 	printf("ply\n");
 	printf("format ascii 1.0\n");
+	//printf("format binary_little_endian 1.0\n");
 	printf("comment created by cutrecombine\n");
 	printf("element vertex %d\n", w*h);
 	printf("property float x\n");
@@ -75,7 +79,8 @@ int main(int c, char *v[])
 		for (int k = 0; k < pd; k++) rgb[k] = color[j][i][k];
 		for (int k = pd; k < 3; k++) rgb[k] = rgb[k-1];
 		double xyz[3] = {i, j, height[j][i]};
-		getxyz(xyz, r, i + offsetx, j + offsety, height[j][i]);
+		if (!IJMESH())
+			getxyz(xyz, r, i + offsetx, j + offsety, height[j][i]);
 		printf("%.16lf %.16lf %.16lf %d %d %d\n",
 				xyz[0], xyz[1], xyz[2], rgb[0], rgb[1], rgb[2]);
 	}
