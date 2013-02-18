@@ -78,7 +78,7 @@ int main(int c, char *v[])
 		uint8_t rgb[3];
 		for (int k = 0; k < pd; k++) rgb[k] = color[j][i][k];
 		for (int k = pd; k < 3; k++) rgb[k] = rgb[k-1];
-		double xyz[3] = {i, j, height[j][i]};
+		double xyz[3] = {j + offsety, i + offsetx, height[j][i]};
 		if (!IJMESH())
 			getxyz(xyz, r, i + offsetx, j + offsety, height[j][i]);
 		printf("%.16lf %.16lf %.16lf %d %d %d\n",
