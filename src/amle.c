@@ -10,6 +10,7 @@
 #include "xmalloc.c"
 #include "smapa.h"
 
+SMART_PARAMETER(AMLE_NN,4)
 
 static int get_nvals(float *v, float *wv2, float *x, int w, int h, int i, int j)
 {
@@ -26,7 +27,8 @@ static int get_nvals(float *v, float *wv2, float *x, int w, int h, int i, int j)
 		//{+2,0,4}, {0,+2,4}, {-2,0,4}, {0,-2,4}, (non-primitive)
 		//{+4,0,16}, {0,+4,16}, {-4,0,16}, {0,-4,16} (non-primitive)
 	};
-	for (int p = 0; p < 8; p++)
+	int nn = AMLE_NN();
+	for (int p = 0; p < nn; p++)
 	{
 		int ii = i + n[p][0];
 		int jj = j + n[p][1];
