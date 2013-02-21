@@ -89,14 +89,24 @@ static int parse_floats(float *t, int nmax, const char *s)
 	return i;
 }
 
-static float *alloc_parse_floats(int nmax, const char *s, int *n)
+static float *alloc_parse_floats(int nmax, const char *ss, int *n)
 {
+	// add a space to s, so that gabriele's expression works as intended
+	int ns = strlen(ss);
+	char t[2+ns], *s = t;
+	s[0] = ' ';
+	for (int i = 0; i <= ns; i++)
+		s[i+1] = ss[i];
+
 	float *r = xmalloc(nmax * sizeof*r);
 	int i = 0, w;
-	while (i < nmax && 1 == sscanf(s, "%g %n", r + i, &w)) {
+	//while (i < nmax && 1 == sscanf(s, "%g %n", r + i, &w)) {
+	while (i < nmax && 1 == sscanf(s, "%*[][ \n\t,:;]%g%n", r + i, &w)) {
+		//fprintf(stderr, "read %g\n", r[i]);
 		i += 1;
 		s += w;
 	}
+	//fprintf(stderr, "finished, got i=%d\n", i);
 	*n = i;
 	return r;
 }
