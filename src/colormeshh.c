@@ -122,7 +122,7 @@ int main(int c, char *v[])
 		for (int k = pd; k < 3; k++) rgb[k] = rgb[k-1];
 		double xy[2] = {i, j}, pq[2];
 		apply_homography(pq, invH, xy);
-		double xyz[3] = {pq[1], pq[0], height[j][i]};
+		double xyz[3] = {pq[1], pq[0], 2 * height[j][i]};
 		if (!IJMESH())
 			getxyz(xyz, r, pq[0], pq[1], height[j][i]);
 		printf("%.16lf %.16lf %.16lf %d %d %d\n",

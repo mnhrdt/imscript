@@ -324,9 +324,9 @@ static void matrix_product_clean(
 	for (int i = 0; i < *ab_nrows; i++)
 	for (int j = 0; j < *ab_ncols; j++)
 	{
-		AB[j][i] = 0;
+		AB[i][j] = 0;
 		for (int k = 0; k < a_ncols; k++)
-			AB[j][i] += A[i][k] * B[k][j];
+			AB[i][j] += A[i][k] * B[k][j];
 	}
 }
 
