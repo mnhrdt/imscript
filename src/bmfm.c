@@ -9,12 +9,15 @@ void bmfm(float *disp, float *a, float *b, int w, int h, int pd, double fm[9]);
 #include "xmalloc.c"
 #include "getpixel.c"
 
+static int verb = 0;
+
 static int plot_line(int (*P)[2], int w, int h, double a, double b, double c)
 {
 	int r = 0;
 	if (fabs(a) < fabs(b)) { // slope less than 1
 		double p = -a/b;
 		double q = -c/b;
+		if (verb) fprintf(stderr, "p q = %g %g\n", p, q);
 		for (int x = 0; x < w; x++) {
 			int y = round(p*x + q);
 			P[r][0] = x;
@@ -24,6 +27,7 @@ static int plot_line(int (*P)[2], int w, int h, double a, double b, double c)
 	} else {
 		double p = -b/a;
 		double q = -c/a;
+		if (verb) fprintf(stderr, "P Q = %g %g\n", p, q);
 		for (int y = 0; y < h; y++) {
 			int x = round(p*y + q);
 			P[r][1] = y;
@@ -39,6 +43,7 @@ static int plot_epipolar(int (*p)[2], double fm[9], int w, int h, int i, int j)
 	double a = i*fm[0] + j*fm[3] + fm[6];
 	double b = i*fm[1] + j*fm[4] + fm[7];
 	double c = i*fm[2] + j*fm[5] + fm[8];
+	if (verb) fprintf(stderr, "a b c = %g %g %g\n", a, b, c);
 	return plot_line(p, w, h, a, b, c);
 }
 
@@ -92,8 +97,9 @@ void bmfm(float *disp, float *a, float *b, int w, int h, int pd, double fm[9])
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 	{
-		if (0==i&&0==j%10)fprintf(stderr,"line %d/%d\n",j,h);
+		if (0==i&&0==j%10){fprintf(stderr,"line %d/%d\n",j,h);verb=1;}
 		int np = plot_epipolar(p, fm, w, h, i, j);
+		verb=0;
 		float mincorr = INFINITY;
 		int minidx = -1;
 		for (int k = 0; k < np; k++)
@@ -105,8 +111,8 @@ void bmfm(float *disp, float *a, float *b, int w, int h, int pd, double fm[9])
 			}
 		}
 		int idx = j*w + i;
-		disp[3*idx + 0] = p[minidx][0];
-		disp[3*idx + 1] = p[minidx][1];
+		disp[3*idx + 0] = p[minidx][0] - i;
+		disp[3*idx + 1] = p[minidx][1] - j;
 		disp[3*idx + 2] = mincorr;
 	}
 	free(p);
