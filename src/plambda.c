@@ -1922,6 +1922,8 @@ int main_calc(int c, char *v[])
 		fprintf(stderr, "calculator correspondence \"%s\" = \"%s\"\n",
 				p->var->t[i], v[i+1]);
 
+	xsrand(SRAND());
+
 	float out[pdmax];
 	int od = run_program_vectorially_at(out, p, x, 1, 1, pd, 0, 0);
 

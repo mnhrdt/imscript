@@ -10,21 +10,15 @@ void bmfm(float *disp, float *a, float *b, int w, int h, int pd, double fm[9]);
 #include "xmalloc.c"
 #include "getpixel.c"
 
-static int verb = 0;
-
 static int plot_centered_segment(int (*P)[2], int w, int h,
 		double a, double b, double c,
 		double px, double py, double rad
 		)
 {
 	if (!isfinite(rad)) rad = fmax(w,h);
-	//fprintf(stderr, "a b c = %g %g %g\n", a, b, c);
-	//fprintf(stderr, "px py = %g %g\n", px, py);
 	assert(fabs(a*px + b*py + c) < 10e-6);
 	double dirn = rad/hypot(a,b), sgn = a - b > 0 ? 1 : -1;
-	//fprintf(stderr, "dirn sgn = %g %g\n", dirn, sgn);
 	double dir[2] = {-b*dirn*sgn, a*dirn*sgn};
-	//fprintf(stderr, "dir = %g %g\n", dir[0], dir[1]);
 	assert(dir[0] + dir[1] > 0);
 	int r = 0;
 	if (fabs(a) < fabs(b)) { // slope less than 1
@@ -32,8 +26,7 @@ static int plot_centered_segment(int (*P)[2], int w, int h,
 		double q = -c/b;
 		int xmin = round(fmax(0,   px - dir[0]));
 		int xmax = round(fmax(w-1, px + dir[0]));
-		assert(xmin <= xmax);
-		if (verb) fprintf(stderr, "p q = %g %g\n", p, q);
+		if (xmin > xmax) return 0;
 		for (int x = xmin; x <= xmax; x++) {
 			int y = round(p*x + q);
 			P[r][0] = x;
@@ -43,12 +36,9 @@ static int plot_centered_segment(int (*P)[2], int w, int h,
 	} else {
 		double p = -b/a;
 		double q = -c/a;
-		if (verb) fprintf(stderr, "P Q = %g %g %g %g\n", p, q, px, py);
 		int ymin = round(fmax(0,   py - dir[1]));
 		int ymax = round(fmin(h-1, py + dir[1]));
-		//fprintf(stderr, "py dir[1] = %g %g\n", py, dir[1]);
-		//fprintf(stderr, "ymin ymax = %d %d\n", ymin, ymax);
-		assert(ymin <= ymax);
+		if (ymin > ymax) return 0;
 		for (int y = ymin; y <= ymax; y++) {
 			int x = round(p*y + q);
 			P[r][1] = y;
@@ -56,7 +46,6 @@ static int plot_centered_segment(int (*P)[2], int w, int h,
 				P[r++][0] = x;
 		}
 	}
-	//fprintf(stderr, "\n");
 	return r;
 }
 
@@ -78,7 +67,6 @@ static int plot_epipolar_fancy(int (*p)[2], double fm[9], int w, int h,
 		ij[0] += ini[0];
 		ij[1] += ini[1];
 	}
-	if (verb) fprintf(stderr, "a b c = %g %g %g\n", a, b, c);
 	double pp[2];
 	project_point_to_line(pp, a, b, c, ij[0], ij[1]);
 	return plot_centered_segment(p, w, h, a, b, c, pp[0], pp[1], rad);
@@ -104,19 +92,137 @@ static float ssd_minus_mean(float *x, float *y, int n)
 	return r;
 }
 
-static double corr(float *a, float *b, int w, int h, int pd,
-		int ax, int ay, int bx, int by)
+static int window_image_square_5x5[] = {5,5, 2,2,
+	1,1,1,1,1,
+	1,1,1,1,1,
+	1,1,2,1,1,
+	1,1,1,1,1,
+	1,1,1,1,1,
+};
+static int window_image_horiz_25[] = {9,3, 4,1,
+	1,1,1,1,0,1,1,1,1,
+	1,1,1,1,2,1,1,1,1,
+	1,1,1,1,0,1,1,1,1,
+};
+static int window_image_vert_25[] = {3,9, 1,4,
+	1,1,1,
+	1,1,1,
+	1,1,1,
+	1,1,1,
+	0,2,0,
+	1,1,1,
+	1,1,1,
+	1,1,1,
+	1,1,1,
+};
+static int window_image_diag_25[] = {9,9, 4,4,
+	0,0,0,0,0,0,0,1,1,
+	0,0,0,0,0,0,1,1,1,
+	0,0,0,0,0,1,1,1,0,
+	0,0,0,0,1,1,1,0,0,
+	0,0,0,1,2,1,0,0,0,
+	0,0,1,1,1,0,0,0,0,
+	0,1,1,1,0,0,0,0,0,
+	1,1,1,0,0,0,0,0,0,
+	1,1,0,0,0,0,0,0,0,
+};
+static int window_image_ndiag_25[] = {9,9, 4,4,
+	1,1,0,0,0,0,0,0,0,
+	1,1,1,0,0,0,0,0,0,
+	0,1,1,1,0,0,0,0,0,
+	0,0,1,1,1,0,0,0,0,
+	0,0,0,1,2,1,0,0,0,
+	0,0,0,0,1,1,1,0,0,
+	0,0,0,0,0,1,1,1,0,
+	0,0,0,0,0,0,1,1,1,
+	0,0,0,0,0,0,0,1,1,
+};
+
+struct correlation_window {
+	int n;
+	int (*off)[2];
+};
+
+struct correlation_window *create_window_list(int *nwin)
 {
-	int winside = 5;
-	int n = winside*winside*pd;
+	int *t[] = {
+		window_image_square_5x5,
+		window_image_horiz_25,
+		window_image_vert_25,
+		window_image_diag_25,
+		window_image_ndiag_25,
+	};
+	int n = 5;
+	struct correlation_window *r = xmalloc((1+n)*sizeof*r);
+	for (int i = 0; i < n; i++) {
+		struct correlation_window *win = r + i;
+		int w = t[i][0];
+		int h = t[i][1];
+		int cx = t[i][2];
+		int cy = t[i][3];
+		int count = 0;
+		for (int p = 0; p < w*h; p++)
+			if (t[i][4+p])
+				count += 1;
+		win->n = count;
+		win->off = xmalloc(count*2*sizeof(int));
+		for (int q = 0; q < h; q++)
+		for (int p = 0; p < w; p++)
+			if (t[i][4+w*q+p]) {
+				count -= 1;
+				win->off[count][0] = p - cx;
+				win->off[count][1] = q - cy;
+				if (2 == t[i][4+w*q+p])
+					assert(p == cx && q == cy);
+			}
+		assert(count == 0);
+		assert(2 == t[i][4+w*cy+cx]);
+	}
+	r[n].n = 0;
+	*nwin = n;
+	return r;
+}
+
+static void print_window_list(struct correlation_window *t)
+{
+	for (int i = 0; ; i++)
+		if (t[i].n) {
+			fprintf(stderr, "window %d on list has %d offsets\n",
+					i, t[i].n);
+			for (int j = 0 ; j < t[i].n; j++)
+				fprintf(stderr, "\toff[%d] = %d %d\n",
+						j, t[i].off[j][0], t[i].off[j][1]);
+			fprintf(stderr, "\n");
+		}
+		else
+			break;
+}
+
+static void free_window_list(struct correlation_window *t)
+{
+	for (int i = 0; ; i++)
+		if (t[i].n)
+			free(t[i].off);
+		else
+			break;
+	free(t);
+}
+
+static struct correlation_window *global_table_of_windows = NULL;
+static int global_number_of_windows = 0;
+
+static double corr(float *a, float *b, int w, int h, int pd,
+		int ax, int ay, int bx, int by, int wintype)
+{
+	struct correlation_window *wen = global_table_of_windows+wintype;
+	int n = pd * wen->n;
 	float pa[n], pb[n];
 	int cx = 0;
-	for (int j = 0; j < winside; j++)
-	for (int i = 0; i < winside; i++)
+	for (int i = 0; i < wen->n; i++)
 	for (int l = 0; l < pd; l++)
 	{
-		int dx = i - winside/2;
-		int dy = j - winside/2;
+		int dx = wen->off[i][0];
+		int dy = wen->off[i][1];
 		pa[cx] = getsample_2(a, w, h, pd, ax + dx, ay + dy, l);
 		pb[cx] = getsample_2(b, w, h, pd, bx + dx, by + dy, l);
 		cx += 1;
@@ -138,28 +244,32 @@ void bmfm_fancy(float *disp,         // output disparities image (dx, dy)
 		float *search_radius // optional, w.r.t. initialization
 		)
 {
-	int maxpoints = 2 * (w+h), (*p)[2] = xmalloc(maxpoints*sizeof*p);
+	int maxpoints = 2 * (w+h), (*P)[2] = xmalloc(maxpoints*sizeof*P);
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++) {
 		float rad = NAN, ini[2] = {0, 0};
 		if (search_radius) rad = search_radius[j*w+i];
 		if (disp_init) ini[0] = disp_init[2*(j*w+i)+0];
 		if (disp_init) ini[1] = disp_init[2*(j*w+i)+1];
-		int np = plot_epipolar_fancy(p, fm, w, h, i, j, ini, rad);
+		int np = plot_epipolar_fancy(P, fm, w, h, i, j, ini, rad);
 		float mincorr = INFINITY;
 		int minidx = 0;
-		for (int k = 0; k < np; k++) {
-			float c = corr(a, b, w, h, pd, i, j, p[k][0], p[k][1]);
+		for (int k = 0; k < np; k++)
+		for (int l = 0; l < global_number_of_windows; l++)
+		{
+			int p = P[k][0];
+			int q = P[k][1];
+			float c = corr(a, b, w, h, pd, i, j, p, q, l);
 			if (c < mincorr) {
 				mincorr = c;
 				minidx = k;
 			}
 		}
-		if (disp) disp[2*(j*w+i) + 0] = p[minidx][0] - i;
-		if (disp) disp[2*(j*w+i) + 1] = p[minidx][1] - j;
+		if (disp) disp[2*(j*w+i) + 0] = P[minidx][0] - i;
+		if (disp) disp[2*(j*w+i) + 1] = P[minidx][1] - j;
 		if (errc) errc[j*w+i] = mincorr;
 	}
-	free(p);
+	free(P);
 }
 
 #ifdef MAIN_BMFM
@@ -216,6 +326,10 @@ int main(int c, char *v[])
 		if (ppdd != 2)
 			fail("init file must be a vector field");
 	}
+
+	global_table_of_windows = create_window_list(&global_number_of_windows);
+	//print_window_list(global_table_of_windows);
+	//global_number_of_windows = 1;
 
 	bmfm_fancy(o, e, a, b, w, h, pd, fm, i, rad);
 

@@ -73,6 +73,7 @@ static double invert_homography(double invH[3][3], double H[3][3])
 
 #include "smapa.h"
 SMART_PARAMETER_SILENT(IJMESH,0)
+SMART_PARAMETER_SILENT(IJMESHFAC,2)
 
 int main(int c, char *v[])
 {
@@ -122,7 +123,7 @@ int main(int c, char *v[])
 		for (int k = pd; k < 3; k++) rgb[k] = rgb[k-1];
 		double xy[2] = {i, j}, pq[2];
 		apply_homography(pq, invH, xy);
-		double xyz[3] = {pq[1], pq[0], 2 * height[j][i]};
+		double xyz[3] = {pq[1], pq[0], IJMESHFAC() * height[j][i]};
 		if (!IJMESH())
 			getxyz(xyz, r, pq[0], pq[1], height[j][i]);
 		printf("%.16lf %.16lf %.16lf %d %d %d\n",

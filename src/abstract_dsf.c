@@ -30,7 +30,7 @@ int adsf_find(int *t, int n, int a)
 
 static int adsf_make_link(int *t, int n, int a, int b)
 {
-	if (a < b) {
+	if (a < b) { // arbitrary choice
 		t[b] = a;
 		return a;
 	} else {
