@@ -1,11 +1,71 @@
 // block matching of two images guided by a fundamental matrix
 // (without rectification)
 
-void bmfm(float *disp, float *a, float *b, int w, int h, int pd, double fm[9]);
-
+// TODO:
+// 1. optimize getpixel by omitting border computations
+// 2. inline LRRL
+// 3. multi-scale
+// 4. inline flath
+// 5. inline mindiff
 
 #include <assert.h>
 #include <math.h>
+
+
+static int window_image_square_5x5[] = {5,5, 2,2,
+	1,1,1,1,1,
+	1,1,1,1,1,
+	1,1,2,1,1,
+	1,1,1,1,1,
+	1,1,1,1,1,
+};
+static int window_image_horiz_25[] = {9,3, 4,1,
+	1,1,1,1,0,1,1,1,1,
+	1,1,1,1,2,1,1,1,1,
+	1,1,1,1,0,1,1,1,1,
+};
+static int window_image_vert_25[] = {3,9, 1,4,
+	1,1,1,
+	1,1,1,
+	1,1,1,
+	1,1,1,
+	0,2,0,
+	1,1,1,
+	1,1,1,
+	1,1,1,
+	1,1,1,
+};
+static int window_image_diag_25[] = {9,9, 4,4,
+	0,0,0,0,0,0,0,1,1,
+	0,0,0,0,0,0,1,1,1,
+	0,0,0,0,0,1,1,1,0,
+	0,0,0,0,1,1,1,0,0,
+	0,0,0,1,2,1,0,0,0,
+	0,0,1,1,1,0,0,0,0,
+	0,1,1,1,0,0,0,0,0,
+	1,1,1,0,0,0,0,0,0,
+	1,1,0,0,0,0,0,0,0,
+};
+static int window_image_ndiag_25[] = {9,9, 4,4,
+	1,1,0,0,0,0,0,0,0,
+	1,1,1,0,0,0,0,0,0,
+	0,1,1,1,0,0,0,0,0,
+	0,0,1,1,1,0,0,0,0,
+	0,0,0,1,2,1,0,0,0,
+	0,0,0,0,1,1,1,0,0,
+	0,0,0,0,0,1,1,1,0,
+	0,0,0,0,0,0,1,1,1,
+	0,0,0,0,0,0,0,1,1,
+};
+static int *window_images[] = {
+		window_image_square_5x5,
+		window_image_horiz_25,
+		window_image_vert_25,
+		window_image_diag_25,
+		window_image_ndiag_25,
+};
+static int number_of_window_images = sizeof(window_images)/sizeof*window_images;
+
 
 #include "xmalloc.c"
 #include "getpixel.c"
@@ -56,6 +116,9 @@ static void project_point_to_line(double pp[2],
 	pp[1] = (a*a*y - a*b*x - b*c)/(a*a + b*b);
 }
 
+// Observation: it is unnecessary to optimize this function.
+// According to callgrind, the program spends less than 0.1%
+// of the overall running time inside it.
 static int plot_epipolar_fancy(int (*p)[2], double fm[9], int w, int h,
 		int i, int j, float ini[2], float rad)
 {
@@ -74,6 +137,9 @@ static int plot_epipolar_fancy(int (*p)[2], double fm[9], int w, int h,
 
 typedef float (*vector_correlation_measure)(float*,float*,int);
 
+// Observation: it is unnecessary to optimize this function.
+// According to callgrind, the program spends about 5% of the running time
+// inside it
 static float ssd_minus_mean(float *x, float *y, int n)
 {
 	float mx = 0, my = 0;
@@ -92,52 +158,6 @@ static float ssd_minus_mean(float *x, float *y, int n)
 	return r;
 }
 
-static int window_image_square_5x5[] = {5,5, 2,2,
-	1,1,1,1,1,
-	1,1,1,1,1,
-	1,1,2,1,1,
-	1,1,1,1,1,
-	1,1,1,1,1,
-};
-static int window_image_horiz_25[] = {9,3, 4,1,
-	1,1,1,1,0,1,1,1,1,
-	1,1,1,1,2,1,1,1,1,
-	1,1,1,1,0,1,1,1,1,
-};
-static int window_image_vert_25[] = {3,9, 1,4,
-	1,1,1,
-	1,1,1,
-	1,1,1,
-	1,1,1,
-	0,2,0,
-	1,1,1,
-	1,1,1,
-	1,1,1,
-	1,1,1,
-};
-static int window_image_diag_25[] = {9,9, 4,4,
-	0,0,0,0,0,0,0,1,1,
-	0,0,0,0,0,0,1,1,1,
-	0,0,0,0,0,1,1,1,0,
-	0,0,0,0,1,1,1,0,0,
-	0,0,0,1,2,1,0,0,0,
-	0,0,1,1,1,0,0,0,0,
-	0,1,1,1,0,0,0,0,0,
-	1,1,1,0,0,0,0,0,0,
-	1,1,0,0,0,0,0,0,0,
-};
-static int window_image_ndiag_25[] = {9,9, 4,4,
-	1,1,0,0,0,0,0,0,0,
-	1,1,1,0,0,0,0,0,0,
-	0,1,1,1,0,0,0,0,0,
-	0,0,1,1,1,0,0,0,0,
-	0,0,0,1,2,1,0,0,0,
-	0,0,0,0,1,1,1,0,0,
-	0,0,0,0,0,1,1,1,0,
-	0,0,0,0,0,0,1,1,1,
-	0,0,0,0,0,0,0,1,1,
-};
-
 struct correlation_window {
 	int n;
 	int (*off)[2];
@@ -145,14 +165,8 @@ struct correlation_window {
 
 struct correlation_window *create_window_list(int *nwin)
 {
-	int *t[] = {
-		window_image_square_5x5,
-		window_image_horiz_25,
-		window_image_vert_25,
-		window_image_diag_25,
-		window_image_ndiag_25,
-	};
-	int n = 5;
+	int n = number_of_window_images;
+	int **t = window_images;
 	struct correlation_window *r = xmalloc((1+n)*sizeof*r);
 	for (int i = 0; i < n; i++) {
 		struct correlation_window *win = r + i;
@@ -211,6 +225,9 @@ static void free_window_list(struct correlation_window *t)
 static struct correlation_window *global_table_of_windows = NULL;
 static int global_number_of_windows = 0;
 
+
+// this function is where 95% of the running time is spent
+// (inside the loop)
 static double corr(float *a, float *b, int w, int h, int pd,
 		int ax, int ay, int bx, int by, int wintype)
 {
@@ -329,7 +346,7 @@ int main(int c, char *v[])
 
 	global_table_of_windows = create_window_list(&global_number_of_windows);
 	//print_window_list(global_table_of_windows);
-	//global_number_of_windows = 1;
+	global_number_of_windows = 1;
 
 	bmfm_fancy(o, e, a, b, w, h, pd, fm, i, rad);
 
