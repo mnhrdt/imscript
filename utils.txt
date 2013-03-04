@@ -19,10 +19,13 @@ CORE: generic tools for image processing
 	veco:     accumulate values over a list of gray images
 	vecov:    accumulate values over a list of multispectral images
 	imgerr:   compare two images with a single number
-	deframe:  projective crop (defined by 4 points in the image)
-	cdeint:   deinterlace a video frame
 	iion:     copy (useful for converting format)
 
+
+NO-CORE: more specific tasks
+
+	deframe:  projective crop (defined by 4 points in the image)
+	cdeint:   deinterlace a video frame
 	distance: image of distances to a set of points
 	ransac:   compute robust models from data points
 	elap:     laplace equation with irregular boundary condition
