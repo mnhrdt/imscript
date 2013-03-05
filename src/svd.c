@@ -311,7 +311,7 @@ int svd_double(double *d, double *a, double *u, int m, double *v, int n)
 	double *du = malloc(m * m * sizeof(double));
 	double *dv = malloc(n * n * sizeof(double));
 	if (!(dd && da && du && dv)) exit(fprintf(stderr,"out of mem"));
-	//for (int i = 0; i < n*m; i++) da[i] = a[i];
+	for (int i = 0; i < n*m; i++) da[i] = a[i];
 	int r = svd(dd, da, du, m, dv, n);
 	if (d) for (int i = 0; i < n; i++) d[i] = dd[i];
 	if (u) for (int i = 0; i < m*m; i++) u[i] = du[i];

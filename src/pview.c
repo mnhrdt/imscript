@@ -53,6 +53,9 @@ struct rgba_value {
 #ifndef FORI
 #define FORI(n) for(int i=0;i<(n);i++)
 #endif//FORI
+#ifndef FORJ
+#define FORJ(n) for(int j=0;j<(n);j++)
+#endif//FORJ
 
 #ifndef BAD_MIN
 #define BAD_MIN(a,b)  (((a)<(b))? (a) : (b))
@@ -195,7 +198,12 @@ static void put_pixel_aa(int a, int b, float f, void *pp)
 static void overlay_segment_color(struct rgba_value *x, int w, int h,
 		int px, int py, int qx, int qy, struct rgba_value c)
 {
-	struct {int w, h; struct rgba_value *x, c; } e = {w, h, x, c};
+	//struct {int w, h; struct rgba_value *x, c; } e = {w, h, x, c};
+	struct {int w, h; struct rgba_value *x, c; } e;
+	e.w = w;
+	e.h = h;
+	e.x = x;
+	e.c = c;
 	traverse_segment_aa(px, py, qx, qy, put_pixel_aa, &e);
 }
 
@@ -402,6 +410,15 @@ static void project_point_to_line(double px[2], double L[3], double x[2])
 	px[1] = (-b*c + a*e)/d;
 }
 
+static int innpair(int s[2], double p[4])
+{
+	return ( 1
+			&& p[0] >= 0 && p[0] < s[0]
+			&& p[1] >= 0 && p[1] < s[1]
+			&& p[2] >= 0 && p[2] < s[0]
+			&& p[3] >= 0 && p[3] < s[1]
+	       );
+}
 
 // CLI utility to display a fundamental matrix and some matched points
 // (produces a transparent PNG image)
@@ -425,16 +442,17 @@ int main_viewepi(int c, char *v[])
 	FORI(s[0]*s[1]) o[0][i] = RGBA_BLACK;
 	// for each point p (=px) in image A
 	// 1. draw the epipolar line L of p
-	FORI(n) { double L[3]; epipolar_line(L, A, p[i]);
-		if (!bmask[i])
+	FORI(n) if (!bmask[i] && innpair(s,p[i])) {
+			double L[3]; epipolar_line(L, A, p[i]);
 			overlay_line(L[0],L[1],L[2],o[0],s[0],s[1],RGBA_GRAY10);
 	}
-	FORI(n) { double L[3]; epipolar_line(L, A, p[i]);
-		if (bmask[i])
+	FORI(n) if (bmask[i] && innpair(s,p[i])) {
+		double L[3]; epipolar_line(L, A, p[i]);
 			overlay_line(L[0],L[1],L[2],o[0],s[0],s[1],RGBA_GRAY50);
 	}
 	// 3. draw the projection line of q to L
 	FORI(n) {
+		if (!innpair(s,p[i])) continue;
 		double L[3];
 		epipolar_line(L, A, p[i]);
 		double Ly[2];
@@ -455,6 +473,7 @@ int main_viewepi(int c, char *v[])
 	}
 	// 2. draw the corresponding point q (py)
 	FORI(n) {
+		if (!innpair(s,p[i])) continue;
 		int y[2] = {lrint(p[i][2]), lrint(p[i][3])};
 		if (inner_point(s[0], s[1], y[0], y[1])) {
 			if (bmask[i])
@@ -463,6 +482,7 @@ int main_viewepi(int c, char *v[])
 				o[y[1]][y[0]] = RGBA_BLUE;
 		}
 	}
+	iio_save_image_uint8_vec("-", (uint8_t*)o, s[0], s[1], 4);
 
 	if (true) { // show statistics
 		int n_inliers = 0, n_outliers = 0;
@@ -515,7 +535,94 @@ int main_viewepi(int c, char *v[])
 				"looking at the wrong model or mask file.\n");
 		}
 	}
-	iio_save_image_uint8_vec("-", (uint8_t*)o, s[0], s[1], 4);
+	return EXIT_SUCCESS;
+}
+
+
+
+
+static int plot_line(int (*P)[2], int w, int h, double a, double b, double c)
+{
+	int r = 0;
+	if (fabs(a) < fabs(b)) { // slope less than 1
+		double p = -a/b;
+		double q = -c/b;
+		for (int x = 0; x < w; x++) {
+			int y = round(p*x + q);
+			P[r][0] = x;
+			if (y >= 0 && y < h)
+				P[r++][1] = y;
+		}
+	} else {
+		double p = -b/a;
+		double q = -c/a;
+		for (int y = 0; y < h; y++) {
+			int x = round(p*y + q);
+			P[r][1] = y;
+			if (x >= 0 && x < w)
+				P[r++][0] = x;
+		}
+	}
+	return r;
+}
+
+static int plot_epipolar(int (*p)[2], double fm[9], int w, int h, int i, int j)
+{
+	double a = i*fm[0] + j*fm[3] + fm[6];
+	double b = i*fm[1] + j*fm[4] + fm[7];
+	double c = i*fm[2] + j*fm[5] + fm[8];
+	return plot_line(p, w, h, a, b, c);
+}
+
+#include "random.c"
+
+// CLI utility to display the epipolar lines defined by a fundamental matrix
+int main_viewfmpair(int c, char *v[])
+{
+	if (c != 13) {
+		fprintf(stderr, "usage:\n\t%s f0 ... f8 sx sy [0|1]\n", *v);
+		//                          0 1      9  10 11 12
+		return EXIT_FAILURE;
+	}
+	double A[9]; FORI(9) A[i] = atof(v[1+i]);
+	int s[2], n; FORI(2) s[i] = atoi(v[10+i]);
+	int overlay = atoi(v[12]);
+
+	double Atr[9];
+	FORI(3)FORJ(3) Atr[3*i+j]=A[3*j+i];
+
+	struct rgba_value (*o)[2*s[0]] = xmalloc(2*s[0]*s[1]*4);
+	FORI(2*s[0]*s[1]) o[0][i] = RGBA_BLACK;
+
+	int maxlpoints = 4 * (s[0]*s[1]);
+	int (*p)[2] = xmalloc(maxlpoints*sizeof*p);
+
+	for (int cx = 0; cx < 20; cx += 1)
+	{
+		int i = randombounds(0, s[0]-1);
+		int j = randombounds(0, s[1]-1);
+		int np = plot_epipolar(p, A, s[0], s[1], i, j);
+		for (int pi = 0; pi < np; pi++)
+		{
+			int ii = p[pi][0];
+			int jj = p[pi][1];
+			//fprintf(stderr, "p[%d / %d] = %d %d\n", pi, np, ii, jj);
+			assert(ii >= 0);
+			assert(ii < s[0]);
+			assert(jj >= 0);
+			assert(jj < s[1]);
+			o[jj][ii] = RGBA_BRIGHT;
+		}
+		o[j][i] = RGBA_GREEN;
+
+		np = plot_epipolar(p, Atr, s[0], s[1], i, j);
+		for (int pi = 0; pi < np; pi++)
+			o[p[pi][1]][p[pi][0]+s[0]] = RGBA_BRIGHT;
+		o[j][i+s[0]] = RGBA_GREEN;
+	}
+
+
+	iio_save_image_uint8_vec("-", (uint8_t*)o, 2*s[0], s[1], 4);
 	return EXIT_SUCCESS;
 }
 
@@ -530,6 +637,7 @@ int main(int c, char *v[])
 	else if (0 == strcmp(v[1], "pairs")) return main_viewpairs(c-1, v+1);
 	else if (0 == strcmp(v[1], "triplets")) return main_viewtrips(c-1, v+1);
 	else if (0 == strcmp(v[1], "epipolar")) return main_viewepi(c-1, v+1);
+	else if (0 == strcmp(v[1], "fmpair")) return main_viewfmpair(c-1, v+1);
 	else {
 	usage: fprintf(stderr, "usage:\n\t%s [points|pairs|triplets|epipolar] "
 			       "params... < data.txt | display\n", *v);
