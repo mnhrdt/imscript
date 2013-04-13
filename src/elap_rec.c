@@ -180,6 +180,39 @@ static float bilinear_interpolation(float *x, int w, int h, float p, float q)
 	return r;
 }
 
+static float cubic_interpolation(float v[4], float x)
+{
+	return v[1] + 0.5 * x*(v[2] - v[0]
+			+ x*(2.0*v[0] - 5.0*v[1] + 4.0*v[2] - v[3]
+			+ x*(3.0*(v[1] - v[2]) + v[3] - v[0])));
+}
+
+static float bicubic_interpolation_cell(float p[4][4], float x, float y)
+{
+	float v[4];
+	v[0] = cubic_interpolation(p[0], y);
+	v[1] = cubic_interpolation(p[1], y);
+	v[2] = cubic_interpolation(p[2], y);
+	v[3] = cubic_interpolation(p[3], y);
+	return cubic_interpolation(v, x);
+}
+
+static float bicubic_interpolation(float *img, int w, int h, float x, float y)
+{
+	x -= 1;
+	y -= 1;
+
+	getpixel_operator p = getpixel_1;
+
+	int ix = floor(x);
+	int iy = floor(y);
+	float c[4][4];
+	for (int j = 0; j < 4; j++)
+		for (int i = 0; i < 4; i++)
+			c[i][j] = p(img, w, h, ix + i, iy + j);
+	return bicubic_interpolation_cell(c, x - ix, y - iy);
+}
+
 // zoom-in by replicating pixels into 2x2 blocks
 // no NAN's are expected in the input image
 static void zoom_in_by_factor_two(float *out, int ow, int oh,
@@ -190,8 +223,9 @@ static void zoom_in_by_factor_two(float *out, int ow, int oh,
 	assert(abs(2*ih-oh) < 2);
 	for (int j = 0; j < oh; j++)
 	for (int i = 0; i < ow; i++)
-		out[ow*j+i] = bilinear_interpolation(in, iw, ih, i/2.0, j/2.0);
-		//out[ow*j+i] = p(in, iw, ih, i/2, j/2);
+		//out[ow*j+i] = p(in, iw, ih, round((i-0.5)/2), round((j-0.5)/2));
+		//out[ow*j+i] = bicubic_interpolation(in, iw, ih, (i-0.5)/2.0, (j-0.5)/2.0);
+		out[ow*j+i] = bilinear_interpolation(in, iw, ih, (i-0.5)/2.0, (j-0.5)/2.0);
 }
 
 #include "iio.h"
@@ -207,7 +241,7 @@ void elap_recursive(float *out, float *in, int w, int h,
 		float *ins = xmalloc(ws*hs*sizeof*ins);
 		float *outs = xmalloc(ws*hs*sizeof*outs);
 		zoom_out_by_factor_two(ins, ws, hs, in, w, h);
-		elap_recursive(outs, ins, ws, hs, timestep, niter, scale-1);
+		elap_recursive(outs, ins, ws, hs, timestep, niter, scale - 1);
 		zoom_in_by_factor_two(init, w, h, outs, ws, hs);
 
 		//char buf[FILENAME_MAX];

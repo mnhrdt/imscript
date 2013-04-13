@@ -16,9 +16,9 @@ BLURRY=$4
 export FIWARN=0
 
 TPD=`mktemp -d /tmp/dwiener.XXXXXX` || exit 1
-echo "TPD=$TPD" 1>&2
-echo "$@" > $TPD/args
+#echo "TPD=$TPD" 1>&2
+#echo "$@" > $TPD/args
 
 fft < $BLURRY > $TPD/blurry.fft
-plambda $BLURRY ":i :j hypot 0.1 <" | blur $KTYPE $KVAR | fft | plambda - $TPD/blurry.fft "x[0] dup dup * $PREC + / y *" | ifft
+plambda $BLURRY ":i :j hypot 0.1 <" | blur $KTYPE $KVAR | fft | plambda - $TPD/blurry.fft "x[0] dup dup * $PREC + / y *" 2>/dev/null | ifft
 

@@ -2037,7 +2037,8 @@ static int print_help(char *v, int verbosity)
 "\n"
 "VARIABLES: anything not recognized as a constant or operator.  There\n"
 "must be as many variables as input images, and they are assigned to\n"
-"images in alphabetical order.\n"
+"images in alphabetical order.  If there are no variables, the input\n"
+"images are pushed to the stack.\n"
 "\n"
 "All operators (unary, binary and ternary) are vectorizable.\n"
 "\n"
@@ -2130,6 +2131,7 @@ static int do_man(void)
 
 int main(int c, char *v[])
 {
+	if (c == 1) return print_help(*v, 0);
 	if (c == 2 && 0 == strcmp(v[1], "-h")) return print_help(*v,0);
 	if (c == 2 && 0 == strcmp(v[1], "--help")) return print_help(*v,1);
 	if (c == 2 && 0 == strcmp(v[1], "--version")) return print_version();

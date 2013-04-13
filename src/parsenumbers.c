@@ -1,6 +1,7 @@
 #ifndef _PARSENUMBERS_C
 #define _PARSENUMBERS_C
 
+#include <string.h>
 #include "xmalloc.c"
 
 // utility function: parse floats from a text file

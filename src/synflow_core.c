@@ -450,8 +450,8 @@ static double produce_affinity(double A[6], int w, int h,
 		double R[6] = {cos(theta), sin(theta), 0,
 			-sin(theta), cos(theta), 0};
 		affine_map(rc, R, c);
-		R[2] = w*v[2]/100 - rc[0] + c[0];
-		R[5] = h*v[3]/100 - rc[1] + c[1];
+		R[2] = w*v[1]/100 - rc[0] + c[0];
+		R[5] = h*v[2]/100 - rc[1] + c[1];
 		FORI(6) A[i] = R[i];
 	} else if (0 == strcmp(afftype, "similar")) {
 		double theta = v[0];

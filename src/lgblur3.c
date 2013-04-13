@@ -77,6 +77,9 @@ void apply_local_blur(float *oy, float *sigma, float *px,
 
 #include "bicubic.c"
 
+#include "smapa.h"
+SMART_PARAMETER_SILENT(BFBOUND,0)
+
 void apply_general_model(float *oy, float *sigma, float *uv, float *px,
 		int npyr, float sfirst, float slast, int w, int h, int pd)
 {
@@ -91,7 +94,7 @@ void apply_general_model(float *oy, float *sigma, float *uv, float *px,
 		float dx = f[j][i][0];
 		float dy = f[j][i][1];
 		float v[pd];
-		bicubic_interpolation(v, p[sidx][0][0], w, h, pd, i+dx, j+dy);
+		bicubic_interpolation_boundary(v, p[sidx][0][0], w, h, pd, i+dx, j+dy, BFBOUND());
 		for (int l = 0; l < pd; l++)
 			y[j][i][l] = v[l];
 	}

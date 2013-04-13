@@ -346,7 +346,7 @@ int main(int c, char *v[])
 
 	global_table_of_windows = create_window_list(&global_number_of_windows);
 	//print_window_list(global_table_of_windows);
-	global_number_of_windows = 1;
+	//global_number_of_windows = 1;
 
 	bmfm_fancy(o, e, a, b, w, h, pd, fm, i, rad);
 
