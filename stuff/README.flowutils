@@ -1,0 +1,73 @@
+A COLLECTION OF TINY IMAGE PROCESSING UTILITIES
+-----------------------------------------------
+
+Among them, the following:
+--------------------------
+
+*************
+GENERIC UTILS
+*************
+
+blur:      blur an image by a gaussian, laplacian, cauchy or uniform kernel
+crop:      crop an image
+
+qeasy:     quantize an image with input range [0,255]
+qauto:     quantize with automatically guessed input range
+
+downsa:    zoom out (using various subsampling methods)
+upsa:      zoom in (using various interpolation methods)
+ntiply:    enlarge an image by replicating its pixels
+
+plambda:   evaluate an expression with images as variables
+veco:      pixelwise min,max,med,avg,mod of a set of gray images
+vecov:     pixelwise min,max,med,avg,mod of a set of color images or fields
+
+dct:       discrete cosine transform
+fft:       discrete fourier transform (direct)
+ifft:      discrete fourier transform (inverse)
+fftshift:  put the zero frequency at the center of the image
+
+minimize:  minimize a function computed by an external program
+
+
+*****************************
+QUERY OR VISUALIZE IMAGE DATA
+*****************************
+
+ghisto:    histogram of a gray image
+imgerr:    distance between two images, using various metrics
+imprintf:  print image characteristics such as its size, dimension, etc
+
+cline:     evaluate an imate on one or all lines passing through the center
+
+
+
+**************************
+UTILS FOR FLOWS AND FIELDS
+**************************
+
+backflow:  apply a deformation field to an image
+flowinv:   invert a vector field
+synflow:   generate a parametric flow field (e.g. an homographic map)
+
+viewflow:  display a vector field using a color code
+flowh:     2D histogram of a vector field
+
+rgfield:   generate a random "gaussian" field
+rgfields:  generate a coherent sequence of random "gaussian" fields
+rgfieldst: generate random fields with spatiotemporally anisotropic coherence
+
+
+
+******************************************
+UTILS SPECIFIC FOR THE STUDY OF TURBULENCE
+******************************************
+
+lure:      simplest lucky region
+lures:     simplest lucky region (alternative implementation, much slower)
+
+cdeint:    deinterlace a color video frame
+
+lgblur:    apply a field of local blurs
+lgblur2:   apply a sequence of fields of local blurs
+lgblur3:   apply a sequence of fields of local blurs and deformations
