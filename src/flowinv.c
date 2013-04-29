@@ -115,11 +115,11 @@ static void flowinv(float *v, float *u, int w, int h, int niter, int epsil)
 	if (epsil > 0)
 		flowinv_init(v, u, w, h);
 
-	flowinv_printeval(v, u, w, h);
+	//flowinv_printeval(v, u, w, h);
 	for (int i = 0; i < niter; i++)
 	{
 		flowinv_iter(v, u, w, h);
-		flowinv_printeval(v, u, w, h);
+		//flowinv_printeval(v, u, w, h);
 	}
 }
 
