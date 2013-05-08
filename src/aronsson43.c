@@ -1,12 +1,11 @@
 // Aronsson infinity-harmonic function
 
-#define _USE_MATH_DEFINES
 #include <math.h>
 
 static void aronsson43(float *X, int w, int h, float alpha, float x0, float y0)
 {
-	//alpha *= 4*atan(1)/180;
-	alpha *= M_PI/180;
+	alpha *= 4*atan(1)/180;
+	//alpha *= M_PI/180;
 	float c = cos(alpha);
 	float s = sin(alpha);
 	float e = 4.0/3;

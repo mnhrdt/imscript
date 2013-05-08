@@ -238,21 +238,11 @@ void elap_recursive(float *out, float *in, int w, int h,
 	{
 		int ws = ceil(w/2.0);
 		int hs = ceil(h/2.0);
-		float *ins = xmalloc(ws*hs*sizeof*ins);
-		float *outs = xmalloc(ws*hs*sizeof*outs);
+		float *ins  = xmalloc(ws * hs * sizeof*ins);
+		float *outs = xmalloc(ws * hs * sizeof*outs);
 		zoom_out_by_factor_two(ins, ws, hs, in, w, h);
 		elap_recursive(outs, ins, ws, hs, timestep, niter, scale - 1);
 		zoom_in_by_factor_two(init, w, h, outs, ws, hs);
-
-		//char buf[FILENAME_MAX];
-		//snprintf(buf, FILENAME_MAX, "/tmp/elap_rec_in_%d", scale);
-		//iio_save_image_float(buf, in, w, h);
-		//snprintf(buf, FILENAME_MAX, "/tmp/elap_rec_ins_%d", scale);
-		//iio_save_image_float(buf, ins, ws, hs);
-		//snprintf(buf, FILENAME_MAX, "/tmp/elap_rec_outs_%d", scale);
-		//iio_save_image_float(buf, outs, ws, hs);
-		//snprintf(buf, FILENAME_MAX, "/tmp/elap_rec_init_%d", scale);
-		//iio_save_image_float(buf, init, w, h);
 
 		free(ins);
 		free(outs);
