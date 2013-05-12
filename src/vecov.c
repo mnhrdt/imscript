@@ -51,6 +51,12 @@ static float fnorm(float *x, int n)
 	}
 }
 
+// euclidean distance between the vectors x and y
+static float fdist(float *x, float *y, int n)
+{
+	return n ? hypot(*x - *y, fdist(x + 1, y + 1, n - 1)) : 0;
+}
+
 static void float_min(float *y, float *xx, int d, int n)
 {
 	float (*x)[d] = (void*)xx;
@@ -171,6 +177,31 @@ static void float_modc(float *y, float *xx, int d, int n)
 	}
 }
 
+#include "smapa.h"
+
+SMART_PARAMETER(WEISZ_NITER,10)
+
+static void float_weisz(float *y, float *xx, int d, int n)
+{
+	float (*x)[d] = (void*)xx;
+	for (int l = 0; l < d; l++)
+		y[l] = -1.234;
+	int niter = WEISZ_NITER();
+	for (int k = 0; k < niter; k++) {
+		float a[d], b = 0;
+		for (int l = 0; l < d; l++)
+			a[l] = 0;
+		for (int i = 0; i < n; i++) {
+			float dxy = fdist(x[i], y, d);
+			for (int l = 0; l < d; l++)
+				a[l] += x[i][l]/dxy;
+			b += 1/dxy;
+		}
+		for (int l = 0; l < d; l++)
+			y[l] = a[l]/b;
+	}
+}
+
 #if 0
 static float float_max(float *x, int d, int n)
 {
@@ -257,6 +288,7 @@ int main(int c, char *v[])
 	if (0 == strcmp(operation_name, "med"))   f = float_med;
 	if (0 == strcmp(operation_name, "medi"))   f = float_med;
 	if (0 == strcmp(operation_name, "modc"))   f = float_modc;
+	if (0 == strcmp(operation_name, "weisz"))   f = float_weisz;
 	//if (0 == strcmp(operation_name, "medv"))   f = float_medv;
 	//if (0 == strcmp(operation_name, "rnd"))   f = float_pick;
 	//if (0 == strcmp(operation_name, "first")) f = float_first;
