@@ -51,12 +51,6 @@ static float fnorm(float *x, int n)
 	}
 }
 
-// euclidean distance between the vectors x and y
-static float fdist(float *x, float *y, int n)
-{
-	return n ? hypot(*x - *y, fdist(x + 1, y + 1, n - 1)) : 0;
-}
-
 static void float_min(float *y, float *xx, int d, int n)
 {
 	float (*x)[d] = (void*)xx;
@@ -177,27 +171,34 @@ static void float_modc(float *y, float *xx, int d, int n)
 	}
 }
 
-#include "smapa.h"
 
-SMART_PARAMETER(WEISZ_RANDOM,0)
+// euclidean distance between the vectors x and y
+static float fdist(float *x, float *y, int n)
+{
+	return n ? hypot(*x - *y, fdist(x + 1, y + 1, n - 1)) : 0;
+}
+
+// euclidean distance between the vectors x and y, regularized around 0
+static float fdiste(float *x, float *y, int n, float e)
+{
+	return n ? hypot(*x - *y, fdiste(x + 1, y + 1, n - 1, e)) : e;
+}
+
+#include "smapa.h"
 SMART_PARAMETER(WEISZ_NITER,10)
 
-static void float_weisz(float *y, float *xx, int d, int n)
+static void float_weisz(float *y, float *x, int d, int n)
 {
-	float (*x)[d] = (void*)xx;
-	float_avg(y, xx, d, n);
-	if (WEISZ_RANDOM() > 0)
-		for (int l = 0; l < d; l++)
-			y[l] += WEISZ_RANDOM()*(random_uniform()-0.5);
+	float_avg(y, x, d, n);
 	int niter = WEISZ_NITER();
 	for (int k = 0; k < niter; k++) {
 		float a[d], b = 0;
 		for (int l = 0; l < d; l++)
 			a[l] = 0;
 		for (int i = 0; i < n; i++) {
-			float dxy = fdist(x[i], y, d);
+			float dxy = fdiste(x + i*d, y, d, 1e-5);
 			for (int l = 0; l < d; l++)
-				a[l] += x[i][l]/dxy;
+				a[l] += x[i*d + l]/dxy;
 			b += 1/dxy;
 		}
 		for (int l = 0; l < d; l++)
