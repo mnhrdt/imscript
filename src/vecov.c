@@ -179,13 +179,16 @@ static void float_modc(float *y, float *xx, int d, int n)
 
 #include "smapa.h"
 
+SMART_PARAMETER(WEISZ_RANDOM,0)
 SMART_PARAMETER(WEISZ_NITER,10)
 
 static void float_weisz(float *y, float *xx, int d, int n)
 {
 	float (*x)[d] = (void*)xx;
-	for (int l = 0; l < d; l++)
-		y[l] = -1.234;
+	float_avg(y, xx, d, n);
+	if (WEISZ_RANDOM() > 0)
+		for (int l = 0; l < d; l++)
+			y[l] += WEISZ_RANDOM()*(random_uniform()-0.5);
 	int niter = WEISZ_NITER();
 	for (int k = 0; k < niter; k++) {
 		float a[d], b = 0;
