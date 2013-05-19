@@ -272,6 +272,14 @@ static bool isgood(float x)
 }
 #endif
 
+static bool isgood(float *x, int n)
+{
+	for (int i = 0; i < n; i++)
+		if (!isfinite(x[i]))
+			return false;
+	return true;
+}
+
 int main(int c, char *v[])
 {
 	if (c < 4) {
@@ -309,14 +317,20 @@ int main(int c, char *v[])
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-	for (int i = 0; i < *w * *h; i++)
-	{
+	for (int i = 0; i < *w * *h; i++) {
 		float tmp[n][*pd];
+		int ngood = 0;
 		for (int j = 0; j < n; j++)
-			for (int k = 0; k < *pd; k++)
-				tmp[j][k] = x[j][i**pd+k];
-		f(y + i**pd, tmp[0], *pd, n);
+			if (isgood(x[j]+i**pd, *pd)) {
+				for (int k = 0; k < *pd; k++)
+					tmp[ngood][k] = x[j][i**pd+k];
+				ngood += 1;
+			}
+		f(y + i**pd, tmp[0], *pd, ngood);
 	}
 	iio_save_image_float_vec("-", y, *w, *h, *pd);
+	free(y);
+	for (int i = 0; i < n; i++)
+		free(x[i]);
 	return EXIT_SUCCESS;
 }
