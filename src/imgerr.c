@@ -215,18 +215,21 @@ int main(int c, char *v[])
 	float *xx = x, *yy = y;
 	int m = IMGERR_PPT();
 	if (m > 0 && 2*m+1<*w && 2*m+1<*h) {
-		xx = xmalloc((*w-2*m)*(*h-2*m)*sizeof*xx);
-		yy = xmalloc((*w-2*m)*(*h-2*m)*sizeof*yy);
+		xx = xmalloc((*w-2*m)*(*h-2*m)**pd*sizeof*xx);
+		yy = xmalloc((*w-2*m)*(*h-2*m)**pd*sizeof*yy);
 		for (int i = 0; i < *w-2*m; i++)
 		for (int j = 0; j < *h-2*m; j++)
+		for (int l = 0; l < *pd; l++)
 		{
-			xx[(*w-2*m)*j + i] = x[*w*(j+m)+(i+m)];
-			yy[(*w-2*m)*j + i] = y[*w*(j+m)+(i+m)];
+			xx[((*w-2*m)*j + i)**pd+l] = x[(*w*(j+m)+(i+m))**pd+l];
+			yy[((*w-2*m)*j + i)**pd+l] = y[(*w*(j+m)+(i+m))**pd+l];
 		}
 		*w -= 2*m;
 		*h -= 2*m;
 	}
 
+	iio_save_image_float_vec("/tmp/xx.tmp.asc", xx, *w, *h, *pd);
+	iio_save_image_float_vec("/tmp/yy.tmp.asc", yy, *w, *h, *pd);
 	double e = imgerr(metric_id, xx, yy, *w**h**pd);
 
 	printf("%.16lf\n", e);

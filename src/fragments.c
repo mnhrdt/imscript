@@ -141,13 +141,14 @@ static void hsv_to_rgb_doubles(double *out, double *in)
 	//assert_rgb(out);
 }
 
-#define BAD_MIN(a,b) (b)<(a)?(b):(a)
 
+#if 0
 static void assert_rgb(double t[3])
 {
 	for (int i = 0; i < 3; i++)
 		assert(t[i] >= 0 && t[i] <= 1);
 }
+#endif
 
 static void assert_hsv(double t[3])
 {
@@ -169,12 +170,12 @@ static void rgb_to_hsv_doubles(double *out, double *in)
 
 	if (g >= r && g >= b) {
 		M = g;
-		m = BAD_MIN(r, b);
+		m = fmin(r, b);
 		h = M == m ? 0 : 60*(b-r)/(M-m)+120;
 	}
 	else if (b >= g && b >= r) {
 		M = b;
-		m = BAD_MIN(r, b);
+		m = fmin(r, b);
 		h = M == m ? 0 : 60*(r-g)/(M-m)+240;
 	}
 	else {

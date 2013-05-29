@@ -91,16 +91,16 @@ void fancy_conjugate_gradient(double *x,
 
 	for (int iter = 0; iter < max_iter; iter++) {
 		A(Ap, p, n, e);
-		double App = scalar_product(Ap, p, n);
-		double rr_old = scalar_product(r, r, n);
-		double alpha = rr_old / App;
-		FOR(i,n) x[i] += alpha * p[i];
-		FOR(i,n) r[i] -= alpha * Ap[i];
-		double rr_new = scalar_product(r, r, n);
+		double   App    = scalar_product(Ap, p, n);
+		double   rr_old = scalar_product(r, r, n);
+		double   alpha  = rr_old / App;
+		FOR(i,n) x[i]   = x[i] + alpha * p[i];
+		FOR(i,n) r[i]   = r[i] -alpha * Ap[i];
+		double   rr_new = scalar_product(r, r, n);
 		if (sqrt(rr_new) < min_residual)
 			break;
-		double beta = rr_new / rr_old;
-		FOR(i,n) p[i] = r[i] + beta * p[i];
+		double   beta   = rr_new / rr_old;
+		FOR(i,n) p[i]   = r[i] + beta * p[i];
 	}
 
 	free(r);

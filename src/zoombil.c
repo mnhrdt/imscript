@@ -93,7 +93,7 @@ static void bilinear_interpolation(int pd, float (**y)[pd], int ow, int oh,
 {
 	float wfactor = w/(float)ow;
 	float hfactor = h/(float)oh;
-	float a, b, c, d;
+	float a=0, b=0, c=0, d=0;
 	for (int j = 0; j < oh; j++)
 	for (int i = 0; i < ow; i++)
 	for (int l = 0; l < pd; l++)
@@ -184,6 +184,42 @@ static int main_gray(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
+static bool innerP(int w, int h, int i, int j)
+{
+	if (i < 0) return false;
+	if (j < 0) return false;
+	if (i >= w) return false;
+	if (j >= h) return false;
+	return true;
+}
+
+static void downsav(float *yy, float *xx, int w, int h, int pd, int n)
+{
+	int W = w/n;
+	int H = h/n;
+	float (*x)[w][pd] = (void*)xx;
+	float (*y)[W][pd] = (void*)yy;
+	for (int j = 0; j < H; j++)
+	for (int i = 0; i < W; i++)
+	for (int l = 0; l < pd; l++)
+	{
+		float num = 0, sum = 0;
+		for (int jj = 0; jj < n; jj++)
+		for (int ii = 0; ii < n; ii++)
+		if (innerP(w, h, i*n+ii, j*n+jj))
+		{
+			num += 1;
+			sum += x[j*n+jj][i*n+ii][l];
+		}
+		y[j][i][l] = sum/num;
+	}
+}
+
+//static void combined_bilinear_interpolation(float *y, int ow, int oh
+//		float *x, int w, int h, int pd)
+//{
+//}
+
 static int main_vec(int c, char *v[])
 {
 	if (c != 5) {
@@ -200,6 +236,16 @@ static int main_vec(int c, char *v[])
 	if (ow == -1 && oh == -1) ow = 400;
 	else if (oh == -1) oh = (h*ow)/w;
 	else if (ow == -1) ow = (w*oh)/h;
+	else if (ow < 0 && oh < 0) {
+		// if both input numbers are negative, we compute
+		// a zoom-to-fit preserving aspect ratio
+		ow = -ow;
+		oh = -oh;
+		if (oh*w > ow*h)
+			oh = (h*ow)/w;
+		else
+			ow = (w*oh)/h;
+	}
 
 	float (**y)[pd] = matrix_build(ow, oh, sizeof**y);
 	bilinear_interpolation(pd, y, ow, oh, x, w, h);

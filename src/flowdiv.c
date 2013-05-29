@@ -10,7 +10,7 @@
 static void flowdiv(float *y, float *flow, int w, int h)
 {
 	float (*divergence)[w] = (void*)y;
-	getsample_operator p = getsample_0;
+	getsample_operator p = getsample_1;
 #define FX(i,j) p(flow,w,h,2,(i),(j),0)
 #define FY(i,j) p(flow,w,h,2,(i),(j),1)
 	for (int j = 0; j < h; j++)
@@ -19,8 +19,8 @@ static void flowdiv(float *y, float *flow, int w, int h)
 			+FX(i+1,j-1)+2*FX(i+1,j)+FX(i+1,j+1);
 		float yy = -FY(i-1,j-1)-2*FY(i,j-1)-FY(i+1,j-1)
 			+FY(i-1,j+1)+2*FY(i,j+1)+FY(i+1,j+1);
-		//divergence[j][i] = (xx + yy)/8;
-		divergence[j][i] = xx + yy;
+		divergence[j][i] = (xx + yy)/8;
+		//divergence[j][i] = xx + yy;
 	}
 #undef FX
 #undef FY
