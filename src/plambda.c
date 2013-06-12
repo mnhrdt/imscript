@@ -615,14 +615,6 @@ struct plambda_program {
 	struct plambda_token t[PLAMBDA_MAX_TOKENS];
 	struct collection_of_varnames var[1];
 
-	// TODO: move the registerrs to the "value_vstack" structure
-	// registers
-	int regn[10];
-	float regv[10][PLAMBDA_MAX_PIXELDIM];
-
-	//// stack of "forgotten" values (accessible via lastx, lasty, lastz...)
-	//int lasttop, lastn[10];
-	//float lastv[10][PLAMBDA_MAX_PIXELDIM];
 };
 
 
@@ -1299,7 +1291,7 @@ static void plambda_compile_program(struct plambda_program *p, const char *str)
 	char s[1+strlen(str)], *spacing = " \n\t";
 	strcpy(s, str);
 
-	FORI(10) p->regn[i] = 0;
+	//FORI(10) s->regn[i] = 0;
 
 	collection_of_varnames_init(p->var);
 	p->n = 0;
@@ -1376,10 +1368,21 @@ static void print_compiled_program(struct plambda_program *p)
 
 
 // stack of vectorial (or possibly scalar) values
+// This structure actually holds the state of a plambda program as it is being
+// executed
 struct value_vstack {
 	int n;
 	int d[PLAMBDA_MAX_TOKENS];
 	float t[PLAMBDA_MAX_TOKENS][PLAMBDA_MAX_PIXELDIM];
+
+	// TODO: move the registerrs to the "value_vstack" structure
+	// registers
+	int regn[10];
+	float regv[10][PLAMBDA_MAX_PIXELDIM];
+
+	//// stack of "forgotten" values (accessible via lastx, lasty, lastz...)
+	//int lasttop, lastn[10];
+	//float lastv[10][PLAMBDA_MAX_PIXELDIM];
 };
 
 static int vstack_pop_vector(float *val, struct value_vstack *s)
@@ -1675,13 +1678,6 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 		vstack_push_vector(s, y, m);
 		break;
 				  }
-	//case PLAMBDA_STACKOP_MUL22: {
-	//	float a[6];
-	//	FORI(6) {
-	//		float tmp[PLAMBDA_MAX_PIXELDIM];
-	//		if (1 == vstack_pop_vector)
-	//	vstack_pop_vector
-	//			    }
 	case PLAMBDA_STACKOP_VMERGEALL:
 		fail("mergeall not implemented");
 		break;
@@ -1695,8 +1691,9 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 		float x[n][PLAMBDA_MAX_PIXELDIM], y[PLAMBDA_MAX_PIXELDIM];
 		int d[n], sdi = 0;
 		FORI(n) {
-			d[i] = vstack_pop_vector(x[i], s);
-			sdi += d[i];
+			int j = n-i-1;
+			d[j] = vstack_pop_vector(x[j], s);
+			sdi += d[j];
 		}
 		if (sdi >= PLAMBDA_MAX_PIXELDIM)
 			fail("merging vectors results in large vector");
@@ -1830,9 +1827,9 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 		case PLAMBDA_VARDEF: {
 			int n = abs(t->index);
 			if (t->index > 0)
-				p->regn[n] = vstack_pop_vector(p->regv[n], s);
+				s->regn[n] = vstack_pop_vector(s->regv[n], s);
 			if (t->index < 0)
-				vstack_push_vector(s, p->regv[n], p->regn[n]);
+				vstack_push_vector(s, s->regv[n], s->regn[n]);
 				     }
 			break;
 		case PLAMBDA_MAGIC: {
@@ -1897,7 +1894,7 @@ static void add_hidden_variables(char *out, int maxplen, int newvars, char *in)
 
 #include "smapa.h"
 SMART_PARAMETER_SILENT(SRAND,0)
-SMART_PARAMETER_SILENT(PLAMBDA_CALC,0)
+//SMART_PARAMETER_SILENT(PLAMBDA_CALC,0)
 
 int main_calc(int c, char *v[])
 {
@@ -1943,6 +1940,26 @@ int main_calc(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
+// @c pointer to original argc
+// @v pointer to original argv
+// @o option name (after hyphen)
+// @d default value
+static char *pick_option(int *c, char ***v, char *o, char *d)
+{
+	int argc = *c;
+	char **argv = *v;
+	for (int i = 0; i < argc - 1; i++)
+		if (argv[i][0] == '-' && 0 == strcmp(argv[i]+1, o))
+		{
+			char *r = argv[i+1];
+			*c -= 2;
+			for (int j = i; j < argc - 1; j++)
+				(*v)[j] = (*v)[j+2];
+			return r;
+		}
+	return d;
+}
+
 #include "iio.h"
 int main_images(int c, char *v[])
 {
@@ -1951,6 +1968,7 @@ int main_images(int c, char *v[])
 		//                          0 1   2         c-1
 		return EXIT_FAILURE;
 	}
+	char *filename_out = pick_option(&c, &v, "o", "-");
 
 	struct plambda_program p[1];
 
@@ -1986,7 +2004,7 @@ int main_images(int c, char *v[])
 	int opd = run_program_vectorially(out, pdreal, p, x, *w, *h, pd);
 	assert(opd == pdreal);
 
-	iio_save_image_float_vec("-", out, *w, *h, opd);
+	iio_save_image_float_vec(filename_out, out, *w, *h, opd);
 
 	FORI(n) free(x[i]);
 	free(out);
@@ -2005,48 +2023,53 @@ static int print_version(void)
 static int print_help(char *v, int verbosity)
 {
 	printf(
-	"Plambda evaluates an expression with images as variables.\n"
-	"\n"
-	"The resulting image is printed to standard output.  The expression\n"
-	"should be written in reverse polish notation using common operators\n"
-	"and functions from `math.h'.  The variables appearing on the\n"
-	"expression are assigned to each input image in alphabetical order.\n"
-	"%s"
-	"\n"
-	"Usage: %s img1.png img2.png img3.png ... \"EXPRESSION\"\n"
-	"   or: %s -c num1 num2 num3  ... \"EXPRESSION\"\n"
-	"\n"
-	"Options:\n"
-	" -c\tact as a symbolic calculator\n"
-	" -h\tdisplay short help message\n"
-	" --help\tdisplay longer help message\n"
-	//" --version\tdisplay version\n"
-	//" --man\tdisplay manpage\n"
-	"\n"
-	"Examples:\n"
-	" plambda a.tiff b.tiff \"x y +\" > sum.tiff\tCompute the sum of two images.\n"
-	" plambda -c \"1 atan 4 *\"\t\t\tPrint pi\n"
-	"%s"
-	"\n"
-	"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>.\n",
-	verbosity>0?
-	"\n"
-	"EXPRESSIONS:\n\n"
-	"A \"plambda\" expression is a sequence of tokens.\nTokens may be constants,\n"
-	"variables, or operators.  Constants and variables get their value\n"
-	"computed and pushed to the stack.  Operators pop values from the stack,\n"
-	"apply a function to them, and push back the results.\n"
-	"\n"
+"Plambda evaluates an expression with images as variables.\n"
+"\n"
+"The resulting image is printed to standard output.  The expression\n"
+"should be written in reverse polish notation using common operators\n"
+"and functions from `math.h'.  The variables appearing on the\n"
+"expression are assigned to each input image in alphabetical order.\n"
+"%s"
+"\n"
+"Usage: %s img1.png img2.png img3.png ... \"EXPRESSION\"\n"
+"   or: %s -c num1 num2 num3  ... \"EXPRESSION\"\n"
+"\n"
+"Options:\n"
+" -o file\tsave output to named file\n"
+" -c\t\tact as a symbolic calculator\n"
+" -h\t\tdisplay short help message\n"
+" --help\t\tdisplay longer help message\n"
+//" --version\tdisplay version\n"
+//" --man\tdisplay manpage\n"
+"\n"
+"Examples:\n"
+" plambda a.tiff b.tiff \"x y +\" > sum.tiff\tCompute the sum of two images.\n"
+" plambda -c \"1 atan 4 *\"\t\t\tPrint pi\n"
+"%s"
+"\n"
+"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>.\n",
+verbosity>0?
+"\n"
+"EXPRESSIONS:\n\n"
+"A \"plambda\" expression is a sequence of tokens.\nTokens may be constants,\n"
+"variables, or operators.  Constants and variables get their value\n"
+"computed and pushed to the stack.  Operators pop values from the stack,\n"
+"apply a function to them, and push back the results.\n"
+"\n"
 "CONSTANTS: numeric constants written in scientific notation, and \"pi\"\n"
 "\n"
-"OPERATORS: +, -, *, ^, /, and all the functions from math.h\n"
+"OPERATORS: +, -, *, ^, /, <, >, ==, and all the functions from math.h\n"
+"\n"
+"LOGIC OPS: if, and, or, not\n"
 "\n"
 "VARIABLES: anything not recognized as a constant or operator.  There\n"
 "must be as many variables as input images, and they are assigned to\n"
 "images in alphabetical order.  If there are no variables, the input\n"
 "images are pushed to the stack.\n"
 "\n"
-"All operators (unary, binary and ternary) are vectorizable.\n"
+"All operators (unary, binary and ternary) are vectorizable.  Thus, you can\n"
+"add a scalar to a vector, divide two vectors of the same size, and so on.\n"
+"The semantics of each operation follows the principle of least surprise.\n"
 "\n"
 "Some \"sugar\" is added to the language:\n"
 "\n"
@@ -2065,30 +2088,6 @@ static int print_help(char *v, int verbosity)
 " :W\twidth of the image divided by 2*pi\n"
 " :H\theight of the image divided by 2*pi\n"
 "\n"
-//
-// 	All operators (unary, binary and ternary) are vectorializable.
-//
-//	Some "sugar" is added to the language:
-//
-//	Predefined variables (always preceeded by a colon):
-//
-//		TOKEN	MEANING
-//
-//		:i	horizontal coordinate of the pixel
-//		:j	vertical coordinate of the pixel
-//		:w	width of the image
-//		:h	heigth of the image
-//		:n	number of pixels in the image
-//		:x	relative horizontal coordinate of the pixel
-//		:y	relative horizontal coordinate of the pixel
-//		:r	relative distance to the center of the image
-//		:t	relative angle from the center of the image
-//		:I	horizontal coordinate of the pixel (centered)
-//		:J	vertical coordinate of the pixel (centered)
-//		:W	width of the image divided by 2*pi
-//		:H	height of the image divided by 2*pi
-//
-//
 "Variable modifiers acting on regular variables:\n"
 " x\t\tvalue of pixel (i,j)\n"
 " x(0,0)\t\tvalue of pixel (i,j)\n"
@@ -2098,23 +2097,6 @@ static int print_help(char *v, int verbosity)
 " x[1]\t\tvalue of second component of pixel (i,j)\n"
 " x(1,2)[3]\tvalue of fourth component of pixel (i+1,j+2)\n"
 "\n"
-//	Variable modifiers acting on regular variables:
-//
-//		TOKEN	MEANING
-//
-//		x	value of pixel (i,j)
-//		x(0,0)	value of pixel (i,j)
-//		x(1,0)	value of pixel (i+1,j)
-//		x(0,-1)	value of pixel (i,j-1)
-//		...
-//
-//		x	value of pixel (i,j)
-//		x[0]	value of first component of pixel (i,j)
-//		x[1]	value of second component of pixel (i,j)
-//
-//		x(1,-1)[2] value of third component of pixel (i+1,j-1)
-//
-//
 "Stack operators (allow direct manipulation of the stack):\n"
 " del\tremove the value at the top of the stack (ATTTOS)\n"
 " dup\tduplicate the value ATTTOS\n"
@@ -2146,11 +2128,11 @@ static int print_help(char *v, int verbosity)
 " x%Wn\tcomponent-wise nth millionth part\n"
 " x%0n\tcomponent-wise nth order statistic\n"
 " x%9n\tcomponent-wise nth order statistic (from the right)\n"
+//" x[2]%i\tminimum value of the blue channel\n"
 //" \n"
 //" x%M\tmedian pixel value\n"
-//" x[2]%i\tminimum value of the blue channel\n"
 "\n"
-"Random numbers:\n"
+"Random numbers (seeded by the SRAND environment variable):\n"
 " randu\tpush a random number with distribution Uniform(0,1)\n"
 " randn\tpush a random number with distribution Normal(0,1)\n"
 " randc\tpush a random number with distribution Cauchy(0,1)\n"
@@ -2172,6 +2154,14 @@ static int print_help(char *v, int verbosity)
 " mtrans\t\ttranspose of a matrix\n"
 " mtrace\t\ttrace of a matrix\n"
 " minv\t\tinverse of a matrix\n"
+"\n"
+"Registers (numbered from 1 to 9):\n"
+" >7\tcopy to register 7\n"
+" <3\tcopy from register 3\n"
+//"\n"
+//"Environment:\n"
+//" SRAND\tseed of the random number generator (default=1)\n"
+//" CAFMT\tformat of the number printed by the calculator (default=%.15lf)\n"
 	:
 	"See the manual page for details on the syntax for expressions.\n"
 	,
@@ -2196,7 +2186,8 @@ int main(int c, char *v[])
 	if (c == 2 && 0 == strcmp(v[1], "--man")) return do_man();
 
 	int (*f)(int c, char *v[]);
-       	f = (PLAMBDA_CALC()>0 || **v=='c' || c==2) ? main_calc : main_images;
+       	//f = (PLAMBDA_CALC()>0 || **v=='c' || c==2) ? main_calc : main_images;
+       	f = (**v=='c' || c==2) ? main_calc : main_images;
 	if (f == main_images && c > 2 && 0 == strcmp(v[1], "-c"))
 	{
 		for (int i = 1; i <= c; i++)
