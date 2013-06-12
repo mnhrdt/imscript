@@ -73,7 +73,7 @@
 //		split	split the vector ATTOTS into scalar components
 //		join	join the components of two vectors ATTOTS
 //		join3	join the components of three vectors ATTOTS
-//		n join	join the components of n vectors ATTOTS
+//		n njoin	join the components of n vectors ATTOTS
 //
 //
 //	Magic modifiers (which are not computed locally for each image):
@@ -182,8 +182,6 @@
 //		  cat image|fftper|fft|plambda - "x :I :I * :J :J * + *"|ifft|crop 0 0 `imprintf "%w %h"`|fft|plambda - "x :I :I * :J :J * + /"|ifft >pcomponent
 //
 //
-// TODO: 2x2 and 3x3 matrix multiplication
-// TODO: admit images of different number of channels
 // TODO: implement shunting-yard algorithm to admit infix notation
 // TODO: handle 3D and nD images
 // TODO: merge colonvars and magicvars (the only difficulty lies in naming)
@@ -616,8 +614,15 @@ struct plambda_program {
 	int n;
 	struct plambda_token t[PLAMBDA_MAX_TOKENS];
 	struct collection_of_varnames var[1];
-	int regn[10]; // registers
+
+	// TODO: move the registerrs to the "value_vstack" structure
+	// registers
+	int regn[10];
 	float regv[10][PLAMBDA_MAX_PIXELDIM];
+
+	//// stack of "forgotten" values (accessible via lastx, lasty, lastz...)
+	//int lasttop, lastn[10];
+	//float lastv[10][PLAMBDA_MAX_PIXELDIM];
 };
 
 
@@ -1383,6 +1388,7 @@ static int vstack_pop_vector(float *val, struct value_vstack *s)
 		s->n -= 1;
 		int d = s->d[s->n];
 		if (val) FORI(d) val[i] = s->t[s->n][i];
+		// TODO: push this value onto a "lastx" register, à la HP
 		return d;
 	} else fail("popping from empty stack");
 }
@@ -2007,15 +2013,15 @@ static int print_help(char *v, int verbosity)
 	"expression are assigned to each input image in alphabetical order.\n"
 	"%s"
 	"\n"
-	"Usage: %s image1.png image2.png image3.png ... \"EXPRESSION\"\n"
-	"   or: %s -c number1 number2 number3  ... \"EXPRESSION\"\n"
+	"Usage: %s img1.png img2.png img3.png ... \"EXPRESSION\"\n"
+	"   or: %s -c num1 num2 num3  ... \"EXPRESSION\"\n"
 	"\n"
 	"Options:\n"
 	" -c\tact as a symbolic calculator\n"
 	" -h\tdisplay short help message\n"
 	" --help\tdisplay longer help message\n"
 	//" --version\tdisplay version\n"
-	" --man\tdisplay manpage\n"
+	//" --man\tdisplay manpage\n"
 	"\n"
 	"Examples:\n"
 	" plambda a.tiff b.tiff \"x y +\" > sum.tiff\tCompute the sum of two images.\n"
@@ -2058,6 +2064,7 @@ static int print_help(char *v, int verbosity)
 " :J\tvertical coordinate of the pixel (centered)\n"
 " :W\twidth of the image divided by 2*pi\n"
 " :H\theight of the image divided by 2*pi\n"
+"\n"
 //
 // 	All operators (unary, binary and ternary) are vectorializable.
 //
@@ -2082,6 +2089,15 @@ static int print_help(char *v, int verbosity)
 //		:H	height of the image divided by 2*pi
 //
 //
+"Variable modifiers acting on regular variables:\n"
+" x\t\tvalue of pixel (i,j)\n"
+" x(0,0)\t\tvalue of pixel (i,j)\n"
+" x(1,0)\t\tvalue of pixel (i+1,j)\n"
+" x(0,-1)\tvalue of pixel (i,j-1)\n"
+" x[0]\t\tvalue of first component of pixel (i,j)\n"
+" x[1]\t\tvalue of second component of pixel (i,j)\n"
+" x(1,2)[3]\tvalue of fourth component of pixel (i+1,j+2)\n"
+"\n"
 //	Variable modifiers acting on regular variables:
 //
 //		TOKEN	MEANING
@@ -2099,21 +2115,63 @@ static int print_help(char *v, int verbosity)
 //		x(1,-1)[2] value of third component of pixel (i+1,j-1)
 //
 //
-//	Stack operators (allow direct manipulation of the stack):
-//
-//		TOKEN	MEANING
-//
-//		del	remove the value at the top of the stack (ATTOTS)
-//		dup	duplicate the value ATTOTS
-//		rot	swap the two values ATTOTS
-//		split	split the vector ATTOTS into scalar components
-//		join	join the components of two vectors ATTOTS
-//		join3	join the components of three vectors ATTOTS
-//		n join	join the components of n vectors ATTOTS
-	//"Expressions:\n"
-	//" a -c p q\n\n"
-	//" a -c p q\n"
-	//" a -c p q\n"
+"Stack operators (allow direct manipulation of the stack):\n"
+" del\tremove the value at the top of the stack (ATTTOS)\n"
+" dup\tduplicate the value ATTTOS\n"
+" rot\tswap the two values ATTTOS\n"
+" split\tsplit the vector ATTTOS into scalar components\n"
+" join\tjoin the components of two vectors ATTOTS\n"
+" join3\tjoin the components of three vectors ATTOTS\n"
+" njoin\tjoin the components of n vectors\n"
+" halve\tsplit an even-sized vector ATTOTS into two equal-sized parts\n"
+//" interleave\tinterleave\n"
+//" deinterleave\tdeinterleave\n"
+//" nsplit\tnsplit\n"
+"\n"
+//"Magic variable modifiers:\n"
+"Magic variable modifiers (global data associated to each input image):\n"
+" x%i\tvalue of the smallest sample of image x\n"
+" x%a\tvalue of the largest sample\n"
+" x%v\taverage sample value\n"
+" x%m\tmedian sample value\n"
+" x%s\tsum of all samples\n"
+" x%I\tvalue of the smallest pixel (in euclidean norm)\n"
+" x%A\tvalue of the largest pixel\n"
+" x%V\taverage pixel value\n"
+" x%S\tsum of all pixels\n"
+" x%Y\tcomponent-wise minimum of all pixels\n"
+" x%E\tcomponent-wise maximum of all pixels\n"
+" x%qn\tnth sample percentile\n"
+" x%On\tcomponent-wise nth percentile\n"
+" x%Wn\tcomponent-wise nth millionth part\n"
+" x%0n\tcomponent-wise nth order statistic\n"
+" x%9n\tcomponent-wise nth order statistic (from the right)\n"
+//" \n"
+//" x%M\tmedian pixel value\n"
+//" x[2]%i\tminimum value of the blue channel\n"
+"\n"
+"Random numbers:\n"
+" randu\tpush a random number with distribution Uniform(0,1)\n"
+" randn\tpush a random number with distribution Normal(0,1)\n"
+" randc\tpush a random number with distribution Cauchy(0,1)\n"
+" randl\tpush a random number with distribution Laplace(0,1)\n"
+" rande\tpush a random number with distribution Exponential(1)\n"
+" randp\tpush a random number with distribution Pareto(1)\n"
+" rand\tpush a random integer returned from rand(3)\n"
+"\n"
+"Vectorial operations (acting over vectors of a certain length):\n"
+" topolar\tconvert a 2-vector from cartesian to polar\n"
+" frompolar\tconvert a 2-vector from polar to cartesian\n"
+" hsv2rgb\tconvert a 3-vector from HSV to RGB\n"
+" rgb2hsv\tconvert a 3-vector from RGB to HSV\n"
+" cprod\t\tmultiply two 2-vectrs as complex numbers\n"
+" mprod\t\tmultiply two 2-vectrs as matrices (4-vector = 2x2 matrix, etc)\n"
+" vprod\t\tvector product of two 3-vectors\n"
+" sprod\t\tscalar product of two n-vectors\n"
+" mdet\t\tdeterminant of a n-matrix (a n*n-vector)\n"
+" mtrans\t\ttranspose of a matrix\n"
+" mtrace\t\ttrace of a matrix\n"
+" minv\t\tinverse of a matrix\n"
 	:
 	"See the manual page for details on the syntax for expressions.\n"
 	,
