@@ -4,16 +4,18 @@
 plambda \- evaluate an expression with images as variables
 .SH SYNOPSIS
 .B plambda
-\fIimg1.png img2.png img3.png \fR... \fI"EXPRESSION"\fR
+\fIa.png b.png c.png \fR... \fI"EXPRESSION" > output\fR
+.br
+.B plambda
+\fIa.png b.png c.png \fR... \fI"EXPRESSION" -o output.png\fR
 .br
 .B plambda
 \fI-c num1 num2 num3  \fR... \fI"EXPRESSION"\fR
 .SH DESCRIPTION
 Plambda evaluates an expression with images as variables.
 .PP
-The resulting image is printed to standard output.  The expression
-should be written in reverse polish notation using common operators
-and functions from `math.h'.  The variables appearing on the
+The expression is written in reverse polish notation using common
+operators and functions from `math.h'.  The variables appearing on the
 expression are assigned to each input image in alphabetical order.
 .PP
 EXPRESSIONS:
@@ -26,14 +28,18 @@ apply a function to them, and push back the results.
 .PP
 CONSTANTS: numeric constants written in scientific notation, and "pi"
 .PP
-OPERATORS: +, \-, *, ^, /, and all the functions from math.h
+OPERATORS: +, \-, *, ^, /, <, >, ==, and all the functions from math.h
+.PP
+LOGIC OPS: if, and, or, not
 .PP
 VARIABLES: anything not recognized as a constant or operator.  There
 must be as many variables as input images, and they are assigned to
 images in alphabetical order.  If there are no variables, the input
 images are pushed to the stack.
 .PP
-All operators (unary, binary and ternary) are vectorizable.
+All operators (unary, binary and ternary) are vectorizable.  Thus, you can
+add a scalar to a vector, divide two vectors of the same size, and so on.
+The semantics of each operation follows the principle of least surprise.
 .PP
 Some "sugar" is added to the language:
 .SS "Predefined variables (always preceeded by a colon):"
@@ -172,7 +178,7 @@ component\-wise nth order statistic
 .TP
 x%9n
 component\-wise nth order statistic (from the right)
-.SS "Random numbers:"
+.SS "Random numbers (seeded by the SRAND environment variable):"
 .TP
 randu
 push a random number with distribution Uniform(0,1)
@@ -231,15 +237,26 @@ trace of a matrix
 .TP
 minv
 inverse of a matrix
+.SS "Registers (numbered from 1 to 9):"
+.TP
+>7
+copy to register 7
+.TP
+<3
+copy from register 3
 .SH OPTIONS
+.TP
+\fB\-o\fR file
+save output to named file
 .TP
 \fB\-c\fR
 act as a symbolic calculator
 .TP
 \fB\-h\fR
 display short help message
-.HP
-\fB\-\-help\fR display longer help message
+.TP
+\fB\-\-help\fR
+display longer help message
 .SH EXAMPLES
 .TP
 plambda a.tiff b.tiff "x y +" > sum.tiff

@@ -8,6 +8,9 @@
 
 #include "iio.h"
 
+// rpc: rpc file in XML
+// ssf: sub sampling factor (wrt to the original panchromatic image)
+// h: a height at which to evaluate the numbers
 int main(int c, char *v[])
 {
 	if (c != 4) {
@@ -20,6 +23,7 @@ int main(int c, char *v[])
 	double h = atof(v[3]);
 	int nx = (r->dmval[2] - r->dmval[0])/f;
 	int ny = (r->dmval[3] - r->dmval[1])/f;
+	//fprintf(stderr, "
 	fprintf(stderr, "will build image of size %dx%d\n", nx, ny);
 	float (*e)[nx][2] = xmalloc(2*nx*ny*sizeof(float));
 	for (int j = 0; j < ny; j++)

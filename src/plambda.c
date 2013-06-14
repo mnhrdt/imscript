@@ -1,17 +1,21 @@
-// NAME
+// PLAMBDA(1)                  imscript                  PLAMBDA(1)        {{{1
+//
+// NAME                                                                    {{{2
 // 	plambda - a RPN calculator for image pixels
 //
-// SYNOPSIS
-// 	plambda a.pnb b.png c.png ... "lambda expression" > output.png
+// SYNOPSIS                                                                {{{2
+// 	plambda a.pnb b.png c.png ... "lambda expression" > output
+// 	plambda a.pnb b.png c.png ... "lambda expression" -o output.png
+// 	plambda -c num1 num2 ... "lambda expression"
 //
-// DESCRIPTION
+// DESCRIPTION                                                             {{{2
 // 	Plambda applies an expression to all the pixels of a collection of
 // 	images, and produces a single output image.  Each input image
 // 	corresponds to one of the variables of the expression (in alphabetical
 // 	order).  There are modifiers to the variables that allow access to the
 // 	values of neighboring pixels, or to particular components of a pixel.
 //
-// LANGUAGE
+// LANGUAGE                                                                {{{2
 // 	A "plambda" program is a sequence of tokens.  Tokens may be constants,
 // 	variables, or operators.  Constants and variables get their value
 // 	computed and pushed to the stack.  Operators pop values from the stack,
@@ -117,8 +121,15 @@
 //		mtrace	trace of a matrix
 //		minv	inverse of a matrix
 //
+// OPTIONS                                                                 {{{2
+//      -o file     save output to named file
+//      -c          act as a symbolic calculator
+//      -h          print short help message
+//      --help      print longer help message
+//      --man       print manpage (requires help2man)
+//      --version   print program version
 //
-// EXAMPLES
+// EXAMPLES                                                                {{{2
 // 	Sum two images:
 //
 // 		plambda a.png b.png "a b +" > aplusb.png
@@ -182,10 +193,25 @@
 //		  cat image|fftper|fft|plambda - "x :I :I * :J :J * + *"|ifft|crop 0 0 `imprintf "%w %h"`|fft|plambda - "x :I :I * :J :J * + /"|ifft >pcomponent
 //
 //
-// TODO: implement shunting-yard algorithm to admit infix notation
-// TODO: handle 3D and nD images
-// TODO: merge colonvars and magicvars (the only difficulty lies in naming)
+//
+// AUTHOR                                                                  {{{2
+//
+//      Written by Enric Meinhardt-Llopis
+//
+//
+// REPORTING BUGS                                                          {{{2
+//
+//      Download last version from https://github.com/mnhrdt
+//      Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>
+//
+// TODO LIST                                                               {{{2
+//
+//      * implement shunting-yard algorithm to admit infix notation
+//      * handle 3D and nD images
+//      * merge colonvars and magicvars (the only difficulty lies in naming)
 
+
+// #includes {{{1
 
 #include <assert.h>
 #include <ctype.h>
@@ -194,6 +220,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+
+#include "fail.c"
+#include "xmalloc.c"
+#include "random.c"
+#include "parsenumbers.c"
+#include "colorcoords.c"
+
+
+// #defines {{{1
 
 #define PLAMBDA_MAX_TOKENS 2049
 #define PLAMBDA_MAX_VARLEN 0x100
@@ -214,14 +249,6 @@
 #define FORL(n) for(int l=0;l<(n);l++)
 #endif
 
-//#define RNG_SPECIFIC_WELL1024
-//#include "fragments.c"
-#include "fail.c"
-#include "xmalloc.c"
-#include "random.c"
-#include "colorcoords.c"
-#include "parsenumbers.c"
-
 
 #define PLAMBDA_CONSTANT 0 // numeric constant
 #define PLAMBDA_SCALAR 1   // pixel component
@@ -232,7 +259,8 @@
 #define PLAMBDA_VARDEF 6   // register variable definition (hacky)
 #define PLAMBDA_MAGIC 7    // "magic" modifier (requiring cached global data)
 
-// local functions
+// local functions {{{1
+
 static double sum_two_doubles      (double a, double b) { return a + b; }
 static double substract_two_doubles(double a, double b) { return a - b; }
 static double multiply_two_doubles (double a, double b) { return a * b; }
@@ -466,7 +494,7 @@ static int matrix_transpose(float *r, float *a, int nn)
 }
 
 
-// table of all functions (local and from math.h)
+// table of all functions (local and from math.h) {{{1
 struct predefined_function {
 	void (*f)(void);
 	char *name;
@@ -593,31 +621,6 @@ struct predefined_function {
 };
 
 
-struct plambda_token {
-	int type;
-	float value;         // if type==constant, value
-	int index;           // if type==variable, its index
-	                     // if type==operator, its index
-	int component;       // if type==variable, index of selected component
-	int displacement[2]; // if type==variable, relative displacement
-	int colonvar;        // if type==colon, the letter
-
-	char *tmphack;       // temporary place for storing the unsorted index
-};
-
-struct collection_of_varnames {
-	int n;
-	char *t[PLAMBDA_MAX_TOKENS];
-};
-
-struct plambda_program {
-	int n;
-	struct plambda_token t[PLAMBDA_MAX_TOKENS];
-	struct collection_of_varnames var[1];
-
-};
-
-
 static float apply_function(struct predefined_function *f, float *v)
 {
 	switch(f->nargs) {
@@ -660,6 +663,36 @@ static float eval_colonvar(int w, int h, int i, int j, int c)
 	default: fail("unrecognized colonvar \":%c\"", c);
 	}
 }
+
+
+// struct plambda_program {{{1
+
+struct plambda_token {
+	int type;
+	float value;         // if type==constant, value
+	int index;           // if type==variable, its index
+	                     // if type==operator, its index
+	int component;       // if type==variable, index of selected component
+	int displacement[2]; // if type==variable, relative displacement
+	int colonvar;        // if type==colon, the letter
+
+	char *tmphack;       // temporary place for storing the unsorted index
+};
+
+struct collection_of_varnames {
+	int n;
+	char *t[PLAMBDA_MAX_TOKENS];
+};
+
+struct plambda_program {
+	int n;
+	struct plambda_token t[PLAMBDA_MAX_TOKENS];
+	struct collection_of_varnames var[1];
+
+};
+
+
+// image statistics {{{1
 
 struct image_stats {
 	bool init_simple, init_vsimple, init_ordered, init_vordered;
@@ -980,6 +1013,7 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 	return 0;
 }
 
+// lexing and parsing {{{1
 
 // if the token resolves to a numeric constant, store it in *x and return true
 // otherwise, return false
@@ -1366,17 +1400,21 @@ static void print_compiled_program(struct plambda_program *p)
 		fprintf(stderr, "VARIABLE[%d] = \"%s\"\n", i, p->var->t[i]);
 }
 
+// evaluation {{{1
+
+// struct value_vstack {{{2
 
 // stack of vectorial (or possibly scalar) values
+//
 // This structure actually holds the state of a plambda program as it is being
 // executed
 struct value_vstack {
+	// stack
 	int n;
 	int d[PLAMBDA_MAX_TOKENS];
 	float t[PLAMBDA_MAX_TOKENS][PLAMBDA_MAX_PIXELDIM];
 
-	// TODO: move the registerrs to the "value_vstack" structure
-	// registers
+	// registers 0 to 9
 	int regn[10];
 	float regv[10][PLAMBDA_MAX_PIXELDIM];
 
@@ -1384,6 +1422,8 @@ struct value_vstack {
 	//int lasttop, lastn[10];
 	//float lastv[10][PLAMBDA_MAX_PIXELDIM];
 };
+
+// struct value_vstack manipulation {{{2
 
 static int vstack_pop_vector(float *val, struct value_vstack *s)
 {
@@ -1427,7 +1467,7 @@ static void vstack_push_scalar(struct value_vstack *s, float x)
 //}
 
 
-
+// function application (strange cases) {{{2
 // XXX TODO: refactor the following strange cases into the general setup
 
 // a function that takes no arguments but must be called nonetheless
@@ -1503,37 +1543,6 @@ static void treat_strange_case4(struct value_vstack *s,
 	fail("color space conversions not implemented");
 }
 
-//#define PACK_THREE_INTS(a,b,c) (142+(a)*10000+(b)*100+(c))
-//static void unpack_three_ints(int *abc, int x)
-//{
-//	x -= 142; abc[2] = x % 100;
-//	x /= 100; abc[1] = x % 100;
-//	x /= 100; abc[0] = x % 100;
-//}
-
-// codifies a function R^a x R^b -> R^c
-// if a = 0, this is a function R^b -> R^c
-// the dimensions must be smaller than, say, 40
-//static void non_vectorialized_vectorial_operation(struct value_vstack *s,
-//		struct predefined_function *f)
-//{
-//	int abc[3];
-//	unpack_three_ints(abc, -f->nargs);
-//	assert(abc[0] >= 0);
-//	assert(abc[1] > 0);
-//	assert(abc[2] > 0);
-//	if (abc[0] == 0) {
-//		// pop a b-vector and push the resulting c-vector
-//	} else {
-//		// pop an a-vector and a b-vector and push a c-vector
-//		float a[PLAMBDA_MAX_PIXELDIM];
-//		float b[PLAMBDA_MAX_PIXELDIM];
-//		float c[PLAMBDA_MAX_PIXELDIM];
-//		int na = vstack_pop_vector(a, s);
-//		int nb = vstack_pop_vector(b, s);
-//		int nc = vstack_pop_vector(b, s);
-//	}
-//}
 
 // codifies a function R^a x R^b -> R^c
 // the dimensions must be smaller than, say, 40
@@ -1562,6 +1571,8 @@ static void treat_univector_function(struct value_vstack *s,
 	int nr = ((int(*)(float*,float*,int))(f->f))(r,a,na);
 	vstack_push_vector(s, r, nr);
 }
+
+// function application (general case) {{{2
 
 // this function is complicated because it contains the scalar+vector
 // semantics, which is complicated
@@ -1600,6 +1611,9 @@ static void vstack_apply_function(struct value_vstack *s,
 	}
 	vstack_push_vector(s, r, rd);
 }
+
+
+// vstack_process_op (evaluate a program instruction) {{{2
 
 static void vstack_process_op(struct value_vstack *s, int opid)
 {
@@ -1764,6 +1778,7 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 }
 
 
+// run_program_vectorially_at {{{2
 #include "getpixel.c"
 
 // returns the dimension of the output
@@ -1848,6 +1863,9 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 	return vstack_pop_vector(out, s);
 }
 
+
+// evaluation (higher level) {{{1
+
 static int eval_dim(struct plambda_program *p, float **val, int *pd)
 {
 	float result[PLAMBDA_MAX_PIXELDIM];
@@ -1861,7 +1879,7 @@ static int run_program_vectorially(float *out, int pdmax,
 		float **val, int w, int h, int *pd)
 {
 #ifdef _OPENMP
-#pragma omp parallel for default(none)
+#pragma omp parallel for
 #endif
 	FORJ(h) FORI(w) {
 		float result[pdmax];
@@ -1874,14 +1892,7 @@ static int run_program_vectorially(float *out, int pdmax,
 	return pdmax;
 }
 
-//static void shrink_components(float *y, float *x, int n, int ypd, int xpd)
-//{
-//	assert(ypd <= xpd);
-//	FORI(n)
-//		FORL(ypd)
-//			y[ypd*i + l] = x[xpd*i + l];
-//}
-
+// mains {{{1
 
 static void add_hidden_variables(char *out, int maxplen, int newvars, char *in)
 {
@@ -1894,9 +1905,8 @@ static void add_hidden_variables(char *out, int maxplen, int newvars, char *in)
 
 #include "smapa.h"
 SMART_PARAMETER_SILENT(SRAND,0)
-//SMART_PARAMETER_SILENT(PLAMBDA_CALC,0)
 
-int main_calc(int c, char *v[])
+int main_calc(int c, char **v)
 {
 	if (c < 2) {
 		fprintf(stderr, "usage:\n\t%s v1 v2 ... \"plambda\"\n", *v);
@@ -1961,7 +1971,7 @@ static char *pick_option(int *c, char ***v, char *o, char *d)
 }
 
 #include "iio.h"
-int main_images(int c, char *v[])
+int main_images(int c, char **v)
 {
 	if (c < 2) {
 		fprintf(stderr, "usage:\n\t%s in1 in2 ... \"plambda\"\n", *v);
@@ -2025,13 +2035,17 @@ static int print_help(char *v, int verbosity)
 	printf(
 "Plambda evaluates an expression with images as variables.\n"
 "\n"
-"The resulting image is printed to standard output.  The expression\n"
-"should be written in reverse polish notation using common operators\n"
-"and functions from `math.h'.  The variables appearing on the\n"
+"The expression is written in reverse polish notation using common\n"
+"operators and functions from `math.h'.  The variables appearing on the\n"
 "expression are assigned to each input image in alphabetical order.\n"
+//"The resulting image is printed to standard output.  The expression\n"
+//"should be written in reverse polish notation using common operators\n"
+//"and functions from `math.h'.  The variables appearing on the\n"
+//"expression are assigned to each input image in alphabetical order.\n"
 "%s"
 "\n"
-"Usage: %s img1.png img2.png img3.png ... \"EXPRESSION\"\n"
+"Usage: %s a.png b.png c.png ... \"EXPRESSION\" > output\n"
+"   or: %s a.png b.png c.png ... \"EXPRESSION\" -o output.png\n"
 "   or: %s -c num1 num2 num3  ... \"EXPRESSION\"\n"
 "\n"
 "Options:\n"
@@ -2158,14 +2172,14 @@ verbosity>0?
 "Registers (numbered from 1 to 9):\n"
 " >7\tcopy to register 7\n"
 " <3\tcopy from register 3\n"
-//"\n"
+"\n"
 //"Environment:\n"
 //" SRAND\tseed of the random number generator (default=1)\n"
 //" CAFMT\tformat of the number printed by the calculator (default=%.15lf)\n"
 	:
 	"See the manual page for details on the syntax for expressions.\n"
 	,
-	v, v,
+	v, v, v,
 	verbosity < 1 ? "" :
 	" plambda -c \"355 113 /\"\t\t\t\tPrint an approximation of pi\n"
 		);
@@ -2174,10 +2188,11 @@ verbosity>0?
 
 static int do_man(void)
 {
-	return system("help2man -N -S imscript -n \"evaluate an expression with images as variables\" plambda|man -l -");
+	return system("help2man -N -S imscript -n \"evaluate an expression "
+				"with images as variables\" plambda|man -l -");
 }
 
-int main(int c, char *v[])
+int main(int c, char **v)
 {
 	if (c == 1) return print_help(*v, 0);
 	if (c == 2 && 0 == strcmp(v[1], "-h")) return print_help(*v,0);
@@ -2185,9 +2200,7 @@ int main(int c, char *v[])
 	if (c == 2 && 0 == strcmp(v[1], "--version")) return print_version();
 	if (c == 2 && 0 == strcmp(v[1], "--man")) return do_man();
 
-	int (*f)(int c, char *v[]);
-       	//f = (PLAMBDA_CALC()>0 || **v=='c' || c==2) ? main_calc : main_images;
-       	f = (**v=='c' || c==2) ? main_calc : main_images;
+	int (*f)(int, char**) = (**v=='c' || c==2) ? main_calc : main_images;
 	if (f == main_images && c > 2 && 0 == strcmp(v[1], "-c"))
 	{
 		for (int i = 1; i <= c; i++)
@@ -2197,3 +2210,5 @@ int main(int c, char *v[])
 	}
 	return f(c,v);
 }
+
+// vim:set foldmethod=marker:
