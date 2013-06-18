@@ -1,188 +1,31 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
+#include <math.h>
 
-#include "iio.h"
 
-static float getsample(float *x, int w, int h, int pd, int i, int j, int l)
+#include "fail.c"
+#include "xmalloc.c"
+#include "bilinear_interpolation.c"
+
+
+static void bilinear_interpolant_vec(float *y, int yw, int yh,
+		float *x, int xw, int xh, int pd)
 {
-	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
-		return 0;
-	return x[(i+j*w)*pd + l];
-}
-
-static void setsample(float *x, int w, int h, int pd, int i, int j, int l,
-		float v)
-{
-	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
-		return;
-	x[(i+j*w)*pd + l] = v;
-}
-
-static float getpixel(float *x, int w, int h, int i, int j)
-{
-	if (i < 0 || i >= w || j < 0 || j >= h)
-		return 0;
-	return x[i + j*w];
-}
-
-static void setpixel(float *x, int w, int h, int i, int j, float v)
-{
-	if (i < 0 || i >= w || j < 0 || j >= h)
-		return;
-	x[i + j*w] = v;
-}
-
-static float evaluate_bilinear(float a, float b, float c, float d,
-							float x, float y)
-{
-	float r = 0;
-	r += a * (1-x) * (1-y);
-	r += b * ( x ) * (1-y);
-	r += c * (1-x) * ( y );
-	r += d * ( x ) * ( y );
-	return r;
-}
-
-static void bilinear_zoom(float *X, int W, int H, float *x, int w, int h)
-{
-	float wfactor = w/(float)W;
-	float hfactor = h/(float)H;
-	for (int j = 0; j < H; j++)
-	for (int i = 0; i < W; i++)
+	float (*yy)[yw][pd] = (void*)y;
+	float wfactor = xw/(float)yw;
+	float hfactor = xh/(float)yh;
+	for (int j = 0; j < yh; j++)
+	for (int i = 0; i < yw; i++)
 	{
 		float p = i*wfactor;
 		float q = j*hfactor;
-		int ip = p;
-		int iq = q;
-		float a = getpixel(x, w, h, ip  , iq  );
-		float b = getpixel(x, w, h, ip+1, iq  );
-		float c = getpixel(x, w, h, ip  , iq+1);
-		float d = getpixel(x, w, h, ip+1, iq+1);
-		float r = evaluate_bilinear(a, b, c, d, p-ip, q-iq);
-		setpixel(X, W, H, i, j, r);
+		bilinear_interpolation_vec_at(yy[j][i], x, xw, xh, pd, p, q);
 	}
 }
 
-
-//static float *bilinear_zoom(float *x, int w, int h, int pd, int ow, int oh)
-//{
-//	float *y = malloc(ow*oh*pd*sizeof*y);
-//	float wfactor = w/(float)ow;
-//	float hfactor = h/(float)oh;
-//	for (int j = 0; j < oh; j++)
-//	for (int i = 0; i < ow; i++)
-//	for (int l = 0; l < pd; l++)
-//	{
-//		float p = i*wfactor;
-//		float q = j*hfactor;
-//		int ip = p;
-//		int iq = q;
-//		float a = getsample(x, w, h, pd, ip  , iq  , l);
-//		float b = getsample(x, w, h, pd, ip+1, iq  , l);
-//		float c = getsample(x, w, h, pd, ip  , iq+1, l);
-//		float d = getsample(x, w, h, pd, ip+1, iq+1, l);
-//		float r = evaluate_bilinear(a, b, c, d, p-ip, q-iq);
-//		setsample(y, ow, oh, pd, i, j, l, r);
-//	}
-//	return y;
-//}
-
-static void bilinear_interpolation(int pd, float (**y)[pd], int ow, int oh,
-		float (**x)[pd], int w, int h)
-{
-	float wfactor = w/(float)ow;
-	float hfactor = h/(float)oh;
-	float a=0, b=0, c=0, d=0;
-	for (int j = 0; j < oh; j++)
-	for (int i = 0; i < ow; i++)
-	for (int l = 0; l < pd; l++)
-	{
-		float p = i*wfactor;
-		float q = j*hfactor;
-		int ip = p;
-		int iq = q;
-		//fprintf(stderr, "i j p q ip iq %d %d %g %g %d %d\n", i, j, p, q, ip, iq);
-		a = x[iq][ip][l];
-		if (ip+1 < w) b = x[iq][ip+1][l];
-		if (iq+1 < h) c = x[iq+1][ip][l];
-		if (ip+1 < w && iq+1 < h) d = x[iq+1][ip+1][l];
-		float r = evaluate_bilinear(a, b, c, d, p-ip, q-iq);
-		y[j][i][l] = r;
-	}
-}
-
-//// input: n vectors of dimension d and component size s
-//// output (in place): d arrays of length n and element size s
-//static void act_of_violence(void *data, int n, int d, int s)
-//{
-//	void *tmp = malloc(n*d*s);
-//	for (int i = 0; i < n; i++)
-//		for (int j = 0; j < d; j++)
-//		{
-//			void *from = s*(d*i + j) + (char *)data;
-//			void *to =   s*(n*j + i) + (char *)tmp;
-//			memcpy(to, from, s);
-//		}
-//
-//	memcpy(data, tmp, n*d*s);
-//	free(tmp);
-//}
-
-//int main_flat(int c, char *v[])
-//{
-//	if (c != 3) {
-//		fprintf(stderr, "usage:\n\t%s width height < in > out\n", *v);
-//		return EXIT_FAILURE;
-//	}
-//	int ow = atoi(v[1]);
-//	int oh = atoi(v[2]);
-//
-//	int w, h, pd;
-//	float *x = iio_read_image_float_vec("-", &w, &h, &pd);
-//	float *y = bilinear_zoom(x, w, h, pd, ow, oh);
-//
-//	iio_save_image_float_vec("-", y, ow, oh, pd);
-//
-//	free(y);
-//	free(x);
-//
-//	return EXIT_SUCCESS;
-//}
-
-// alloc a 2d matrix contiguously (wxh elements of size n)
-static void *matrix_build(int w, int h, size_t n)
-{
-	size_t p = sizeof(void *);
-	char *r = malloc(h*p + w*h*n);
-	for (int i = 0; i < h; i++)
-		*(void **)(r + i*p) = r + h*p + i*w*n;
-	return r;
-}
-
-static int main_gray(int c, char *v[])
-{
-	if (c != 5) {
-		fprintf(stderr, "usage:\n\t%s width height in out\n", *v);
-		return EXIT_FAILURE;
-	}
-
-	int W = atoi(v[1]);
-	int H = atoi(v[2]);
-
-	int w, h;
-	float *x = iio_read_image_float(v[3], &w, &h);
-	iio_save_image_float("/tmp/caca.png", x, w, h);
-	float *y = malloc(W*H*sizeof*y);
-	bilinear_zoom(y, W, H, x, w, h);
-
-	iio_save_image_float(v[4], y, W, H);
-
-	free(y);
-	free(x);
-
-	return EXIT_SUCCESS;
-}
 
 static bool innerP(int w, int h, int i, int j)
 {
@@ -193,9 +36,10 @@ static bool innerP(int w, int h, int i, int j)
 	return true;
 }
 
-static void downsav(float *yy, float *xx, int w, int h, int pd, int n)
+
+static void downsav2(float *yy, float *xx, int w, int h, int pd, int m, int n)
 {
-	int W = w/n;
+	int W = w/m;
 	int H = h/n;
 	float (*x)[w][pd] = (void*)xx;
 	float (*y)[W][pd] = (void*)yy;
@@ -205,22 +49,67 @@ static void downsav(float *yy, float *xx, int w, int h, int pd, int n)
 	{
 		float num = 0, sum = 0;
 		for (int jj = 0; jj < n; jj++)
-		for (int ii = 0; ii < n; ii++)
-		if (innerP(w, h, i*n+ii, j*n+jj))
+		for (int ii = 0; ii < m; ii++)
+		if (innerP(w, h, i*m+ii, j*n+jj))
 		{
 			num += 1;
-			sum += x[j*n+jj][i*n+ii][l];
+			sum += x[j*n+jj][i*m+ii][l];
 		}
 		y[j][i][l] = sum/num;
 	}
 }
 
-//static void combined_bilinear_interpolation(float *y, int ow, int oh
-//		float *x, int w, int h, int pd)
-//{
-//}
+void compute_resize_sizes(int *out_w, int *out_h, int w, int h)
+{
+	int ow = *out_w;
+	int oh = *out_h;
+	if (ow == -1 && oh == -1) ow = 400;
+	if (oh == -1) oh = (h*ow)/w;
+	if (ow == -1) ow = (w*oh)/h;
+	if (ow < 0 && oh < 0) {
+		// if both input numbers are negative, we compute
+		// a zoom-to-fit preserving aspect ratio
+		ow = -ow;
+		oh = -oh;
+		if (oh*w > ow*h)
+			oh = (h*ow)/w;
+		else
+			ow = (w*oh)/h;
+	} //else fail("incompatible output sizes %d %d", ow, oh);
+	assert(ow > 0);
+	assert(oh > 0);
+	*out_w = ow;
+	*out_h = oh;
+}
 
-static int main_vec(int c, char *v[])
+#include "smapa.h"
+SMART_PARAMETER_SILENT(ZOOMBIL_DIRECT,0)
+
+void resize_api_vec(float *y, int yw, int yh, float *x, int xw, int xh, int pd)
+{
+	//fprintf(stderr, "resize %dx%d -> %dx%d\n", xw, xh, yw, yh);
+	if ((yw >= xw && yh >= xh) || ZOOMBIL_DIRECT()>0) { // zoom in
+		bilinear_interpolant_vec(y, yw, yh, x, xw, xh, pd);
+	} else if (yw < xw && yh < xh) { // zoom out
+		int m = floor(xw/(float)yw);
+		int n = floor(xh/(float)yh);
+		int tw = xw/m;
+		int th = xh/n;
+		assert(yw <= tw); assert(tw <= xw);
+		assert(yh <= th); assert(th <= xh);
+		float *t = xmalloc(tw*th*pd*sizeof*t);
+		downsav2(t, x, xw, xh, pd, m, n);
+		//fprintf(stderr, "w: %d -> %d -> %d\n", xw, tw, yw);
+		//fprintf(stderr, "h: %d -> %d -> %d\n", xh, th, yh);
+		bilinear_interpolant_vec(y, yw, yh, t, tw, th, pd);
+		free(t);
+	} else fail("anisotropic resize %dx%d => %dx%d not implemented",
+			xw, xh, yw, yh);
+}
+
+#include "iio.h"
+
+int main(int c, char *v[])
 {
 	if (c != 5) {
 		fprintf(stderr, "usage:\n\t%s width height in out\n", *v);
@@ -230,39 +119,18 @@ static int main_vec(int c, char *v[])
 	int oh = atoi(v[2]);
 
 	int w, h, pd;
-	void *data = iio_read_image_float_matrix_vec(v[3], &w, &h, &pd);
-	float (**x)[pd] = data;
+	void *x = iio_read_image_float_vec(v[3], &w, &h, &pd);
 
-	if (ow == -1 && oh == -1) ow = 400;
-	else if (oh == -1) oh = (h*ow)/w;
-	else if (ow == -1) ow = (w*oh)/h;
-	else if (ow < 0 && oh < 0) {
-		// if both input numbers are negative, we compute
-		// a zoom-to-fit preserving aspect ratio
-		ow = -ow;
-		oh = -oh;
-		if (oh*w > ow*h)
-			oh = (h*ow)/w;
-		else
-			ow = (w*oh)/h;
-	}
+	compute_resize_sizes(&ow, &oh, w, h);
+	float *y = xmalloc(ow*oh*pd*sizeof*y);
+	resize_api_vec(y, ow, oh, x, w, h, pd);
+	//bilinear_interpolant_vec(y, ow, oh, x, w, h, pd);
 
-	float (**y)[pd] = matrix_build(ow, oh, sizeof**y);
-	bilinear_interpolation(pd, y, ow, oh, x, w, h);
-
-	iio_save_image_float_vec(v[4], y[0][0], ow, oh, pd);
+	iio_save_image_float_vec(v[4], y, ow, oh, pd);
 
 	free(x);
 	free(y);
 
 	fprintf(stderr, "%g %g\n", w/(1.0*ow), h/(1.0*oh));
 	return EXIT_SUCCESS;
-}
-
-int main(int c, char *v[])
-{
-	return main_vec(c, v);
-	/*
-	return main_gray(c, v);
-	*/
 }
