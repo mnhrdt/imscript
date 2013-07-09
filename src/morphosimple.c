@@ -175,6 +175,18 @@ void morsi_laplacian(float *y, float *x, int w, int h, int *e)
 	free(b);
 }
 
+void morsi_strange(float *y, float *x, int w, int h, int *e)
+{
+	float *a = xmalloc(w*h*sizeof*a);
+	float *b = xmalloc(w*h*sizeof*b);
+	morsi_opening(a, x, w, h, e);
+	morsi_closing(b, x, w, h, e);
+	for (int i = 0; i < w*h; i++)
+		y[i] = b[i] - a[i];
+	free(a);
+	free(b);
+}
+
 void morsi_tophat(float *y, float *x, int w, int h, int *e)
 {
 	float *t = xmalloc(w*h*sizeof*t);
@@ -252,6 +264,7 @@ int main(int c, char **v)
 	if (0 == strcmp(v[2], "igradient")) operation = morsi_igradient;
 	if (0 == strcmp(v[2], "egradient")) operation = morsi_egradient;
 	if (0 == strcmp(v[2], "laplacian")) operation = morsi_laplacian;
+	if (0 == strcmp(v[2], "strange"  )) operation = morsi_strange;
 	if (0 == strcmp(v[2], "tophat" ))   operation = morsi_tophat;
 	if (0 == strcmp(v[2], "bothat" ))   operation = morsi_bothat;
 	if (!operation) {
@@ -260,15 +273,19 @@ int main(int c, char **v)
 	}
 
 	// prepare input and output images
-	int w, h;
-	float *x = iio_read_image_float(filename_in, &w, &h);
-	float *y = malloc(w*h*sizeof*y);
+	int w, h, pd;
+	float *x = iio_read_image_float_split(filename_in, &w, &h, &pd);
+	float *y = malloc(w*h*pd*sizeof*y);
 
 	// compute
-	operation(y, x, w, h, structuring_element);
+	if (pd == 1)
+		operation(y, x, w, h, structuring_element);
+	else
+		for (int k = 0; k < pd; k++)
+			operation(y+k*w*h, x+k*w*h, w, h, structuring_element);
 
 	// save result
-	iio_save_image_float(filename_out, y, w, h);
+	iio_save_image_float_split(filename_out, y, w, h, pd);
 
 	// cleanup
 	free(x);
