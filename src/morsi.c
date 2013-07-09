@@ -175,6 +175,15 @@ void morsi_laplacian(float *y, float *x, int w, int h, int *e)
 	free(b);
 }
 
+void morsi_enhance(float *y, float *x, int w, int h, int *e)
+{
+	float *t = xmalloc(w*h*sizeof*t);
+	morsi_laplacian(t, x, w, h, e);
+	for (int i = 0; i < w*h; i++)
+		y[i] = x[i] - t[i];
+	free(t);
+}
+
 void morsi_strange(float *y, float *x, int w, int h, int *e)
 {
 	float *a = xmalloc(w*h*sizeof*a);
@@ -264,9 +273,10 @@ int main(int c, char **v)
 	if (0 == strcmp(v[2], "igradient")) operation = morsi_igradient;
 	if (0 == strcmp(v[2], "egradient")) operation = morsi_egradient;
 	if (0 == strcmp(v[2], "laplacian")) operation = morsi_laplacian;
+	if (0 == strcmp(v[2], "enhance"  )) operation = morsi_enhance;
 	if (0 == strcmp(v[2], "strange"  )) operation = morsi_strange;
-	if (0 == strcmp(v[2], "tophat" ))   operation = morsi_tophat;
-	if (0 == strcmp(v[2], "bothat" ))   operation = morsi_bothat;
+	if (0 == strcmp(v[2], "tophat"   )) operation = morsi_tophat;
+	if (0 == strcmp(v[2], "bothat"   )) operation = morsi_bothat;
 	if (!operation) {
 		fprintf(stderr, "operations = erosion, dilation, opening...\n");
 		return 1;
