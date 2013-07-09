@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -50,7 +51,6 @@ static float getpixel_1(float *x, int w, int h, int i, int j)
 // (E[6], E[7]) = second pixel
 // ...
 
-
 void morsi_erosion(float *y, float *x, int w, int h, int *e)
 {
 	getpixel_operator p = getpixel_nan;
@@ -86,7 +86,7 @@ static int compare_floats(const void *aa, const void *bb)
 	return (*a > *b) - (*a < *b);
 }
 
-float median(float *a, int n)
+static float median(float *a, int n)
 {
 	if (n < 1) return NAN;
 	if (n == 1) return *a;
@@ -128,8 +128,8 @@ void morsi_opening(float *y, float *x, int w, int h, int *e)
 void morsi_closing(float *y, float *x, int w, int h, int *e)
 {
 	float *t = xmalloc(w*h*sizeof*t);
-	morsi_erosion(t, x, w, h, e);
-	morsi_dilation(y, t, w, h, e);
+	morsi_dilation(t, x, w, h, e);
+	morsi_erosion(y, t, w, h, e);
 	free(t);
 }
 
@@ -143,6 +143,75 @@ void morsi_gradient(float *y, float *x, int w, int h, int *e)
 		y[i] = b[i] - a[i];
 	free(a);
 	free(b);
+}
+
+void morsi_igradient(float *y, float *x, int w, int h, int *e)
+{
+	float *t = xmalloc(w*h*sizeof*t);
+	morsi_erosion(t, x, w, h, e);
+	for (int i = 0; i < w*h; i++)
+		y[i] = x[i] - t[i];
+	free(t);
+}
+
+void morsi_egradient(float *y, float *x, int w, int h, int *e)
+{
+	float *t = xmalloc(w*h*sizeof*t);
+	morsi_dilation(t, x, w, h, e);
+	for (int i = 0; i < w*h; i++)
+		y[i] = t[i] - x[i];
+	free(t);
+}
+
+void morsi_laplacian(float *y, float *x, int w, int h, int *e)
+{
+	float *a = xmalloc(w*h*sizeof*a);
+	float *b = xmalloc(w*h*sizeof*b);
+	morsi_erosion(a, x, w, h, e);
+	morsi_dilation(b, x, w, h, e);
+	for (int i = 0; i < w*h; i++)
+		y[i] = (a[i] + b[i] - 2*x[i])/2;
+	free(a);
+	free(b);
+}
+
+void morsi_tophat(float *y, float *x, int w, int h, int *e)
+{
+	float *t = xmalloc(w*h*sizeof*t);
+	morsi_opening(t, x, w, h, e);
+	for (int i = 0; i < w*h; i++)
+		y[i] = x[i] - t[i];
+	free(t);
+}
+
+void morsi_bothat(float *y, float *x, int w, int h, int *e)
+{
+	float *t = xmalloc(w*h*sizeof*t);
+	morsi_closing(t, x, w, h, e);
+	for (int i = 0; i < w*h; i++)
+		y[i] = t[i] - x[i];
+	free(t);
+}
+
+static int *build_disk(float radius)
+{
+	if (!(radius >1)) return NULL;
+	fprintf(stderr, "building a disk of radius %g\n", radius);
+	int side = 2*radius+4, elen = 2*side*side+4;
+	int *e = xmalloc(elen*sizeof*e);
+	int cx = 0;
+	for (int i = -radius-1; i <= radius+1; i++)
+	for (int j = -radius-1; j <= radius+1; j++)
+		if (hypot(i,j) < radius)
+		{
+			e[2*cx+4] = i;
+			e[2*cx+5] = j;
+			cx += 1;
+		}
+	assert(cx < side*side);
+	e[0] = cx;
+	e[1] = e[2] = e[3] = 0;
+	return e;
 }
 
 #define MORSI_TEST_MAIN
@@ -168,6 +237,7 @@ int main(int c, char **v)
 	int *structuring_element = NULL;
 	if (0 == strcmp(v[1], "cross" )) structuring_element = cross;
 	if (0 == strcmp(v[1], "square")) structuring_element = square;
+	if (4 == strspn(v[1], "disk")) structuring_element = build_disk(atof(v[1]+4));
 	if (!structuring_element) {
 		fprintf(stderr, "elements = cross, square ...\n");
 		return 1;
@@ -179,6 +249,11 @@ int main(int c, char **v)
 	if (0 == strcmp(v[2], "opening"  )) operation = morsi_opening;
 	if (0 == strcmp(v[2], "closing"  )) operation = morsi_closing;
 	if (0 == strcmp(v[2], "gradient" )) operation = morsi_gradient;
+	if (0 == strcmp(v[2], "igradient")) operation = morsi_igradient;
+	if (0 == strcmp(v[2], "egradient")) operation = morsi_egradient;
+	if (0 == strcmp(v[2], "laplacian")) operation = morsi_laplacian;
+	if (0 == strcmp(v[2], "tophat" ))   operation = morsi_tophat;
+	if (0 == strcmp(v[2], "bothat" ))   operation = morsi_bothat;
 	if (!operation) {
 		fprintf(stderr, "operations = erosion, dilation, opening...\n");
 		return 1;
