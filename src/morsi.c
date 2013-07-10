@@ -321,6 +321,40 @@ static int *build_vrec(float radius)
 	return e;
 }
 
+static int *build_drec(float radius)
+{
+	if (!(radius >1)) return NULL;
+	fprintf(stderr, "building a drec of radius %g\n", radius);
+	int side = 2*radius+4;
+	int *e = xmalloc((2*side+4)*sizeof*e), cx = 0;
+	for (int i = -radius-1; i <= radius+1; i++)
+		if (abs(i) < radius) {
+			e[2*cx+4] = i;
+			e[2*cx+5] = i;
+			cx += 1;
+		}
+	e[0] = cx;
+	e[1] = e[2] = e[3] = 0;
+	return e;
+}
+
+static int *build_Drec(float radius)
+{
+	if (!(radius >1)) return NULL;
+	fprintf(stderr, "building a drec of radius %g\n", radius);
+	int side = 2*radius+4;
+	int *e = xmalloc((2*side+4)*sizeof*e), cx = 0;
+	for (int i = -radius-1; i <= radius+1; i++)
+		if (abs(i) < radius) {
+			e[2*cx+4] = -i;
+			e[2*cx+5] = i;
+			cx += 1;
+		}
+	e[0] = cx;
+	e[1] = e[2] = e[3] = 0;
+	return e;
+}
+
 #define MORSI_TEST_MAIN
 
 #ifdef MORSI_TEST_MAIN
@@ -348,6 +382,8 @@ int main(int c, char **v)
 	if (4==strspn(v[1],"dysk"))structuring_element=build_dysk(atof(v[1]+4));
 	if (4==strspn(v[1],"hrec"))structuring_element=build_hrec(atof(v[1]+4));
 	if (4==strspn(v[1],"vrec"))structuring_element=build_vrec(atof(v[1]+4));
+	if (4==strspn(v[1],"drec"))structuring_element=build_drec(atof(v[1]+4));
+	if (4==strspn(v[1],"Drec"))structuring_element=build_Drec(atof(v[1]+4));
 	if (!structuring_element) {
 		fprintf(stderr, "elements = cross, square ...\n");
 		return 1;
