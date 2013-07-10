@@ -214,22 +214,108 @@ void morsi_bothat(float *y, float *x, int w, int h, int *e)
 	free(t);
 }
 
+void morsi_all(
+	float *o_ero, float *o_dil, float *o_ope, float *o_clo,
+	float *o_grad, float *o_igrad, float *o_egrad,
+	float *o_lap, float *o_enh, float *o_str,
+	float *o_top, float *o_bot, float *x, int w, int h, int *e)
+{
+	int n = w*h, s = n*sizeof(float), own_ope=0, own_clo=0, own_lap=0, i;
+	float *min = xmalloc(s);
+	float *max = xmalloc(s);
+	if ((o_top || o_str) && !o_ope) { o_ope = xmalloc(s); own_ope = 1; }
+	if ((o_bot || o_str) && !o_clo) { o_clo = xmalloc(s); own_clo = 1; }
+	if (o_enh && ! o_lap)           { o_lap = xmalloc(s); own_lap = 1; }
+
+	morsi_erosion (min, x, w, h, e);
+	morsi_dilation(max, x, w, h, e);
+	if (o_ero)   for(i=0;i<n;i++) o_ero[i] = min[i];
+	if (o_dil)   for(i=0;i<n;i++) o_dil[i] = max[i];
+	if (o_ope)   morsi_dilation(  o_ope,     min, w, h, e);
+	if (o_clo)   morsi_erosion (  o_clo,     max, w, h, e);
+	if (o_grad)  for(i=0;i<n;i++) o_grad[i]  = max[i] - min[i];
+	if (o_igrad) for(i=0;i<n;i++) o_igrad[i] =   x[i] - min[i];
+	if (o_egrad) for(i=0;i<n;i++) o_egrad[i] = max[i] -   x[i];
+	if (o_top)   for(i=0;i<n;i++) o_top[i]   =     x[i] - o_ope[i];
+	if (o_bot)   for(i=0;i<n;i++) o_bot[i]   = o_clo[i] -   x[i];
+	if (o_str)   for(i=0;i<n;i++) o_str[i]   = o_clo[i] - o_ope[i];
+	if (o_lap)   for(i=0;i<n;i++) o_lap[i]   = (max[i] + min[i] - 2*x[i])/2;
+	if (o_enh)   for(i=0;i<n;i++) o_enh[i]   =     x[i] - o_lap[i];
+
+	free(min); free(max);
+	if (own_ope) free(o_ope);
+	if (own_clo) free(o_clo);
+	if (own_lap) free(o_lap);
+}
+
+
 static int *build_disk(float radius)
 {
 	if (!(radius >1)) return NULL;
 	fprintf(stderr, "building a disk of radius %g\n", radius);
 	int side = 2*radius+4, elen = 2*side*side+4;
-	int *e = xmalloc(elen*sizeof*e);
-	int cx = 0;
+	int *e = xmalloc(elen*sizeof*e), cx = 0;
 	for (int i = -radius-1; i <= radius+1; i++)
 	for (int j = -radius-1; j <= radius+1; j++)
-		if (hypot(i,j) < radius)
-		{
+		if (hypot(i,j) < radius) {
 			e[2*cx+4] = i;
 			e[2*cx+5] = j;
 			cx += 1;
 		}
 	assert(cx < side*side);
+	e[0] = cx;
+	e[1] = e[2] = e[3] = 0;
+	return e;
+}
+
+static int *build_dysk(float radius)
+{
+	if (!(radius >1)) return NULL;
+	fprintf(stderr, "building a dysk of radius %g\n", radius);
+	int side = 2*radius+4, elen = 2*side*side+4;
+	int *e = xmalloc(elen*sizeof*e), cx = 0;
+	for (int i = -radius-1; i <= radius+1; i++)
+	for (int j = -radius-1; j <= radius+1; j++)
+		if (hypot(i,j) < radius && hypot(i,j) >= radius-1) {
+			e[2*cx+4] = i;
+			e[2*cx+5] = j;
+			cx += 1;
+		}
+	assert(cx < side*side);
+	e[0] = cx;
+	e[1] = e[2] = e[3] = 0;
+	return e;
+}
+
+static int *build_hrec(float radius)
+{
+	if (!(radius >1)) return NULL;
+	fprintf(stderr, "building a hrec of radius %g\n", radius);
+	int side = 2*radius+4;
+	int *e = xmalloc((2*side+4)*sizeof*e), cx = 0;
+	for (int i = -radius-1; i <= radius+1; i++)
+		if (abs(i) < radius) {
+			e[2*cx+4] = i;
+			e[2*cx+5] = 0;
+			cx += 1;
+		}
+	e[0] = cx;
+	e[1] = e[2] = e[3] = 0;
+	return e;
+}
+
+static int *build_vrec(float radius)
+{
+	if (!(radius >1)) return NULL;
+	fprintf(stderr, "building a vrec of radius %g\n", radius);
+	int side = 2*radius+4;
+	int *e = xmalloc((2*side+4)*sizeof*e), cx = 0;
+	for (int i = -radius-1; i <= radius+1; i++)
+		if (abs(i) < radius) {
+			e[2*cx+4] = 0;
+			e[2*cx+5] = i;
+			cx += 1;
+		}
 	e[0] = cx;
 	e[1] = e[2] = e[3] = 0;
 	return e;
@@ -258,7 +344,10 @@ int main(int c, char **v)
 	int *structuring_element = NULL;
 	if (0 == strcmp(v[1], "cross" )) structuring_element = cross;
 	if (0 == strcmp(v[1], "square")) structuring_element = square;
-	if (4 == strspn(v[1], "disk")) structuring_element = build_disk(atof(v[1]+4));
+	if (4==strspn(v[1],"disk"))structuring_element=build_disk(atof(v[1]+4));
+	if (4==strspn(v[1],"dysk"))structuring_element=build_dysk(atof(v[1]+4));
+	if (4==strspn(v[1],"hrec"))structuring_element=build_hrec(atof(v[1]+4));
+	if (4==strspn(v[1],"vrec"))structuring_element=build_vrec(atof(v[1]+4));
 	if (!structuring_element) {
 		fprintf(stderr, "elements = cross, square ...\n");
 		return 1;
