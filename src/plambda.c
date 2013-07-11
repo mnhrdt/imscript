@@ -190,7 +190,7 @@
 //		plambda zero:WxH "randn randn randn randn  4 njoin $GRAINSIZE * pi sqrt * 2 *"|blur g $GRAINSIZE|plambda - "x[0] x[1] * x[2] x[3] * - 2 sqrt /"
 //
 //	Periodic component of an image
-//		  cat image|fftper|fft|plambda - "x :I :I * :J :J * + *"|ifft|crop 0 0 `imprintf "%w %h"`|fft|plambda - "x :I :I * :J :J * + /"|ifft >pcomponent
+//		  cat image|fftper|fft|plambda - "x :I :I * :J :J * + *"|ifft|crop 0 0 `imprintf "%w %h" image`|fft|plambda - "x :I :I * :J :J * + / 4 /"|ifft >pcomponent
 //
 //
 //
@@ -220,6 +220,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+
+#include "smapa.h"
 
 #include "fail.c"
 #include "xmalloc.c"
@@ -888,10 +890,10 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 {
 	// XXX WARNING : global variables here (leading to non-re-entrant code)
 	static bool initt = false;
-	//static struct image_stats *t = 0;
-	static struct image_stats t[PLAMBDA_MAX_MAGIC];
+	static struct image_stats *t = 0;
+	//static struct image_stats t[PLAMBDA_MAX_MAGIC];
 	if (!initt) {
-		//t = xmalloc(PLAMBDA_MAX_MAGIC * sizeof*t);
+		t = xmalloc(PLAMBDA_MAX_MAGIC * sizeof*t);
 		for (int i = 0; i < PLAMBDA_MAX_MAGIC; i++) {
 			t[i].init_simple = false;
 			t[i].init_ordered = false;
@@ -1781,10 +1783,27 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 // run_program_vectorially_at {{{2
 #include "getpixel.c"
 
+SMART_PARAMETER_SILENT(PLAMBDA_GETPIXEL,1)
+static float getsample_cfg(float *x, int w, int h, int pd, int i, int j, int l)
+{
+	getsample_operator p = NULL;
+	int option = PLAMBDA_GETPIXEL();
+	switch (option) {
+	case 0: p = getsample_0; break;
+	case 1: p = getsample_1; break;
+	case 2: p = getsample_2; break;
+	case 3: p = getsample_per; break;
+	case 4: p = getsample_nan; break;
+	default: fail("unrecognized PLAMBDA_GETPIXEL value %d", option);
+	}
+	return p(x, w, h, pd, i, j, l);
+}
+
 // returns the dimension of the output
 static int run_program_vectorially_at(float *out, struct plambda_program *p,
 		float **val, int w, int h, int *pd, int ai, int aj)
 {
+	getsample_operator P = getsample_cfg;
 	struct value_vstack s[1];
 	s->n = 0;
 	FORI(p->n) {
@@ -1807,7 +1826,7 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			int daj = aj + t->displacement[1];
 			int cmp = t->component;
 			int pdv = pd[t->index];
-			float x = getsample_1(img, w, h, pdv, dai, daj, cmp);
+			float x = P(img, w, h, pdv, dai, daj, cmp);
 			vstack_push_scalar(s, x);
 			break;
 				     }
@@ -1819,16 +1838,15 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			float x[pdv];
 			if (t->component == -1) { // regular vector
 				FORL(pdv)
-				x[l] = getsample_1(img, w, h, pdv, dai, daj, l);
+				x[l] = P(img, w, h, pdv, dai, daj, l);
 				vstack_push_vector(s, x, pdv);
 			} else if (t->component == -2 && 0==pdv%2) {// 1st half
 				FORL(pdv/2)
-				x[l] = getsample_1(img, w, h, pdv, dai, daj, l);
+				x[l] = P(img, w, h, pdv, dai, daj, l);
 				vstack_push_vector(s, x, pdv/2);
 			} else if (t->component == -3 && 0==pdv%2) {// 2nd half
 				FORL(pdv/2)
-				x[l] = getsample_1(img, w, h, pdv, dai, daj,
-						pdv/2+l);
+				x[l] = P(img, w, h, pdv, dai, daj, pdv/2+l);
 				vstack_push_vector(s, x, pdv/2);
 			}
 				     }
@@ -1848,6 +1866,10 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 				     }
 			break;
 		case PLAMBDA_MAGIC: {
+#ifdef _OPENMP
+			fail("magic variables are not available in "
+					"parallel plambda");
+#endif//_OPENMP
 			int pdv = pd[t->index];
 			float *img = val[t->index], x[pdv];
 			int rm = eval_magicvar(x, t->colonvar, t->index,
@@ -1903,7 +1925,6 @@ static void add_hidden_variables(char *out, int maxplen, int newvars, char *in)
 	//fprintf(stderr, "HIVA: %s\n", out);
 }
 
-#include "smapa.h"
 SMART_PARAMETER_SILENT(SRAND,0)
 
 int main_calc(int c, char **v)
