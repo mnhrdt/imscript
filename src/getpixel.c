@@ -55,6 +55,15 @@ static float getsample_abort(float *x, int w, int h, int pd, int i, int j, int l
 	return x[(i+j*w)*pd + l];
 }
 
+// exit the program extrapolation is required
+inline
+static float getsample_exit(float *x, int w, int h, int pd, int i, int j, int l)
+{
+	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
+		exit(42);
+	return x[(i+j*w)*pd + l];
+}
+
 static int good_modulus(int n, int p)
 {
 	if (!p) return 0;
@@ -93,6 +102,54 @@ static float getsample_2(float *x, int w, int h, int pd, int i, int j, int l)
 	j = positive_reflex(j, h);
 	return getsample_abort(x, w, h, pd, i, j, l);
 }
+
+// extrapolate by periodicity
+inline
+static float getsample_per(float *x, int w, int h, int pd, int i, int j, int l)
+{
+	i = good_modulus(i, w);
+	j = good_modulus(j, w);
+	return getsample_abort(x, w, h, pd, i, j, l);
+}
+
+// extrapolate by constant (set by calling it with zero sizes)
+inline static
+float getsample_constant(float *x, int w, int h, int pd, int i, int j, int l)
+{
+	static float value = 0;
+	if (w == 0 && h == 0)
+		value = *x;
+	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
+		return value;
+	return x[(i+j*w)*pd + l];
+}
+
+#ifdef _STRING_H
+#ifdef _STDLIB_H
+static getsample_operator get_sample_operator(getsample_operator o)
+{
+	char *option = getenv("GETPIXEL"), *endptr;
+	if (!option) return o;
+#ifdef NAN
+	if (0 == strcmp(option, "nan"      )) return getsample_nan;
+#endif//NAN
+	if (0 == strcmp(option, "segfault" )) return getsample_error;
+	if (0 == strcmp(option, "error"    )) return getsample_error;
+	if (0 == strcmp(option, "abort"    )) return getsample_abort;
+	if (0 == strcmp(option, "exit"    ))  return getsample_exit;
+	if (0 == strcmp(option, "periodic" )) return getsample_per;
+	if (0 == strcmp(option, "constant" )) return getsample_0;
+	if (0 == strcmp(option, "reflex"   )) return getsample_2;
+	if (0 == strcmp(option, "symmetric")) return getsample_2;
+	float value = strtof(option, &endptr);
+	if (endptr != option) {
+		getsample_constant(&value, 0, 0, 0, 0, 0, 0);
+		return getsample_constant;
+	}
+	return getsample_0;
+}
+#endif//_STDLIB_H
+#endif//_STRING_H
 
 
 inline
