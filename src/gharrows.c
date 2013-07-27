@@ -42,7 +42,14 @@ void flowarrows(float *ff, int w, int h, float s, int g)
 	printf("unset border\n");
 	printf("unset xtics\n");
 	printf("unset ytics\n");
-	printf("plot \"-\" notitle w vec\n");
+	printf("set rmargin 0\n");
+	printf("set lmargin 0\n");
+	printf("set tmargin 0\n");
+	printf("set bmargin 0\n");
+	printf("plot [0:%d] [0:%d] \"-\" notitle with vectors "
+		//	"filled "
+			"linestyle 1"
+			"\n", w, h);
 	float (*f)[w][2] = (void*)ff;
 	int gw = w/g, gh = h/g;
 	for (int j = 0; j < gh; j++)

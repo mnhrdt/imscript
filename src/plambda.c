@@ -1783,12 +1783,13 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 // run_program_vectorially_at {{{2
 #include "getpixel.c"
 
-SMART_PARAMETER_SILENT(PLAMBDA_GETPIXEL,1)
+SMART_PARAMETER_SILENT(PLAMBDA_GETPIXEL,-1)
 static float getsample_cfg(float *x, int w, int h, int pd, int i, int j, int l)
 {
-	getsample_operator p = NULL;
+	getsample_operator p = get_sample_operator(getsample_1);
 	int option = PLAMBDA_GETPIXEL();
 	switch (option) {
+	case -1: break;
 	case 0: p = getsample_0; break;
 	case 1: p = getsample_1; break;
 	case 2: p = getsample_2; break;

@@ -268,8 +268,9 @@ static void deframe(float *y, int *out_w, int *out_h,
 	compute_homography_from_point_pairs(H, cpoints, points);
 
 	fprintf(stderr, "invH =");
-	for (int i = 0; i < 9; i++)
-		fprintf(stderr, " %g", H[0][i]);
+	for (int j = 0; j < 3; j++)
+	for (int i = 0; i < 3; i++)
+		fprintf(stderr, " %g", H[j][i]);
 	fprintf(stderr, "\n");
 
 	*out_w = cpoints[3][0];

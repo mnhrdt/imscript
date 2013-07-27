@@ -57,12 +57,6 @@ struct rgba_value {
 #define FORJ(n) for(int j=0;j<(n);j++)
 #endif//FORJ
 
-#ifndef BAD_MIN
-#define BAD_MIN(a,b)  (((a)<(b))? (a) : (b))
-#endif//BAD_MIN
-#ifndef BAD_MAX
-#define BAD_MAX(a,b)  (((a)<(b))? (b) : (a))
-#endif//BAD_MAX
 
 // decide whether a point falls within the image domain
 static bool inner_point(int w, int h, int x, int y)
@@ -290,17 +284,17 @@ int main_viewpairs(int c, char *v[])
 		FORI(n) {
 			double tt[2]; projective_map(tt, A, p[i]);
 			double e = hypot(tt[0]-p[i][2], tt[1]-p[i][3]);
-			allstats[0] = BAD_MIN(allstats[0], e);
-			allstats[1] = BAD_MAX(allstats[1], e);
+			allstats[0] = fmin(allstats[0], e);
+			allstats[1] = fmax(allstats[1], e);
 			allstats[2] += e;
 			if (bmask[i]) {
-				instats[0] = BAD_MIN(instats[0], e);
-				instats[1] = BAD_MAX(instats[1], e);
+				instats[0] = fmin(instats[0], e);
+				instats[1] = fmax(instats[1], e);
 				instats[2] += e;
 				n_inliers += 1;
 			} else {
-				outstats[0] = BAD_MIN(outstats[0], e);
-				outstats[1] = BAD_MAX(outstats[1], e);
+				outstats[0] = fmin(outstats[0], e);
+				outstats[1] = fmax(outstats[1], e);
 				outstats[2] += e;
 				n_outliers += 1;
 			}
@@ -495,17 +489,17 @@ int main_viewepi(int c, char *v[])
 			epipolar_line(L, A, p[i]);
 			project_point_to_line(Ly, L, p[i]+2);
 			double e = hypot(Ly[0]-p[i][2], Ly[1]-p[i][3]);
-			allstats[0] = BAD_MIN(allstats[0], e);
-			allstats[1] = BAD_MAX(allstats[1], e);
+			allstats[0] = fmin(allstats[0], e);
+			allstats[1] = fmax(allstats[1], e);
 			allstats[2] += e;
 			if (bmask[i]) {
-				instats[0] = BAD_MIN(instats[0], e);
-				instats[1] = BAD_MAX(instats[1], e);
+				instats[0] = fmin(instats[0], e);
+				instats[1] = fmax(instats[1], e);
 				instats[2] += e;
 				n_inliers += 1;
 			} else {
-				outstats[0] = BAD_MIN(outstats[0], e);
-				outstats[1] = BAD_MAX(outstats[1], e);
+				outstats[0] = fmin(outstats[0], e);
+				outstats[1] = fmax(outstats[1], e);
 				outstats[2] += e;
 				n_outliers += 1;
 			}

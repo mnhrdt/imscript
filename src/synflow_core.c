@@ -41,16 +41,17 @@ static void general_interpolate(float *result,
 		float *x, int w, int h, int pd, float p, float q,
 		int m) // method
 {
+	getsample_operator P = get_sample_operator(getsample_0);
 	//if (p < 0 || q < 0 || p+1 >= w || q+1 >= h) {
 	//	FORL(pd) result[l] = 0;
 	//} else {
 		int ip = floor(p);
 		int iq = floor(q);
 		FORL(pd) {
-			float a = getsample_0(x, w, h, pd, ip  , iq  , l);
-			float b = getsample_0(x, w, h, pd, ip  , iq+1, l);
-			float c = getsample_0(x, w, h, pd, ip+1, iq  , l);
-			float d = getsample_0(x, w, h, pd, ip+1, iq+1, l);
+			float a = P(x, w, h, pd, ip  , iq  , l);
+			float b = P(x, w, h, pd, ip  , iq+1, l);
+			float c = P(x, w, h, pd, ip+1, iq  , l);
+			float d = P(x, w, h, pd, ip+1, iq+1, l);
 			//float a = x[iq][ip][l];
 			//float b = x[iq+1][ip][l];
 			//float c = x[iq][ip+1][l];

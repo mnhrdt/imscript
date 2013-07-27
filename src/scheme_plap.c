@@ -29,7 +29,8 @@ inline static double getpixel_1(double *x, int w, int h, int i, int j)
 
 
 // global variable containing p
-static double global_variable_containing_p = NAN;
+//static double global_variable_containing_p = NAN;
+static double global_variable_containing_p = 0;
 
 // the type of a compact scheme
 typedef double (*scheme9_t)(double [3][3]);
