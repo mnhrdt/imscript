@@ -1,44 +1,45 @@
 #include <assert.h>
 #include <ctype.h>
+#include <math.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "xmalloc.c"
-#include "xfopen.c"
-#include "fail.c"
+// utility function that returns a valid pointer to memory
+static void *xmalloc(size_t size)
+{
+	void *new = malloc(size);
+	if (!new) {
+		fprintf(stderr, "ERROR: out of memory when requesting "
+			       "%zu bytes\n", size);
+		abort();
+	}
+	return new;
+}
 
-
-// Why do we need two structures for fonts?
-// 1. packed is space-efficient to embed into a C program
-// 2. unpacked is very easy to use inside the program
-//
-// Note: they are actually the same structure but the interperation is different
-
-struct unpacked_bitmap_font {
+// data structure for storing a bitmap font
+struct bitmap_font {
 	int number_of_glyphs;
 	int width;
 	int height;
-	unsigned char *data; // each char is either 0 or 1
+	enum {UNPACKED, PACKED, ZRLE} packing;
+	unsigned char *data;
 };
 
-struct packed_bitmap_font {
-	int number_of_glyphs;
-	int width;
-	int height;
-	unsigned char *data; // each char codifies 8 bits, without padding
-};
-
-
+// macros for accessing the individual bits of an integer
 #define SETBIT(x,i) ((x)|=(1<<(i)))
 #define GETBIT(x,i) ((x)&(1<<(i)))
 
-// u: array of chars containing boolean values
+// pack an array of boolean (char) values into indivitual bits
 static unsigned char *pack_bit_data(unsigned char *u, int nu)
 {
 	int np = nu / 8;
-	if (np*8 != nu)
-		fail("can not unpack an odd number of bits");
+	if (np*8 != nu) {
+		fprintf(stderr, "can not unpack an odd number of bools\n");
+		abort();
+	}
 	unsigned char *p = xmalloc(np);
 	for (int i = 0; i < np; i++)
 	{
@@ -50,7 +51,7 @@ static unsigned char *pack_bit_data(unsigned char *u, int nu)
 	return p;
 }
 
-// p: array of chars to be separated into bits
+// unpack a bit field into an array of boolean (char) values
 static unsigned char *unpack_bit_data(unsigned char *p, int np)
 {
 	int nu = 8*np;
@@ -61,28 +62,32 @@ static unsigned char *unpack_bit_data(unsigned char *p, int np)
 	return u;
 }
 
-// unpack font
-static struct unpacked_bitmap_font unpack_font(struct packed_bitmap_font *fp)
+// unpack font data
+static struct bitmap_font unpack_font(struct bitmap_font *fp)
 {
-	struct unpacked_bitmap_font fu; memcpy(&fu, fp, sizeof*fp);
+	struct bitmap_font fu; memcpy(&fu, fp, sizeof*fp);
 	int usize = fu.width * fu.height * fu.number_of_glyphs;
 	int psize = usize / 8;
 	fu.data = unpack_bit_data(fp->data, psize);
+	assert(fp->packing == PACKED);
+	fu.packing = UNPACKED;
 	return fu;
 }
 
-// pack font
-static struct packed_bitmap_font pack_font(struct unpacked_bitmap_font *fu)
+// pack font data
+static struct bitmap_font pack_font(struct bitmap_font *fu)
 {
-	struct packed_bitmap_font fp; memcpy(&fp, fu, sizeof*fu);
+	struct bitmap_font fp; memcpy(&fp, fu, sizeof*fu);
 	int usize = fp.width * fp.height * fp.number_of_glyphs;
 	int psize = usize / 8;
 	fp.data = pack_bit_data(fu->data, usize);
+	assert(fu->packing == UNPACKED);
+	fp.packing = PACKED;
 	return fp;
 }
 
 
-// X fixed font 6x12
+// fixed font 6x12 from X windows
 static unsigned char font_data_6x12[] = {
 	0, 0, 84, 64, 4, 68, 64, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -199,11 +204,11 @@ static unsigned char font_data_6x12[] = {
 	128, 16, 64, 20, 69, 10, 33, 4, 0, 0, 4, 193, 19, 69, 209, 19, 4, 0, 0,
 	40, 64, 20, 69, 10, 33, 4, 0
 };
-static struct packed_bitmap_font font_6x12[1] = {{256, 6, 12, font_data_6x12}};
+static struct bitmap_font font_6x12[1] = {{256, 6, 12, PACKED, font_data_6x12}};
 
 
 // get the pixel (i,j) of glyph c from the font f
-static int get_font_bit(struct unpacked_bitmap_font *f, int c, int i, int j)
+static int get_font_bit(struct bitmap_font *f, int c, int i, int j)
 {
 	if (c < 0 || c > f->number_of_glyphs)
 		return 0;
@@ -212,7 +217,7 @@ static int get_font_bit(struct unpacked_bitmap_font *f, int c, int i, int j)
 
 
 // set the pixel (i,j) of glyph c of the font f
-static void set_font_bit(struct unpacked_bitmap_font *f, int c, int i, int j)
+static void set_font_bit(struct bitmap_font *f, int c, int i, int j)
 {
 	if (c >= 0 && c < f->number_of_glyphs
 			&& i >= 0 && i < f->width
@@ -231,7 +236,7 @@ static void put_pixel(float *x, int w, int h, int pd, int i, int j, float *c)
 // print a string into an image
 static void put_string_in_float_image(float *x, int w, int h, int pd,
 		int posx, int posy, float *color, int kerning,
-		struct unpacked_bitmap_font *font, char *string)
+		struct bitmap_font *font, char *string)
 {
 	int n = strlen(string);
 	for (int k = 0; k < n; k++)
@@ -252,31 +257,163 @@ static void put_string_in_float_image(float *x, int w, int h, int pd,
 	}
 }
 
-static float *put_watermark(float *x, int w, int h, int pd, char *url,
-		int *ow, int *oh)
-{
-	int vmargin = 94;
-	*ow = w;
-	*oh = h + vmargin;
-	size_t sf = sizeof(float);
-	float *y = xmalloc(*ow * *oh * pd * sf);
-	for (int i = 0; i < *ow * *oh * pd; i++)
-		y[i] = 255;
-	//memset(y, 0xff, *ow * *oh * pd * sf);
-	memcpy(y, x, w*h*pd*sf);
 
-	struct unpacked_bitmap_font f = unpack_font(font_6x12);
+#define MIN_WIDTH 432
+#define UMARGIN 84
+
+#define LINEH 16
+#define LINE_1 "This image was created by an IPOL demo"
+#define LINE_2 url
+#define LINE_3 "Please cite the corresponding article if you use this image."
+#define LINE_4 "To remove this comment, upload the image to http://dev.ipol.im/unmark"
+
+#define MAGIC_PX 0
+#define MAGIC_PY 0
+#define MAGIC_UINT16 57089
+#define MAGIC_BPP 1
+
+static void unfold_byte(int *buf, int byte)
+{
+	assert(byte >= 0);
+	assert(byte < 256);
+	for (int i = 0; i < 8; i++)
+		buf[i] = (bool)GETBIT(byte, i);
+}
+
+static int fold_byte(int *buf)
+{
+	int r = 0;
+	for (int i = 0; i < 8; i++)
+		if (buf[i])
+			SETBIT(r, i);
+	assert(r >= 0);
+	assert(r < 256);
+	return r;
+}
+
+static void get_buf_from_code(int *buf, uint16_t code[5])
+{
+	for (int i = 0; i < 5; i++)
+	{
+		//fprintf(stderr, "code[%d] = %hd\n", i, (unsigned)code[i]);
+		unfold_byte(buf + 16*i + 0, code[i]%256);
+		unfold_byte(buf + 16*i + 8, code[i]/256);
+	}
+	//for (int i = 0 ; i < 80; i++)
+	//	fprintf(stderr, "buf[%d] = %d\n", i, buf[i]);
+}
+
+static void get_code_from_buf(uint16_t code[5], int *buf)
+{
+	//for (int i = 0 ; i < 80; i++)
+	//	fprintf(stderr, "buf[%d] = %d\n", i, buf[i]);
+	for (int i = 0; i < 5; i++)
+	{
+		int lo = fold_byte(buf + 16*i + 0);
+		int hi = fold_byte(buf + 16*i + 8);
+		code[i] = 256*hi + lo;
+		//fprintf(stderr, "code[%d] = %hd\n", i, (unsigned)code[i]);
+	}
+}
+
+// put the IPOL watermark
+static float *put_ipol_watermark(float *x, int w, int h, int pd, char *url,
+		int *oow, int *ooh)
+{
+	// 1. the white margin
+	int umargin = UMARGIN;
+	int rmargin = 0;
+	if (w < MIN_WIDTH)
+		rmargin = MIN_WIDTH - w;
+
+	int ow = w + rmargin;
+	int oh = h + umargin;
+	size_t sf = sizeof(float);
+	float *y = xmalloc(ow * oh * pd * sf);
+	for (int i = 0; i < ow * oh * pd; i++)
+		y[i] = 255; // set background white
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	for (int l = 0; l < pd; l++)
+		y[(ow*(j+umargin)+i)*pd+l] = x[(w*j+i)*pd+l];
+
+	// 2. the watermark text
+	struct bitmap_font f = unpack_font(font_6x12);
 	float color[pd];
 	for (int i = 0; i < pd; i++) color[i] = 0;
-	//color[pd-1] = 255;
-	put_string_in_float_image(y, *ow, *oh, pd, 10, h+20, color, 0, &f, url);
+
+	put_string_in_float_image(y,ow,oh,pd, 5, 5, color, 0, &f,LINE_1);
+	if (pd == 3) {color[0] = 0; color[1] = 0; color[2] = 255;} // blue
+	put_string_in_float_image(y,ow,oh,pd, 25,5+LINEH, color, 0, &f,LINE_2);
+	if (pd == 3) {color[0] = 0; color[1] = 0; color[2] = 0;}   // black
+	put_string_in_float_image(y,ow,oh,pd, 5,5+2*LINEH, color, 0, &f,LINE_3);
+	if (pd == 3) {color[0] = 0; color[1] = 170; color[2] = 0;} // green
+	put_string_in_float_image(y,ow,oh,pd, 5,5+4*LINEH, color, 0, &f,LINE_4);
+
+	// 3. the "magic" code
+	uint16_t code[5] = {MAGIC_UINT16, 0, umargin, w, h};
+	int buf[80] = {0};
+	get_buf_from_code(buf, code);
+	for (int k = 0; k < 80; k++)
+	{
+		int i = MAGIC_PX + k;
+		int j = MAGIC_PY;
+		y[(j*ow+i)*pd] -= buf[k];
+	}
+
+	*oow = ow;
+	*ooh = oh;
 	return y;
 }
 
-static float *remove_watermark(float *x, int w, int h, int pd, int *ow, int *oh)
+// remove the IPOL watermark
+static float *remove_ipol_watermark(float *x, int w, int h, int pd,
+		int *ow, int *oh)
 {
-	fail("watermark removal not implemented");
+	// 1. find magic code, and associated data
+	int buf[80];
+	for (int k = 0; k < 80; k++)
+	{
+		int i = MAGIC_PX + k;
+		int j = MAGIC_PY;
+		buf[k] = round(255-x[(j*w+i)*pd]);
+	}
+	uint16_t code[5];
+	get_code_from_buf(code, buf);
+
+	if (*code != MAGIC_UINT16)
+	{
+		fprintf(stderr, "could not find magic unwatermarking code\n");
+		abort();
+	}
+
+	fprintf(stderr, "orig = %d %d\n", w, h);
+	fprintf(stderr, "crop data = %d %d %d %d\n",
+			code[1], code[2], code[3], code[4]);
+
+	if (code[1] >= w) {fprintf(stderr,"inconsistent crop\n");abort();}
+	if (code[2] >= h) {fprintf(stderr,"ynconsistent crop\n");abort();}
+	if (code[1]+code[3]>w){fprintf(stderr,"inconsistent crop\n");abort();}
+	if (code[2]+code[4]>h){fprintf(stderr,"ynconsistent krop\n");abort();}
+
+	// 2. perform the actual crop
+	*ow = code[3];
+	*oh = code[4];
+	float *y = xmalloc(*ow * *oh * pd * sizeof*y);
+	for (int i = 0; i < code[3]; i++)
+	for (int j = 0; j < code[4]; j++)
+	for (int l = 0; l < pd; l++)
+	{
+		int ii = code[1] + i;
+		int jj = code[2] + j;
+		y[(*ow*j + i)*pd+l] = x[(w*jj + ii)*pd+l];
+	}
+
+	return y;
 }
+
+
+
 
 
 #include "iio.h"
@@ -299,9 +436,9 @@ exiterr:	fprintf(stderr, "usage:\n\t"
 	float *y;
 
 	if (operation[0] == 'p')
-		y = put_watermark(x, w, h, pd, url, &ow, &oh);
+		y = put_ipol_watermark(x, w, h, pd, url, &ow, &oh);
 	else if (operation[0] == 'r')
-		y = remove_watermark(x, w, h, pd, &ow, &oh);
+		y = remove_ipol_watermark(x, w, h, pd, &ow, &oh);
 	else goto exiterr;
 
 	iio_save_image_float_vec(filename_out, y, ow, oh, pd);
