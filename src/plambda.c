@@ -866,7 +866,7 @@ static void compute_simple_vector_stats(struct image_stats *s,
 	if (w*h > 1) s->init_vsimple = true;
 	int np = w * h, rnp = 0;
 	float minpixel = INFINITY, maxpixel = -INFINITY;
-	long double avgpixel[PLAMBDA_MAX_PIXELDIM] = {0}, avgnorm = 0;
+	long double avgpixel[PLAMBDA_MAX_PIXELDIM];
 	int minidx=-1, maxidx=-1;
 	for (int j = 0; j < pd; j++)
 		avgpixel[j] = 0;
@@ -878,12 +878,10 @@ static void compute_simple_vector_stats(struct image_stats *s,
 		if (xnorm > maxpixel) { maxidx = i; maxpixel = xnorm; }
 		for (int j = 0; j < pd; j++)
 			avgpixel[j] += x[pd*i+j];
-		avgnorm += xnorm;
 		rnp += 1;
 	}
 	//assert(rnp);
 	FORI(pd) s->vector_sum[i] = avgpixel[i];
-	avgnorm /= rnp;
 	long double mipi[pd], mapi[pd];
 	for (int j = 0; j < pd; j++) {
 		mipi[j] = x[minidx*pd+j];
@@ -893,7 +891,6 @@ static void compute_simple_vector_stats(struct image_stats *s,
 	FORI(pd) s->vector_n2min[i] = mipi[i];
 	FORI(pd) s->vector_n2max[i] = mapi[i];
 	FORI(pd) s->vector_avg[i] = avgpixel[i];
-	//setnumber(p, "error", avgnorm);
 }
 
 static int compare_floats(const void *aa, const void *bb)
@@ -931,17 +928,17 @@ static void compute_ordered_component_stats(struct image_stats *s,
 	}
 }
 
-static void compute_ordered_vector_stats(struct image_stats *s,
-		float *x, int w, int h, int pd)
-{
-	(void)x;
-	(void)w;
-	(void)h;
-	(void)pd;
-	fail("ordered vector stats not implemented");
-	// there is some bizarre trickery waiting to be coded in here
-	//s->init_vordered = true;
-}
+//static void compute_ordered_vector_stats(struct image_stats *s,
+//		float *x, int w, int h, int pd)
+//{
+//	(void)x;
+//	(void)w;
+//	(void)h;
+//	(void)pd;
+//	fail("ordered vector stats not implemented");
+//	// there is some bizarre trickery waiting to be coded in here
+//	//s->init_vordered = true;
+//}
 
 static int bound(int a, int x, int b)
 {
@@ -1395,17 +1392,12 @@ static void plambda_compile_program(struct plambda_program *p, const char *str)
 	char s[1+strlen(str)], *spacing = " \n\t";
 	strcpy(s, str);
 
-	//FORI(10) s->regn[i] = 0;
-
 	collection_of_varnames_init(p->var);
 	p->n = 0;
-	int n = 0;
 	char *tok = strtok(s, spacing);
 	while (tok) {
-		//fprintf(stderr, "token[%d] = %s\n", n, tok);
 		process_token(p, tok);
 		tok = strtok(NULL, spacing);
-		n += 1;
 	}
 
 	collection_of_varnames_sort(p->var);
@@ -1605,14 +1597,6 @@ static void treat_strange_case3(struct value_vstack *s,
 	//((void(*)(float*,float*,float*))(f->f))(r, a, b);
 	vstack_push_vector(s, r, n);
 }
-
-// pop a 3-vector x from the stack and push f(x) as a 3-vector
-static void treat_strange_case4(struct value_vstack *s,
-		struct predefined_function *f)
-{
-	fail("color space conversions not implemented");
-}
-
 
 // codifies a function R^a x R^b -> R^c
 // the dimensions must be smaller than, say, 40
@@ -1870,7 +1854,7 @@ static float getsample_cfg(float *x, int w, int h, int pd, int i, int j, int l)
 
 // returns the dimension of the output
 static int run_program_vectorially_at(float *out, struct plambda_program *p,
-		float **val, int w, int h, int *pd, int ai, int aj)
+		float **val, int *w, int *h, int *pd, int ai, int aj)
 {
 	getsample_operator P = getsample_cfg;
 	struct value_vstack s[1];
@@ -1885,37 +1869,41 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			vstack_push_scalar(s, t->value);
 			break;
 		case PLAMBDA_COLONVAR: {
-			float x = eval_colonvar(w, h, ai, aj, t->colonvar);
+			float x = eval_colonvar(*w, *h, ai, aj, t->colonvar);
 			vstack_push_scalar(s, x);
 			break;
 				       }
 		case PLAMBDA_SCALAR: {
 			float *img = val[t->index];
+			int imw = w ? w[t->index] : 1;
+			int imh = h ? h[t->index] : 1;
+			int pdv = pd[t->index];
 			int dai = ai + t->displacement[0];
 			int daj = aj + t->displacement[1];
 			int cmp = t->component;
-			int pdv = pd[t->index];
-			float x = P(img, w, h, pdv, dai, daj, cmp);
+			float x = P(img, imw, imh, pdv, dai, daj, cmp);
 			vstack_push_scalar(s, x);
 			break;
 				     }
 		case PLAMBDA_VECTOR: {
 			float *img = val[t->index];
+			int imw = w ? w[t->index] : 1;
+			int imh = h ? h[t->index] : 1;
+			int pdv = pd[t->index];
 			int dai = ai + t->displacement[0];
 			int daj = aj + t->displacement[1];
-			int pdv = pd[t->index];
 			float x[pdv];
 			if (t->component == -1) { // regular vector
 				FORL(pdv)
-				x[l] = P(img, w, h, pdv, dai, daj, l);
+				x[l] = P(img, imw, imh, pdv, dai, daj, l);
 				vstack_push_vector(s, x, pdv);
 			} else if (t->component == -2 && 0==pdv%2) {// 1st half
 				FORL(pdv/2)
-				x[l] = P(img, w, h, pdv, dai, daj, l);
+				x[l] = P(img, imw, imh, pdv, dai, daj, l);
 				vstack_push_vector(s, x, pdv/2);
 			} else if (t->component == -3 && 0==pdv%2) {// 2nd half
 				FORL(pdv/2)
-				x[l] = P(img, w, h, pdv, dai, daj, pdv/2+l);
+				x[l] = P(img, imw, imh, pdv, dai, daj, pdv/2+l);
 				vstack_push_vector(s, x, pdv/2);
 			}
 				     }
@@ -1939,11 +1927,13 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			fail("magic variables are not available in "
 					"parallel plambda");
 #endif//_OPENMP
+			int imw = w[t->index];
+			int imh = h[t->index];
 			int pdv = pd[t->index];
 			float *img = val[t->index], x[pdv];
 			int rm = eval_magicvar(x, t->colonvar, t->index,
 					t->component, t->displacement[0],
-					img, w, h, pdv);
+					img, imw, imh, pdv);
 			vstack_push_vector(s, x, rm);
 				    }
 			break;
@@ -1959,26 +1949,25 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 
 static int eval_dim(struct plambda_program *p, float **val, int *pd)
 {
-	float result[PLAMBDA_MAX_PIXELDIM];
-	int r = run_program_vectorially_at(result, p, val, 1, 1, pd, 0, 0);
+	int r = run_program_vectorially_at(NULL, p, val, NULL, NULL, pd, 0, 0);
 	return r;
 }
 
 // returns the dimension of the output
 static int run_program_vectorially(float *out, int pdmax,
 		struct plambda_program *p,
-		float **val, int w, int h, int *pd)
+		float **val, int *w, int *h, int *pd)
 {
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-	FORJ(h) FORI(w) {
+	FORJ(*h) FORI(*w) {
 		float result[pdmax];
 		int r = run_program_vectorially_at(result, p,val, w,h,pd, i,j);
 		assert(r == pdmax);
 		if (r != pdmax) fail("r != pdmax");
 		FORL(r)
-			setsample_0(out, w, h, pdmax, i, j, l, result[l]);
+			setsample_0(out, *w, *h, pdmax, i, j, l, result[l]);
 	}
 	return pdmax;
 }
@@ -2028,7 +2017,7 @@ int main_calc(int c, char **v)
 	xsrand(SRAND());
 
 	float out[pdmax];
-	int od = run_program_vectorially_at(out, p, x, 1, 1, pd, 0, 0);
+	int od = run_program_vectorially_at(out, p, x, NULL, NULL, pd, 0, 0);
 
 	for (int i = 0; i < od; i++)
 		printf("%.15lf%c", out[i], i==(od-1)?'\n':' ');
@@ -2087,9 +2076,9 @@ int main_images(int c, char **v)
 	int w[n], h[n], pd[n];
 	float *x[n];
 	FORI(n) x[i] = iio_read_image_float_vec(v[i+1], w + i, h + i, pd + i);
-	FORI(n-1)
-		if (w[0] != w[i+1] || h[0] != h[i+1])// || pd[0] != pd[i+1])
-			fail("input images size mismatch");
+	//FORI(n-1)
+	//	if (w[0] != w[i+1] || h[0] != h[i+1])// || pd[0] != pd[i+1])
+	//		fail("input images size mismatch");
 
 	if (n>1) FORI(n) if (!strstr(p->var->t[i], "hidden"))
 		fprintf(stderr, "plambda correspondence \"%s\" = \"%s\"\n",
@@ -2101,7 +2090,7 @@ int main_images(int c, char **v)
 	int pdreal = eval_dim(p, x, pd);
 
 	float *out = xmalloc(*w * *h * pdreal * sizeof*out);
-	int opd = run_program_vectorially(out, pdreal, p, x, *w, *h, pd);
+	int opd = run_program_vectorially(out, pdreal, p, x, w, h, pd);
 	assert(opd == pdreal);
 
 	iio_save_image_float_vec(filename_out, out, *w, *h, opd);
