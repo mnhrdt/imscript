@@ -495,6 +495,67 @@ static int matrix_transpose(float *r, float *a, int nn)
 	return nn;
 }
 
+// instance of "univector_function"
+static int vector_avg(float *r, float *a, int n)
+{
+	*r = 0;
+	for (int i = 0; i < n; i++)
+		*r += a[i]/n;
+	return 1;
+}
+
+// instance of "univector_function"
+static int vector_sum(float *r, float *a, int n)
+{
+	*r = 0;
+	for (int i = 0; i < n; i++)
+		*r += a[i];
+	return 1;
+}
+
+// instance of "univector_function"
+static int vector_min(float *r, float *a, int n)
+{
+	*r = *a;
+	for (int i = 1; i < n; i++)
+		*r = fmin(*r, a[i]);
+	return 1;
+}
+
+// instance of "univector_function"
+static int vector_max(float *r, float *a, int n)
+{
+	*r = *a;
+	for (int i = 1; i < n; i++)
+		*r = fmax(*r, a[i]);
+	return 1;
+}
+
+// instance of "univector_function"
+static int vector_mul(float *r, float *a, int n)
+{
+	*r = 1;
+	for (int i = 0; i < n; i++)
+		*r *= a[i];
+	return 1;
+}
+
+// instance of "univector_function"
+static int vector_norm(float *r, float *a, int n)
+{
+	*r = 0;
+	for (int i = 0; i < n; i++)
+		*r = hypot(*r, a[i]);
+	return 1;
+}
+
+// instance of "univector_function"
+static int vector_dimension(float *r, float *a, int n)
+{
+	*r = n;
+	return 1;
+}
+
 
 // table of all functions (local and from math.h) {{{1
 struct predefined_function {
@@ -598,6 +659,13 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(matrix_transpose,"mtrans",-6),
 	REGISTER_FUNCTIONN(matrix_inverse,"minv",-6),
 	REGISTER_FUNCTIONN(matrix_trace,"mtrace",-6),
+	REGISTER_FUNCTIONN(vector_avg,"vavg",-6),
+	REGISTER_FUNCTIONN(vector_sum,"vsum",-6),
+	REGISTER_FUNCTIONN(vector_min,"vmin",-6),
+	REGISTER_FUNCTIONN(vector_max,"vmax",-6),
+	REGISTER_FUNCTIONN(vector_mul,"vmul",-6),
+	REGISTER_FUNCTIONN(vector_norm,"vnorm",-6),
+	REGISTER_FUNCTIONN(vector_dimension,"vdim",-6),
 	//REGISTER_FUNCTIONN(rgb2hsv,"rgb2hsv",3),
 	//REGISTER_FUNCTIONN(hsv2rgb,"rgb2hsv",3),
 #undef REGISTER_FUNCTION
