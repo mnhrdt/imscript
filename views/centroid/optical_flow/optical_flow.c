@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
+
 // this function is like "malloc", but it returns always a valid pointer
 static void *xmalloc(size_t size)
 {
@@ -10,6 +12,7 @@ static void *xmalloc(size_t size)
 		exit(fprintf(stderr, "out of memory\n"));
 	return p;
 }
+
 
 
 // compute a smoothness measure of a 3x3 patch from a vector field (U,V)
@@ -99,7 +102,7 @@ static void field_smoothen(float *U, float *V, float *u, float *v, int w, int h)
 		}
 	free(smoothness);
 
-	// cound number of masked pixels (only for reporting)
+	// count number of masked pixels (only for reporting)
 	int nnan = 0;
 	for (int i = 0; i < w*h; i++)
 		if (!isfinite(u[i]))
