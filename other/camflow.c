@@ -485,7 +485,7 @@ int main( int argc, char *argv[] )
 		cvShowImage( "result", frame_small );
 
 		/* exit if user press 'q' */
-		key = cvWaitKey( 1 );
+		key = cvWaitKey( 1 ) % 0x10000;
 		if (key == 'd') {
 			global_display_diff = !global_display_diff;
 			global_display_img = false;

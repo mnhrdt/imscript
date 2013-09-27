@@ -58,6 +58,15 @@ static double random_uniform(void)
 #endif
 }
 
+static double random_ramp(void)
+{
+	double x1 = random_uniform();
+	double x2 = random_uniform();
+	//double y = sqrt(random_uniform());
+	double y = fmax(x1, x2);
+	return y;
+}
+
 static double random_normal(void)
 {
 	double x1 = random_uniform();

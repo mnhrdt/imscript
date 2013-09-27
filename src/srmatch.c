@@ -32,7 +32,7 @@ static void invert_homography(float invH[9], float H[9])
 			{H[6], H[7], H[8]}};
 	float det, ih[3][3];
 	INVERT_3X3(ih, det, h);
-	for (int i = 0; i < 9; i++) invH[i] = ih[0][i];
+	for (int i = 0; i < 9; i++) invH[i] = ih[i/3][i%3];
 }
 
 #include "smapa.h"

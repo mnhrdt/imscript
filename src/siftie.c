@@ -944,7 +944,7 @@ static void homographic_mapf(float y[2], float H[9], float x[2])
 void siftaff(struct sift_keypoint *t, int n, float A[9])
 {
 	float det = A[0]*A[4] - A[1]*A[3];
-	fprintf(stderr, "det = %g\n", det);
+	//fprintf(stderr, "det = %g\n", det);
 	FORI(n) {
 		struct sift_keypoint *k = t+i;
 		float vec[2] = {cos(k->orientation), sin(k->orientation)};

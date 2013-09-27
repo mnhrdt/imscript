@@ -84,9 +84,11 @@ static void put_star_behind(struct star *s, struct camera *c)
 #include "xmalloc.c"
 int main(int argc, char **argv)
 {
-	if (argc != 6) {
-		fprintf(stderr, "usage:\n\t%s w h nstars nframes dz\n", *argv);
-		//                          0 1 2 3      4       5
+	if (argc != 7) {
+		fprintf(stderr, "usage:\n\t"
+				"%s w h nstars nframes dz outpat\n", *argv);
+		//                0 1 2 3      4       5  6
+		return 1;
 	}
 	int w = atoi(argv[1]);
 	int h = atoi(argv[2]);

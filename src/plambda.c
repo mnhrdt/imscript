@@ -120,6 +120,14 @@
 //		mtrans	transpose of a matrix
 //		mtrace	trace of a matrix
 //		minv	inverse of a matrix
+//		vavg	average value of a vector
+//		vsum	sum of the components of a vector
+//		vmul	product of the components of a vector
+//		vmax	max component of a vector
+//		vmin	min component of a vector
+//		vnorm	euclidean norm of a vector
+//		vdim	length of a vector
+//
 //
 // OPTIONS                                                                 {{{2
 //      -o file     save output to named file
@@ -698,7 +706,7 @@ static float apply_function(struct predefined_function *f, float *v)
 	case 1: return ((double(*)(double))(f->f))(v[0]);
 	case 2: return ((double(*)(double,double))f->f)(v[1], v[0]);
 	case 3: return ((double(*)(double,double,double))f->f)(v[2],v[1],v[0]);
-	case -1: return ((double(*)())(f->f))();
+	case -1: return ((double(*)(void))(f->f))();
 	default: fail("bizarre{%d}", f->nargs);
 	}
 	//return 0;
@@ -1869,7 +1877,9 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			vstack_push_scalar(s, t->value);
 			break;
 		case PLAMBDA_COLONVAR: {
-			float x = eval_colonvar(*w, *h, ai, aj, t->colonvar);
+			int imw = w ? *w : 1;
+			int imh = h ? *h : 1;
+			float x = eval_colonvar(imw, imh, ai, aj, t->colonvar);
 			vstack_push_scalar(s, x);
 			break;
 				       }
@@ -1927,8 +1937,8 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			fail("magic variables are not available in "
 					"parallel plambda");
 #endif//_OPENMP
-			int imw = w[t->index];
-			int imh = h[t->index];
+			int imw = w ? w[t->index] : 1;
+			int imh = h ? h[t->index] : 1;
 			int pdv = pd[t->index];
 			float *img = val[t->index], x[pdv];
 			int rm = eval_magicvar(x, t->colonvar, t->index,
@@ -2019,8 +2029,13 @@ int main_calc(int c, char **v)
 	float out[pdmax];
 	int od = run_program_vectorially_at(out, p, x, NULL, NULL, pd, 0, 0);
 
+	char *fmt = getenv("PLAMBDA_FFMT");
+	if (!fmt) fmt = "%.15lf";
 	for (int i = 0; i < od; i++)
-		printf("%.15lf%c", out[i], i==(od-1)?'\n':' ');
+	{
+		printf(fmt, out[i]);
+		putchar(i==(od-1)?'\n':' ');
+	}
 
 	collection_of_varnames_end(p->var);
 	FORI(n) free(x[i]);
@@ -2052,6 +2067,9 @@ static char *pick_option(int *c, char ***v, char *o, char *d)
 #include "iio.h"
 int main_images(int c, char **v)
 {
+	//fprintf(stderr, "main images c = %d\n", c);
+	//for (int i = 0; i < c; i++)
+	//	fprintf(stderr, "main images argv[%d] = %s\n", i, v[i]);
 	if (c < 2) {
 		fprintf(stderr, "usage:\n\t%s in1 in2 ... \"plambda\"\n", *v);
 		//                          0 1   2         c-1
@@ -2064,6 +2082,7 @@ int main_images(int c, char **v)
 	plambda_compile_program(p, v[c-1]);
 
 	int n = c - 2;
+	//fprintf(stderr, "n = %d\n", n);
 	if (n > 0 && p->var->n == 0) {
 		int maxplen = n*10 + strlen(v[c-1]) + 100;
 		char newprogram[maxplen];

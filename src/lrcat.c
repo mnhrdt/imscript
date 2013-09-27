@@ -4,8 +4,33 @@
 
 #include "xmalloc.c"
 #include "getpixel.c"
+#include "pickopt.c"
 
 #define BAD_MAX(a,b) (a)<(b)?(b):(a);
+
+//int main(int c, char **v)
+//{
+//	char *filename_out = pick_option(&c, &v, "o", "-");
+//	if (c < 3) {
+//		fprintf(stderr, "usage:\n\t%s a1 a2 ...an [>out|-o out]\n", *v);
+//		//                          0 1   2    n
+//		return 1;
+//	}
+//	int n = c - 1, w[n], h[n], d[n], ww = 0, hh = 0, dd = 0;
+//	float x[n];
+//	for (int i = 0; i < n; i++)
+//	{
+//		x[i] = iio_read_image_float_vec(v[1+i], w+i, h+i, d+i);
+//		ww += w[i];
+//		if (h[i] > hh) hh = h[i];
+//		if (d[i] > dd) dd = d[i];
+//	}
+//	float *y = xmalloc(ww*hh*dd*sizeof*y);
+//	for (int i = 0; i < ww*hh*dd; i++)
+//		y[i] = 0;
+//	for (int l = 0; l < n; l++)
+//	return 0;
+//}
 
 int main(int c, char *v[])
 {

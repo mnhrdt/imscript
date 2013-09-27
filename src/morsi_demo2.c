@@ -5,6 +5,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #include "iio.h"
 
 
@@ -249,6 +254,9 @@ void morsi_all_split(
 	float *o_lap, float *o_enh, float *o_str,
 	float *o_top, float *o_bot, float *x, int w, int h, int pd, int *e)
 {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
 	for (int i = 0; i < pd; i++)
 	{
 		int n = i*w*h;
@@ -365,29 +373,37 @@ int main(int c, char **v)
 	float *y = xmalloc(13*n*sizeof*y);
 
 	// compute filters
-	morsi_all_split(y+0*n, y+1*n, 0/* y+2*n */, y+3*n, y+4*n, y+5*n, y+6*n,
+	morsi_all_split(y+0*n, y+1*n, 0/*y+2*n*/, y+3*n, y+4*n, y+5*n, y+6*n,
 			y+7*n, y+8*n, y+9*n, y+10*n, y+11*n, y+12*n,
 			x, w, h, pd, structuring_element);
-
 
 	// normalize the laplacian
 	for(int i = 0; i < w*h*pd; i++)
 		y[8*n+i] += 127;
 
 	// save images
-	iio_save_image_float_split("001_erosion.png",   y+0*n, w, h, pd);
-	iio_save_image_float_split("002_dilation.png",  y+1*n, w, h, pd);
-	//iio_save_image_float_split("003_median.png",    y+2*n, w, h, pd);
-	iio_save_image_float_split("004_opening.png",   y+3*n, w, h, pd);
-	iio_save_image_float_split("005_closing.png",   y+4*n, w, h, pd);
-	iio_save_image_float_split("006_gradient.png",  y+5*n, w, h, pd);
-	iio_save_image_float_split("007_igradient.png", y+6*n, w, h, pd);
-	iio_save_image_float_split("008_egradient.png", y+7*n, w, h, pd);
-	iio_save_image_float_split("009_laplacian.png", y+8*n, w, h, pd);
-	iio_save_image_float_split("010_enhance.png",   y+9*n, w, h, pd);
-	iio_save_image_float_split("011_oscill.png",    y+10*n, w, h, pd);
-	iio_save_image_float_split("012_tophat.png",    y+11*n, w, h, pd);
-	iio_save_image_float_split("013_bothat.png",    y+12*n, w, h, pd);
+	struct { char *n; float *x; } t[13] = {
+		{"001_erosion.png",   y+0*n },
+		{"002_dilation.png",  y+1*n },
+		{"003_median.png",    y+2*n },
+		{"004_opening.png",   y+3*n },
+		{"005_closing.png",   y+4*n },
+		{"006_gradient.png",  y+5*n },
+		{"007_igradient.png", y+6*n },
+		{"008_egradient.png", y+7*n },
+		{"009_laplacian.png", y+8*n },
+		{"010_enhance.png",   y+9*n },
+		{"011_oscill.png",    y+10*n},
+		{"012_tophat.png",    y+11*n},
+		{"013_bothat.png",    y+12*n}
+	};
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+	for (int i = 0; i < 13; i++)
+		if (t[i].x)
+			iio_save_image_float_split(t[i].n, t[i].x, w, h, pd);
 
 	// cleanup and exit
 	free(x); free(y);

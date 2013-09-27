@@ -1,3 +1,4 @@
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,9 +6,35 @@
 #include <math.h>
 #include "iio.h"
 
-#include "fail.c"
-#include "xmalloc.c"
-#include "random.c"
+
+// auxiliary function: exit the program with an error
+static void fail(const char *fmt, ...)
+
+{
+	va_list argp;
+	fprintf(stderr, "\nFAIL: ");
+	va_start(argp, fmt);
+	vfprintf(stderr, fmt, argp);
+	va_end(argp);
+	fprintf(stderr, "\n\n");
+	fflush(NULL);
+#ifdef NDEBUG
+	exit(-1);
+#else//NDEBUG
+	exit(*(volatile int *)0x43);
+#endif//NDEBUG
+}
+
+// auxiliary function (like malloc, but always returns a valid pointer)
+static void *xmalloc(size_t size)
+{
+	void *p = malloc(size);
+	if (!p)
+		exit(fprintf(stderr,
+			"ERROR: out of mem requesting %zu butes\n", size));
+	return p;
+}
+
 
 // y[k] = sum_i x[i][k]
 static void float_sum(float *y, float *xx, int d, int n)
@@ -171,20 +198,20 @@ static float fdiste(float *x, float *y, int n, float e)
 	return n ? hypot(*x - *y, fdiste(x + 1, y + 1, n - 1, e)) : e;
 }
 
-#include "smapa.h"
-SMART_PARAMETER_SILENT(WEISZ_NITER,10)
+#define WEISZ_NITER 6
+#define WEISZ_EPSILON 1e-5
 
 // y[k] = euclidean median of the vectors x[i][k]
 static void float_weisz(float *y, float *x, int d, int n)
 {
 	float_avg(y, x, d, n);
-	int niter = WEISZ_NITER();
+	int niter = WEISZ_NITER;
 	for (int k = 0; k < niter; k++) {
 		float a[d], b = 0;
 		for (int l = 0; l < d; l++)
 			a[l] = 0;
 		for (int i = 0; i < n; i++) {
-			float dxy = fdiste(x + i*d, y, d, 1e-5);
+			float dxy = fdiste(x + i*d, y, d, WEISZ_EPSILON);
 			for (int l = 0; l < d; l++)
 				a[l] += x[i*d + l]/dxy;
 			b += 1/dxy;
@@ -203,7 +230,26 @@ static bool isgood(float *x, int n)
 	return true;
 }
 
-#include "pickopt.c"
+// @c pointer to original argc
+// @v pointer to original argv
+// @o option name (after hyphen)
+// @d default value
+static char *pick_option(int *c, char ***v, char *o, char *d)
+{
+	int argc = *c;
+	char **argv = *v;
+	int id = d ? 1 : 0;
+	for (int i = 0; i < argc - id; i++)
+		if (argv[i][0] == '-' && 0 == strcmp(argv[i]+1, o))
+		{
+			char *r = argv[i+id]+1-id;
+			*c -= id+1;
+			for (int j = i; j < argc - id; j++)
+				(*v)[j] = (*v)[j+id+1];
+			return r;
+		}
+	return d;
+}
 
 int main(int c, char *v[])
 {

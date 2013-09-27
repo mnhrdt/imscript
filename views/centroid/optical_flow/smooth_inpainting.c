@@ -11,13 +11,13 @@
 // utility function that always returns a valid pointer to memory
 static void *xmalloc(size_t n)
 {
-	void *new = malloc(n);
-	if (!new)
+	void *p = malloc(n);
+	if (!p)
 	{
 		fprintf(stderr, "xmalloc: can not malloc %zu bytes\n", n);
 		exit(1);
 	}
-	return new;
+	return p;
 }
 
 // the type of a "getpixel" function

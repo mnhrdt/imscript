@@ -33,20 +33,20 @@
 struct rgba_value {
 	uint8_t r, g, b, a;
 };
-#define RGBA_BLACK   (struct rgba_value){.r=0x00,.g=0x00,.b=0x00,.a=0xff}
-#define RGBA_RED     (struct rgba_value){.r=0xff,.g=0x00,.b=0x00,.a=0xff}
-#define RGBA_GREEN   (struct rgba_value){.r=0x00,.g=0xff,.b=0x00,.a=0xff}
-#define RGBA_BLUE    (struct rgba_value){.r=0x00,.g=0x00,.b=0xff,.a=0xff}
-#define RGBA_MAGENTA (struct rgba_value){.r=0xff,.g=0x00,.b=0xff,.a=0xff}
-#define RGBA_YELLOW  (struct rgba_value){.r=0xff,.g=0xff,.b=0x00,.a=0xff}
-#define RGBA_PHANTOM (struct rgba_value){.r=0x30,.g=0x20,.b=0x10,.a=0xff}
-#define RGBA_BRIGHT  (struct rgba_value){.r=129,.g=86,.b=43,.a=0xff}
+#define RGBA_BLACK    (struct rgba_value){.r=0x00,.g=0x00,.b=0x00,.a=0xff}
+#define RGBA_RED      (struct rgba_value){.r=0xff,.g=0x00,.b=0x00,.a=0xff}
+#define RGBA_GREEN    (struct rgba_value){.r=0x00,.g=0xff,.b=0x00,.a=0xff}
+#define RGBA_BLUE     (struct rgba_value){.r=0x00,.g=0x00,.b=0xff,.a=0xff}
+#define RGBA_MAGENTA  (struct rgba_value){.r=0xff,.g=0x00,.b=0xff,.a=0xff}
+#define RGBA_YELLOW   (struct rgba_value){.r=0xff,.g=0xff,.b=0x00,.a=0xff}
+#define RGBA_PHANTOM  (struct rgba_value){.r=0x30,.g=0x20,.b=0x10,.a=0xff}
+#define RGBA_BRIGHT   (struct rgba_value){.r= 129,.g=  86,.b=  43,.a=0xff}
 #define RGBA_DARKGRAY (struct rgba_value){.r=0x30,.g=0x30,.b=0x30,.a=0xff}
-#define RGBA_GRAY10 (struct rgba_value){.r=0x10,.g=0x10,.b=0x10,.a=0xff}
-#define RGBA_GRAY20 (struct rgba_value){.r=0x20,.g=0x20,.b=0x20,.a=0xff}
-#define RGBA_GRAY30 (struct rgba_value){.r=0x30,.g=0x30,.b=0x30,.a=0xff}
-#define RGBA_GRAY40 (struct rgba_value){.r=0x40,.g=0x40,.b=0x40,.a=0xff}
-#define RGBA_GRAY50 (struct rgba_value){.r=0x50,.g=0x50,.b=0x50,.a=0xff}
+#define RGBA_GRAY10   (struct rgba_value){.r=0x10,.g=0x10,.b=0x10,.a=0xff}
+#define RGBA_GRAY20   (struct rgba_value){.r=0x20,.g=0x20,.b=0x20,.a=0xff}
+#define RGBA_GRAY30   (struct rgba_value){.r=0x30,.g=0x30,.b=0x30,.a=0xff}
+#define RGBA_GRAY40   (struct rgba_value){.r=0x40,.g=0x40,.b=0x40,.a=0xff}
+#define RGBA_GRAY50   (struct rgba_value){.r=0x50,.g=0x50,.b=0x50,.a=0xff}
 
 
 

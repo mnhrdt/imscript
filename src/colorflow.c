@@ -127,7 +127,7 @@ void middlebury_setcols(int r, int g, int b, int k)
     middlebury_colorwheel[k][2] = b;
 }
 
-void middlebury_makecolorwheel()
+void middlebury_makecolorwheel(void)
 {
     // relative lengths of color transitions:
     // these are chosen based on perceptual similarity

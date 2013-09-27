@@ -12,14 +12,14 @@ int main(int c, char *v[])
 	}
 	double a[3][3], z = atof(v[10]);
 	for (int i = 0; i < 9; i++)
-		a[0][i] = atof(v[1+i]);
+		a[i/3][i%3] = atof(v[1+i]);
 	double zp[3][3] = {{1/z, 0, 0}, {0, 1/z, 0}, {0,0,1}};
 	double zm[3][3] = {{z, 0, 0}, {0, z, 0}, {0,0,1}};
 	double oa[3][3];
 	MATRIX_PRODUCT_3X3(oa,a,zp);
 	MATRIX_PRODUCT_3X3(a,zm,oa);
 	for (int i = 0; i < 9; i++)
-		printf(" %lf", a[0][i]);
+		printf(" %lf", a[i/3][i%3]);
 	printf("\n");
 	return 0;
 }

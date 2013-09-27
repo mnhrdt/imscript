@@ -190,12 +190,12 @@ int main(int argc, char *argv[])
 	char *filename_mask = argv[2];
 	char *filename_out = argv[3];
 
-	int w[2], h[2];
-	float *in = iio_read_image_float(filename_in, w, h);
+	int w[2], h[2], pd;
+	float *in = iio_read_image_float(filename_in, w, h, &pd);
 	float *mask = iio_read_image_float(filename_mask, w+1, h+1);
 	if (w[0] != w[1] || h[0] != h[1])
 		return fprintf(stderr, "image and mask file size mismatch");
-	float *out = xmalloc(*w**h*sizeof*out);
+	float *out = xmalloc(*w**h*pd*sizeof*out);
 
 	for (int i = 0; i < *w * *h; i++)
 		if (mask[i] > 0)

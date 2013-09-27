@@ -36,6 +36,11 @@ uint8_t *alloc_and_transform_from_RLE1_to_BIT(uint8_t *x, int n, int *nout);
 uint8_t *alloc_and_transform_from_RAW_to_RLE8(uint8_t *x, int n, int *nout);
 uint8_t *alloc_and_transform_from_RLE8_to_RAW(uint8_t *x, int n, int *nout);
 
+// 1.3. differential coding and decoding
+uint8_t *alloc_and_transform_diff(uint8_t *x, int n, int *nout);
+uint8_t *alloc_and_transform_undiff(uint8_t *x, int n, int *nout);
+uint8_t *alloc_and_transform_xor(uint8_t *x, int n, int *nout);
+
 // 1.3. canonical huffman encoding and decoding
 uint8_t *alloc_and_transform_from_RAW_to_HUF8(uint8_t *x, int n, int *nout);
 uint8_t *alloc_and_transform_from_HUF8_to_RAW(uint8_t *x, int n, int *nout);
@@ -88,6 +93,7 @@ uint8_t *alloc_and_transpose_3dz(uint8_t *x, int w, int h, int d);
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "xmalloc.c"
 #include "fail.c"
@@ -128,7 +134,7 @@ uint8_t *alloc_and_transform_from_BIT_to_RAW(uint8_t *x, int n, int *nout)
 uint8_t *alloc_and_transform_from_BIT_to_RLE1(uint8_t *x, int n, int *nout)
 {
 	int r = 0;
-	uint8_t *y = xmalloc(n+1); // worst case: alternating sequence
+	uint8_t *y = xmalloc(n+25);
 	y[r++] = (bool)x[0];
 	y[r] = 1;
 	for (int i = 1; i < n; i++)
@@ -144,6 +150,7 @@ uint8_t *alloc_and_transform_from_BIT_to_RLE1(uint8_t *x, int n, int *nout)
 			y[++r] = 1;
 	}
 	*nout = r + 1;
+	for (int i = *nout; i < *nout+24; i++) y[i] = 0;
 	return y;
 }
 
@@ -184,22 +191,6 @@ static uint8_t decode_b64_quark(uint8_t x)
 	if (x == '/' || x == '_') return 63;
 	fail("bad quark %c", x);
 }
-
-//static uint8_t encode_b64_quark(uint8_t x)
-//{
-//	assert(x < 64);
-//	return '#' + x;
-//}
-//
-//static uint8_t decode_b64_quark(uint8_t x)
-//{
-//	assert(isprint(x));
-//	int r = x - '#';
-//	assert(r >= 0);
-//	assert(r < 64);
-//	return r;
-//}
-
 
 // base 64 encoding
 uint8_t *alloc_and_transform_from_RAW_to_B64(uint8_t *x, int n, int *nout)
@@ -289,22 +280,11 @@ uint8_t *alloc_and_transform_from_A85_to_RAW(uint8_t *x, int n, int *nout)
 	return (void*)y;
 }
 
-//static uint8_t encode_x85_quark(uint8_t x)
-//{
-//	assert(x < 85);
-//	return x + (x < 52 ? 40 : 41);
-//
-//}
-//
-//static uint8_t decode_x85_quark(uint8_t x)
-//{
-//	assert(isprint(x));
-//	return x - (x < 92 ? 40 : 41);
-//}
-
 // base 85 encoding with quotable charset
 uint8_t *alloc_and_transform_from_RAW_to_X85(uint8_t *x, int n, int *nout)
 {
+	if (0 != n % 4)
+		n += 4 - n % 4;
 	assert(0 == n % 4);
 	*nout = 5*n/4;
 	uint8_t *y = xmalloc(*nout);
@@ -382,36 +362,145 @@ uint8_t *alloc_and_transpose_3d1(uint8_t *x, int w, int h, int d)
 	return y;
 }
 
+uint8_t *alloc_and_transform_diff(uint8_t *x, int n, int *nout)
+{
+	uint8_t *y = xmalloc(n);
+	*nout = n;
+	*y = *x;
+	for (int i = 1; i < n; i++)
+		y[i] = x[i] - x[i-1];
+	return y;
+}
+
+uint8_t *alloc_and_transform_undiff(uint8_t *x, int n, int *nout)
+{
+	uint8_t *y = xmalloc(n);
+	*nout = n;
+	*y = *x;
+	for (int i = 1; i < n; i++)
+		y[i] = x[i] + x[i-1];
+	return y;
+}
+
+uint8_t *alloc_and_transform_xor(uint8_t *x, int n, int *nout)
+{
+	uint8_t *y = xmalloc(n);
+	*nout = n;
+	*y = *x;
+	for (int i = 1; i < n; i++)
+		y[i] = x[i] ^ x[i-1];
+	return y;
+}
+
+// PCX encoding
+uint8_t *alloc_and_transform_from_RAW_to_RLE8(uint8_t *x, int n, int *nout)
+{
+	uint8_t curr = x[0]+1, *y = xmalloc(2*n);
+	int r = 0, runlen = 1;
+	if (curr == x[1]) curr++;
+	assert(x[0] != curr);
+	assert(x[1] != curr);
+	for (int i = 0; i < n; i++)
+	{
+		if (i+1 < n && curr == x[i+1] && runlen < 64) // inside run
+			runlen += 1;
+		else // end of run
+		{
+			if (x[i] > 191 || runlen > 1)
+				y[r++] = 192 + runlen - 1;
+			y[r++] = x[i];
+			runlen = 1;
+			curr = x[i+1];
+		}
+	}
+	*nout = r;
+	return y;
+}
+
+// PCX decoding
+uint8_t *alloc_and_transform_from_RLE8_to_RAW(uint8_t *x, int n, int *nout)
+{
+	uint8_t *y = xmalloc(64*n);
+	int r = 0, i = 0;
+	while (i < n)
+	{
+		if (x[i] > 191) {
+			assert(i+1 < n);
+			int count = x[i] - 192 + 1;
+			for (int j = 0; j < count; j++)
+				y[r++] = x[i+1];
+			i += 2;
+		} else
+			y[r++] = x[i++];
+	}
+	*nout = r;
+	return y;
+}
+
+double entropy(uint8_t *x, int n)
+{
+	double t[256] = {0};
+	for (int i = 0; i < n; i++)
+		t[x[i]] += 1;
+	double e = 0;
+	for (int i = 0; i < 256; i++)
+	{
+		double p = t[i] / n;
+		//fprintf(stderr, "t[%d] = %g, p=%g\n", i, t[i], p);
+		if (p > 0)
+			e -= p * log2(p);
+	}
+	return e;
+}
+
 
 
 #ifdef MAIN_DATACONV
 
 static void f(void)
 {
-	int n = 1000;
-	uint8_t data[n+24];
+	//int n = 22;
+	//uint8_t data[22] = {1, 2, 3,  7, 7, 7,  1, 2, 3,
+	//	200, 2, 3,  222, 222, 222,  1, 2, 3, 44, 45, 46, 47};
+	int n = 100003;
+	uint8_t data[n];
 	for (int i = 0; i < n; i++)
 		data[i] = rand();
 
-	int ne;
-	uint8_t *edata = alloc_and_transform_from_RAW_to_X85(data, n, &ne);
 
-	int ne2;
-	uint8_t *edata2 = alloc_and_transform_from_RAW_to_B64(data, n, &ne2);
+
+	fprintf(stderr, "\n\n\noriginal data:\n");
+	for (int i = 0; i < n; i++)
+		fprintf(stderr, "%d%s", data[i], (i&&(0==(i+1)%77))?"\n":" ");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "entropy = %g\n", entropy(data, n));
+
+
+	int ne;
+	uint8_t *edata = alloc_and_transform_from_RAW_to_RLE8(data, n, &ne);
+
+	//int ne2;
+	//uint8_t *edata2 = alloc_and_transform_from_RAW_to_B64(data, n, &ne2);
+
+
+	fprintf(stderr, "\nPCX data:\n");
+	for (int i = 0; i < ne; i++)
+		fprintf(stderr, "%d%s", edata[i], (i&&(0==(i+1)%77))?"\n":" ");
+	fprintf(stderr, "\n");
+	fprintf(stderr, "%d => %d\n", n, ne);
+	fprintf(stderr, "entropy = %g\n", entropy(edata, ne));
 
 	int dne;
-	uint8_t *dedata = alloc_and_transform_from_X85_to_RAW(edata, ne, &dne);
+	uint8_t *dedata = alloc_and_transform_from_RLE8_to_RAW(edata, ne, &dne);
 
-	for (int i = 0; i < ne; i++)
-		fprintf(stderr, "%c%s", edata[i], (i&&(0==(i+1)%77))?"\n":"");
+
+
+	fprintf(stderr, "\ndata recovered from PCX:\n");
+	for (int i = 0; i < dne; i++)
+		fprintf(stderr, "%d%s", dedata[i], (i&&(0==(i+1)%77))?"\n":" ");
 	fprintf(stderr, "\n");
-	fprintf(stderr, "%d => %d => %d\n", n, ne, dne);
 
-	for (int i = 0; i < ne2; i++)
-		fprintf(stderr, "%c%s", edata2[i], (i&&(0==(i+1)%77))?"\n":"");
-	fprintf(stderr, "\n");
-	fprintf(stderr, "%d => %d\n", n, ne2);
-
+	fprintf(stderr, "n=%d dne=%d\n", n, dne);
 	assert(n == dne);
 	for (int i = 0; i < n; i++)
 		assert(data[i] == dedata[i]);
@@ -419,7 +508,7 @@ static void f(void)
 
 	free(edata);
 	free(dedata);
-	free(edata2);
+	//free(edata2);
 }
 
 int main(void)

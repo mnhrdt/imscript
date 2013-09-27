@@ -36,8 +36,8 @@ int grid_index_of_cell(struct grid *g, int *i)
 	int *n = g->n;
 	switch(g->dim) {
 	case 2: return i[0] + n[0] * i[1];
-	case 3: return i[0] + n[0] * (i[1] + n[1] * i[2]);
-	case 4: return i[0] + n[0] * (i[1] + n[1] * (i[2] + n[2] * i[3]));
+	//case 3: return i[0] + n[0] * (i[1] + n[1] * i[2]);
+	//case 4: return i[0] + n[0] * (i[1] + n[1] * (i[2] + n[2] * i[3]));
 	default: fail("caca");
 	}
 }

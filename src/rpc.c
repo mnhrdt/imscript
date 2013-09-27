@@ -121,7 +121,7 @@ void read_rpc_file_xml(struct rpc *p, char *filename)
 	FILE *f = xfopen(filename, "r");
 	int n = 0x100, o = 1;
 	while (1) {
-		char line[n], tag[n], *sl = fgets(line, n, f);;
+		char line[n], tag[n], *sl = fgets(line, n, f);
 		if (!sl) break;
 		if (o && 0 == strhas(line, "<Inverse_Model>")) o = 0;
 		tag[0] = 'i';

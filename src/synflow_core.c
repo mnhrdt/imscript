@@ -256,7 +256,7 @@ static void invert_homography(double invH[9], double H[9])
 			{H[6], H[7], H[8]}};
 	double det, ih[3][3];
 	INVERT_3X3(ih, det, h);
-	FORI(9) invH[i] = ih[0][i];
+	FORI(9) invH[i] = ih[i/3][i%3];
 }
 
 #include "cmphomod.c"
@@ -287,7 +287,7 @@ static double produce_homography(double H[9], int w, int h,
 		homography_from_4corresp(
 				corner[0], corner[1], corner[2], corner[3],
 				other[0], other[1], other[2], other[3], R);
-		FORI(9) H[i] = R[0][i];
+		FORI(9) H[i] = R[i/3][i%3];
 	} else if (0 == strcmp(homtype, "hom4pr")) {
 		// absolute displacement of the image corners
 		double corner[4][2] = {{0,0}, {w,0}, {0,h}, {w,h}};
@@ -301,7 +301,7 @@ static double produce_homography(double H[9], int w, int h,
 		homography_from_4corresp(
 				corner[0], corner[1], corner[2], corner[3],
 				other[0], other[1], other[2], other[3], R);
-		FORI(9) H[i] = R[0][i];
+		FORI(9) H[i] = R[i/3][i%3];
 	} else if (0 == strcmp(homtype, "hom4prc")) {
 		// percentual relative displacement of the image corners
 		double corner[4][2] = {{0,0}, {w,0}, {0,h}, {w,h}};
@@ -315,7 +315,7 @@ static double produce_homography(double H[9], int w, int h,
 		homography_from_4corresp(
 				corner[0], corner[1], corner[2], corner[3],
 				other[0], other[1], other[2], other[3], R);
-		FORI(9) H[i] = R[0][i];
+		FORI(9) H[i] = R[i/3][i%3];
 	} else if (0 == strcmp(homtype, "hom16")) {
 		// absolute coordinates of 4 point pairs
 		double a[4][2] = {
@@ -327,7 +327,7 @@ static double produce_homography(double H[9], int w, int h,
 		double R[3][3];
 		homography_from_4corresp( a[0], a[1], a[2], a[3],
 				b[0], b[1], b[2], b[3], R);
-		FORI(9) H[i] = R[0][i];
+		FORI(9) H[i] = R[i/3][i%3];
 	} else if (0 == strcmp(homtype, "hom16r")) {
 		// relative coordinates of 4 point pairs
 		double a[4][2] = {
@@ -345,7 +345,7 @@ static double produce_homography(double H[9], int w, int h,
 		double R[3][3];
 		homography_from_4corresp( a[0], a[1], a[2], a[3],
 				b[0], b[1], b[2], b[3], R);
-		FORI(9) H[i] = R[0][i];
+		FORI(9) H[i] = R[i/3][i%3];
 	} else if (0 == strcmp(homtype, "hom16rc")) {
 		// percentual relative coordinates of 4 point pairs
 		double a[4][2] = {
@@ -363,7 +363,7 @@ static double produce_homography(double H[9], int w, int h,
 		double R[3][3];
 		homography_from_4corresp( a[0], a[1], a[2], a[3],
 				b[0], b[1], b[2], b[3], R);
-		FORI(9) H[i] = R[0][i];
+		FORI(9) H[i] = R[i/3][i%3];
 	} else error("unrecognized homography type \"%s\"", homtype);
 	return 0;
 }
@@ -559,7 +559,7 @@ static double produce_combi2_model(double H[15], int w, int h,
 				other[0], other[1], other[2], other[3], R);
 		FORI(2) H[i] = c[0][i];
 		H[2] = a[0];
-		FORI(9) H[i+3] = R[0][i];
+		FORI(9) H[i+3] = R[i/3][i%3];
 		FORI(2) H[12+i] = c[1][i];
 		H[14] = a[1];
 	}
@@ -702,14 +702,14 @@ static void produce_flow_model(struct flow_model *f,
 		assert(f->nh == 3);
 		double H[3], invH[3];
 		produce_radial_model(H, invH, w, h, f->model_name, f->p);
-		FORI(6) f->H[i] = H[i];
-		FORI(6) f->iH[i] = invH[i];
+		FORI(3) f->H[i] = H[i];
+		FORI(3) f->iH[i] = invH[i];
 	} else if (f->hidden_id == FLOWMODEL_HIDDEN_IPRADIAL) {
 		assert(f->nh == 3);
 		double H[3], invH[3];
 		produce_iradial_model(H, invH, w, h, f->model_name, f->p);
-		FORI(6) f->H[i] = H[i];
-		FORI(6) f->iH[i] = invH[i];
+		FORI(3) f->H[i] = H[i];
+		FORI(3) f->iH[i] = invH[i];
 	} else if (f->hidden_id == FLOWMODEL_HIDDEN_COMBI2) {
 		assert(f->nh == 15);
 		double H[15], invH[9];
@@ -845,7 +845,6 @@ static void transform_back(float *yy, struct flow_model *f, float *xx,
 // "API"
 static void transform_forward(float *yy, struct flow_model *f, float *xx,
 							int w, int h, int pd)
-
 {
 	float (*y)[w][pd] = (void *)yy;
 	assert(f->w == w);

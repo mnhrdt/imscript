@@ -43,7 +43,6 @@ struct bitmap_font {
 
 	enum font_data_format packing;
 	int ndata; // when UNPACKED: ndata = number_of_glyphs * width * height
-	char *name; // optional field
 	unsigned char *data;
 };
 
@@ -405,18 +404,10 @@ static void dump_font_as_parseable_c_struct_as_it_is(char *filename,
 	fprintf(f, "unsigned char %s_data[] =", name);
 	dump_data_in_c(f, font.data, font.ndata, font.packing);
 	fprintf(f, ";\n");
-	fprintf(f, "struct bitmap_font %s[1] = "
-			"{{%d, %d, %d, %s, \"%s\", %s_data}};\n",
+	fprintf(f, "struct bitmap_font %s[1] = {{%d, %d, %d, %s, %s_data}};\n",
 		name, font.number_of_glyphs, font.width, font.height,
-		packing_string(font.packing), name, name);
+		packing_string(font.packing), name);
 	xfclose(f);
-
-	double e = entropy(font.data, font.ndata);
-	double cs = font.ndata * e/8;
-	double cf = 100.0*cs/font.ndata;
-	fprintf(stderr, "entropy %s %s  = %g  %d => %g %g%%\n",
-			name, packing_string(font.packing),
-			e,font.ndata, cs, cf);
 }
 
 static void dump_font_as_parseable_c_struct(char *filename,

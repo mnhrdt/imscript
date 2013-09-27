@@ -63,11 +63,11 @@ int main( int argc, char **argv )
 	}
 
 	fprintf(stderr, "%dx%d %d [%d]\n", w, h, pd, depth);
-	CvSize size;
-	size.width = 2*w;
-	size.height = 2*h;
-	IplImage *frame_big = cvCreateImage(size, depth, pd);
-	fprintf(stderr, "%dx%d %d [%d]\n", frame_big->width, frame_big->height, pd, depth);
+	//CvSize size;
+	//size.width = 1*w;
+	//size.height = 1*h;
+	//IplImage *frame_big = cvCreateImage(size, depth, pd);
+	//fprintf(stderr, "%dx%d %d [%d]\n", frame_big->width, frame_big->height, pd, depth);
 
 	/* create a window for the video */
 	cvNamedWindow( "result", CV_WINDOW_FREERATIO );
@@ -75,6 +75,8 @@ int main( int argc, char **argv )
 	cvResizeWindow("result", w, h);
 
 	while( key != 'q' ) {
+		if (key > 0)
+			fprintf(stderr, "key = %d %x\n", key, key);
 		/* get a frame */
 		frame = cvQueryFrame( capture );
 
@@ -88,19 +90,19 @@ int main( int argc, char **argv )
 		if (pd != 3) fail("pd is not 3");
 
 		// copy this frame values into the carroussel
-		for (int i = 0; i < w * h * pd; i++)
-			accum[accum_index][i] = (unsigned char)frame->imageData[i];
+		//for (int i = 0; i < w * h * pd; i++)
+		//	accum[accum_index][i] = (unsigned char)frame->imageData[i];
 
 		//fprintf(stderr, "accum_index = %d\n", accum_index);
 
-		float *taccu = accum[accum_n];
-		for (int i = 0; i < w * h * pd; i++)
-			taccu[i] = 0;//(float)(unsigned char)frame->imageData[i];
+		//float *taccu = accum[accum_n];
+		//for (int i = 0; i < w * h * pd; i++)
+		//	taccu[i] = 0;//(float)(unsigned char)frame->imageData[i];
 
 
-		for (int j = 0; j < accum_n; j++)
-			for (int i = 0; i < w * h * pd; i++)
-				taccu[i] += accum[j][i]/(accum_n);
+		//for (int j = 0; j < accum_n; j++)
+		//	for (int i = 0; i < w * h * pd; i++)
+		//		taccu[i] += accum[j][i]/(accum_n);
 		//
 		//if (0)if (count++ == 9 && pd == 3)
 		//	for (int i = 0; i < w * h * 3; i++)
@@ -110,11 +112,11 @@ int main( int argc, char **argv )
 		//				frame->imageData[3*i+2]);
 
 		//stats(taccu,w*h,pd);
-		taccu[0]=taccu[1]=taccu[2]=0;
-		taccu[3]=taccu[4]=taccu[5]=255;
+		//taccu[0]=taccu[1]=taccu[2]=0;
+		//taccu[3]=taccu[4]=taccu[5]=255;
 
-		for (int i = 0; i < (w * h * pd)/2; i++)
-			frame->imageData[i] = taccu[i];
+		//for (int i = 0; i < (w * h * pd)/2; i++)
+		//	frame->imageData[i] = taccu[i];
 
 		//for (int i = 0; i < w * h * pd; i++)
 		//	frame->imageData[i] *= 4;//taccu[i];
@@ -135,7 +137,7 @@ int main( int argc, char **argv )
 		cvShowImage( "result", frame );
 
 		/* exit if user press 'q' */
-		key = cvWaitKey( 1 );
+		key = cvWaitKey( 1 ) % 0x10000;
 		accum_index = (accum_index + 1)%accum_n;
 	}
 

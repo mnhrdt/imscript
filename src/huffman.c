@@ -1,8 +1,15 @@
 #include <stdint.h>
 
 // 1. API
-//int huffman_encode(uint8_t *out, uint8_t *in, int n);
-//int huffman_decode(uint8_t *out, uint8_t *in, int n);
+//
+// @out: output array of encoded bytes, to be filled-in
+// @in: input array of code words
+// @n: length of input array
+// return value: number of output bytes
+//int huffman_encode(uint8_t *out, int *in, int n);
+//
+//
+//int huffman_decode(int *out, uint8_t *in, int n);
 
 // precondition "out" must contain enough pre-allocated space
 // at worse, 260+n
@@ -18,8 +25,9 @@
 
 struct tree_node { int mother, left, right; };
 struct heap_node { int word, freq; };
-
 struct code_word { int word, length, *bits; };
+
+
 
 static void fill_code_word(struct code_word *w, struct tree_node *t, int l)
 {
@@ -89,9 +97,72 @@ static void find_code_from_tree(struct code_word *c, struct tree_node *t, int n)
 	}
 }
 
+static void find_tree_from_code(struct tree_node *t, struct code_word *c, int n)
+{
+}
+
 #define HEAP_ENERGY(h,i) h[i].freq
 #define HEAP_SWAP(h,i,j) do{struct heap_node t_=h[i];h[i]=h[j];h[j]=t_;}while(0)
 #include "abstract_heap.h"
+
+static void heap_swap(struct heap_node *h, int i, int j)
+{
+	struct heap_node t = h[i];
+	h[i] = h[j];
+	h[j] = t;
+}
+
+static void heap_fixup(struct heap_node *h, int n, int i)
+{
+	while (h[i].freq < h[HEAP_PARENT(i)].freq)
+	{
+		heap_swap(h, i, HEAP_PARENT(i));
+		i = HEAP_PARENT(i);
+	}
+}
+
+static void heap_build(struct heap_node *h, int n)
+{
+	int i = 0;
+	while (i < n)
+		heap_fixup(h, n, i++);
+}
+
+static int heap_best_of_three(struct heap_node *h, int n, int i)
+{
+	int ir = HEAP_RIGHT(i);
+	int il = HEAP_LEFT(i);
+	int ei = h[i].freq;
+	int eir = h[ir].freq;
+	int eil = h[il].freq;
+	return (il >= n ) ? i :(
+		(ir == n ) ? ( ei < eil ? i : il) :(
+		(ei  <= eil && ei  <=  eir ) ? i  :(
+		(eil <= ei  && eil <=  eir ) ? il :(
+		(eir <= eil && eir <=  ei  ) ? ir :-1))));
+}
+
+static void heap_fixdown(struct heap_node *h, int n, int i)
+{
+	int j;
+	while ((j = heap_best_of_three(h,n,i)) != i)
+	{
+		heap_swap(h, i, j);
+		i = j;
+	}
+}
+
+static void heap_remove_top(struct heap_node *h, int n)
+{
+	heap_swap(h, 0, n-1);
+	heap_fixdown(h, n-1, 0);
+}
+
+static void heap_add(struct heap_node *h, int k)
+{
+	heap_fixup(h, k+1, k);
+}
+
 
 static
 void compute_huffman_tree(struct tree_node *htree, uint8_t *in, int n, int nw)
@@ -181,15 +252,20 @@ int encode_message(uint8_t *y, struct code_word *c, int nw, uint8_t *x, int n)
 	assert(nw < 256);
 	fprintf(stderr, "original message of %d bytes\n", n);
 
+	// TODO: canonicalize code words
 	// 1. encode the codebook (each int goes to 4 bytes)
 	uint32_t *yy = (void*)y;
+	y[0] = n;//original message length
 	// 1.1. number of words
-	yy[0] = nw;
+	yy[1] = nw;
 	// 1.2. the lengths of each word
 	for (int i = 0; i < nw; i++)
-		yy[i] = c[i].length;
-	int r = 4*nw + 4, nbits = 0;
-	y += 4*(nw + 1);
+	{
+		assert(c[i].word == i);
+		yy[2+i] = c[i].length;
+	}
+	int r = 4*nw + 8, nbits = 0;
+	y += 4*(nw + 2);
 	// 1.3. the words themselves
 	for (int i = 0; i < nw; i++)
 		for (int j = 0; j < c[i].length; j++)
@@ -208,6 +284,35 @@ int encode_message(uint8_t *y, struct code_word *c, int nw, uint8_t *x, int n)
 	return r;
 }
 
+int huffman_decode(uint8_t *y, uint8_t *x, int n)
+{
+	uint32_t *xx = (void*)x;
+	int nout = xx[0], nw = xx[1], nbits = 0, wordpos = 0, wordidx = 0;
+	struct code_word code[nw];
+	for (int i = 0; i < nw; i++) {
+		code[i].word = i;
+		code[i].length = xx[1+i];
+		nbits += code[i].length;
+	}
+	x += 4*(nw + 2);
+	for (int i = 0; i < nbits; i++) {
+		code[wordidx].bits[wordpos++] = get_bit_from_stream(x, i);
+		if (wordpos == code[wordidx].length) {
+			wordpos = 0;
+			wordidx += 1;
+		}
+	}
+	for (int i = 0; i < nout; i++)
+	{
+		// we need the tree for decoding!
+	}
+
+	fprintf(stderr, "decoding not yet implemented");
+	abort();
+
+
+}
+
 int huffman_encode(uint8_t *out, uint8_t *in, int n, int nw)
 {
 	struct tree_node htree[NT];
@@ -219,6 +324,7 @@ int huffman_encode(uint8_t *out, uint8_t *in, int n, int nw)
 	return encode_message(out, code, NW, in, n);
 }
 
+
 int main(int c, char **v)
 {
 	if (c != 3) return -1;
@@ -226,7 +332,7 @@ int main(int c, char **v)
 	int m = atoi(v[2]);
 	uint8_t t[n], tt[2*n+1000];
 	for (int i = 0; i < n; i++)
-		t[i] = fmin(rand()%m,rand()%m);//sqrt(1.0*(rand()%m)/m)*m);
+		t[i] = pow(1.0*(rand()%m)/m,4)*m;
 	return huffman_encode(tt, t, n, m);
 	//uint8_t t[40] = {
 	//	0, 1, 3,  3, 3, 3,  3, 3, 3,  0,

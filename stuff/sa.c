@@ -8,7 +8,7 @@ typedef void (sort_function_ints)(int *, int);
 static void swap_places(int *x, int a, int b)
 {
 	if (a == b) return;
-	//printf("SWAP_%d_%d\n", a, b);
+	//printf("SWAP %d %d\n", a, b);
 	int t = x[a];
 	x[a] = x[b];
 	x[b] = t;
@@ -100,17 +100,17 @@ void heapsort_ints(int *t, int n)
 }
 
 
-static void insert(int *t, int n, int x)
-{
-	// skip elements less than x
-	for (int i = 0; i
-}
-
-void insertsort_ints(int *t, int n)
-{
-	for (int i = 1; i < n; i++)
-		insert(t, i, t[i]);
-}
+//static void insert(int *t, int n, int x)
+//{
+//	// skip elements less than x
+//	for (int i = 0; i
+//}
+//
+//void insertsort_ints(int *t, int n)
+//{
+//	for (int i = 1; i < n; i++)
+//		insert(t, i, t[i]);
+//}
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,8 +1,8 @@
 This subdirectory contains an implementation of the "optical_flow" function as
-required by the centroid method.  This implementation consists in three files:
+required by the centroid method.  The implementation consists of three files:
 
 pyramidal_horn_schunck.c:
-	The multiscale Horn-Schunck implementation by Sanchez, Meinhardt and
+	The multiscale Horn-Schunck implementation by Sánchez, Meinhardt and
 	Koenderman, copied directly from the IPOL publication.
 
 smooth_inpainting.c:

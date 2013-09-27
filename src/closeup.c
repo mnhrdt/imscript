@@ -300,10 +300,14 @@ static float interpolate_cell(float a, float b, float c, float d,
 	return -1;
 }
 
+#include "bicubic.c"
+
 static void interpolate_vec(float *out, float *x, int w, int h, int pd,
 		float p, float q, int m)
 {
-	if (p < 0 || q < 0 || p+1 >= w || q+1 >= h) {
+	if (m == 3)
+		bicubic_interpolation(out, x, w, h, pd, p, q);
+	else if (p < 0 || q < 0 || p+1 >= w || q+1 >= h) {
 		FORL(pd) out[l] = 0;
 	} else {
 		int ip = floor(p);

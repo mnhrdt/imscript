@@ -20,7 +20,7 @@
 #include "fragments.c"
 
 struct statistics_float {
-	float min, max, median, average, sample, variance, middle;
+	float min, max, median, average, sample, variance, middle, laverage;
 };
 
 //SMART_PARAMETER_INT(STATISTIC_MEDIAN_BIAS,0)
@@ -71,6 +71,10 @@ static void statistics_getf_spoilable(struct statistics_float *s, float *f,
 	for (int i = 0; i < n; i++)
 		s->average += f[i];
 	s->average /= n;
+	s->laverage = 0;
+	for (int i = 0; i < n; i++)
+		s->laverage += exp(f[i]/255);
+	s->laverage = log(s->laverage/n)*255;
 	s->variance = 0;
 	for (int i = 0; i < n; i++)
 		s->variance = hypot(s->variance, s->average - f[i]);
@@ -121,12 +125,13 @@ static void downsa2d(float *oy, float *ox, int w, int h, int pd, int n, int ty)
 		float g;
 		switch (ty)
 		{
-		case 'i': g = s.min;     break;
-		case 'e': g = s.median;  break;
-		case 'a': g = s.max;     break;
-		case 'v': g = s.average; break;
-		case 'r': g = s.sample;  break;
-		case 'f': g = vv[0];  break;
+		case 'i': g = s.min;      break;
+		case 'e': g = s.median;   break;
+		case 'a': g = s.max;      break;
+		case 'v': g = s.average;  break;
+		case 'V': g = s.laverage; break;
+		case 'r': g = s.sample;   break;
+		case 'f': g = vv[0];      break;
 		default:  error("downsa type %c not implemented", ty);
 		}
 		y[j][i][l] = g;

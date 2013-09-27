@@ -111,9 +111,11 @@ static void harmonic_extension_with_init(
 	{
 		float u = perform_one_iteration(y, w, h, mask, nmask, timestep);
 
+		if (u < 1e-10) break;
+
 		//if (0 == i % 10)
-		fprintf(stderr, "size = %dx%d, iter = %d, maxupdate = %g\n",
-				w, h, i, u);
+		//fprintf(stderr, "size = %dx%d, iter = %d, maxupdate = %g\n",
+		//		w, h, i, u);
 	}
 
 	free(mask);
@@ -219,7 +221,6 @@ void elap_recursive_separable(float *out, float *in, int w, int h, int pd,
 		elap_recursive(outl, inl, w, h, timestep, niter, scale);
 	}
 }
-
 
 #define MAIN_ELAP_RECSEP
 

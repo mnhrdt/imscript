@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "iio.h"
 
-int main()
+int main(void)
 {
 	int w, h;
 	float *x = iio_read_image_float("-", &w, &h);

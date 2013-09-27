@@ -457,7 +457,7 @@ static void draw_histogram(uint8_t (**d)[3], int dside, float ***h, int bins)
 			h, bins);
 }
 
-int main()
+int main(void)
 {
 	int width, height, bins = CHISTO_BINS();
 	uint8_t (*x)[3] = iio_read_image_uint8_rgb("-", &width, &height);

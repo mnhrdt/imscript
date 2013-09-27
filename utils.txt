@@ -20,6 +20,7 @@ CORE: generic tools for image processing
 	vecov:    accumulate values over a list of multispectral images
 	imgerr:   compare two images with a single number
 	iion:     copy (useful for converting format)
+	morsi:    elementary gray-level morphological operations
 
 
 NO-CORE: more specific tasks
@@ -57,7 +58,6 @@ VIS: utils for data visualization
 WANTED: not yet implemented/ported from qnm
 
 	fderiv:    partial derivatives of various types and schemes
-	morphoop:  elementary gray-level morphological operations
 	ccfilt:    compute connected components of a binary image
 	ccbound:   compute boundaries of connected components
 	ccdist:    distance transform

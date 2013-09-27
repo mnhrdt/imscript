@@ -282,7 +282,7 @@ SMART_PARAMETER_SILENT(SIFTAFF_INV,0)
 int main_siftaff(int c, char *v[])
 {
 	if (c != 7) {
-		fprintf(stderr, "usage:\n\t%s aff <sift.in >sift.out\n", *v);
+		fprintf(stderr, "usage:\n\t%s a b p c d q <sift.in >sift.out\n", *v);
 		return EXIT_FAILURE;
 	}
 	float A[6], B[6]; FORI(6) B[i] = atof(v[i+1]);
