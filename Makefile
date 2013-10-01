@@ -24,7 +24,7 @@ ifeq ($(ENABLE_GSL), yes)
 	SRCGSL = paraflow minimize
 endif
 
-IIOFLAGS = -ljpeg -ltiff -lpng
+IIOFLAGS = -ljpeg -ltiff -lpng -lm
 FFTFLAGS = -lfftw3f
 GSLFLAGS = -lgsl -lgslcblas
 
