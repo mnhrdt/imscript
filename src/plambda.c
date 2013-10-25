@@ -564,6 +564,15 @@ static int vector_dimension(float *r, float *a, int n)
 	return 1;
 }
 
+// instance of "univector_function"
+static int vector_rgb2gray(float *r, float *a, int n)
+{
+	if (n != 3) fail("vgray needs a 3-vector");
+	*r = 0.299 * a[0] + 0.587 * a[1] + 0.114 * a[2];
+	return 1;
+}
+
+
 
 // table of all functions (local and from math.h) {{{1
 struct predefined_function {
@@ -674,6 +683,7 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(vector_mul,"vmul",-6),
 	REGISTER_FUNCTIONN(vector_norm,"vnorm",-6),
 	REGISTER_FUNCTIONN(vector_dimension,"vdim",-6),
+	REGISTER_FUNCTIONN(vector_rgb2gray,"vgray",-6),
 	//REGISTER_FUNCTIONN(rgb2hsv,"rgb2hsv",3),
 	//REGISTER_FUNCTIONN(hsv2rgb,"rgb2hsv",3),
 #undef REGISTER_FUNCTION
