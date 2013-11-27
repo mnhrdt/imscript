@@ -487,6 +487,29 @@ static int matrix_trace(float *r, float *a, int nn)
 }
 
 // instance of "univector_function"
+static int matrix_3x3to12x9(float *r, float *a, int n)
+{
+	if (n != 9)
+		fail("mto12x9 needs a 3x3 matrix");
+	if (108 > PLAMBDA_MAX_PIXELDIM)
+		fail("MAX_PIXELDIM needs to be at least 108");
+	for (int i = 0; i < 108; i++)
+		r[i] = 0;
+	r[0] = r[39] = r[78] = a[0];
+	r[1] = r[40] = r[79] = a[1];
+	r[2] = r[41] = r[80] = a[2];
+	r[12] = r[51] = r[90] = a[3];
+	r[13] = r[52] = r[91] = a[4];
+	r[14] = r[53] = r[92] = a[5];
+	r[24] = r[63] = r[102] = a[6];
+	r[25] = r[64] = r[103] = a[7];
+	r[26] = r[65] = r[104] = a[8];
+	r[21] = r[34] = r[71] = 1;
+	r[45] = r[82] = r[95] = -1;
+	return 108;
+}
+
+// instance of "univector_function"
 static int matrix_transpose(float *r, float *a, int nn)
 {
 	int n;
@@ -676,6 +699,7 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(matrix_transpose,"mtrans",-6),
 	REGISTER_FUNCTIONN(matrix_inverse,"minv",-6),
 	REGISTER_FUNCTIONN(matrix_trace,"mtrace",-6),
+	REGISTER_FUNCTIONN(matrix_3x3to12x9,"mto12x9",-6),
 	REGISTER_FUNCTIONN(vector_avg,"vavg",-6),
 	REGISTER_FUNCTIONN(vector_sum,"vsum",-6),
 	REGISTER_FUNCTIONN(vector_min,"vmin",-6),
