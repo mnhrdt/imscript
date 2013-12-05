@@ -454,6 +454,82 @@ struct ann_pair *siftlike_get_annpairs(
 }
 
 // get two lists of points, and produce a list of pairs
+// (nearest match from a to b)
+struct ann_pair *siftlike_get_annpairs_lowe(
+		struct sift_keypoint *ka, int na,
+		struct sift_keypoint *kb, int nb,
+		int *np,
+		float loweratio
+		)
+{
+	assert(loweratio < 1);
+	assert(loweratio > 0);
+	struct ann_pair *p = xmalloc(na * sizeof * p);
+	int cx = 0;
+	FORI(na) {
+		double d, dp;
+		int to = fancynearest(ka+i, kb, nb, &d, &dp);
+		assert(dp >= d);
+		if (d / dp < loweratio) {
+			p[cx].from = i;
+			p[cx].to = fancynearest(ka+i, kb, nb, &d, &dp);
+			p[cx].v[0] = d;
+			p[cx].v[1] = dp;
+			cx += 1;
+		}
+	}
+	//FORI(na) fprintf(stderr, "BEFORE p[%d].from=%d\n", i, p[i].from);
+	sort_annpairs(p, cx);
+	//FORI(na) fprintf(stderr, "AFTER p[%d].from=%d\n", i, p[i].from);
+	*np = cx;
+	return p;
+}
+
+// get two lists of points, and produce a list of pairs
+// (nearest match from a to b)
+struct ann_pair *siftlike_get_annpairs_lowe2(
+		struct sift_keypoint *ka, int na,
+		struct sift_keypoint *kb, int nb,
+		int *np,
+		float loweratio, float tdown, float tup
+		)
+{
+	assert(loweratio < 1);
+	assert(loweratio > 0);
+	struct ann_pair *p = xmalloc(na * sizeof * p);
+	int cx = 0;
+	int count_tdown = 0;
+	int count_ratio = 0;
+	int count_tup = 0;
+	int count_ratiotup = 0;
+	FORI(na) {
+		double d, dp;
+		int to = fancynearest(ka+i, kb, nb, &d, &dp);
+		assert(dp >= d);
+		if ((d / dp < loweratio && d < tup) || d < tdown ) {
+			p[cx].from = i;
+			p[cx].to = fancynearest(ka+i, kb, nb, &d, &dp);
+			p[cx].v[0] = d;
+			p[cx].v[1] = dp;
+			cx += 1;
+		}
+		if (d < tdown) count_tdown += 1;
+		if (d/dp < loweratio) count_ratio += 1;
+		if (d < tup) count_tup += 1;
+		if (d/dp < loweratio && d < tup) count_ratiotup += 1;
+	}
+	fprintf(stderr, "count_tdown = %d\n", count_tdown);
+	fprintf(stderr, "count_ratio = %d\n", count_ratio);
+	fprintf(stderr, "count_tup = %d\n", count_tup);
+	fprintf(stderr, "count_ratiotup = %d\n", count_ratiotup);
+	//FORI(na) fprintf(stderr, "BEFORE p[%d].from=%d\n", i, p[i].from);
+	sort_annpairs(p, cx);
+	//FORI(na) fprintf(stderr, "AFTER p[%d].from=%d\n", i, p[i].from);
+	*np = cx;
+	return p;
+}
+
+// get two lists of points, and produce a list of pairs
 // (first nearest matches)
 struct ann_pair *siftlike_get_accpairs(
 		struct sift_keypoint *ka, int na,
