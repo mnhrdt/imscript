@@ -73,7 +73,7 @@ static int find_homographic_model_among_pairs(float *model, bool *omask,
 		for (int i = 0; i < modeldim; i++)
 			printf(" %g", model[i]);
 		printf("\n");
-	} else printf("RANSAC found no model\n");
+	} else printf("GRAND FAILURE: RANSAC found no model\n");
 
 	return n_inliers;
 }
