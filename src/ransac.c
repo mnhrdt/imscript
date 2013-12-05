@@ -154,7 +154,7 @@ static void fill_random_shuffle(int *idx, int n, int a, int b)
 // generate a set of n different ints between a and b
 static void fill_random_indices(int *idx, int n, int a, int b)
 {
-	if (b-a==n) {for(int i=0;i<n;i++)idx[i]=a+i;}
+	if (b-a==n) {for(int i=0;i<n;i++)idx[i]=a+i;return;}
 	if (5*n > (b-a)) {fill_random_shuffle(idx, n, a, b);return;}
 	// TODO fisher yates shuffle and traverse it by blocks of length nfit
 	int safecount = 0;
@@ -465,17 +465,19 @@ int main_cases(int c, char *v[])
 
 int main_hack_fundamental_matrix(int c, char *v[])
 {
-	if (c < 4) {
+	if (c != 5 && c != 6 && c != 7) {
 		fprintf(stderr, "usage:\n\t%s fmn "
 		//                         -1   0
-			"ntrials maxerr minliers [inliers] <data\n", *v);
-		//       1       2      3        4
+		"ntrials maxerr minliers omodel [omask [oinliers]] <data\n",*v);
+		//     1 2      3        4       5      6
 		return EXIT_FAILURE;
 	}
 	int ntrials = atoi(v[1]);
 	float maxerr = atof(v[2]);
 	int minliers = atoi(v[3]);
-	char *inliers_filename = v[4];
+	char *filename_omodel =  c > 4 ? v[4] : 0;
+	char *filename_omask =   c > 5 ? v[5] : 0;
+	char *filename_inliers = c > 6 ? v[6] : 0;
 
 	fprintf(stderr, "WARNING: ignoring parameter minliers=%d\n", minliers);
 
@@ -523,9 +525,9 @@ int main_hack_fundamental_matrix(int c, char *v[])
 	}
 #endif
 
-	// if needed, print the inliers
-	if (inliers_filename) {
-		FILE *f = xfopen(inliers_filename, "w");
+	// if requested, save the inlying data points
+	if (filename_inliers) {
+		FILE *f = xfopen(filename_inliers, "w");
 		for (int i = 0; i < n; i++)
 			if (mask[i]) {
 				for(int d = 0; d < datadim; d++)
@@ -534,16 +536,26 @@ int main_hack_fundamental_matrix(int c, char *v[])
 			}
 		xfclose(f);
 	}
-	if (false) {
-		FILE *f = xfopen("/tmp/omask.txt", "w");
+
+	// if requested, save the inlier mask
+	if (filename_omask) {
+		FILE *f = xfopen(filename_omask, "w");
 		for (int i = 0; i < n; i++)
 			fprintf(f, mask[i]?" 1":" 0");
 		fprintf(f, "\n");
 		xfclose(f);
 	}
 
-	free(mask);
-	free(data);
+	// if requested, save the model
+	if (filename_omodel) {
+		FILE *f = xfopen(filename_omodel, "w");
+		for (int i = 0; i < modeldim; i++)
+			fprintf(f, "%a%c", model[i], i==modeldim-1?'\n':' ');
+		xfclose(f);
+	}
+
+	//free(mask);
+	//free(data);
 
 	return EXIT_SUCCESS;
 }

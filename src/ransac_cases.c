@@ -325,6 +325,19 @@ static float epipolar_euclidean_error(float *fm, float *pair, void *usr)
 	return fabs(pfq);
 }
 
+// instance of "ransac_error_evaluation_function"
+static float epipolar_euclidean_error_sym(float *fm, float *pair, void *usr)
+{
+	float Tfm[9] = {fm[0], fm[3], fm[6],
+		        fm[1], fm[4], fm[7],
+		        fm[2], fm[5], fm[8]};
+	float Tpair[4] = {pair[2], pair[3], pair[0], pair[1]};
+	float e1 = epipolar_euclidean_error(fm, pair, usr);
+	float e2 = epipolar_euclidean_error(Tfm, Tpair, usr);
+	return fmax(e1, e2);
+}
+
+
 //// instance of "ransac_error_evaluation_function"
 //static float epipolar_symmetric_euclidean_error(float *fm, float *pair, void *u)
 //{
@@ -339,7 +352,9 @@ static float epipolar_euclidean_error(float *fm, float *pair, void *usr)
 static float epipolar_error(float *fm, float *pair, void *usr)
 {
 	ransac_error_evaluation_function *f;
-	f = epipolar_euclidean_error;
+	//f = epipolar_algebraic_error;
+	//f = epipolar_euclidean_error;
+	f = epipolar_euclidean_error_sym;
 	return f(fm, pair, usr);
 }
 
