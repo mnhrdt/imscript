@@ -30,6 +30,9 @@
 #include "parsenumbers.c"
 #include "drawsegment.c"
 
+struct rgb_value {
+	uint8_t r, g, b;
+};
 struct rgba_value {
 	uint8_t r, g, b, a;
 };
@@ -47,6 +50,20 @@ struct rgba_value {
 #define RGBA_GRAY30   (struct rgba_value){.r=0x30,.g=0x30,.b=0x30,.a=0xff}
 #define RGBA_GRAY40   (struct rgba_value){.r=0x40,.g=0x40,.b=0x40,.a=0xff}
 #define RGBA_GRAY50   (struct rgba_value){.r=0x50,.g=0x50,.b=0x50,.a=0xff}
+#define RGB_BLACK    (struct rgb_value){.r=0x00,.g=0x00,.b=0x00}
+#define RGB_RED      (struct rgb_value){.r=0xff,.g=0x00,.b=0x00}
+#define RGB_GREEN    (struct rgb_value){.r=0x00,.g=0xff,.b=0x00}
+#define RGB_BLUE     (struct rgb_value){.r=0x00,.g=0x00,.b=0xff}
+#define RGB_MAGENTA  (struct rgb_value){.r=0xff,.g=0x00,.b=0xff}
+#define RGB_YELLOW   (struct rgb_value){.r=0xff,.g=0xff,.b=0x00}
+#define RGB_PHANTOM  (struct rgb_value){.r=0x30,.g=0x20,.b=0x10}
+#define RGB_BRIGHT   (struct rgb_value){.r= 129,.g=  86,.b=  43}
+#define RGB_DARKGRAY (struct rgb_value){.r=0x30,.g=0x30,.b=0x30}
+#define RGB_GRAY10   (struct rgb_value){.r=0x10,.g=0x10,.b=0x10}
+#define RGB_GRAY20   (struct rgb_value){.r=0x20,.g=0x20,.b=0x20}
+#define RGB_GRAY30   (struct rgb_value){.r=0x30,.g=0x30,.b=0x30}
+#define RGB_GRAY40   (struct rgb_value){.r=0x40,.g=0x40,.b=0x40}
+#define RGB_GRAY50   (struct rgb_value){.r=0x50,.g=0x50,.b=0x50}
 
 
 
@@ -419,23 +436,32 @@ static int innpair(int s[2], double p[4])
 int main_viewepi(int c, char *v[])
 {
 	if (c != 12 && c != 13) {
-		fprintf(stderr, "usage:\n\t%s f0 ... f8 sx sy [mask]\n", *v);
+		fprintf(stderr, "usage:\n\t%s f0 ... f8 sx sy [mask] < pairs\n", *v);
 		//                          0 1      9  10 11  12
 		return EXIT_FAILURE;
 	}
 	double A[9]; FORI(9) A[i] = atof(v[1+i]);
 	int s[2], n; FORI(2) s[i] = atoi(v[10+i]);
+
+	// 0. read input pairs
 	double (*p)[4] = (void*)read_ascii_doubles(stdin, &n);
 	n /= 4;
+
+
+	// 1. create output image and plot black background
 	struct rgba_value (*o)[s[0]] = xmalloc(s[0]*s[1]*4);
+	FORI(s[0]*s[1]) o[0][i] = RGBA_BLACK;
+
+	// 2. if there is a mask file, read it
 	bool mask=c>12, bmask[n]; FORI(n) bmask[i] = !mask;
 	if (mask) { FILE *f = xfopen(v[12], "r");
 		FORI(n) {int t,q=fscanf(f, "%d", &t);bmask[i]=q&&t;}
 		xfclose(f);
 	}
-	FORI(s[0]*s[1]) o[0][i] = RGBA_BLACK;
+
+
 	// for each point p (=px) in image A
-	// 1. draw the epipolar line L of p
+	// 3. draw the epipolar line L of p
 	FORI(n) if (!bmask[i] && innpair(s,p[i])) {
 			double L[3]; epipolar_line(L, A, p[i]);
 			overlay_line(L[0],L[1],L[2],o[0],s[0],s[1],RGBA_GRAY10);
@@ -444,7 +470,7 @@ int main_viewepi(int c, char *v[])
 		double L[3]; epipolar_line(L, A, p[i]);
 			overlay_line(L[0],L[1],L[2],o[0],s[0],s[1],RGBA_GRAY50);
 	}
-	// 3. draw the projection line of q to L
+	// 4. draw the projection line of q to L
 	FORI(n) {
 		if (!innpair(s,p[i])) continue;
 		double L[3];
@@ -465,7 +491,7 @@ int main_viewepi(int c, char *v[])
 				o[iLy[1]][iLy[0]] = RGBA_RED;
 		}
 	}
-	// 2. draw the corresponding point q (py)
+	// 5. draw the corresponding point q (py)
 	FORI(n) {
 		if (!innpair(s,p[i])) continue;
 		int y[2] = {lrint(p[i][2]), lrint(p[i][3])};
@@ -620,6 +646,86 @@ int main_viewfmpair(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
+//#define BAD_MAX(x,y) (((x)>(y))?(x):(y))
+//
+//// CLI utility to display the epipolar lines defined by a fundamental matrix
+//int main_viewfmpairi(int c, char *v[])
+//{
+//	float dimfactor = 0.5;
+//
+//	if (c != 13) {
+//		fprintf(stderr, "usage:\n\t"
+//			"%s f0 ... f8 a.png b.png <points >view\n", *v);
+//		//        0 1      9  10    11
+//		return EXIT_FAILURE;
+//	}
+//	double A[9]; FORI(9) A[i] = atof(v[1+i]);
+//	char *filename_a = v[10];
+//	char *filename_b = v[11];
+//
+//	int wa, ha, wb, hb, pda, pdb;
+//	float *a = iio_load_image_uint8_vec(filename_a, &wa, &ha, &pda);
+//	float *b = iio_load_image_uint8_vec(filename_b, &wb, &hb, &pdb);
+//	int w = wa+wb;
+//	int h = BAD_MAX(ha, hb);
+//	pd = pda;
+//	if (pda != 3 || pdb != 3) fail("works with color images");
+//
+//	assert(3 == sizeof(struct rgb_value));
+//	uint8_t *out = xmalloc(w*h*pd);
+//	struct rgb_value (*o)[w] = (void*)out;
+//
+//	// set background
+//	for (int i = 0; i < w*h*pd; i++)
+//		out[i] = 0;
+//	for (int j = 0; j < ha; j++)
+//	for (int i = 0; i < wa; i++)
+//		o[j][i] = *(struct rgb_value*)(a+3*(w*j+i));
+//	for (int j = 0; j < hb; j++)
+//	for (int i = 0; i < wb; i++)
+//		o[j][i+wa] = *(struct rgb_value*)(b+3*(w*j+i));
+//	for (int i = 0; i < w*h*pd; i++)
+//		out[i] *= dimfactor;
+//
+//	double Atr[9];
+//	FORI(3)FORJ(3) Atr[3*i+j]=A[3*j+i];
+//
+//	int n;
+//	float *t = read_ascii_floats(stdin, &n);
+//	n /= 4;
+//
+//	int maxlpoints = 4 * w*h;
+//	int (*p)[2] = xmalloc(maxlpoints*sizeof*p);
+//
+//	for (int cx = 0; cx < 20; cx += 1)
+//	{
+//		int i = randombounds(0, s[0]-1);
+//		int j = randombounds(0, s[1]-1);
+//		int np = plot_epipolar(p, A, s[0], s[1], i, j);
+//		for (int pi = 0; pi < np; pi++)
+//		{
+//			int ii = p[pi][0];
+//			int jj = p[pi][1];
+//			//fprintf(stderr, "p[%d / %d] = %d %d\n", pi, np, ii, jj);
+//			assert(ii >= 0);
+//			assert(ii < s[0]);
+//			assert(jj >= 0);
+//			assert(jj < s[1]);
+//			o[jj][ii] = RGBA_BRIGHT;
+//		}
+//		o[j][i] = RGBA_GREEN;
+//
+//		np = plot_epipolar(p, Atr, s[0], s[1], i, j);
+//		for (int pi = 0; pi < np; pi++)
+//			o[p[pi][1]][p[pi][0]+s[0]] = RGBA_BRIGHT;
+//		o[j][i+s[0]] = RGBA_GREEN;
+//	}
+//
+//
+//	iio_save_image_uint8_vec("-", (uint8_t*)o, 2*s[0], s[1], 4);
+//	return EXIT_SUCCESS;
+//}
+
 // CLI utility to access some visualization programs
 // all programs read text file from stdin and write a transparent PNG to stdout
 int main(int c, char *v[])
@@ -632,6 +738,7 @@ int main(int c, char *v[])
 	else if (0 == strcmp(v[1], "triplets")) return main_viewtrips(c-1, v+1);
 	else if (0 == strcmp(v[1], "epipolar")) return main_viewepi(c-1, v+1);
 	else if (0 == strcmp(v[1], "fmpair")) return main_viewfmpair(c-1, v+1);
+	//else if (0 == strcmp(v[1], "fmpairi")) return main_viewfmpairi(c-1,v+1);
 	else {
 	usage: fprintf(stderr, "usage:\n\t%s [points|pairs|triplets|epipolar] "
 			       "params... < data.txt | display\n", *v);
