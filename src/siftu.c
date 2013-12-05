@@ -40,6 +40,80 @@ static int main_siftcpairs(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
+// compute pairs using sift-nn (non-sym, exhaustive, relative)
+static int main_siftcpairsR(int c, char *v[])
+{
+	if (c != 5) {
+		fprintf(stderr,"usage:\n\t%s R k1 k2 pairs.txt\n",*v);
+		return EXIT_FAILURE;
+	}
+	struct sift_keypoint *p[2];
+	int n[2];
+	FORI(2) {
+		FILE *f = xfopen(v[2+i], "r");
+		p[i] = read_raw_sifts(f, n+i);
+		xfclose(f);
+	}
+	int npairs;
+	struct ann_pair *pairs;
+	float R = atof(v[1]);
+	pairs = siftlike_get_annpairs_lowe(p[0], n[0], p[1], n[1], &npairs, R);
+	fprintf(stderr, "SIFTCPAIRS: produced %d pairs "
+			"(from %d and %d){%d}[%g%%]\n",
+			npairs, n[0], n[1], n[0]*n[1],npairs*100.0/(n[0]*n[1]));
+	FILE *f = xfopen(v[4], "w");
+	FORI(npairs) {
+		struct sift_keypoint *ka = p[0] + pairs[i].from;
+		struct sift_keypoint *kb = p[1] + pairs[i].to;
+		fprintf(f, "%g %g %g %g\n",
+				ka->pos[0], ka->pos[1],
+				kb->pos[0], kb->pos[1]);
+	}
+	xfclose(f);
+	FORI(2) if (p[i]) xfree(p[i]);
+	if (pairs) xfree(pairs);
+	return EXIT_SUCCESS;
+}
+
+// compute pairs using sift-nn (non-sym, exhaustive, relative and absolute)
+static int main_siftcpairsR2(int c, char *v[])
+{
+	if (c != 7) {
+		fprintf(stderr,"usage:\n\t%s R tdown tup k1 k2 pairs.txt\n",*v);
+		//                         0 1 2     3   4  5  6
+		return EXIT_FAILURE;
+	}
+	struct sift_keypoint *p[2];
+	int n[2];
+	FORI(2) {
+		FILE *f = xfopen(v[4+i], "r");
+		p[i] = read_raw_sifts(f, n+i);
+		xfclose(f);
+	}
+	int npairs;
+	struct ann_pair *pairs;
+	float R = atof(v[1]);
+	float tdown = atof(v[2]);
+	float tup = atof(v[3]);
+	pairs = siftlike_get_annpairs_lowe2(p[0], n[0], p[1], n[1], &npairs,
+			R, tdown, tup);
+	fprintf(stderr, "SIFTCPAIRS: produced %d pairs "
+			"(from %d and %d){%d}[%g%%]\n",
+			npairs, n[0], n[1], n[0]*n[1],npairs*100.0/(n[0]*n[1]));
+	FILE *f = xfopen(v[6], "w");
+	FORI(npairs) {
+		struct sift_keypoint *ka = p[0] + pairs[i].from;
+		struct sift_keypoint *kb = p[1] + pairs[i].to;
+		fprintf(f, "%g %g %g %g\n",
+				ka->pos[0], ka->pos[1],
+				kb->pos[0], kb->pos[1]);
+	}
+	xfclose(f);
+	FORI(2) if (p[i]) xfree(p[i]);
+	if (pairs) xfree(pairs);
+	return EXIT_SUCCESS;
+}
+
 // compute pairs using sift-nn (non-sym, exhaustive, explicit)
 static int main_siftcpairsr(int c, char *v[])
 {
@@ -366,16 +440,18 @@ int main_siftrr(int c, char *v[])
 int main(int c, char *v[])
 {
 	if (c < 2) goto usage;
-	else if (0 == strcmp(v[1], "pair")) return main_siftcpairs(c-1, v+1);
-	else if (0 == strcmp(v[1], "pairr")) return main_siftcpairsr(c-1, v+1);
-	else if (0 == strcmp(v[1], "pairt")) return main_siftcpairst(c-1, v+1);
-	else if (0 == strcmp(v[1], "trip")) return main_sifttriplets(c-1, v+1);
-	else if (0 == strcmp(v[1], "tripr")) return main_sifttripletsr(c-1,v+1);
-	else if (0 == strcmp(v[1], "aff")) return main_siftaff(c-1, v+1);
-	else if (0 == strcmp(v[1], "split")) return main_siftsplit(c-1, v+1);
-	//else if (0 == strcmp(v[1], "mask")) return main_siftmask(c-1, v+1);
-	else if (0 == strcmp(v[1], "clean")) return main_siftrr(c-1, v+1);
-	else if (0 == strcmp(v[1], "convert")) return main_siftcon(c-1, v+1);
+	else if (0 == strcmp(v[1],"pair"))   return main_siftcpairs(c-1, v+1);
+	else if (0 == strcmp(v[1],"pairr"))  return main_siftcpairsr(c-1, v+1);
+	else if (0 == strcmp(v[1],"pairt"))  return main_siftcpairst(c-1, v+1);
+	else if (0 == strcmp(v[1],"pairR"))  return main_siftcpairsR(c-1, v+1);
+	else if (0 == strcmp(v[1],"pairR2")) return main_siftcpairsR2(c-1, v+1);
+	else if (0 == strcmp(v[1],"trip"))   return main_sifttriplets(c-1, v+1);
+	else if (0 == strcmp(v[1],"tripr"))  return main_sifttripletsr(c-1,v+1);
+	else if (0 == strcmp(v[1],"aff"))    return main_siftaff(c-1, v+1);
+	else if (0 == strcmp(v[1],"split"))  return main_siftsplit(c-1, v+1);
+	//else if (0 == strcmp(v[1],"mask")) return main_siftmask(c-1, v+1);
+	else if (0 == strcmp(v[1],"clean"))  return main_siftrr(c-1, v+1);
+	else if (0 == strcmp(v[1],"convert"))return main_siftcon(c-1, v+1);
 	else {
 	usage: fprintf(stderr, "usage:\n\t%s "
 				"[pair|trip|aff|split|clean|convert] params\n",
