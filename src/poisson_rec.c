@@ -197,8 +197,8 @@ static void zoom_in_by_factor_two(float *out, int ow, int oh,
 	{
 		float x = (i - 0.5)/2;
 		float y = (j - 0.5)/2;
-		//out[ow*j+i] = bilinear_interpolation(in, iw, ih, x, y);
-		out[ow*j+i] = p(in, iw, ih, round(x), round(y));
+		out[ow*j+i] = bilinear_interpolation(in, iw, ih, x, y);
+		//out[ow*j+i] = p(in, iw, ih, round(x), round(y));
 	}
 }
 
@@ -216,6 +216,8 @@ void pois_recursive(float *out, float *in, float *dat, int w, int h,
 		float *outs = xmalloc(ws * hs * sizeof*outs);
 		zoom_out_by_factor_two(ins, ws, hs, in, w, h);
 		zoom_out_by_factor_two(dats, ws, hs, dat, w, h);
+		for (int i = 0; i < ws*hs; i++)
+			dats[i] *= 4;
 		pois_recursive(outs, ins, dats, ws, hs, tstep, niter, scale-1);
 		zoom_in_by_factor_two(init, w, h, outs, ws, hs);
 
