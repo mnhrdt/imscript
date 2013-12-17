@@ -121,6 +121,10 @@ static void harmonic_extension_with_init(
 	free(mask);
 }
 
+#include <stdbool.h>
+#include "smapa.h"
+SMART_PARAMETER(PREFILTER,0)
+
 // zoom-out by 2x2 block averages
 // NANs are discarded when possible
 static void zoom_out_by_factor_two(float *out, int ow, int oh,
@@ -129,6 +133,40 @@ static void zoom_out_by_factor_two(float *out, int ow, int oh,
 	getpixel_operator p = getpixel_1;
 	assert(abs(2*ow-iw) < 2);
 	assert(abs(2*oh-ih) < 2);
+	if (PREFILTER() > 0) {
+		float *fin = xmalloc(iw*ih*sizeof*fin);
+		for (int j = 0; j < ih; j++)
+		for (int i = 0; i < iw; i++)
+		{
+			//if (isfinite(in[iw*j+i])) {
+			//	float a[9], m = 0;
+			//	for (int ii=-1;ii<=1;ii++)
+			//	for (int jj=-1;jj<=1;jj++)
+			//		a[3*ii+jj] = p(in, iw, ih, i+ii, j+jj);
+			//	int cx = 0;
+			//	for (int k = 0; k < 9; k++)
+			//		if (isfinite(a[k])) {
+			//			m += a[k];
+			//			cx += 1;
+			//		}
+			//	fin[iw*j + i] = cx ? m/cx : NAN;
+			//} else {
+				float a[4], m = 0;
+				a[0] = p(in, iw, ih, i+1, j);
+				a[1] = p(in, iw, ih, i-1, j);
+				a[2] = p(in, iw, ih, i, j+1);
+				a[3] = p(in, iw, ih, i, j-1);
+				int cx = 0;
+				for (int k = 0; k < 4; k++)
+					if (isfinite(a[k])) {
+						m += a[k];
+						cx += 1;
+					}
+				fin[iw*j + i] = cx ? m/cx : NAN;
+			//}
+		}
+		in = fin;
+	}
 	for (int j = 0; j < oh; j++)
 	for (int i = 0; i < ow; i++)
 	{
@@ -145,6 +183,7 @@ static void zoom_out_by_factor_two(float *out, int ow, int oh,
 			}
 		out[ow*j + i] = cx ? m/cx : NAN;
 	}
+	if (PREFILTER() > 0) free(in);
 }
 
 // evaluate a bilinear cell at the given point
@@ -177,12 +216,13 @@ static float bilinear_interpolation(float *x, int w, int h, float p, float q)
 static void zoom_in_by_factor_two(float *out, int ow, int oh,
 		float *in, int iw, int ih)
 {
+	getpixel_operator p = getpixel_1;
 	assert(abs(2*iw-ow) < 2);
 	assert(abs(2*ih-oh) < 2);
 	for (int j = 0; j < oh; j++)
 	for (int i = 0; i < ow; i++)
-		out[ow*j+i] = bilinear_interpolation(in, iw, ih,
-						(i-0.5)/2, (j-0.5)/2);
+		out[ow*j+i] = p(in, iw, ih, round((i-0.5)/2), round((j-0.5)/2));
+		//out[ow*j+i] = bilinear_interpolation(in, iw, ih, (i-0.5)/2, (j-0.5)/2);
 }
 
 // extension of an image by laplace equation
