@@ -268,6 +268,38 @@
 #define PLAMBDA_STACKOP 5  // stack operator
 #define PLAMBDA_VARDEF 6   // register variable definition (hacky)
 #define PLAMBDA_MAGIC 7    // "magic" modifier (requiring cached global data)
+#define PLAMBDA_IMAGEOP 8    // comma-modified variable
+
+#define IMAGEOP_IDENTITY 0
+#define IMAGEOP_X 1
+#define IMAGEOP_Y 2
+#define IMAGEOP_XX 3
+#define IMAGEOP_XY 4
+#define IMAGEOP_YX 5
+#define IMAGEOP_YY 6
+#define IMAGEOP_GRAD 7
+#define IMAGEOP_NGRAD 8
+#define IMAGEOP_LAP 9
+#define IMAGEOP_CURV 10
+#define IMAGEOP_DIV 11
+#define IMAGEOP_ILAP 12
+#define IMAGEOP_HESS 13
+
+#define SCHEME_FORWARD 0
+#define SCHEME_BACKWARD 1
+#define SCHEME_CENTERED 2
+#define SCHEME_CONSISTENT 3
+#define SCHEME_PRATT 4
+#define SCHEME_SOBEL 5
+#define SCHEME_PREWITT 6
+#define SCHEME_SCHARR 7
+#define SCHEME_MORPHO5_FORWARD 8
+#define SCHEME_MORPHO5_BACKWARD 9
+#define SCHEME_MORPHO5_CENTERED 10
+#define SCHEME_MORPHO9_FORWARD 11
+#define SCHEME_MORPHO9_BACKWARD 12
+#define SCHEME_MORPHO9_CENTERED 13
+
 
 // local functions {{{1
 
@@ -789,6 +821,10 @@ struct plambda_token {
 	int colonvar;        // if type==colon, the letter
 
 	char *tmphack;       // temporary place for storing the unsorted index
+
+	// only for imageop hack:
+	int imageop_operator;
+	int imageop_scheme;
 };
 
 struct collection_of_varnames {
@@ -1894,6 +1930,76 @@ static float getsample_cfg(float *x, int w, int h, int pd, int i, int j, int l)
 	return p(x, w, h, pd, i, j, l);
 }
 
+#define H 0.5
+#define O 0.125
+static float stencil_3x3_dx_forward[9] =  {0,0,0,  0,-1,1, 0,0,0};
+static float stencil_3x3_dx_backward[9] = {0,0,0,  -1,1,0, 0,0,0};
+static float stencil_3x3_dx_centered[9] = {0,0,0,  -H,0,H, 0,0,0};
+static float stencil_3x3_dy_forward[9] =  {0,0,0,  0,-1,0, 0,1,0};
+static float stencil_3x3_dy_backward[9] = {0,-1,0, 0,1,0,  0,0,0};
+static float stencil_3x3_dy_centered[9] = {0,-H,0, 0,0,0,  0,H,0};
+static float stencil_3x3_dy_sobel[9] = {-O,-2*O,2*O,  0,0,0, O,2*O,O};
+static float stencil_3x3_dx_sobel[9] = {-O,0,O,  -2*O,0,2*O, -O,0,O};
+static float stencil_3x3_laplace[9] =  {0,1,0,  1,-4,1, 1,0,1};
+static float stencil_3x3_dxx[9] =  {0,0,0,  1,-2,1, 0,0,0};
+static float stencil_3x3_dyy[9] =  {0,1,0,  0,-2,0, 0,1,0};
+#undef H
+#undef O
+
+static float *get_stencil_3x3(int operator, int scheme)
+{
+	switch(operator) {
+	case IMAGEOP_XX: return stencil_3x3_dxx;
+	case IMAGEOP_YY: return stencil_3x3_dyy;
+	case IMAGEOP_LAP: return stencil_3x3_laplace;
+	case IMAGEOP_X: { switch(scheme) {
+			case SCHEME_FORWARD: return stencil_3x3_dx_forward;
+			case SCHEME_BACKWARD: return stencil_3x3_dx_backward;
+			case SCHEME_CENTERED: return stencil_3x3_dx_centered;
+			case SCHEME_SOBEL: return stencil_3x3_dx_sobel;
+			default: fail("unrecognized stencil scheme %d");
+			}
+		}
+	case IMAGEOP_Y: { switch(scheme) {
+			case SCHEME_FORWARD: return stencil_3x3_dy_forward;
+			case SCHEME_BACKWARD: return stencil_3x3_dy_backward;
+			case SCHEME_CENTERED: return stencil_3x3_dy_centered;
+			case SCHEME_SOBEL: return stencil_3x3_dy_sobel;
+			default: fail("unrecognized stencil scheme %d");
+			}
+		}
+	default: fail("unrecognized stencil operator %d");
+	}
+	return NULL;
+}
+
+static float apply_3x3_stencil(float *img, int w, int h, int pd,
+		int ai, int aj, int channel, float *s)
+{
+	getsample_operator P = getsample_cfg;
+	float r = 0;
+	for (int i = 0; i < 9; i++)
+		r += s[i] * P(img, w, h, pd, ai-1+i%3, aj-1+i/3, channel);
+	return r;
+}
+
+static int imageop(float *out, float *img, int w, int h, int pd,
+				int ai, int aj, struct plambda_token *t)
+{
+	int retval = 1;
+	int pi = ai + t->displacement[0];
+	int pj = aj + t->displacement[1];
+	int channel = t->component;
+	float *s = get_stencil_3x3(t->imageop_operator,t->imageop_scheme);
+	if (channel < 0) {
+		retval = pd;
+		FORL(pd)
+			*out = apply_3x3_stencil(img, w, h, pd, pi, pj, l, s);
+	} else
+		*out = apply_3x3_stencil(img, w, h, pd, pi, pj, channel, s);
+	return retval;
+}
+
 // returns the dimension of the output
 static int run_program_vectorially_at(float *out, struct plambda_program *p,
 		float **val, int *w, int *h, int *pd, int ai, int aj)
@@ -1913,6 +2019,11 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 		case PLAMBDA_COLONVAR: {
 			int imw = w ? *w : 1;
 			int imh = h ? *h : 1;
+			/*hack*/if ('X' == t->colonvar) {
+				float v[2] = {ai, aj};
+				vstack_push_vector(s, v, 2);
+				break;
+			}
 			float x = eval_colonvar(imw, imh, ai, aj, t->colonvar);
 			vstack_push_scalar(s, x);
 			break;
@@ -1952,6 +2063,15 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			}
 				     }
 			break;
+		case PLAMBDA_IMAGEOP: {
+			float *img = val[t->index], lout[PLAMBDA_MAX_PIXELDIM];
+			int pdv = pd[t->index];
+			int imw = w ? w[t->index] : 1;
+			int imh = h ? h[t->index] : 1;
+			int rdim = imageop(lout, img, imw, imh, pdv, ai, aj, t);
+			vstack_push_vector(s, lout, rdim);
+			break;
+				      }
 		case PLAMBDA_OPERATOR: {
 			struct predefined_function *f =
 				global_table_of_predefined_functions+t->index;
