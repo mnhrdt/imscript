@@ -1253,7 +1253,7 @@ static int token_is_word(const char *t, const char **endptr)
 	while (t[n]) {
 		if  (!(isalnum(t[n])||t[n]=='_')) {
 			*endptr = t+n;
-			return (t[n]=='(' || t[n]=='[' || t[n]=='%') ? n : 0;
+			return (t[n]=='('||t[n]=='['||t[n]=='%'||t[n]==',')?n:0;
 		}
 		n += 1;
 	}
@@ -1275,6 +1275,7 @@ static int word_is_predefined(const char *id)
 static void parse_modifiers(const char *mods,
 		int *ocomp, int *odx, int *ody, int *omagic)
 {
+	fprintf(stderr, "parsemods \"%s\"\n", mods);
 	*ocomp = -1;
 	*odx = 0;
 	*ody = 0;
@@ -1318,7 +1319,41 @@ static void parse_modifiers(const char *mods,
 	} else if (1 == sscanf(mods, "[%d]", &comp)) {
 		*ocomp = comp;
 		return;
+	} else if (*mods == ',') {
+		*omagic = -1;
+		return;
 	}
+}
+
+static bool hasprefix(const char *s, const char *p)
+{
+	return s == strstr(s, p);
+}
+
+static bool hassuffix(const char *s, const char *suf)
+{
+	int len_s = strlen(s);
+	int len_suf = strlen(suf);
+	if (len_s < len_suf)
+		return false;
+	return 0 == strcmp(suf, s + (len_s - len_suf));
+}
+
+static void parse_imageop(const char *s, int *op, int *scheme)
+{
+	if (false) ;
+	else if (hasprefix(s, "xx")) *op = IMAGEOP_XX;
+	else if (hasprefix(s, "yy")) *op = IMAGEOP_YY;
+	else if (hasprefix(s, "l")) *op = IMAGEOP_LAP;
+	else if (hasprefix(s, "x")) *op = IMAGEOP_X;
+	else if (hasprefix(s, "y")) *op = IMAGEOP_Y;
+	else fail("unrecognized comma modifier \",%s\"", s);
+	*scheme = SCHEME_SOBEL;
+	if (false) ;
+	else if (hassuffix(s, "f")) *scheme = SCHEME_FORWARD;
+	else if (hassuffix(s, "b")) *scheme = SCHEME_BACKWARD;
+	else if (hassuffix(s, "c")) *scheme = SCHEME_CENTERED;
+	else if (hassuffix(s, "s")) *scheme = SCHEME_SOBEL;
 }
 
 static void collection_of_varnames_init(struct collection_of_varnames *x)
@@ -1425,10 +1460,23 @@ static void process_token(struct plambda_program *p, const char *tokke)
 			int comp, disp[2], magic;
 			t->tmphack =collection_of_varnames_add(p->var, varname);
 			parse_modifiers(tok_end, &comp, disp, disp+1, &magic);
+			fprintf(stderr, "token = \"%s\"\n", tok);
+			fprintf(stderr, "varname = \"%s\"\n", varname);
+			fprintf(stderr, "magic = %d\n", magic);
 			t->type = comp<0 ? PLAMBDA_VECTOR : PLAMBDA_SCALAR;
-			if (magic) {
+			if (magic > 0) {
 				t->type = PLAMBDA_MAGIC;
 				t->colonvar = magic;
+			}
+			if (magic < 0) {
+				t->type = PLAMBDA_IMAGEOP; // comma operator
+				parse_imageop(1+tok_end, &t->imageop_operator,
+							&t->imageop_scheme);
+				fprintf(stderr, "imageop \"%s\"\n", 1+tok_end);
+				fprintf(stderr, "imageop_operator = %d\n",
+						t->imageop_operator);
+				fprintf(stderr, "imageop_scheme = %d\n",
+						t->imageop_scheme);
 			}
 			t->component = comp;
 			t->displacement[0] = disp[0];
@@ -1454,7 +1502,8 @@ static void update_variable_indices(struct plambda_program *p)
 	{
 		struct plambda_token *t = p->t + i;
 		if (t->type == PLAMBDA_SCALAR || t->type == PLAMBDA_VECTOR
-				|| t->type == PLAMBDA_MAGIC)
+				|| t->type == PLAMBDA_MAGIC
+				|| t->type == PLAMBDA_IMAGEOP)
 		{
 			t->index = collection_of_varnames_find(p->var,
 								t->tmphack);
@@ -1474,6 +1523,7 @@ static void plambda_compile_program(struct plambda_program *p, const char *str)
 	p->n = 0;
 	char *tok = strtok(s, spacing);
 	while (tok) {
+		fprintf(stderr, "TOK = \"%s\"\n", tok);
 		process_token(p, tok);
 		tok = strtok(NULL, spacing);
 	}
@@ -1938,9 +1988,9 @@ static float stencil_3x3_dx_centered[9] = {0,0,0,  -H,0,H, 0,0,0};
 static float stencil_3x3_dy_forward[9] =  {0,0,0,  0,-1,0, 0,1,0};
 static float stencil_3x3_dy_backward[9] = {0,-1,0, 0,1,0,  0,0,0};
 static float stencil_3x3_dy_centered[9] = {0,-H,0, 0,0,0,  0,H,0};
-static float stencil_3x3_dy_sobel[9] = {-O,-2*O,2*O,  0,0,0, O,2*O,O};
+static float stencil_3x3_dy_sobel[9] = {-O,-2*O,-O,  0,0,0, O,2*O,O};
 static float stencil_3x3_dx_sobel[9] = {-O,0,O,  -2*O,0,2*O, -O,0,O};
-static float stencil_3x3_laplace[9] =  {0,1,0,  1,-4,1, 1,0,1};
+static float stencil_3x3_laplace[9] =  {0,1,0,  1,-4,1, 0,1,0};
 static float stencil_3x3_dxx[9] =  {0,0,0,  1,-2,1, 0,0,0};
 static float stencil_3x3_dyy[9] =  {0,1,0,  0,-2,0, 0,1,0};
 #undef H
@@ -1990,11 +2040,11 @@ static int imageop(float *out, float *img, int w, int h, int pd,
 	int pi = ai + t->displacement[0];
 	int pj = aj + t->displacement[1];
 	int channel = t->component;
-	float *s = get_stencil_3x3(t->imageop_operator,t->imageop_scheme);
+	float *s = get_stencil_3x3(t->imageop_operator, t->imageop_scheme);
 	if (channel < 0) {
 		retval = pd;
 		FORL(pd)
-			*out = apply_3x3_stencil(img, w, h, pd, pi, pj, l, s);
+			out[l] = apply_3x3_stencil(img, w, h, pd, pi, pj, l, s);
 	} else
 		*out = apply_3x3_stencil(img, w, h, pd, pi, pj, channel, s);
 	return retval;
@@ -2238,6 +2288,7 @@ int main_images(int c, char **v)
 	int n = c - 2;
 	//fprintf(stderr, "n = %d\n", n);
 	if (n > 0 && p->var->n == 0) {
+		fprintf(stderr, "will add hidden variables! n=%d, vn=%d\n", n, p->var->n);
 		int maxplen = n*10 + strlen(v[c-1]) + 100;
 		char newprogram[maxplen];
 		add_hidden_variables(newprogram, maxplen, n, v[c-1]);
