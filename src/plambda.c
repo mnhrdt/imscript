@@ -1253,7 +1253,8 @@ static int token_is_word(const char *t, const char **endptr)
 	while (t[n]) {
 		if  (!(isalnum(t[n])||t[n]=='_')) {
 			*endptr = t+n;
-			return (t[n]=='('||t[n]=='['||t[n]=='%'||t[n]==',')?n:0;
+			//return (t[n]=='('||t[n]=='['||t[n]=='%'||t[n]==';')?n:0;
+			return ispunct(t[n]) ? n : 0;
 		}
 		n += 1;
 	}
@@ -1318,9 +1319,6 @@ static void parse_modifiers(const char *mods,
 	} else if (1 == sscanf(mods, "[%d]", &comp)) {
 		*ocomp = comp;
 		return;
-	} else if (*mods == ',') {
-		*omagic = -1;
-		return;
 	}
 }
 
@@ -1340,13 +1338,18 @@ static bool hassuffix(const char *s, const char *suf)
 
 static void parse_imageop(const char *s, int *op, int *scheme)
 {
+	*op = IMAGEOP_IDENTITY;
 	if (false) ;
 	else if (hasprefix(s, "xx")) *op = IMAGEOP_XX;
 	else if (hasprefix(s, "yy")) *op = IMAGEOP_YY;
+	else if (hasprefix(s, "xy")) *op = IMAGEOP_XY;
+	else if (hasprefix(s, "yx")) *op = IMAGEOP_XY;
 	else if (hasprefix(s, "l")) *op = IMAGEOP_LAP;
 	else if (hasprefix(s, "x")) *op = IMAGEOP_X;
 	else if (hasprefix(s, "y")) *op = IMAGEOP_Y;
-	else fail("unrecognized comma modifier \",%s\"", s);
+	else if (hasprefix(s, "n")) *op = IMAGEOP_NGRAD;
+	//else if (hasprefix(s, "k")) *op = IMAGEOP_CURV;
+	//else fail("unrecognized comma modifier \",%s\"", s);
 	*scheme = SCHEME_SOBEL;
 	if (false) ;
 	else if (hassuffix(s, "f")) *scheme = SCHEME_FORWARD;
@@ -1458,16 +1461,21 @@ static void process_token(struct plambda_program *p, const char *tokke)
 			varname[varlen] = '\0';
 			int comp, disp[2], magic;
 			t->tmphack =collection_of_varnames_add(p->var, varname);
+			//fprintf(stderr, "varname, mods = \"%s\" , \"%s\"\n", varname, tok_end);
 			parse_modifiers(tok_end, &comp, disp, disp+1, &magic);
+			//fprintf(stderr, "comp=%d disp=[%d %d] magic=%d\n",
+			//		comp, *disp, disp[1], magic);
 			t->type = comp<0 ? PLAMBDA_VECTOR : PLAMBDA_SCALAR;
 			if (magic > 0) {
 				t->type = PLAMBDA_MAGIC;
 				t->colonvar = magic;
 			}
-			if (magic < 0) {
+			char *iopos = strchr(tok_end, ';');
+			if (iopos) {
 				t->type = PLAMBDA_IMAGEOP; // comma operator
-				parse_imageop(1+tok_end, &t->imageop_operator,
+				parse_imageop(1+iopos, &t->imageop_operator,
 							&t->imageop_scheme);
+				//fprintf(stderr, "imageop %d %d\n", t->imageop_operator, t->imageop_scheme);
 			}
 			t->component = comp;
 			t->displacement[0] = disp[0];
@@ -1514,6 +1522,7 @@ static void plambda_compile_program(struct plambda_program *p, const char *str)
 	p->n = 0;
 	char *tok = strtok(s, spacing);
 	while (tok) {
+		//fprintf(stderr, "TOK \"%s\"\n", tok);
 		process_token(p, tok);
 		tok = strtok(NULL, spacing);
 	}
@@ -1971,7 +1980,9 @@ static float getsample_cfg(float *x, int w, int h, int pd, int i, int j, int l)
 }
 
 #define H 0.5
+#define Q 0.25
 #define O 0.125
+static float stencil_3x3_identity[9] =  {0,0,0,  0,1,0, 0,0,0};
 static float stencil_3x3_dx_forward[9] =  {0,0,0,  0,-1,1, 0,0,0};
 static float stencil_3x3_dx_backward[9] = {0,0,0,  -1,1,0, 0,0,0};
 static float stencil_3x3_dx_centered[9] = {0,0,0,  -H,0,H, 0,0,0};
@@ -1983,21 +1994,30 @@ static float stencil_3x3_dx_sobel[9] = {-O,0,O,  -2*O,0,2*O, -O,0,O};
 static float stencil_3x3_laplace[9] =  {0,1,0,  1,-4,1, 0,1,0};
 static float stencil_3x3_dxx[9] =  {0,0,0,  1,-2,1, 0,0,0};
 static float stencil_3x3_dyy[9] =  {0,1,0,  0,-2,0, 0,1,0};
+static float stencil_3x3_dxy_4point[9] =  {-Q,0,Q,  0,0,0, Q,0,-Q};
+static float stencil_3x3_dxy_7point[9] =  {0,-H,H,  -H,1,-H, H,-H,0};
 #undef H
+#undef Q
 #undef O
 
 static float *get_stencil_3x3(int operator, int scheme)
 {
 	switch(operator) {
+	case IMAGEOP_LAP: return stencil_3x3_laplace;
 	case IMAGEOP_XX: return stencil_3x3_dxx;
 	case IMAGEOP_YY: return stencil_3x3_dyy;
-	case IMAGEOP_LAP: return stencil_3x3_laplace;
+	case IMAGEOP_XY: { switch(scheme) {
+			 case SCHEME_CENTERED: return stencil_3x3_dxy_4point;
+			 case SCHEME_SOBEL: return stencil_3x3_dxy_7point;
+			 default: fail("unrecognized stencil,xy scheme %d");
+			 }
+		}
 	case IMAGEOP_X: { switch(scheme) {
 			case SCHEME_FORWARD: return stencil_3x3_dx_forward;
 			case SCHEME_BACKWARD: return stencil_3x3_dx_backward;
 			case SCHEME_CENTERED: return stencil_3x3_dx_centered;
 			case SCHEME_SOBEL: return stencil_3x3_dx_sobel;
-			default: fail("unrecognized stencil scheme %d");
+			default: fail("unrecognized stencil,x scheme %d");
 			}
 		}
 	case IMAGEOP_Y: { switch(scheme) {
@@ -2005,17 +2025,18 @@ static float *get_stencil_3x3(int operator, int scheme)
 			case SCHEME_BACKWARD: return stencil_3x3_dy_backward;
 			case SCHEME_CENTERED: return stencil_3x3_dy_centered;
 			case SCHEME_SOBEL: return stencil_3x3_dy_sobel;
-			default: fail("unrecognized stencil scheme %d");
+			default: fail("unrecognized stencil,y scheme %d");
 			}
 		}
-	default: fail("unrecognized stencil operator %d");
+	case IMAGEOP_IDENTITY: return stencil_3x3_identity;
+	default: return NULL;//fail("unrecognized stencil operator %d");
 	}
-	return NULL;
 }
 
 static float apply_3x3_stencil(float *img, int w, int h, int pd,
 		int ai, int aj, int channel, float *s)
 {
+	assert(s);
 	getsample_operator P = getsample_cfg;
 	float r = 0;
 	for (int i = 0; i < 9; i++)
@@ -2023,12 +2044,35 @@ static float apply_3x3_stencil(float *img, int w, int h, int pd,
 	return r;
 }
 
+//static float imageop_scalar_old(float *img, int w, int h, int pd,
+//		int ai, int aj, int al, struct plambda_token *t)
+//{
+//	float *s = get_stencil_3x3(t->imageop_operator, t->imageop_scheme);
+//	return apply_3x3_stencil(img, w, h, pd, ai, aj, al, s);
+//}
+
 static float imageop_scalar(float *img, int w, int h, int pd,
 		int ai, int aj, int al, struct plambda_token *t)
 {
 	float *s = get_stencil_3x3(t->imageop_operator, t->imageop_scheme);
-	return apply_3x3_stencil(img, w, h, pd, ai, aj, al, s);
+	if (s)
+		return apply_3x3_stencil(img, w, h, pd, ai, aj, al, s);
+	else {
+		switch(t->imageop_operator) {
+		case IMAGEOP_NGRAD:
+			{
+			float *sx=get_stencil_3x3(IMAGEOP_X,t->imageop_scheme);
+			float *sy=get_stencil_3x3(IMAGEOP_Y,t->imageop_scheme);
+			float gx = apply_3x3_stencil(img, w,h,pd, ai,aj,al, sx);
+			float gy = apply_3x3_stencil(img, w,h,pd, ai,aj,al, sy);
+			return hypot(gx, gy);
+			}
+		default: fail("unrecognized imageop operator %d\n", t->imageop_operator);
+		}
+	}
+	return 0;
 }
+
 
 static int imageop(float *out, float *img, int w, int h, int pd,
 				int ai, int aj, struct plambda_token *t)
@@ -2284,7 +2328,7 @@ int main_images(int c, char **v)
 	int n = c - 2;
 	//fprintf(stderr, "n = %d\n", n);
 	if (n > 0 && p->var->n == 0) {
-		fprintf(stderr, "will add hidden variables! n=%d, vn=%d\n", n, p->var->n);
+		//fprintf(stderr, "will add hidden variables! n=%d, vn=%d\n", n, p->var->n);
 		int maxplen = n*10 + strlen(v[c-1]) + 100;
 		char newprogram[maxplen];
 		add_hidden_variables(newprogram, maxplen, n, v[c-1]);
