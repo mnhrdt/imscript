@@ -1275,7 +1275,6 @@ static int word_is_predefined(const char *id)
 static void parse_modifiers(const char *mods,
 		int *ocomp, int *odx, int *ody, int *omagic)
 {
-	fprintf(stderr, "parsemods \"%s\"\n", mods);
 	*ocomp = -1;
 	*odx = 0;
 	*ody = 0;
@@ -1460,9 +1459,6 @@ static void process_token(struct plambda_program *p, const char *tokke)
 			int comp, disp[2], magic;
 			t->tmphack =collection_of_varnames_add(p->var, varname);
 			parse_modifiers(tok_end, &comp, disp, disp+1, &magic);
-			fprintf(stderr, "token = \"%s\"\n", tok);
-			fprintf(stderr, "varname = \"%s\"\n", varname);
-			fprintf(stderr, "magic = %d\n", magic);
 			t->type = comp<0 ? PLAMBDA_VECTOR : PLAMBDA_SCALAR;
 			if (magic > 0) {
 				t->type = PLAMBDA_MAGIC;
@@ -1472,11 +1468,6 @@ static void process_token(struct plambda_program *p, const char *tokke)
 				t->type = PLAMBDA_IMAGEOP; // comma operator
 				parse_imageop(1+tok_end, &t->imageop_operator,
 							&t->imageop_scheme);
-				fprintf(stderr, "imageop \"%s\"\n", 1+tok_end);
-				fprintf(stderr, "imageop_operator = %d\n",
-						t->imageop_operator);
-				fprintf(stderr, "imageop_scheme = %d\n",
-						t->imageop_scheme);
 			}
 			t->component = comp;
 			t->displacement[0] = disp[0];
@@ -1523,7 +1514,6 @@ static void plambda_compile_program(struct plambda_program *p, const char *str)
 	p->n = 0;
 	char *tok = strtok(s, spacing);
 	while (tok) {
-		fprintf(stderr, "TOK = \"%s\"\n", tok);
 		process_token(p, tok);
 		tok = strtok(NULL, spacing);
 	}
@@ -2033,6 +2023,13 @@ static float apply_3x3_stencil(float *img, int w, int h, int pd,
 	return r;
 }
 
+static float imageop_scalar(float *img, int w, int h, int pd,
+		int ai, int aj, int al, struct plambda_token *t)
+{
+	float *s = get_stencil_3x3(t->imageop_operator, t->imageop_scheme);
+	return apply_3x3_stencil(img, w, h, pd, ai, aj, al, s);
+}
+
 static int imageop(float *out, float *img, int w, int h, int pd,
 				int ai, int aj, struct plambda_token *t)
 {
@@ -2040,13 +2037,12 @@ static int imageop(float *out, float *img, int w, int h, int pd,
 	int pi = ai + t->displacement[0];
 	int pj = aj + t->displacement[1];
 	int channel = t->component;
-	float *s = get_stencil_3x3(t->imageop_operator, t->imageop_scheme);
 	if (channel < 0) {
 		retval = pd;
 		FORL(pd)
-			out[l] = apply_3x3_stencil(img, w, h, pd, pi, pj, l, s);
+			out[l] = imageop_scalar(img, w, h, pd, pi, pj, l, t);
 	} else
-		*out = apply_3x3_stencil(img, w, h, pd, pi, pj, channel, s);
+		*out = imageop_scalar(img, w, h, pd, pi, pj, channel, t);
 	return retval;
 }
 
