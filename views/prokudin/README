@@ -1,0 +1,67 @@
+Some utilities for working with "Prokudin" images
+
+
+***********
+COMPILATION
+***********
+
+Running "make" on this directory should compile without problems (tried on
+linux and mac, with four different compilers).
+
+It requires a working installation of a C compiler, and the "libpng",
+"libtiff", and "libjpeg" libraries.  For displaying the images, it is desirable
+to install the imagemagick package.
+
+
+
+************************
+DESCRIPTION OF EACH TOOL
+************************
+
+
+* cut3 : cut a gray image into three equal height vertical slices
+
+Example: cut3 input.tiff out1.tiff out2.tiff out3.tiff
+
+
+* join3 : join three gray images of the same size to form a color image
+
+Example: join3 in_red.tiff in_green.tiff in_blue.tiff out_colorized.tiff
+
+
+* quantize : quantize an image to 8 bits
+
+Example : quantize 0 65000 in.tiff out.png
+
+
+* translation : apply an integral displacement to an image (filling-in by zero)
+
+Example: translation 10 -20 in.png out.png
+
+
+* registration : naive algorithm to register two gray images
+
+Example: registration A.tiff B.tiff Btranslated.tiff
+
+
+
+*************************
+EXAMPLE OF RECONSTRUCTION
+*************************
+
+First download a Prokudin glass plate, for example, the one from this address:
+http://lcweb2.loc.gov/master/pnp/prok/01000/01043a.tif
+
+Cut the image into three components:
+
+	cut3 01043a.tif red.tiff green.tiff blue.tiff
+
+Check the reconstruction without any registration:
+
+	join3 red.tiff green.tiff blue.tiff test.tiff
+	quantize test.tiff test.png
+	display test.png
+
+Try a registration computed by hand:
+
+	
