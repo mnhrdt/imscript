@@ -1,4 +1,4 @@
-// naive program to register to gray images
+// naive program to register two gray images
 // method: find the translation that minimizes their L2 distance
 
 #include <assert.h>
@@ -18,6 +18,7 @@
 // j: vertical position
 //
 // return value: color of the requested pixel
+//
 float getpixel_0(float *x, int w, int h, int i, int j)
 {
 	if (i < 0 || j < 0 || i >= w || j >= h)
@@ -35,6 +36,7 @@ float getpixel_0(float *x, int w, int h, int i, int j)
 // dx: horizontal displacement
 // dy: vertical displacement
 // out: output image, to be filled-in
+//
 void apply_translation(float *out, int dx, int dy, float *in, int w, int h)
 {
 	for (int j = 0; j < h; j++)
@@ -55,6 +57,7 @@ void apply_translation(float *out, int dx, int dy, float *in, int w, int h)
 // out: output image to be filled-in
 // ow: output image width (supplied by the user)
 // oh: output image height (supplied by the user)
+//
 static void zoom_out_by_factor_two(float *out, int ow, int oh,
 		float *in, int iw, int ih)
 {
@@ -81,6 +84,7 @@ static void zoom_out_by_factor_two(float *out, int ow, int oh,
 // d: translation vector
 //
 // return value: normalized L2 distance
+//
 float eval_displacement(float *A, float *B, int w, int h, int d[2])
 {
 	long double r = 0;
@@ -106,6 +110,7 @@ float eval_displacement(float *A, float *B, int w, int h, int d[2])
 // h: heigth
 // scale: number of multi-scale recursions
 // d: optimal displacement (output)
+//
 void find_displacement(int d[2], float *A, float *B, int w, int h, int scale)
 {
 	// find an initial rhough displacement d
@@ -147,11 +152,13 @@ void find_displacement(int d[2], float *A, float *B, int w, int h, int scale)
 
 
 // register two images
+//
 // w: width
 // h: height
 // left: left image
 // right: right image
 // out: right image after registration
+//
 void registration(float *out, float *left, float *right, int w, int h)
 {
 	int d[2];

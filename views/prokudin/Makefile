@@ -4,7 +4,7 @@ LFLAGS = -ltiff -lpng -lm
 
 # NOTE: to change the optimization settings swap the following two lines
 CFLAGS = -g
-CFLAGS = -O3 -Wall -Wextra -pedantic
+CFLAGS = -O3
 
 all: cut3 join3 translation quantize registration
 

@@ -52,16 +52,24 @@ EXAMPLE OF RECONSTRUCTION
 First download a Prokudin glass plate, for example, the one from this address:
 http://lcweb2.loc.gov/master/pnp/prok/01000/01043a.tif
 
+Download the image:
+
+	wget http://lcweb2.loc.gov/master/pnp/prok/01000/01043a.tif
+
 Cut the image into three components:
 
-	cut3 01043a.tif red.tiff green.tiff blue.tiff
+	cut3 01043a.tif blue.tiff green.tiff red.tiff
 
 Check the reconstruction without any registration:
 
 	join3 red.tiff green.tiff blue.tiff test.tiff
-	quantize test.tiff test.png
+	quantize 0 65000 test.tiff test.png
 	display test.png
 
-Try a registration computed by hand:
+Test a registration computed by hand:
 
-	
+	translation -8 -25 green.tiff translated_green.tiff
+	translation -17 -10 blue.tiff translated_blue.tiff
+	join3 red.tiff translated_green.tiff translated_blue.tiff test2.tiff
+	quantize 0 65000 test2.tiff test2.png
+	display test2.png
