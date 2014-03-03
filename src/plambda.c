@@ -627,7 +627,15 @@ static int vector_rgb2gray(float *r, float *a, int n)
 	return 1;
 }
 
-
+// instance of "univector_function"
+static int vector_colorsign(float *r, float *a, int n)
+{
+	if (n != 1) fail("vcolorsign needs a scalar");
+	r[0] = fabs(*a) * (*a < 0);
+	r[1] = fabs(*a) * (*a > 0);
+	r[2] = 0;
+	return 3;
+}
 
 // table of all functions (local and from math.h) {{{1
 struct predefined_function {
@@ -740,6 +748,7 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(vector_norm,"vnorm",-6),
 	REGISTER_FUNCTIONN(vector_dimension,"vdim",-6),
 	REGISTER_FUNCTIONN(vector_rgb2gray,"vgray",-6),
+	REGISTER_FUNCTIONN(vector_colorsign,"vcsign",-6),
 	//REGISTER_FUNCTIONN(rgb2hsv,"rgb2hsv",3),
 	//REGISTER_FUNCTIONN(hsv2rgb,"rgb2hsv",3),
 #undef REGISTER_FUNCTION
@@ -2073,7 +2082,19 @@ static float imageop_scalar(float *img, int w, int h, int pd,
 	return 0;
 }
 
+//static int imageop_vector(float *out, float *img, int w, int h, int pd,
+//		int ai, int aj, int al, struct plambda_token *t)
+//{
+//	// only two particular cases: gradient (*2) and divergence (/2)
+//	switch (t->imageop_operator) {
+//	default:
+//
+//		return 1;
+//	}
+//}
 
+
+// compute the requested imageop at the given point
 static int imageop(float *out, float *img, int w, int h, int pd,
 				int ai, int aj, struct plambda_token *t)
 {
@@ -2081,7 +2102,7 @@ static int imageop(float *out, float *img, int w, int h, int pd,
 	int pi = ai + t->displacement[0];
 	int pj = aj + t->displacement[1];
 	int channel = t->component;
-	if (channel < 0) {
+	if (channel < 0) { // means the whole of it
 		retval = pd;
 		FORL(pd)
 			out[l] = imageop_scalar(img, w, h, pd, pi, pj, l, t);
@@ -2268,7 +2289,6 @@ int main_calc(int c, char **v)
 		fprintf(stderr, "calculator correspondence \"%s\" = \"%s\"\n",
 				p->var->t[i], v[i+1]);
 
-	xsrand(SRAND());
 
 	float out[pdmax];
 	int od = run_program_vectorially_at(out, p, x, NULL, NULL, pd, 0, 0);
