@@ -115,6 +115,7 @@ int read_cloud_mask_from_gml_file(struct cloud_mask *m, char *filename)
 		}
 		read_until_newline(f);
 	}
+	xfclose(f);
 	return 0;
 }
 
@@ -202,6 +203,24 @@ static void positive_connected_component_filter(int *rep, int w, int h)
 //
 //}
 
+void cloud_mask_rescale(struct cloud_mask *m, int w, int h)
+{
+	for (int i = 0; i < m->n; i++)
+	{
+		struct cloud_polygon *p = m->t + i;
+		for (int j = 0; j < p->n; j++)
+		{
+			double *a = p->v + 2*j;
+			double A[2] = {
+				(a[0] - m->low[0]) / (m->up[0] - m->low[0]) * w,
+				(a[1] - m->low[1]) / (m->up[1] - m->low[1]) * h
+			};
+			a[0] = A[0];
+			a[1] = A[1];
+		}
+	}
+}
+
 void clouds_mask_fill(int *img, int w, int h, struct cloud_mask *m)
 {
 	for (int i = 0; i < m->n; i++)
@@ -211,19 +230,66 @@ void clouds_mask_fill(int *img, int w, int h, struct cloud_mask *m)
 		{
 			float a[2] = {p->v[2*j+0], p->v[2*j+1]};
 			float b[2] = {p->v[2*j+2], p->v[2*j+3]};
-			float A[2] = {
-				(a[0] - m->low[0]) / (m->up[0] - m->low[0]) * w,
-				(a[1] - m->low[1]) / (m->up[1] - m->low[1]) * h
-			};
-			float B[2] = {
-				(b[0] - m->low[0]) / (m->up[0] - m->low[0]) * w,
-				(b[1] - m->low[1]) / (m->up[1] - m->low[1]) * h
-			};
-			plot_segment_gray(img, w, h, A, B, -1);
+			plot_segment_gray(img, w, h, a, b, -1);
 		}
 	}
 	positive_connected_component_filter(img, w, h);
 	//set_edges_according_to_bacgkround(img, w, h, 0);
+	for (int i = 0; i < w*h; i++)
+		if (img[i] == i)
+		{
+			img[i] = -3;
+			fprintf(stderr, "rep %d\n", i);
+		}
+}
+
+static double triangle_area(double *A, double *B, double *C)
+{
+	double X[2] = {B[0] - A[0], B[1] - A[1]};
+	double Y[2] = {C[0] - A[0], C[1] - A[1]};
+	return X[0]*Y[1] - X[1]*Y[0];
+}
+
+static int winding_triangle(double *A, double *B, double *C, double *X)
+{
+	double v1 = triangle_area(A, B, X);
+	double v2 = triangle_area(B, C, X);
+	double v3 = triangle_area(C, A, X);
+	return (v1 >= 0 && v2 >= 0 && v3 >= 0) ? 1 : -1;
+}
+
+static int winding_number_polygon(struct cloud_polygon *p, int x, int y)
+{
+	int r = 0;
+	for (int i = 0; i < p->n - 2; i++)
+	{
+		double *A = p->v + 2*(i+0);
+		double *B = p->v + 2*(i+1);
+		double *C = p->v + 2*(i+2);
+		double X[2] = {x, y};
+		r += winding_triangle(A, B, C, X);
+	}
+	if (r > 0) return 1;
+	if (r < 0) return -1;
+	return 0;
+}
+
+static int winding_number_clouds(struct cloud_mask *m, int x, int y)
+{
+	int r = 0;
+	for (int i = 0; i < m->n; i++)
+		r += winding_number_polygon(m->t + i, x, y);
+	return r;
+}
+
+static void windinran(int *img, int w, int h, struct cloud_mask *m)
+{
+	for (int i = 0; i < 597666; i++)
+	{
+		int x = rand()%w;
+		int y = rand()%h;
+		img[w*y+x] = 100 + 10*winding_number_clouds(m, x, y);
+	}
 }
 
 
@@ -251,8 +317,12 @@ int main(int c, char *v[])
 	for (int i = 0; i < w*h; i++)
 		x[i] = 0;
 
+	// scale the co-ordinates of the cloud (TODO: apply an homography)
+	cloud_mask_rescale(m, w, h);
+
 	// draw masks over output image
 	clouds_mask_fill(x, w, h, m);
+	//windinran(x, w, h, m);
 
 	// save output image
 	iio_save_image_int(filename_out, x, w, h);
