@@ -16,7 +16,7 @@ struct cloud_mask {
 
 int read_cloud_mask_from_gml_file(struct cloud_mask *m, char *filename);
 
-void clouds_mask_fill(float *img, int w, int h, struct cloud_mask *m);
+void clouds_mask_fill(int *img, int w, int h, struct cloud_mask *m);
 
 
 
@@ -118,7 +118,7 @@ int read_cloud_mask_from_gml_file(struct cloud_mask *m, char *filename)
 	return 0;
 }
 
-static void putpixel_1(float *img, int w, int h, float x, float y, float v)
+static void putpixel_1(int *img, int w, int h, float x, float y, int v)
 {
 	int i = round(x);
 	int j = round(y);
@@ -130,7 +130,7 @@ static void putpixel_1(float *img, int w, int h, float x, float y, float v)
 }
 
 
-struct plot_data { float *x; int w, h; float c; };
+struct plot_data { int *x; int w, h; int c; };
 static void plot_pixel(int i, int j, void *e)
 {
 	struct plot_data *d = e;
@@ -138,8 +138,8 @@ static void plot_pixel(int i, int j, void *e)
 }
 
 #include "drawsegment.c"
-static void plot_segment_gray(float *img, int w, int h,
-		float a[2], float b[2], float c)
+static void plot_segment_gray(int *img, int w, int h,
+		float a[2], float b[2], int c)
 {
 	int p[2] = {round(a[0]), round(a[1])};
 	int q[2] = {round(b[0]), round(b[1])};
@@ -147,13 +147,66 @@ static void plot_segment_gray(float *img, int w, int h,
 	traverse_segment(p[0], p[1], q[0], q[1], plot_pixel, &d);
 }
 
-void clouds_mask_fill(float *img, int w, int h, struct cloud_mask *m)
+static int dsf_find(int *t, int a)
 {
-	//fprintf(stderr, "CLOUD RECTANGLE %g %g %g %g\n", m->low[0], m->low[1], m->up[0], m->up[1]);
+	if (a != t[a])
+		t[a] = dsf_find(t, t[a]);
+	return t[a];
+}
+
+static int dsf_make_link(int *t, int a, int b)
+{
+	if (a < b) { // arbitrary choice
+		t[b] = a;
+		return a;
+	} else {
+		t[a] = b;
+		return b;
+	}
+}
+
+static int dsf_join(int *t, int a, int b)
+{
+	a = dsf_find(t, a);
+	b = dsf_find(t, b);
+	if (a != b)
+		b = dsf_make_link(t, a, b);
+	return b;
+}
+
+static void positive_connected_component_filter(int *rep, int w, int h)
+{
+	for (int i = 0; i < w*h; i++)
+		if (rep[i] >= 0)
+			rep[i] = i;
+	for (int j = 0; j < h - 1; j++)
+	for (int i = 0; i < w - 1; i++)
+	{
+		int p0 = j*w + i;
+		int p1 = j*w + i+1;
+		int p2  = (j+1)*w + i;
+		if (rep[p0] >= 0 && rep[p1] >= 0)
+			dsf_join(rep, p0, p1);
+		if (rep[p0] >= 0 && rep[p2] >= 0)
+			dsf_join(rep, p0, p2);
+
+	}
+	for (int i = 0; i < w*h; i++)
+		if (rep[i] >= 0)
+			rep[i] = dsf_find(rep, i);
+}
+
+//static void set_edges_according_to_bacgkround(int *img, int w, int h, int bg)
+//{
+//
+//
+//}
+
+void clouds_mask_fill(int *img, int w, int h, struct cloud_mask *m)
+{
 	for (int i = 0; i < m->n; i++)
 	{
 		struct cloud_polygon *p = m->t + i;
-		//fprintf(stderr, "CLOUD %d/%d : %d :", i+1, m->n+1, p->n);
 		for (int j = 0; j < p->n - 1; j++)
 		{
 			float a[2] = {p->v[2*j+0], p->v[2*j+1]};
@@ -166,13 +219,11 @@ void clouds_mask_fill(float *img, int w, int h, struct cloud_mask *m)
 				(b[0] - m->low[0]) / (m->up[0] - m->low[0]) * w,
 				(b[1] - m->low[1]) / (m->up[1] - m->low[1]) * h
 			};
-			plot_segment_gray(img, w, h, A, B, 128);
-			putpixel_1(img, w, h, A[0], A[1], 255);
-			putpixel_1(img, w, h, B[0], B[1], 255);
-			//fprintf(stderr, " (%g %g)", p->v[2*j], p->v[2*j+1]);
+			plot_segment_gray(img, w, h, A, B, -1);
 		}
-		//fprintf(stderr, "\n");
 	}
+	positive_connected_component_filter(img, w, h);
+	//set_edges_according_to_bacgkround(img, w, h, 0);
 }
 
 
@@ -182,11 +233,11 @@ int main(int c, char *v[])
 	// read input arguments
 	if (c != 4) {
 		return fprintf(stderr, "usage:\n\t"
-				"%s CLD_.clg factor image.png\n", *v);
+				"%s CLD_.clg side image.png\n", *v);
 		//                0 1        2      3
 	}
 	char *filename_clg = v[1];
-	float factor = atof(v[2]);
+	float side = atof(v[2]);
 	char *filename_out = v[3];
 
 	// read input cloud file
@@ -194,9 +245,9 @@ int main(int c, char *v[])
 	read_cloud_mask_from_gml_file(m, filename_clg);
 
 	// acquire space for output image
-	int w = 1000;
-	int h = 1000;
-	float *x = xmalloc(w*h*sizeof*x);
+	int w = side;
+	int h = side;
+	int *x = xmalloc(w*h*sizeof*x);
 	for (int i = 0; i < w*h; i++)
 		x[i] = 0;
 
@@ -204,7 +255,7 @@ int main(int c, char *v[])
 	clouds_mask_fill(x, w, h, m);
 
 	// save output image
-	iio_save_image_float(filename_out, x, w, h);
+	iio_save_image_int(filename_out, x, w, h);
 
 	
 	//cleanup
