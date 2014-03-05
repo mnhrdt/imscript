@@ -122,23 +122,19 @@ int read_cloud_mask_from_gml_file(struct cloud_mask *m, char *filename)
 	return 0;
 }
 
-static void putpixel_1(int *img, int w, int h, float x, float y, int v)
+static void putpixel_0(int *img, int w, int h, float x, float y, int v)
 {
 	int i = round(x);
 	int j = round(y);
-	if (i < 0) i = 0;
-	if (j < 0) j = 0;
-	if (i >= w) i = w - 1;
-	if (j >= h) j = h - 1;
-	img[j*w+i] = v;
+	if (i >= 0 && j >= 0 && i < w && j < h)
+		img[j*w+i] = v;
 }
-
 
 struct plot_data { int *x; int w, h; int c; };
 static void plot_pixel(int i, int j, void *e)
 {
 	struct plot_data *d = e;
-	putpixel_1(d->x, d->w, d->h, i, j, d->c);
+	putpixel_0(d->x, d->w, d->h, i, j, d->c);
 }
 
 static void plot_segment_gray(int *img, int w, int h,
@@ -177,6 +173,7 @@ static int dsf_join(int *t, int a, int b)
 	return b;
 }
 
+// connected components of positive pixels of the image rep
 static void positive_connected_component_filter(int *rep, int w, int h)
 {
 	for (int i = 0; i < w*h; i++)
@@ -199,6 +196,7 @@ static void positive_connected_component_filter(int *rep, int w, int h)
 			rep[i] = dsf_find(rep, i);
 }
 
+// area of triangle ABC
 static double triangle_area(double *A, double *B, double *C)
 {
 	double X[2] = {B[0] - A[0], B[1] - A[1]};
@@ -206,6 +204,7 @@ static double triangle_area(double *A, double *B, double *C)
 	return X[0]*Y[1] - X[1]*Y[0];
 }
 
+// test wether point X is inside triangle ABC
 static int winding_triangle(double *A, double *B, double *C, double *X)
 {
 	double v1 = triangle_area(A, B, X);
@@ -217,6 +216,7 @@ static int winding_triangle(double *A, double *B, double *C, double *X)
 	return r;
 }
 
+// winding number of point (x,y) with respect to a single polygon
 static int winding_number_polygon(struct cloud_polygon *p, int x, int y)
 {
 	int r = 0;
@@ -231,6 +231,7 @@ static int winding_number_polygon(struct cloud_polygon *p, int x, int y)
 	return r;
 }
 
+// winding number of point (x,w) with respect to all polygons of the mask
 static int winding_number_clouds(struct cloud_mask *m, int x, int y)
 {
 	int r = 0;
@@ -239,6 +240,7 @@ static int winding_number_clouds(struct cloud_mask *m, int x, int y)
 	return r;
 }
 
+// rescale a cloud of points to fit in the given rectangle
 void cloud_mask_rescale(struct cloud_mask *m, int w, int h)
 {
 	for (int i = 0; i < m->n; i++)
@@ -257,7 +259,26 @@ void cloud_mask_rescale(struct cloud_mask *m, int w, int h)
 	}
 }
 
-static int winding_number_clouds(struct cloud_mask*, int, int);
+// homographic transform y=H(x) 
+static void apply_homography(double y[2], double H[9], double x[2])
+{
+	double z[3];
+	z[0] = H[0]*x[0] + H[1]*x[1] + H[2];
+	z[1] = H[3]*x[0] + H[4]*x[1] + H[5];
+	z[2] = H[6]*x[0] + H[7]*x[1] + H[8];
+	y[0] = z[0]/z[2];
+	y[1] = z[1]/z[2];
+}
+
+// transform the coordinates of a cloud_mask by the given homography
+void cloud_mask_homography(struct cloud_mask *m, double *H)
+{
+	for (int i = 0; i < m->n; i++)
+		for (int j = 0; j < m->t[i].n; j++)
+			apply_homography(2*j+m->t[i].v, H, 2*j+m->t[i].v);
+}
+
+#include "iio.h"
 void clouds_mask_fill(int *img, int w, int h, struct cloud_mask *m)
 {
 	// initialize the image to 0
@@ -275,9 +296,31 @@ void clouds_mask_fill(int *img, int w, int h, struct cloud_mask *m)
 			plot_segment_gray(img, w, h, a, b, -1);
 		}
 	}
+	iio_save_image_int("/tmp/cld_segments.tiff", img, w, h);
 
 	// identify the connected components of positive values
 	positive_connected_component_filter(img, w, h);
+	iio_save_image_int("/tmp/cld_components.tiff", img, w, h);
+
+	{
+		//begin visualization hack
+		for (int j = 0; j < h; j++)
+		for (int i = 0; i < w; i++)
+		{
+			int idx = j*w + i;
+			if (img[idx] == idx)
+				img[idx] = -2;
+		}
+		iio_save_image_int("/tmp/cld_representatives.tiff", img, w, h);
+		for (int j = 0; j < h; j++)
+		for (int i = 0; i < w; i++)
+		{
+			int idx = j*w + i;
+			if (img[idx] == -2)
+				img[idx] = idx;
+		}
+		//end visualization hack
+	}
 
 	// identify the connected components that are background
 	int background_ids[m->n], n_background_ids = 0;
@@ -303,53 +346,70 @@ void clouds_mask_fill(int *img, int w, int h, struct cloud_mask *m)
 	// paint the background pixels in black, the clouds in white
 	for (int i = 0; i < w*h; i++)
 	{
-		int j = 0;
-		while (j < n_background_ids)
-			if (img[i] == background_ids[j++])
-				break;
-		img[i] = j == n_background_ids ? 255 : 0;
+		bool bP = false;
+		for (int j = 0; j < n_background_ids; j++)
+			if (img[i] == background_ids[j])
+				bP = true;
+		//int j = 0;
+		//while (j < n_background_ids)
+		//	if (img[i] == background_ids[j++])
+		//		break;
+		img[i] = bP ? 0 : 255;
 	}
 }
 
+#define CLDMASK_MAIN
+#ifdef CLDMASK_MAIN
 
 #include "iio.h"
+#include "pickopt.c"
 int main(int c, char *v[])
 {
 	// read input arguments
-	if (c != 4) {
-		return fprintf(stderr, "usage:\n\t"
-				"%s CLD_.clg side image.png\n", *v);
-		//                0 1        2      3
+	char *Hstring = pick_option(&c, &v, "h", "");
+	if (c != 5) {
+		return fprintf(stderr, "usage:\n\t%s"
+		       "CLD.cld [-h \"h1 ... h9\"] width height out.png\n", *v);
+		//      1                          2     3      4
 	}
 	char *filename_clg = v[1];
-	float side = atof(v[2]);
-	char *filename_out = v[3];
+	int out_width = atoi(v[2]);
+	int out_height = atoi(v[3]);
+	char *filename_out = v[4];
 
 	// read input cloud file
 	struct cloud_mask m[1];
 	read_cloud_mask_from_gml_file(m, filename_clg);
 
 	// acquire space for output image
-	int w = side;
-	int h = side;
+	int w = out_width;
+	int h = out_height;
 	int *x = xmalloc(w*h*sizeof*x);
 	for (int i = 0; i < w*h; i++)
 		x[i] = 0;
 
-	// scale the co-ordinates of the cloud (TODO: apply an homography)
-	cloud_mask_rescale(m, w, h);
+	// scale the co-ordinates of the cloud
+	if (*Hstring) {
+		int nH;
+		double *H = alloc_parse_doubles(9, Hstring, &nH);
+		if (nH != 9)
+			fail("can not read 3x3 matrix from \"%s\"", Hstring);
+		cloud_mask_homography(m, H);
+		free(H);
 
-	// draw masks over output image
+	} else
+		cloud_mask_rescale(m, w, h);
+
+	// draw mask over output image
 	clouds_mask_fill(x, w, h, m);
-	//windinran(x, w, h, m);
-	//silly(x, w, h, m);
 
 	// save output image
 	iio_save_image_int(filename_out, x, w, h);
 
-	
 	//cleanup
 	free(x);
 	free_cloud(m);
 	return 0;
 }
+
+#endif//CLDMASK_MAIN
