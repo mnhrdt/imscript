@@ -127,4 +127,23 @@ static float *alloc_parse_floats(int nmax, const char *ss, int *n)
 	return r;
 }
 
+static double *alloc_parse_doubles(int nmax, const char *ss, int *n)
+{
+	// add a space to s, so that gabriele's expression works as intended
+	int ns = strlen(ss);
+	char t[2+ns], *s = t;
+	s[0] = ' ';
+	for (int i = 0; i <= ns; i++)
+		s[i+1] = ss[i];
+
+	double *r = xmalloc(nmax * sizeof*r);
+	int i = 0, w;
+	while (i < nmax && 1 == sscanf(s, "%*[][ \n\t,:;]%lf%n", r + i, &w)) {
+		i += 1;
+		s += w;
+	}
+	*n = i;
+	return r;
+}
+
 #endif//_PARSENUMBERS_C
