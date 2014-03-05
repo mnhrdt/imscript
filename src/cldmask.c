@@ -27,13 +27,16 @@ void clouds_mask_fill(int *img, int w, int h, struct cloud_mask *m);
 ///////////////////////
 
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "fail.c"
 #include "xmalloc.c"
 #include "xfopen.c"
 #include "parsenumbers.c"
+#include "drawsegment.c"
 
 // read stream until character "stop" is found
 // if EOF is reached, return NULL
@@ -138,7 +141,6 @@ static void plot_pixel(int i, int j, void *e)
 	putpixel_1(d->x, d->w, d->h, i, j, d->c);
 }
 
-#include "drawsegment.c"
 static void plot_segment_gray(int *img, int w, int h,
 		float a[2], float b[2], int c)
 {
@@ -197,11 +199,45 @@ static void positive_connected_component_filter(int *rep, int w, int h)
 			rep[i] = dsf_find(rep, i);
 }
 
-//static void set_edges_according_to_bacgkround(int *img, int w, int h, int bg)
-//{
-//
-//
-//}
+static double triangle_area(double *A, double *B, double *C)
+{
+	double X[2] = {B[0] - A[0], B[1] - A[1]};
+	double Y[2] = {C[0] - A[0], C[1] - A[1]};
+	return X[0]*Y[1] - X[1]*Y[0];
+}
+
+static int winding_triangle(double *A, double *B, double *C, double *X)
+{
+	double v1 = triangle_area(A, B, X);
+	double v2 = triangle_area(B, C, X);
+	double v3 = triangle_area(C, A, X);
+	int r = 0;
+	if (v1 >= 0 && v2 >= 0 && v3 >= 0) r = 1;
+	if (v1 < 0 && v2 < 0 && v3 < 0) r = -1;
+	return r;
+}
+
+static int winding_number_polygon(struct cloud_polygon *p, int x, int y)
+{
+	int r = 0;
+	for (int i = 1; i < p->n - 2; i++)
+	{
+		double *A = p->v;
+		double *B = p->v + 2*(i);
+		double *C = p->v + 2*(i+1);
+		double X[2] = {x, y};
+		r += abs(winding_triangle(A, B, C, X));
+	}
+	return r;
+}
+
+static int winding_number_clouds(struct cloud_mask *m, int x, int y)
+{
+	int r = 0;
+	for (int i = 0; i < m->n; i++)
+		r += winding_number_polygon(m->t + i, x, y);
+	return r;
+}
 
 void cloud_mask_rescale(struct cloud_mask *m, int w, int h)
 {
@@ -221,8 +257,14 @@ void cloud_mask_rescale(struct cloud_mask *m, int w, int h)
 	}
 }
 
+static int winding_number_clouds(struct cloud_mask*, int, int);
 void clouds_mask_fill(int *img, int w, int h, struct cloud_mask *m)
 {
+	// initialize the image to 0
+	for (int i = 0; i < w*h; i++)
+		img[i] = 0;
+
+	// plot the pixels at the cloud edges with the value -1
 	for (int i = 0; i < m->n; i++)
 	{
 		struct cloud_polygon *p = m->t + i;
@@ -233,62 +275,39 @@ void clouds_mask_fill(int *img, int w, int h, struct cloud_mask *m)
 			plot_segment_gray(img, w, h, a, b, -1);
 		}
 	}
+
+	// identify the connected components of positive values
 	positive_connected_component_filter(img, w, h);
-	//set_edges_according_to_bacgkround(img, w, h, 0);
-	for (int i = 0; i < w*h; i++)
-		if (img[i] == i)
+
+	// identify the connected components that are background
+	int background_ids[m->n], n_background_ids = 0;
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		int idx = j*w + i;
+		if (img[idx] == idx)
 		{
-			img[i] = -3;
-			fprintf(stderr, "rep %d\n", i);
+			int r = winding_number_clouds(m, i, j);
+			if (!r) {
+				background_ids[n_background_ids] = idx;
+				n_background_ids += 1;
+				if (n_background_ids >= m->n)
+					fail("bad heuristic of background"
+						       " components %d %d",
+						       n_background_ids, m->n
+						       );
+			}
 		}
-}
-
-static double triangle_area(double *A, double *B, double *C)
-{
-	double X[2] = {B[0] - A[0], B[1] - A[1]};
-	double Y[2] = {C[0] - A[0], C[1] - A[1]};
-	return X[0]*Y[1] - X[1]*Y[0];
-}
-
-static int winding_triangle(double *A, double *B, double *C, double *X)
-{
-	double v1 = triangle_area(A, B, X);
-	double v2 = triangle_area(B, C, X);
-	double v3 = triangle_area(C, A, X);
-	return (v1 >= 0 && v2 >= 0 && v3 >= 0) ? 1 : -1;
-}
-
-static int winding_number_polygon(struct cloud_polygon *p, int x, int y)
-{
-	int r = 0;
-	for (int i = 0; i < p->n - 2; i++)
-	{
-		double *A = p->v + 2*(i+0);
-		double *B = p->v + 2*(i+1);
-		double *C = p->v + 2*(i+2);
-		double X[2] = {x, y};
-		r += winding_triangle(A, B, C, X);
 	}
-	if (r > 0) return 1;
-	if (r < 0) return -1;
-	return 0;
-}
 
-static int winding_number_clouds(struct cloud_mask *m, int x, int y)
-{
-	int r = 0;
-	for (int i = 0; i < m->n; i++)
-		r += winding_number_polygon(m->t + i, x, y);
-	return r;
-}
-
-static void windinran(int *img, int w, int h, struct cloud_mask *m)
-{
-	for (int i = 0; i < 597666; i++)
+	// paint the background pixels in black, the clouds in white
+	for (int i = 0; i < w*h; i++)
 	{
-		int x = rand()%w;
-		int y = rand()%h;
-		img[w*y+x] = 100 + 10*winding_number_clouds(m, x, y);
+		int j = 0;
+		while (j < n_background_ids)
+			if (img[i] == background_ids[j++])
+				break;
+		img[i] = j == n_background_ids ? 255 : 0;
 	}
 }
 
@@ -323,6 +342,7 @@ int main(int c, char *v[])
 	// draw masks over output image
 	clouds_mask_fill(x, w, h, m);
 	//windinran(x, w, h, m);
+	//silly(x, w, h, m);
 
 	// save output image
 	iio_save_image_int(filename_out, x, w, h);
