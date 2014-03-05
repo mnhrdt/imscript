@@ -367,15 +367,15 @@ int main(int c, char *v[])
 {
 	// read input arguments
 	char *Hstring = pick_option(&c, &v, "h", "");
-	if (c != 5) {
+	if (c != 5 && c!= 4 && c != 3) {
 		return fprintf(stderr, "usage:\n\t%s"
-		       "CLD.cld [-h \"h1 ... h9\"] width height out.png\n", *v);
-		//      1                          2     3      4
+		"width height [-h \"h1 ... h9\"] [clouds.gml [out.png]]\n", *v);
+		//   1 2                          3           4
 	}
-	char *filename_clg = v[1];
-	int out_width = atoi(v[2]);
-	int out_height = atoi(v[3]);
-	char *filename_out = v[4];
+	int out_width = atoi(v[1]);
+	int out_height = atoi(v[2]);
+	char *filename_clg = c > 3 ? v[3] : "-";
+	char *filename_out = c > 4 ? v[4] : "PNG:-";
 
 	// read input cloud file
 	struct cloud_mask m[1];
