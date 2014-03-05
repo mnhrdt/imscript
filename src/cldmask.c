@@ -4,14 +4,14 @@
 
 
 struct cloud_polygon {
-	int n;                       // number of vertices
-	double *v;                   // vertex coordinates (array of length 2*n)
+	int n;                   // number of vertices
+	double *v;               // vertex coordinates (array of length 2*n)
 };
 
 struct cloud_mask {
-	int n;                       // number of polygons
-	struct cloud_polygon *t;     // array of polygons
-	double low[2], up[2]; // "rectangle"
+	int n;                   // number of polygons
+	struct cloud_polygon *t; // array of polygons
+	double low[2], up[2];    // "rectangle"
 };
 
 int read_cloud_mask_from_gml_file(struct cloud_mask *m, char *filename);
@@ -241,7 +241,7 @@ static int winding_number_clouds(struct cloud_mask *m, int x, int y)
 }
 
 // rescale a cloud of points to fit in the given rectangle
-void cloud_mask_rescale(struct cloud_mask *m, int w, int h)
+static void cloud_mask_rescale(struct cloud_mask *m, int w, int h)
 {
 	for (int i = 0; i < m->n; i++)
 	{
@@ -271,7 +271,7 @@ static void apply_homography(double y[2], double H[9], double x[2])
 }
 
 // transform the coordinates of a cloud_mask by the given homography
-void cloud_mask_homography(struct cloud_mask *m, double *H)
+static void cloud_mask_homography(struct cloud_mask *m, double *H)
 {
 	for (int i = 0; i < m->n; i++)
 		for (int j = 0; j < m->t[i].n; j++)
@@ -294,33 +294,14 @@ void clouds_mask_fill(int *img, int w, int h, struct cloud_mask *m)
 			float a[2] = {p->v[2*j+0], p->v[2*j+1]};
 			float b[2] = {p->v[2*j+2], p->v[2*j+3]};
 			plot_segment_gray(img, w, h, a, b, -1);
+			putpixel_0(img, w, h, a[0], a[1], -2);
+			putpixel_0(img, w, h, b[0], b[1], -2);
 		}
 	}
-	iio_save_image_int("/tmp/cld_segments.tiff", img, w, h);
 
 	// identify the connected components of positive values
 	positive_connected_component_filter(img, w, h);
-	iio_save_image_int("/tmp/cld_components.tiff", img, w, h);
 
-	{
-		//begin visualization hack
-		for (int j = 0; j < h; j++)
-		for (int i = 0; i < w; i++)
-		{
-			int idx = j*w + i;
-			if (img[idx] == idx)
-				img[idx] = -2;
-		}
-		iio_save_image_int("/tmp/cld_representatives.tiff", img, w, h);
-		for (int j = 0; j < h; j++)
-		for (int i = 0; i < w; i++)
-		{
-			int idx = j*w + i;
-			if (img[idx] == -2)
-				img[idx] = idx;
-		}
-		//end visualization hack
-	}
 
 	// identify the connected components that are background
 	int background_ids[m->n], n_background_ids = 0;
