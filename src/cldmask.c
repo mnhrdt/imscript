@@ -304,7 +304,8 @@ void clouds_mask_fill(int *img, int w, int h, struct cloud_mask *m)
 
 
 	// identify the connected components that are background
-	int background_ids[m->n], n_background_ids = 0;
+	int maxcomp = 100 + 2*m->n; // heuristic
+	int background_ids[maxcomp], n_background_ids = 0;
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 	{
@@ -315,10 +316,10 @@ void clouds_mask_fill(int *img, int w, int h, struct cloud_mask *m)
 			if (!r) {
 				background_ids[n_background_ids] = idx;
 				n_background_ids += 1;
-				if (n_background_ids >= m->n)
+				if (n_background_ids >= maxcomp)
 					fail("bad heuristic of background"
 						       " components %d %d",
-						       n_background_ids, m->n
+						       n_background_ids, maxcomp
 						       );
 			}
 		}
