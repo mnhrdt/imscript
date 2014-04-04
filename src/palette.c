@@ -8,13 +8,14 @@
 
 #include <assert.h>
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 
 
-//#define PALSAMPLES 1024
-#define PALSAMPLES 256
+#define PALSAMPLES 1024
+//#define PALSAMPLES 256
 
 // Idea: The function
 //
@@ -33,6 +34,8 @@
 
 
 #include "fail.c"
+#include "xmalloc.c"
+#include "xfopen.c"
 
 struct palette {
 	uint8_t t[3*PALSAMPLES];
@@ -72,7 +75,8 @@ static void fill_palette_with_nodes(struct palette *p, float *n, int nn)
 {
 	if (nn < 2) fail("at least 2 nodes required");
 	float factor = (PALSAMPLES-1.0)/(nn-1.0);
-	assert(PALSAMPLES == 1+factor*(nn-1));
+	fprintf(stderr, "1pfnnm1 = %g\n", 1 + factor*(nn-1));
+	assert(PALSAMPLES == round(1+factor*(nn-1)));
 	for (int i = 0; i < nn-1; i++)
 	{
 		float posi = n[4*i];
@@ -113,6 +117,46 @@ static float nodes_cocoterrain[] = {
 	7, 255, 255, 255, // white
 };
 
+static float nodes_nice[] = {
+	1,   0,   0, 255, // blue
+	2, 255, 255, 255, // white
+	3, 255,   0,   0, // red
+};
+
+static float nodes_nnice[] = {
+	1, 255,   0,   0, // red
+	2,   0,   0,   0, // white
+	3,   0, 255,   0, // blue
+};
+
+static float *get_gpl_nodes(char *filename, int *n)
+{
+	int bufsize = 0xff, nnodes = 0;
+	char buf[bufsize];
+	FILE *f = xfopen(filename, "r");
+	static float nodes[4*PALSAMPLES];
+	while(fgets(buf, bufsize, f) && nnodes < PALSAMPLES) {
+		//fprintf(stderr, "s = \"%s\"\n", buf);
+		float *t = nodes + 4*nnodes;
+		*t = nnodes;
+		if (3 == sscanf(buf, "%g %g %g", t+1, t+2, t+3)) {
+			fprintf(stderr, "\tnod[%d] = %g %g %g\n", nnodes, t[1], t[2], t[3]);
+			nnodes += 1;
+		}
+	}
+	xfclose(f);
+	*n = nnodes;
+	return nodes;
+}
+
+static bool hassuffix(const char *s, const char *suf)
+{
+	int len_s = strlen(s);
+	int len_suf = strlen(suf);
+	if (len_s < len_suf)
+		return false;
+	return 0 == strcmp(suf, s + (len_s - len_suf));
+}
 
 static void fill_palette(struct palette *p, char *s, float m, float M)
 {
@@ -125,6 +169,17 @@ static void fill_palette(struct palette *p, char *s, float m, float M)
 	else if (0 == strcmp(s, "cocoterrain")) {
 		set_node_positions_linearly(nodes_cocoterrain, 7, m, M);
 		fill_palette_with_nodes(p, nodes_cocoterrain, 7);
+	} else if (0 == strcmp(s, "nice")) {
+		set_node_positions_linearly(nodes_nice, 3, m, M);
+		fill_palette_with_nodes(p, nodes_nice, 3);
+	} else if (0 == strcmp(s, "nnice")) {
+		set_node_positions_linearly(nodes_nnice, 3, m, M);
+		fill_palette_with_nodes(p, nodes_nnice, 3);
+	} else if (hassuffix(s, ".gpl")) {
+		int nnodes;
+		float *nodes = get_gpl_nodes(s, &nnodes);
+		set_node_positions_linearly(nodes, nnodes, m, M);
+		fill_palette_with_nodes(p, nodes, nnodes);
 	}
 	else fail("unrecognized palette \"%s\"", s);
 }
