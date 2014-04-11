@@ -3,25 +3,17 @@
 ENABLE_GSL = yes
 WFLAGS=
 WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wstrict-prototypes
-WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wstrict-prototypes -Wno-unused
+WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wstrict-prototypes -Wno-unused -Wno-parentheses
 
 CFLAGS = $(WFLAGS)
 CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE -fopenmp
-CFLAGS = $(WFLAGS) -pipe -O3 -DNDEBUG #-fopenmp
-CFLAGS = $(WFLAGS) -pipe -O3 -DNDEBUG
-CFLAGS = $(WFLAGS) -pipe -g -rdynamic -DDOTRACE
-CFLAGS = $(WFLAGS) -O3
 CFLAGS = $(WFLAGS) -g
-
-#end of compiler specific part
-#CC=gcc -std=c99
-#CFLAGS=-O3
-
+CFLAGS = $(WFLAGS) -O3
 
 SRCDIR = src
 BINDIR = bin
 
-SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat tbcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco vecov flowinv ghisto shuntingyard rpc overpoints periodize rpcflow ransac genk cgi zeropad siftu pview homfilt rpchfilt uncrop maptp rpcparcheck rpc_errsingle rpc_errpair cline rpc_angpair rpc_curvpair chisto fftper srmatch croparound zoombil flowh harris lgblur rpc_eval cutrecombine cdeint imgerr amle elap imspread replicate disp_to_corr printmask colormesh colormeshh elap3 sphereheights fmsrA elap_rec amle_rec palette radphar aronsson43 scheme_plap flowjac elap_recsep aronsson11 fill_bill fill_rect rpc_epicyl starfield morsi gharrows ipol_watermark fontu fontu2 cglap flownop pairsinp pairhom poisson_rec cgpois cgpois_rec isoricci lapbediag lapcolo simplest_inpainting lapbediag_sep cldmask plyflatten
+SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat tbcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco vecov flowinv ghisto shuntingyard rpc overpoints periodize rpcflow ransac genk cgi zeropad siftu pview homfilt rpchfilt rpc_errfilt uncrop maptp rpcparcheck rpc_errsingle rpc_errpair cline rpc_angpair rpc_curvpair chisto fftper srmatch croparound zoombil flowh harris lgblur rpc_eval cutrecombine cdeint imgerr amle elap imspread replicate disp_to_corr printmask colormesh colormeshh elap3 sphereheights fmsrA elap_rec amle_rec palette radphar aronsson43 scheme_plap flowjac elap_recsep aronsson11 fill_bill fill_rect rpc_epicyl starfield morsi gharrows ipol_watermark fontu fontu2 cglap flownop pairsinp pairhom poisson_rec cgpois cgpois_rec isoricci lapbediag lapcolo simplest_inpainting lapbediag_sep cldmask plyflatten metatiler tiffu hview
 SRCFFT = gblur fft dct blur lgblur2 lure lgblur3 testgblur lures
 ifeq ($(ENABLE_GSL), yes)
 	SRCGSL = paraflow minimize
