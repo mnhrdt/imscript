@@ -291,8 +291,8 @@ SMART_PARAMETER(HSTEP,1)
 SMART_PARAMETER(LAMAX,1e-6)
 
 // compute the height of a point given its location inside two images
-double rpc_height(struct rpc *rpca, struct rpc *rpcb,
-		double xa, double ya, double xb, double yb, double *outerr)
+double rpc_height2(struct rpc *rpca, struct rpc *rpcb,
+		double xa, double ya, double xb, double yb, double outerr[2])
 {
 	double x[2] = {xa, ya};
 	double y[2] = {xb, yb};
@@ -315,8 +315,8 @@ double rpc_height(struct rpc *rpca, struct rpc *rpcb,
 		// projection of p2 to the line r1-r0
 		double z[2] = {p[0] + lambda*a[0], p[1] + lambda*a[1]};
 
-		double err = hypot(z[0] - y[0], z[1] - y[1]);
-		if (outerr) *outerr=err;
+		outerr[0] = x[0] - y[0];
+		outerr[1] = x[1] - y[1];
 
 		h += lambda*hstep;
 
@@ -324,6 +324,16 @@ double rpc_height(struct rpc *rpca, struct rpc *rpcb,
 			break;
 	}
 	return h;
+}
+
+// compute the height of a point given its location inside two images
+double rpc_height(struct rpc *rpca, struct rpc *rpcb,
+		double xa, double ya, double xb, double yb, double *outerr)
+{
+	double e[2];
+	double r = rpc_height(rpca, rpcb, xa, ya, xb, yb, e);
+	*outerr = hypot(e[0], e[1]);
+	return r;
 }
 
 

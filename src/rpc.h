@@ -47,3 +47,8 @@ static void eval_rpc_pair(double xprime[2],
 // compute the height of a point given its location inside two images
 double rpc_height(struct rpc *rpca, struct rpc *rpcb,
 		double x, double y, double xp, double yp, double *outerr);
+
+// compute the height of a point given its location inside two images
+// (store the error vector)
+double rpc_height2(struct rpc *rpca, struct rpc *rpcb,
+		double x, double y, double xp, double yp, double outerr[2]);
