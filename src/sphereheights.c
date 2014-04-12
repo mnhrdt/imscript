@@ -26,12 +26,15 @@ static void sphere_count_neighbors(float *out_count, float *x, int w, int h,
 		for (int dx = -offset; dx <= offset; dx++) {
 			int ii = i + dx;
 			int jj = j + dy;
+			if (!innerP(w, h, ii, jj)) continue;
+
 			float r = hypot(dx, dy);
+			if (r >= sphere_radius) continue;
+
 			float z = x[jj*w + ii]/vertical_ex;
-			if (innerP(w, h, ii, jj)
-					&& r < sphere_radius
-					&& isfinite(z)
-					&& !(in_mask && !in_mask[jj*w+ii])
+			if (!isfinite(z)) continue;
+
+			if ( !(in_mask && !in_mask[jj*w+ii])
 					&& hypot(r, z - z0) < sphere_radius
 			   )
 				cx += 1;
