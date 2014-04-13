@@ -27,6 +27,7 @@ static float dither_value(float x)
 	return x < 127.5 ? 0 : 255;
 }
 
+// Floyd-Steinberg
 void dither(float *x, int w, int h)
 {
 	getpixel_operator get = getpixel_127;
@@ -36,15 +37,21 @@ void dither(float *x, int w, int h)
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 	{
-		float o = get(x, w, h, i, j);
-		float n = dither_value(o);
-		set(x, w, h, i, j, n);
-		float e = o - n;
-		add(x, w, h, i+1, j+0, 7*e/16);
-		add(x, w, h, i-1, j+1, 3*e/16);
-		add(x, w, h, i+0, j+1, 5*e/16);
-		add(x, w, h, i+1, j+1, 1*e/16);
+		float old = get(x, w, h, i, j);
+		float new = dither_value(old);
+		float err = old - new;
+		set(x, w, h, i, j, new);
+		add(x, w, h, i+1, j+0, 7*err/16);
+		add(x, w, h, i-1, j+1, 3*err/16);
+		add(x, w, h, i+0, j+1, 5*err/16);
+		add(x, w, h, i+1, j+1, 1*err/16);
 	}
+}
+
+void dither_sep(float *x, int w, int h, int pd)
+{
+	for (int i = 0; i < pd; i++)
+		dither(x + i*w*h, w, h);
 }
 
 #include <stdio.h>
@@ -52,19 +59,20 @@ void dither(float *x, int w, int h)
 #include "iio.h"
 int main(int c, char *v[])
 {
-	if (c > 1) {
-		fprintf(stderr, "usage:\n\t%s < gray > binary\n", *v);
+	if (c != 2 && c != 3 && c != 4) {
+		fprintf(stderr, "usage:\n\t%s [gray [binary]]\n", *v);
+		//                          0  1     2
 		return 1;
 	}
-	char *filename_in = "-";
-	char *filename_out = "-";
+	char *filename_in  = c > 1 ? v[1] : "-";
+	char *filename_out = c > 2 ? v[2] : "-";
 
-	int w, h;
-	float *x = iio_read_image_float(filename_in, &w, &h);
+	int w, h, pd;
+	float *x = iio_read_image_float_split(filename_in, &w, &h, &pd);
 
-	dither(x, w, h);
+	dither_sep(x, w, h, pd);
 
-	iio_save_image_float(filename_out, x, w, h);
+	iio_save_image_float_split(filename_out, x, w, h, pd);
 
 	free(x);
 	return 0;
