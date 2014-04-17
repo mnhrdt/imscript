@@ -277,13 +277,14 @@
 #define IMAGEOP_XY 4
 #define IMAGEOP_YX 5
 #define IMAGEOP_YY 6
-#define IMAGEOP_GRAD 7
 #define IMAGEOP_NGRAD 8
 #define IMAGEOP_LAP 9
 #define IMAGEOP_CURV 10
-#define IMAGEOP_DIV 11
 #define IMAGEOP_ILAP 12
-#define IMAGEOP_HESS 13
+#define IMAGEOP_HESS 1001
+#define IMAGEOP_GRAD 1002
+#define IMAGEOP_DIV 1003
+#define IMAGEOP_SHADOW 1004
 
 #define SCHEME_FORWARD 0
 #define SCHEME_BACKWARD 1
@@ -1357,6 +1358,9 @@ static void parse_imageop(const char *s, int *op, int *scheme)
 	else if (hasprefix(s, "x")) *op = IMAGEOP_X;
 	else if (hasprefix(s, "y")) *op = IMAGEOP_Y;
 	else if (hasprefix(s, "n")) *op = IMAGEOP_NGRAD;
+	else if (hasprefix(s, "g")) *op = IMAGEOP_GRAD;
+	else if (hasprefix(s, "d")) *op = IMAGEOP_DIV;
+	else if (hasprefix(s, "S")) *op = IMAGEOP_SHADOW;
 	//else if (hasprefix(s, "k")) *op = IMAGEOP_CURV;
 	//else fail("unrecognized comma modifier \",%s\"", s);
 	*scheme = SCHEME_SOBEL;
@@ -2082,16 +2086,45 @@ static float imageop_scalar(float *img, int w, int h, int pd,
 	return 0;
 }
 
-//static int imageop_vector(float *out, float *img, int w, int h, int pd,
-//		int ai, int aj, int al, struct plambda_token *t)
-//{
-//	// only two particular cases: gradient (*2) and divergence (/2)
-//	switch (t->imageop_operator) {
-//	default:
-//
-//		return 1;
-//	}
-//}
+static int imageop_vector(float *out, float *img, int w, int h, int pd,
+		int ai, int aj, struct plambda_token *t)
+{
+	float *sx = get_stencil_3x3(IMAGEOP_X, t->imageop_scheme);
+	float *sy = get_stencil_3x3(IMAGEOP_Y, t->imageop_scheme);
+	switch (t->imageop_operator) {
+	case IMAGEOP_GRAD:
+		//if (pd != 1) fail("can not yet compute gradient of a vector");
+		//out[0] = apply_3x3_stencil(img, w,h,pd, ai,aj,0, sx);
+		//out[1] = apply_3x3_stencil(img, w,h,pd, ai,aj,0, sy);
+		//return 2;
+		for (int l = 0; l < pd; l++) {
+			out[2*l+0] = apply_3x3_stencil(img,w,h,pd,ai,aj,l, sx);
+			out[2*l+1] = apply_3x3_stencil(img,w,h,pd,ai,aj,l, sy);
+		}
+		return 2*pd;
+	case IMAGEOP_DIV:
+		//if (pd!=2)fail("can not compute divergence of a %d-vector",pd);
+		//float ax = apply_3x3_stencil(img, w,h,pd, ai,aj,0, sx);
+		//float by = apply_3x3_stencil(img, w,h,pd, ai,aj,1, sy);
+		//out[0] = ax + by;
+		//return 1;
+		if (pd%2)fail("can not compute divergence of a %d-vector",pd);
+		for (int l = 0; l < pd/2; l++) {
+			float ax=apply_3x3_stencil(img,w,h,pd,ai,aj,2*l+0,sx);
+			float by=apply_3x3_stencil(img,w,h,pd,ai,aj,2*l+1,sy);
+			out[l] = ax + by;
+		}
+		return pd/2;
+	case IMAGEOP_SHADOW:
+		if (pd != 1) fail("can not yet compute shadow of a vector");
+		float vdx[3]={1,0,apply_3x3_stencil(img, w,h,pd, ai,aj,0, sx)};
+		float vdy[3]={0,1,apply_3x3_stencil(img, w,h,pd, ai,aj,0, sy)};
+		float sun[3] = {-1, -1, 1}, nor[3];
+		vector_product(nor, vdx, vdy, 3, 3);
+		return scalar_product(out, nor, sun, 3, 3);
+	default: fail("unrecognized imageop %d\n", t->imageop_operator);
+	}
+}
 
 
 // compute the requested imageop at the given point
@@ -2102,6 +2135,8 @@ static int imageop(float *out, float *img, int w, int h, int pd,
 	int pi = ai + t->displacement[0];
 	int pj = aj + t->displacement[1];
 	int channel = t->component;
+	if (t->imageop_operator > 1000)
+		return imageop_vector(out, img, w, h, pd, pi, pj, t);
 	if (channel < 0) { // means the whole of it
 		retval = pd;
 		FORL(pd)

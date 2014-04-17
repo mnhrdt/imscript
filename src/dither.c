@@ -1,12 +1,10 @@
-
-
 typedef float (*getpixel_operator)(float*,int,int,int,int);
 typedef void (*setpixel_operator)(float*,int,int,int,int,float);
 
 static float getpixel_127(float *x, int w, int h, int i, int j)
 {
 	if (i < 0 || i >= w || j < 0 || j >= h)
-		return 0;
+		return 127;
 	return x[i + j*w];
 }
 
@@ -14,6 +12,15 @@ static void setpixel_insideP(float *x, int w, int h, int i, int j, float v)
 {
 	if (i >= 0 && j >= 0 && i < w && j < h)
 		x[w*j+i] = v;
+}
+
+static void setpixel_tsum_insideP(float *x, int w, int h, int i, int j, float v)
+{
+	if (i >= 0 && j >= 0 && i < w && j < h)
+	{
+		float g = x[w*j+i] + v;
+		x[w*j+i] = g > 255 ? 255 : g;
+	}
 }
 
 static void setpixel_sum_insideP(float *x, int w, int h, int i, int j, float v)
@@ -32,7 +39,7 @@ void dither(float *x, int w, int h)
 {
 	getpixel_operator get = getpixel_127;
 	setpixel_operator set = setpixel_insideP;
-	setpixel_operator add = setpixel_sum_insideP;
+	setpixel_operator add = setpixel_tsum_insideP;
 
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
@@ -59,7 +66,7 @@ void dither_sep(float *x, int w, int h, int pd)
 #include "iio.h"
 int main(int c, char *v[])
 {
-	if (c != 2 && c != 3 && c != 4) {
+	if (c != 1 && c != 2 && c != 3) {
 		fprintf(stderr, "usage:\n\t%s [gray [binary]]\n", *v);
 		//                          0  1     2
 		return 1;
@@ -71,6 +78,7 @@ int main(int c, char *v[])
 	float *x = iio_read_image_float_split(filename_in, &w, &h, &pd);
 
 	dither_sep(x, w, h, pd);
+
 
 	iio_save_image_float_split(filename_out, x, w, h, pd);
 

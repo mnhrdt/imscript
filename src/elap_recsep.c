@@ -286,7 +286,8 @@ int main(int argc, char *argv[])
 	float *in = iio_read_image_float_split(filename_in, w, h, &pd);
 	float *mask = iio_read_image_float(filename_mask, w+1, h+1);
 	if (w[0] != w[1] || h[0] != h[1])
-		return fprintf(stderr, "image and mask file size mismatch");
+		return fprintf(stderr, "image and mask file size mismatch"
+				" %d %d != %d %d", w[0], h[0], w[1], h[1]);
 	float *out = xmalloc(*w**h*pd*sizeof*out);
 
 	for (int i = 0; i < *w * *h; i++)

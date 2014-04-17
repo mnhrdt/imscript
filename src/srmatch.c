@@ -175,7 +175,7 @@ int main(int c, char *v[])
 	struct ann_pair *pairs;
 	float t = atof(v[1]);
 	int top = atoi(v[4]);
-	float rad = atoi(v[5]);
+	float rad = atof(v[5]);
 	char *filename_pairs = v[6];
 	char *filename_omask = v[7];
 	char *filename_hom = v[8];

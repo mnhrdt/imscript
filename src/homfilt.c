@@ -45,6 +45,6 @@ int main(int c, char *v[])
 	for (int i = 0; i < n; i++)
 		projective_map(t+2*i, H, t+2*i);
 	for (int i = 0; i < n; i++)
-		printf("%g %g\n", t[2*i], t[2*i+1]);
+		printf("%lf %lf\n", t[2*i], t[2*i+1]);
 	return EXIT_SUCCESS;
 }

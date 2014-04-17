@@ -1,6 +1,7 @@
 // blur of a 2D image, using various kernels
 
 #include <assert.h>
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -277,6 +278,14 @@ static void fill_kernel_image(float *kk, int w, int h,
 	double m = 0;
 	FORJ(h) FORI(w) m += k[j][i];
 	FORJ(h) FORI(w) k[j][i] /= m;
+
+}
+
+static void substract_from_identity(float *k, int w, int h)
+{
+	for (int i = 0; i < w*h; i++)
+		k[i] *= -1;
+	k[0] += 1;
 }
 
 static void gray_fconvolution_2d(float *y, float *x, fftwf_complex *fk,
@@ -327,7 +336,7 @@ void blur_2d(float *y, float *x, int w, int h, int pd,
 	}
 
 	float (*f)(float,float,float*);
-	switch(kernel_id[0]) {
+	switch(tolower(kernel_id[0])) {
 	case 'g': f = kernel_2d_gaussian; break;
 	case 'l': f = kernel_2d_laplace;  break;
 	case 'c': f = kernel_2d_cauchy;   break;
@@ -339,6 +348,8 @@ void blur_2d(float *y, float *x, int w, int h, int pd,
 
 	float *k = xmalloc(w*h*sizeof*k);
 	fill_kernel_image(k, w, h, f, p);
+	if (isupper(kernel_id[0]))
+		substract_from_identity(k, w, h);
 	//void iio_save_image_float(char*,float*,int,int);
 	//iio_save_image_float("/tmp/blurk.tiff", k, w, h);
 

@@ -315,8 +315,8 @@ double rpc_height2(struct rpc *rpca, struct rpc *rpcb,
 		// projection of p2 to the line r1-r0
 		double z[2] = {p[0] + lambda*a[0], p[1] + lambda*a[1]};
 
-		outerr[0] = x[0] - y[0];
-		outerr[1] = x[1] - y[1];
+		outerr[0] = z[0] - y[0];
+		outerr[1] = z[1] - y[1];
 
 		h += lambda*hstep;
 
