@@ -21,19 +21,72 @@
 #include "xmalloc.c"
 
 
-//struct tiff_tiles {
-//	int w;
-//	int h;
-//	int spp;
-//	int bps;
-//	bool tiled;
-//	bool broken;
-//	int tiff_format;
-//
-//	int tw;
-//	int th;
-//	int ntiles;
-//};
+struct tiff_tile {
+	int32_t w, h;
+	int16_t spp, bps, fmt;
+	bool broken;
+	uint8_t *data;
+
+	int offx, offy;
+};
+
+struct tiff_file_info {
+	int32_t w;   // image width
+	int32_t h;   // image height
+	int16_t spp; // samples per pixel
+	int16_t bps; // bits per sample
+	int16_t fmt; // sample format
+	bool broken; // whether pixels are contiguous or broken
+	bool packed; // whether bps=1,2 or 4
+	bool tiled;  // whether data is organized into tiles
+
+	// only if tiled
+	int32_t tw;  // tile width
+	int32_t th;  // tile height
+	int32_t ta;  // tiles across
+	int32_t td;  // tiles down
+};
+
+
+// tell how many units "u" are needed to cover a length "n"
+static int how_many(int n, int u)
+{
+	assert(n > 0);
+	assert(u > 0);
+	return n/u + (bool)(n%u);
+
+}
+
+static void get_tiff_file_info(struct tiff_file_info *t, TIFF *tif)
+{
+	TIFFGetFieldDefaulted(tif, TIFFTAG_IMAGEWIDTH,      &t->w);
+	TIFFGetFieldDefaulted(tif, TIFFTAG_IMAGELENGTH,     &t->h);
+	TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLESPERPIXEL, &t->spp);
+	TIFFGetFieldDefaulted(tif, TIFFTAG_BITSPERSAMPLE,   &t->bps);
+	TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLEFORMAT,    &t->fmt);
+
+	uint16_t planarity;
+	TIFFGetFieldDefaulted(tif, TIFFTAG_PLANARCONFIG,    &planarity);
+	t->broken = planarity != PLANARCONFIG_CONTIG;
+	t->packed = 0 != t->bps % 8;
+	t->tiled = TIFFIsTiled(tif);
+
+	if (t->tiled) {
+		TIFFGetField(tif, TIFFTAG_TILEWIDTH,  &t->tw);
+		TIFFGetField(tif, TIFFTAG_TILELENGTH, &t->th);
+		t->ta = how_many(t->w, t->tw);
+		t->td = how_many(t->h, t->th);
+	}
+}
+
+static void get_tiff_file_info_filename(struct tiff_file_info *t, char *fname)
+{
+	TIFF *tif = TIFFOpen(fname, "r");
+	if (!tif)
+		fail("could not open TIFF file \"%s\" for reading", fname);
+	get_tiff_file_info(t, tif);
+	TIFFClose(tif);
+}
 
 static int tiff_imagewidth(TIFF *tif)
 {
@@ -94,15 +147,6 @@ static int tiff_tilelength(TIFF *tif)
 	return R;
 }
 
-// tell how many units "u" are needed to cover a length "n"
-static int how_many(int n, int u)
-{
-	assert(n > 0);
-	assert(u > 0);
-	return n/u + (bool)(n%u);
-
-}
-
 static int tiff_tilesacross(TIFF *tif)
 {
 	int w = tiff_imagewidth(tif);
@@ -117,12 +161,6 @@ static int tiff_tilesdown(TIFF *tif)
 	return how_many(h, th);
 }
 
-struct tiff_tile {
-	int32_t w, h;
-	int16_t spp, bps, fmt;
-	bool broken;
-	uint8_t *data;
-};
 
 // write a non-tiled TIFF image
 static void write_tile_to_file(char *filename, struct tiff_tile *t)
@@ -153,22 +191,58 @@ static void write_tile_to_file(char *filename, struct tiff_tile *t)
 	TIFFClose(tif);
 }
 
+static void dalloc_tile_from_open_file(struct tiff_tile *t, TIFF *tif, int tidx)
+{
+	//struct tiff_file_info tinfo[1];
+	//get_tiff_file_info(tinfo, tif);
+
+	//int nt = TIFFNumberOfTiles(tif);
+	//if (tidx < 0 || tidx >= nt)
+	//	fail("bad tile index %d", tidx);
+
+	//t->w = tinfo->tw;
+	//t->h = tinfo->th;
+	//t->spp = tinfo->spp;
+	//t->bps = tinfo->bps;
+	//t->fmt = tinfo->fmt;
+	//t->broken = false;
+
+	//int tbytes = TIFF
+
+	//int i = tidx % ta;
+	//int j = tidx / ta;
+
+	//int ii = tw*i;
+	//int jj = th*i;
+
+	//int tbytes = TIFFTileSize(tif);
+	//t->data = xmalloc(tbytes);
+	//memset(t->data, 0, tbytes);
+	//int r = TIFFReadTile(tif, t->data, ii, jj, 0, 0);
+	//if (r != tbytes) fail("could not read tile");
+
+}
+
 static void read_tile_from_file(struct tiff_tile *t, char *filename, int tidx)
 {
 	TIFF *tif = TIFFOpen(filename, "r");
-	if (!tif) fail("xould not open TIFF file \"%s\" for reading", filename);
+	if (!tif) fail("could not open TIFF file \"%s\" for reading", filename);
 
 	uint32_t w, h;
-	uint16_t spp, bps, fmt;
+	uint16_t spp, bps, fmt, planarity;
 	TIFFGetFieldDefaulted(tif, TIFFTAG_IMAGEWIDTH,      &w);
 	TIFFGetFieldDefaulted(tif, TIFFTAG_IMAGELENGTH,     &h);
 	TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLESPERPIXEL, &spp);
 	TIFFGetFieldDefaulted(tif, TIFFTAG_BITSPERSAMPLE,   &bps);
 	TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLEFORMAT,    &fmt);
+	TIFFGetFieldDefaulted(tif, TIFFTAG_PLANARCONFIG,    &planarity);
 	t->spp = spp;
 	t->bps = bps;
 	t->fmt = fmt;
 	t->broken = false;
+
+	if (planarity != PLANARCONFIG_CONTIG)
+		fail("broken pixels not supporte yet");
 
 	if (TIFFIsTiled(tif)) {
 		int nt = TIFFNumberOfTiles(tif);
@@ -181,13 +255,13 @@ static void read_tile_from_file(struct tiff_tile *t, char *filename, int tidx)
 		int td = tiff_tilesdown(tif);
 
 		t->w = tw;
-		t->h = tw;
+		t->h = th;
 
 		int i = tidx % ta;
 		int j = tidx / ta;
 
 		int ii = tw*i;
-		int jj = th*i;
+		int jj = th*j;
 
 		int tbytes = TIFFTileSize(tif);
 		t->data = xmalloc(tbytes);
@@ -428,6 +502,93 @@ static void tiffu_tget_hl(char *filename_out, char *filename_in, int tile_idx)
 	free(t->data);
 }
 
+void tcrop(char *fname_out, char *fname_in, int x0, int xf, int y0, int yf)
+{
+	// open input file
+	TIFF *tif = TIFFOpen(fname_in, "r");
+	if (!tif) fail("can not open TIFF file \"%s\" for reading", fname_in);
+
+	fprintf(stderr, "tif = %p\n", (void*)tif);
+
+	// read input file info
+	//struct tiff_file_info tinfo[1];
+	struct tiff_file_info tinfo[1];
+	get_tiff_file_info(tinfo, tif);
+
+
+	// create output structure
+	struct tiff_tile tout[1];
+	tout->w = 1 + xf - x0;
+	tout->h = 1 + yf - y0;
+	tout->spp = tinfo->spp;
+	tout->bps = tinfo->bps;
+	tout->fmt = tinfo->fmt;
+	int pixel_size = tinfo->spp * tinfo->bps/8;
+	int output_size = tout->w * tout->h * pixel_size;
+	//tout->data = xmalloc(tout->w * tout->h * pixel_size);
+	tout->data = xmalloc(output_size);
+	tout->broken = false;
+
+	// convenience simplifcations (not necessary)
+	if (!tinfo->tiled) fail("can only crop tiled files");
+	if (tinfo->packed) fail("can not crop packed images");
+	if (tinfo->broken) fail("can not crop images with broken pixels");
+
+	// compute coordinates of required tiles
+	int tix0 = x0 / tinfo->tw;
+	int tixf = xf / tinfo->tw;
+	int tiy0 = y0 / tinfo->th;
+	int tiyf = yf / tinfo->th;
+	assert(tix0 <= tixf); assert(tixf < tinfo->ta);
+	assert(tiy0 <= tiyf); assert(tiyf < tinfo->td);
+
+	// read input tiles
+	int tisize = TIFFTileSize(tif);
+	assert(tisize == tinfo->tw * tinfo->th * tinfo->spp * tinfo->bps/8);
+	uint8_t *buf = xmalloc(tisize);
+
+	// the outer 2 loops traverse the needed tiles of the big
+	// the inner 3 loops traverse the needed pixels of each tile
+	// i=tile indexes, ii=tile-wise pixel coords, iii=crop-wise pixel coords
+	for (int j = tiy0; j <= tiyf; j++)
+	for (int i = tix0; i <= tixf; i++)
+	{
+		TIFFReadTile(tif, buf, i*tinfo->tw, j*tinfo->th, 0, 0);
+		int i_0 = i > tix0 ? 0 : x0 % tinfo->tw; // first pixel in tile
+		int j_0 = j > tiy0 ? 0 : y0 % tinfo->th;
+		int i_f = i < tixf ? tinfo->tw-1 : xf % tinfo->tw; // last pixel
+		int j_f = j < tiyf ? tinfo->th-1 : yf % tinfo->th;
+		assert(0 <= i_0); assert(i_0 < tinfo->tw);
+		assert(0 <= j_0); assert(j_0 < tinfo->th);
+		assert(0 <= i_f); assert(i_f < tinfo->tw);
+		assert(0 <= j_f); assert(j_f < tinfo->th);
+		for (int jj = j_0; jj <= j_f; jj++)
+		for (int ii = i_0; ii <= i_f; ii++)
+		for (int l = 0; l < pixel_size; l++)
+		{
+			int iii = ii + i*tinfo->tw - x0;
+			int jjj = jj + j*tinfo->th - y0;
+			int oidx = l + pixel_size*(iii + jjj*tout->w);
+			int iidx = l + pixel_size*(ii + jj*tinfo->tw);
+			assert(iii >= 0); assert(iii < tout->w);
+			assert(jjj >= 0); assert(jjj < tout->h);
+			assert(0 <= oidx); assert(oidx < output_size);
+			assert(0 <= iidx); assert(iidx < tisize);
+			tout->data[oidx] = buf[iidx];
+		}
+	}
+	free(buf);
+
+	// close input file
+	TIFFClose(tif);
+
+	// write output data
+	write_tile_to_file(fname_out, tout);
+	
+	// cleanup
+	free(tout->data);
+}
+
 
 //static void tiffu_tilesize(char *fname, int tile_idx, int *w, int *h, int *pd)
 //{
@@ -505,6 +666,25 @@ static int main_info(int c, char *v[])
 	return 0;
 }
 
+static void tiffu_print_info2(char *filename)
+{
+	struct tiff_file_info t[1];
+
+}
+
+static int main_info2(int c, char *v[])
+{
+	if (c != 2) {
+		fprintf(stderr, "usage:\n\t%s file.tiff\n", *v);
+		return 1;
+	}
+	char *filename = v[1];
+
+	tiffu_print_info2(filename);
+
+	return 0;
+}
+
 static int main_whatever(int c, char *v[])
 {
 	if (c != 2) {
@@ -547,17 +727,105 @@ static int main_tget(int c, char *v[])
 	return 0;
 }
 
+static int main_crop(int c, char *v[])
+{
+	if (c != 6) {
+		fprintf(stderr, "usage:\n\t%s cx cy r in.tiff out.tiff\n", *v);
+		//                          0 1  2  3 4       5
+		return 1;
+	}
+	int cx = atoi(v[1]);
+	int cy = atoi(v[2]);
+	int rad = atoi(v[3]);
+	char *filename_in = v[4];
+	char *filename_out = v[5];
+
+	int xmin = cx - rad; if (xmin < 0) xmin = 0;
+	int ymin = cy - rad; if (ymin < 0) ymin = 0;
+	int xmax = cx + rad; //if (xmax >= t->w) xmax = t->w - 1;
+	int ymax = cy + rad; //if (ymax >= t->h) ymax = t->h - 1;
+
+	tcrop(filename_out, filename_in, xmin, xmax, ymin, ymax);
+
+	return 0;
+}
+
+static void my_putchar(FILE *f, int c)
+{
+	fputc(c, f);
+}
+
+static int main_imprintf(int argc, char *argv[])
+{
+	if (argc != 3) {
+		fprintf(stderr, "usage:\n\t%s format image\n", *argv);
+		//                          0 1      2
+		return 1;
+	}
+	char *format = argv[1];
+	char *filename = argv[2];
+
+	struct tiff_file_info t;
+	get_tiff_file_info_filename(&t, filename);
+
+	FILE *f = stdout;
+	while (*format) {
+		int c = *format++;
+		if (c == '%') {
+			c = *format++; if (!c) break;
+			int p = -1;
+			switch(c) {
+			case 'w': p = t.w; break;
+			case 'h': p = t.h; break;
+			case 'n': p = t.w * t.h; break;
+			case 'd': p = t.spp; break;
+			case 'b': p = t.bps; break;
+			case 'B': p = t.bps/8; break;
+			case 'p': p = t.spp * t.bps; break;
+			case 'P': p = t.spp * t.bps / 8; break;
+			case 'f': p = t.fmt == SAMPLEFORMAT_IEEEFP; break;
+			case 'u': p = t.fmt == SAMPLEFORMAT_UINT; break;
+			case 'i': p = t.fmt == SAMPLEFORMAT_INT; break;
+			case 'T': p = t.tiled; break;
+			case 'Z': p = t.broken; break;
+			case 'W': p = t.tw; break;
+			case 'H': p = t.th; break;
+			case 'A': p = t.ta; break;
+			case 'D': p = t.td; break;
+			default: break;
+			}
+			fprintf(f, "%d", p);
+		} else if (c == '\\') {
+			c = *format++; if (!c) break;
+			if (c == '%') my_putchar(f, '%');
+			if (c == 'n') my_putchar(f, '\n');
+			if (c == 't') my_putchar(f, '\t');
+			if (c == '"') my_putchar(f, c);
+			if (c == '\'') my_putchar(f, c);
+			if (c == '\\') my_putchar(f, c);
+		} else
+			my_putchar(f, c);
+	}
+
+	return 0;
+}
+
 int main(int c, char *v[])
 {
+	TIFFSetWarningHandler(NULL);//suppress warnings
+
 	if (c < 2) {
 	err:	fprintf(stderr, "usage:\n\t%s {info|ntiles|tget|tput}\n", *v);
 		return 1;
 	}
-	TIFFSetWarningHandler(NULL);//suppress warnings
-	if (0 == strcmp(v[1], "info"))   return main_info(c-1, v+1);
-	if (0 == strcmp(v[1], "ntiles")) return main_ntiles(c-1, v+1);
-	if (0 == strcmp(v[1], "tget"))   return main_tget(c-1, v+1);
-	if (0 == strcmp(v[1], "whatever"))   return main_whatever(c-1, v+1);
+
+	if (0 == strcmp(v[1], "info"))     return main_info(c-1, v+1);
+	if (0 == strcmp(v[1], "imprintf")) return main_imprintf(c-1, v+1);
+	if (0 == strcmp(v[1], "ntiles"))   return main_ntiles(c-1, v+1);
+	if (0 == strcmp(v[1], "tget"))     return main_tget(c-1, v+1);
+	if (0 == strcmp(v[1], "whatever")) return main_whatever(c-1, v+1);
+	if (0 == strcmp(v[1], "crop"))     return main_crop(c-1, v+1);
 	//if (0 == strcmp(v[1], "tput"))   return main_tput(c-1, v+1);
+
 	goto err;
 }

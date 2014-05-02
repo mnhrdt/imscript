@@ -7,8 +7,8 @@ WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wstrict-prototypes -Wno-unused -Wno-p
 
 CFLAGS = $(WFLAGS)
 CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE -fopenmp
-CFLAGS = $(WFLAGS) -g
 CFLAGS = $(WFLAGS) -O3
+CFLAGS = $(WFLAGS) -g
 
 SRCDIR = src
 BINDIR = bin
