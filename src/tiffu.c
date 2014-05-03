@@ -502,39 +502,91 @@ static void tiffu_tget_hl(char *filename_out, char *filename_in, int tile_idx)
 	free(t->data);
 }
 
-void tcrop(char *fname_out, char *fname_in, int x0, int xf, int y0, int yf)
+//void tcrop_old(char *fname_out, char *fname_in, int x0, int xf, int y0, int yf)
+//{
+//	// open input file
+//	TIFF *tif = TIFFOpen(fname_in, "r");
+//	if (!tif) fail("can not open TIFF file \"%s\" for reading", fname_in);
+//
+//	// read input file info
+//	struct tiff_file_info tinfo[1];
+//	get_tiff_file_info(tinfo, tif);
+//
+//	// adjust crop limits so that they fit inside the input image
+//	if (x0 <  0       ) x0 = 0;
+//	if (y0 <  0       ) y0 = 0;
+//	if (xf >= tinfo->w) xf = tinfo->w - 1;
+//	if (yf >= tinfo->h) yf = tinfo->h - 1;
+//
+//	// create output structure
+//	struct tiff_tile tout[1];
+//	tout->w = 1 + xf - x0;
+//	tout->h = 1 + yf - y0;
+//	tout->spp = tinfo->spp;
+//	tout->bps = tinfo->bps;
+//	tout->fmt = tinfo->fmt;
+//	int pixel_size = tinfo->spp * tinfo->bps/8;
+//	int output_size = tout->w * tout->h * pixel_size;
+//	tout->data = xmalloc(output_size);
+//	tout->broken = false;
+//
+//	// convenience simplifcations (will be removed when the need arises)
+//	if (!tinfo->tiled) fail("can only crop tiled files");
+//	if (tinfo->packed) fail("can not crop packed images");
+//	if (tinfo->broken) fail("can not crop images with broken pixels");
+//
+//	// compute coordinates of required tiles
+//	int tix0 = x0 / tinfo->tw;
+//	int tixf = xf / tinfo->tw;
+//	int tiy0 = y0 / tinfo->th;
+//	int tiyf = yf / tinfo->th;
+//
+//	// read input tiles
+//	int tisize = TIFFTileSize(tif);
+//	uint8_t *buf = xmalloc(tisize);
+//
+//	// the outer 2 loops traverse the needed tiles of the big
+//	// the inner 3 loops traverse the needed pixels of each tile
+//	// i=tile indexes, ii=tile-wise pixel coords, iii=crop-wise pixel coords
+//	for (int j = tiy0; j <= tiyf; j++)
+//	for (int i = tix0; i <= tixf; i++)
+//	{
+//		TIFFReadTile(tif, buf, i*tinfo->tw, j*tinfo->th, 0, 0);
+//		int i_0 = i > tix0 ? 0 : x0 % tinfo->tw; // first pixel in tile
+//		int j_0 = j > tiy0 ? 0 : y0 % tinfo->th;
+//		int i_f = i < tixf ? tinfo->tw-1 : xf % tinfo->tw; // last pixel
+//		int j_f = j < tiyf ? tinfo->th-1 : yf % tinfo->th;
+//		for (int jj = j_0; jj <= j_f; jj++)
+//		for (int ii = i_0; ii <= i_f; ii++)
+//		for (int l = 0; l < pixel_size; l++)
+//		{
+//			int iii = ii + i*tinfo->tw - x0;
+//			int jjj = jj + j*tinfo->th - y0;
+//			int oidx = l + pixel_size*(iii + jjj*tout->w);
+//			int iidx = l + pixel_size*(ii + jj*tinfo->tw);
+//			tout->data[oidx] = buf[iidx];
+//		}
+//	}
+//	free(buf);
+//
+//	// close input file
+//	TIFFClose(tif);
+//
+//	// write output data
+//	write_tile_to_file(fname_out, tout);
+//	
+//	// cleanup
+//	free(tout->data);
+//}
+
+static void crop_tiles(struct tiff_tile *tout, struct tiff_file_info *tinfo,
+		TIFF *tif, int x0, int xf, int y0, int yf)
 {
-	// open input file
-	TIFF *tif = TIFFOpen(fname_in, "r");
-	if (!tif) fail("can not open TIFF file \"%s\" for reading", fname_in);
-
-	fprintf(stderr, "tif = %p\n", (void*)tif);
-
-	// read input file info
-	//struct tiff_file_info tinfo[1];
-	struct tiff_file_info tinfo[1];
-	get_tiff_file_info(tinfo, tif);
-
-
-	// create output structure
-	struct tiff_tile tout[1];
-	tout->w = 1 + xf - x0;
-	tout->h = 1 + yf - y0;
-	tout->spp = tinfo->spp;
-	tout->bps = tinfo->bps;
-	tout->fmt = tinfo->fmt;
+	// define useful constants
 	int pixel_size = tinfo->spp * tinfo->bps/8;
 	int output_size = tout->w * tout->h * pixel_size;
-	//tout->data = xmalloc(tout->w * tout->h * pixel_size);
-	tout->data = xmalloc(output_size);
-	tout->broken = false;
 
-	// convenience simplifcations (not necessary)
-	if (!tinfo->tiled) fail("can only crop tiled files");
-	if (tinfo->packed) fail("can not crop packed images");
-	if (tinfo->broken) fail("can not crop images with broken pixels");
-
-	// compute coordinates of required tiles
+	// compute coordinates of the required tiles
 	int tix0 = x0 / tinfo->tw;
 	int tixf = xf / tinfo->tw;
 	int tiy0 = y0 / tinfo->th;
@@ -542,18 +594,19 @@ void tcrop(char *fname_out, char *fname_in, int x0, int xf, int y0, int yf)
 	assert(tix0 <= tixf); assert(tixf < tinfo->ta);
 	assert(tiy0 <= tiyf); assert(tiyf < tinfo->td);
 
-	// read input tiles
+	// allocate space for a temporal buffer
 	int tisize = TIFFTileSize(tif);
 	assert(tisize == tinfo->tw * tinfo->th * tinfo->spp * tinfo->bps/8);
 	uint8_t *buf = xmalloc(tisize);
 
-	// the outer 2 loops traverse the needed tiles of the big
-	// the inner 3 loops traverse the needed pixels of each tile
+	// the outer 2 loops traverse the needed tiles of the input file
+	// the inner 3 loops traverse the needed samples of each tile
 	// i=tile indexes, ii=tile-wise pixel coords, iii=crop-wise pixel coords
 	for (int j = tiy0; j <= tiyf; j++)
 	for (int i = tix0; i <= tixf; i++)
 	{
-		TIFFReadTile(tif, buf, i*tinfo->tw, j*tinfo->th, 0, 0);
+		int r = TIFFReadTile(tif, buf, i*tinfo->tw, j*tinfo->th, 0, 0);
+		if (r < 0) fail("could not read tile (%d,%d)");
 		int i_0 = i > tix0 ? 0 : x0 % tinfo->tw; // first pixel in tile
 		int j_0 = j > tiy0 ? 0 : y0 % tinfo->th;
 		int i_f = i < tixf ? tinfo->tw-1 : xf % tinfo->tw; // last pixel
@@ -578,6 +631,80 @@ void tcrop(char *fname_out, char *fname_in, int x0, int xf, int y0, int yf)
 		}
 	}
 	free(buf);
+}
+
+static void crop_scanlines(struct tiff_tile *tout, struct tiff_file_info *tinfo,
+		TIFF *tif, int x0, int xf, int y0, int yf)
+{
+	// define useful constants
+	int pixel_size = tinfo->spp * tinfo->bps/8;
+	int output_size = tout->w * tout->h * pixel_size;
+
+	// allocate space for a temporal buffer
+	int scanline_size = TIFFScanlineSize(tif);
+	assert(scanline_size == tinfo->w * pixel_size);
+	uint8_t *buf = xmalloc(scanline_size);
+
+	// the outer loop traverses the required scanlines of the input file
+	// the inner 2 loops traverse the needed samples of each scanline
+	for (int j = y0; j <= yf; j++)
+	{
+		int r = TIFFReadScanline(tif, buf, j, 0);
+		if (r < 0) fail("could not read scanline %d", j);
+		for (int i = x0; i <= xf; i++)
+		for (int l = 0; l < pixel_size; l++)
+		{
+			int ii = i - x0;
+			int jj = j - y0;
+			int oidx = l + pixel_size*(ii + jj*tout->w);
+			int iidx = l + pixel_size*i;
+			assert(ii >= 0); assert(ii < tout->w);
+			assert(jj >= 0); assert(jj < tout->h);
+			assert(0 <= oidx); assert(oidx < output_size);
+			assert(0 <= iidx); assert(iidx < scanline_size);
+			tout->data[oidx] = buf[iidx];
+		}
+	}
+	free(buf);
+}
+
+void tcrop(char *fname_out, char *fname_in, int x0, int xf, int y0, int yf)
+{
+	// open input file
+	TIFF *tif = TIFFOpen(fname_in, "r");
+	if (!tif) fail("can not open TIFF file \"%s\" for reading", fname_in);
+
+	// read input file info
+	struct tiff_file_info tinfo[1];
+	get_tiff_file_info(tinfo, tif);
+
+	// adjust crop limits so that they fit inside the input image
+	if (x0 <  0       ) x0 = 0;
+	if (y0 <  0       ) y0 = 0;
+	if (xf >= tinfo->w) xf = tinfo->w - 1;
+	if (yf >= tinfo->h) yf = tinfo->h - 1;
+
+	// create output structure
+	struct tiff_tile tout[1];
+	tout->w = 1 + xf - x0;
+	tout->h = 1 + yf - y0;
+	tout->spp = tinfo->spp;
+	tout->bps = tinfo->bps;
+	tout->fmt = tinfo->fmt;
+	int pixel_size = tinfo->spp * tinfo->bps/8;
+	int output_size = tout->w * tout->h * pixel_size;
+	tout->data = xmalloc(output_size);
+	tout->broken = false;
+
+	// convenience simplifcations (will be removed when the need arises)
+	if (tinfo->packed) fail("can not crop packed images");
+	if (tinfo->broken) fail("can not crop images with broken pixels");
+	//if (!tinfo->tiled) fail("can only crop tiled files");
+
+	if (tinfo->tiled)
+		crop_tiles(tout, tinfo, tif, x0, xf, y0, yf);
+	else
+		crop_scanlines(tout, tinfo, tif, x0, xf, y0, yf);
 
 	// close input file
 	TIFFClose(tif);
@@ -588,70 +715,6 @@ void tcrop(char *fname_out, char *fname_in, int x0, int xf, int y0, int yf)
 	// cleanup
 	free(tout->data);
 }
-
-
-//static void tiffu_tilesize(char *fname, int tile_idx, int *w, int *h, int *pd)
-//{
-//	TIFFSetWarningHandler(NULL);//suppress warnings
-//
-//	TIFF *tif = TIFFOpen(filename, "r");
-//	if (!tif) fail("could not open TIFF file \"%s\"", filename);
-//
-//	uint32_t w, h;
-//	uint16_t spp, bps, fmt;
-//	int r = 0;
-//	r += TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &w);
-//	r += TIFFGetField(tif, TIFFTAG_IMAGELENGTH, &h);
-//	if (r != 2) fail("can not treat TIFF of unkwnown size");
-//	printf("TIFF %dx%d\n", w, h);
-//
-//	r = TIFFGetField(tif, TIFFTAG_SAMPLESPERPIXEL, &spp);
-//	if(!r) spp=1;
-//	if(r) printf("TIFF spp %d (r=%d)\n", spp, r);
-//
-//	r = TIFFGetField(tif, TIFFTAG_BITSPERSAMPLE, &bps);
-//	if(!r) bps=1;
-//	if(r) printf("TIFF bps %d (r=%d)\n", spp, r);
-//
-//	r = TIFFGetField(tif, TIFFTAG_SAMPLEFORMAT, &fmt);
-//	if(!r) fmt = SAMPLEFORMAT_UINT;
-//	if(r) printf("TIFF fmt %d (r=%d)\n", spp, r);
-//
-//	if (TIFFIsTiled(tif)) {
-//		int tisize = TIFFTileSize(tif);
-//		uint32_t tilewidth, tilelength;
-//		r = 0;
-//		r += TIFFGetField(tif, TIFFTAG_TILEWIDTH, &tilewidth);
-//		r += TIFFGetField(tif, TIFFTAG_TILELENGTH, &tilelength);
-//		if (r != 2) fail("TIFF tiles of unknown size");
-//
-//		int ntiles = (w/tilewidth)*(h/tilelength);
-//
-//		printf("TIFF ntiles %d\n", ntiles);
-//		printf("TIFF tilesize %d (%dx%d)\n", tisize,
-//				tilewidth, tilelength);
-//
-//	}
-//
-//	TIFFClose(tif);
-//}
-
-//static int tiffu_ntiles_cleant(char *filename)
-//{
-//	int r = 0;
-//
-//	TIFF *tif = TIFFOpen(filename, "r");
-//
-//	if (TIFFIsTiled(tif)) {
-//		uint32_t tilewidth, tilelength;
-//		TIFFGetField(tif, TIFFTAG_TILEWIDTH, &tilewidth);
-//		TIFFGetField(tif, TIFFTAG_TILELENGTH, &tilelength);
-//		r = (w/tilewidth)*(h/tilelength);
-//	}
-//
-//	TIFFClose(tif);
-//	return r;
-//}
 
 static int main_info(int c, char *v[])
 {
@@ -705,8 +768,9 @@ static int main_ntiles(int c, char *v[])
 		return 1;
 	}
 
-	printf("%d (%d)\n", tiffu_ntiles(v[1]), tiffu_ntiles2(v[1]));
-	//printf("%d\n", tiffu_ntiles2(v[1]));
+	//printf("%d (%d)\n", tiffu_ntiles(v[1]), tiffu_ntiles2(v[1]));
+	//printf("%d (%d)\n", tiffu_ntiles(v[1]), tiffu_ntiles2(v[1]));
+	printf("%d\n", tiffu_ntiles2(v[1]));
 
 	return 0;
 }
@@ -740,10 +804,10 @@ static int main_crop(int c, char *v[])
 	char *filename_in = v[4];
 	char *filename_out = v[5];
 
-	int xmin = cx - rad; if (xmin < 0) xmin = 0;
-	int ymin = cy - rad; if (ymin < 0) ymin = 0;
-	int xmax = cx + rad; //if (xmax >= t->w) xmax = t->w - 1;
-	int ymax = cy + rad; //if (ymax >= t->h) ymax = t->h - 1;
+	int xmin = cx - rad;
+	int ymin = cy - rad;
+	int xmax = cx + rad;
+	int ymax = cy + rad;
 
 	tcrop(filename_out, filename_in, xmin, xmax, ymin, ymax);
 
@@ -788,10 +852,11 @@ static int main_imprintf(int argc, char *argv[])
 			case 'i': p = t.fmt == SAMPLEFORMAT_INT; break;
 			case 'T': p = t.tiled; break;
 			case 'Z': p = t.broken; break;
-			case 'W': p = t.tw; break;
-			case 'H': p = t.th; break;
-			case 'A': p = t.ta; break;
-			case 'D': p = t.td; break;
+			case 'W': p = !t.tiled ? 0 : t.tw; break;
+			case 'H': p = !t.tiled ? 0 : t.th; break;
+			case 'A': p = !t.tiled ? 0 : t.ta; break;
+			case 'D': p = !t.tiled ? 0 : t.td; break;
+			case 'N': p = !t.tiled ? 0 : t.ta * t.td; break;
 			default: break;
 			}
 			fprintf(f, "%d", p);
