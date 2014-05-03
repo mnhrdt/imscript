@@ -39,6 +39,7 @@ struct tiff_file_info {
 	bool broken; // whether pixels are contiguous or broken
 	bool packed; // whether bps=1,2 or 4
 	bool tiled;  // whether data is organized into tiles
+	bool compressed;
 
 	// only if tiled
 	int32_t tw;  // tile width
@@ -65,9 +66,11 @@ static void get_tiff_file_info(struct tiff_file_info *t, TIFF *tif)
 	TIFFGetFieldDefaulted(tif, TIFFTAG_BITSPERSAMPLE,   &t->bps);
 	TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLEFORMAT,    &t->fmt);
 
-	uint16_t planarity;
+	uint16_t planarity, compression;
 	TIFFGetFieldDefaulted(tif, TIFFTAG_PLANARCONFIG,    &planarity);
+	TIFFGetFieldDefaulted(tif, TIFFTAG_COMPRESSION,     &compression);
 	t->broken = planarity != PLANARCONFIG_CONTIG;
+	t->compressed = compression != COMPRESSION_NONE;
 	t->packed = 0 != t->bps % 8;
 	t->tiled = TIFFIsTiled(tif);
 
@@ -647,10 +650,11 @@ static void crop_scanlines(struct tiff_tile *tout, struct tiff_file_info *tinfo,
 
 	// the outer loop traverses the required scanlines of the input file
 	// the inner 2 loops traverse the needed samples of each scanline
-	for (int j = y0; j <= yf; j++)
+	for (int j = tinfo->compressed ? 0 : y0; j <= yf; j++)
 	{
 		int r = TIFFReadScanline(tif, buf, j, 0);
 		if (r < 0) fail("could not read scanline %d", j);
+		if (j < y0) continue;
 		for (int i = x0; i <= xf; i++)
 		for (int l = 0; l < pixel_size; l++)
 		{
