@@ -22,7 +22,9 @@ struct state {
 	float *view;
 //	unsigned char *view;
 	float qmin, qmax;
-	//float a, b;
+
+	// GUI drag and drop status
+	int dragx, dragy;
 };
 
 struct state global_state[1];
@@ -49,6 +51,8 @@ void action_color_lighten_at(int, int);
 void action_color_darken_at(int, int);
 void action_color_center_at(int, int);
 void action_viewport_translation(int, int);
+void action_gui_start_dragging(int, int);
+void action_gui_finish_dragging(int, int);
 void dump_view(void);
 
 
@@ -207,19 +211,26 @@ void handle_mouse(int button, int state,int x,int y)
 	// button=3 : wheel up
 	// button=4 : wheel down
 
-	if (state == GLUT_DOWN) {
-		int m = glutGetModifiers(); // 1=shift, 2=ctrl, 4=alt
-		fprintf(stderr, "mouse but=%d, state=%d, pos=%d %d mod=%d\n",
-				button, state, x, y, m);
+	int m = glutGetModifiers(); // 1=shift, 2=ctrl, 4=alt
 
+	fprintf(stderr, "mouse but=%d, state=%d, pos=%d %d mod=%d\n",
+			button, state, x, y, m);
+
+	if (state == GLUT_DOWN)
+	{
 		if (m == 0 && button == 3) action_color_lighten();
 		if (m == 0 && button == 4) action_color_darken();
 		if (m == 1 && button == 3) action_color_lighten_at(x, y);
 		if (m == 1 && button == 4) action_color_darken_at(x, y);
-
-		dump_view();
-		glutPostRedisplay();
+		if (m == 0 && button == 0) action_gui_start_dragging(x, y);
 	}
+
+	if (state == GLUT_UP) {
+		if (m == 0 && button == 0) action_gui_finish_dragging(x, y);
+	}
+
+	dump_view();
+	glutPostRedisplay();
 }
 
 // event: mouse DRAG
@@ -311,6 +322,19 @@ void action_viewport_translation(int dx, int dy)
 {
 	global_state->px += dx;
 	global_state->py -= dy;
+}
+
+void action_gui_start_dragging(int x, int y)
+{
+	global_state->dragx = x;
+	global_state->dragy = y;
+}
+
+void action_gui_finish_dragging(int x, int y)
+{
+	int dx = x - global_state->dragx;
+	int dy = y - global_state->dragy;
+	action_viewport_translation(-dx, dy);
 }
 
 void dump_view(void)
