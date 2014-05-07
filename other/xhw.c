@@ -95,6 +95,8 @@ struct FTR *ftr_new_window(void)
 	int bufsize = 3 * f->max_w * f->max_h;
 	f->rgb8_buffer = malloc(bufsize);
 	memset(f->rgb8_buffer, 0, bufsize);
+	for (int i = 0; i < bufsize; i++)
+		f->rgb8_buffer[i] = rand();
 
 	int s = DefaultScreen(f->display);
 	int white = WhitePixel(f->display, s);
@@ -150,23 +152,23 @@ int ftr_start_loop(struct FTR *f)
 			XDrawString(f->display, f->window, f->gc,
 					50, 12, msg, strlen(msg));
 
-			//XImage *xi = XCreateImage(f->display, f->visual, 8,
-			//	XYPixmap, 0, f->rgb8_buffer, f->w, f->h, 0, 0);
 			if (!f->ximage) {
 				f->ximage = XGetImage(f->display, f->window,
-					0, 0, f->w, f->h, AllPlanes, XYPixmap);
+					0, 0, f->w, f->h, AllPlanes, ZPixmap);
 				f->ximage->data = f->rgb8_buffer;
-				if (!XInitImage(f->ximage))
-					exit(fprintf(stderr,"e:xinit image\n"));
 			}
+			f->ximage->width = f->w;
+			f->ximage->height = f->h;
+			f->ximage->bytes_per_line = 0;
+			if (!XInitImage(f->ximage))
+				exit(fprintf(stderr,"e:xinit image\n"));
 
-			int s = DefaultScreen(f->display);
-			int white = WhitePixel(f->display, s);
-			int black = BlackPixel(f->display, s);
-			XPutPixel(f->ximage, 1, 1, white);
-			XPutPixel(f->ximage, 2, 2, black);
-			XPutImage(f->display, f->window, f->gc, f->ximage,
-					0, 0, 0, 0, f->w, f->h);
+			//int s = DefaultScreen(f->display);
+			//int white = WhitePixel(f->display, s);
+			//int black = BlackPixel(f->display, s);
+			//XPutPixel(f->ximage, 1, 1, white);
+			//XPutPixel(f->ximage, 2, 2, black);
+			XPutImage(f->display, f->window, f->gc, f->ximage, 0, 0, 0, 0, f->w, f->h);
 		}
 		if (event.type == KeyPress && f->handle_key)
 		{
