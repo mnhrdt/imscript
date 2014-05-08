@@ -1,10 +1,7 @@
-/*
- *   * Simple Xlib application drawing a box in a window.
- *     * gcc input.c -o output -lX11
- *       */
+// c99 -O3 xhw.c -lX11
 
 #include <X11/Xlib.h>
-#include <X11/Xutil.h>
+#include <X11/Xutil.h> // only for XDestroyImage, that can be easily removed
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -37,6 +34,7 @@ struct FTR {
 	Window window;
 	GC gc;
 	XImage *ximage;
+	int imgupdate;
 };
 
 
@@ -92,7 +90,7 @@ struct FTR *ftr_new_window(void)
 	f->h = 200;
 	f->max_w = 1000;
 	f->max_h = 1000;
-	int bufsize = 3 * f->max_w * f->max_h;
+	int bufsize = 4 * f->max_w * f->max_h;
 	f->rgb8_buffer = malloc(bufsize);
 	memset(f->rgb8_buffer, 0, bufsize);
 	for (int i = 0; i < bufsize; i++)
@@ -107,19 +105,20 @@ struct FTR *ftr_new_window(void)
 			RootWindow(f->display, s), 10, 10, f->w, f->h, 1,
 			black, white);
 	f->ximage = NULL;
+	f->imgupdate = 1;
 
 	//XSelectInput(f->display, f->window, ExposureMask | KeyPressMask);
-	//XSelectInput(f->display, f->window, (1L<<25)-1-(1L<<7));
+	XSelectInput(f->display, f->window, (1L<<25)-1-(1L<<7)-ResizeRedirectMask);
 	//XSelectInput(f->display, f->window, (1L<<25)-1);
 	//XSelectInput(f->display, f->window, (1L<<25)-1);
-	XSelectInput(f->display, f->window,
-		       	ExposureMask
-			| KeyPressMask
-			| ButtonPressMask
-			| PointerMotionMask
-			//| ResizeRedirectMask
-			| StructureNotifyMask
-			);
+	//XSelectInput(f->display, f->window,
+	//	       	ExposureMask
+	//		| KeyPressMask
+	//		| ButtonPressMask
+	//		| PointerMotionMask
+	//		//| ResizeRedirectMask
+	//		| StructureNotifyMask
+	//		);
 
 	XMapWindow(f->display, f->window);
 
@@ -133,10 +132,11 @@ struct FTR *ftr_new_window(void)
 	return f;
 }
 
-int ftr_start_loop(struct FTR *f)
+int ftr_loop_run(struct FTR *f)
 {
 	char *msg = "Hello, World!";
 	XEvent event;
+
 
 	while (!f->do_exit)
 	{
@@ -144,31 +144,35 @@ int ftr_start_loop(struct FTR *f)
 		//fprintf(stderr, "ev %d\t\"%s\"\n", event.type,
 		//		event_names[event.type]);
 
+		static int pos = 0;
+		for (int i = 0; i < 42; i++)
+			f->rgb8_buffer[pos++] = 0;
+
 		if (event.type == Expose)
 		{
-			//fprintf(stderr, "\texpose event\n");
-			XFillRectangle(f->display, f->window, f->gc,
-					20, 20, f->w - 40, f->h - 40);
-			XDrawString(f->display, f->window, f->gc,
-					50, 12, msg, strlen(msg));
+			fprintf(stderr, "\texpose event\n");
+			//XFillRectangle(f->display, f->window, f->gc,
+			//		20, 20, f->w - 40, f->h - 40);
+			//XDrawString(f->display, f->window, f->gc,
+			//		50, 12, msg, strlen(msg));
 
-			if (!f->ximage) {
+			if (!f->ximage && event.type == Expose) {
 				f->ximage = XGetImage(f->display, f->window,
 					0, 0, f->w, f->h, AllPlanes, ZPixmap);
-				f->ximage->data = f->rgb8_buffer;
 			}
-			f->ximage->width = f->w;
-			f->ximage->height = f->h;
-			f->ximage->bytes_per_line = 0;
-			if (!XInitImage(f->ximage))
-				exit(fprintf(stderr,"e:xinit image\n"));
+			if (f->ximage) {
+				if (f->imgupdate) {
+				f->ximage->data = f->rgb8_buffer;
+				f->ximage->width = f->w;
+				f->ximage->height = f->h;
+				f->ximage->bytes_per_line = 0;
+				if (!XInitImage(f->ximage))
+					exit(fprintf(stderr,"e:xinit image\n"));
+				f->imgupdate = 0;
+				}
+				XPutImage(f->display, f->window, f->gc, f->ximage, 0, 0, 0, 0, f->w, f->h);
+			}
 
-			//int s = DefaultScreen(f->display);
-			//int white = WhitePixel(f->display, s);
-			//int black = BlackPixel(f->display, s);
-			//XPutPixel(f->ximage, 1, 1, white);
-			//XPutPixel(f->ximage, 2, 2, black);
-			XPutImage(f->display, f->window, f->gc, f->ximage, 0, 0, 0, 0, f->w, f->h);
 		}
 		if (event.type == KeyPress && f->handle_key)
 		{
@@ -201,6 +205,7 @@ int ftr_start_loop(struct FTR *f)
 				f->w = e.width < f->max_w ? e.width : f->max_w;
 				f->h = e.height< f->max_h ? e.height : f->max_h;
 				f->handle_resize(f, 0, 0, f->w, f->h);
+				f->imgupdate = 1;
 			}
 		}
 	}
@@ -260,12 +265,48 @@ int main(void)
 	ftr_set_handler(f, "button", my_button_handler);
 	ftr_set_handler(f, "motion", my_motion_handler);
 	ftr_set_handler(f, "resize", my_resize_handler);
-	return ftr_start_loop(f);
+	return ftr_loop_run(f);
 }
 
 
 
 
+#if 0
+void my_draw_frame(FTR *f)
+{
+	// fes una iteració del foc
+}
+
+int main_foc(void)
+{
+	struct FTR *f = ftr_new_window(320, 200);
+	ftr_set_handler(f, "idle", my_draw_frame);
+	ftr_set_handler(f, "key", ftr_key_exit_on_ESC);
+	int r = ftr_start_loop(f);
+	return r;
+}
+
+
+
+struct FTR *f = my_spawn_image(float *x, int w, int h, int pd)
+{
+	struct FTR *f = ftr_new_window(w, h);
+	ftr_fork_loop(f); // runs on a parallel thread, waiting
+	// to be exited or stopped from inside
+}
+
+int main_show_image(void)
+{
+	int w, h, pd;
+	float *x = iio_read_image_float_vec("-", &w, &h, &pd);
+	struct FTR *f = my_spawn_image(x, w, h, pd);
+	...
+	...
+	...
+	ftr_stop(f);
+	return 0;
+}
+#endif
 
 
 

@@ -1,0 +1,63 @@
+NIPL is Not an Image Processing Library
+---------------------------------------
+
+NIPL is a set of conventions for doing image processing in standard C.
+
+The conventions are the following:
+
+1. Conventions for image data:
+
+	1.1. An image is an array of pixels
+	1.2. The pixels are ordered from left to right, and from top to bottom
+	1.3. A pixel is an array of samples
+	1.4. A sample is a numeric C type (typically char or float).
+	1.5. All the pixels on an image have the same number of samples
+	1.6. This number of samples is arbitrary, it can be 1, 3, or 10 or 1000
+	1.7. The samples are numbers, not intensities
+	1.8. Pixels are contiguous, never broken (identical to 1.3)
+	1.9. Broken pixels (color planes) are represented as arrays of images
+	1.10. The "default" format for samples is "float"
+
+
+2. Coding conventions (basedn on Linux Kernel coding style)
+
+	2.1. Tabs are 8 spaces
+	2.2. Lines have at most 80 columns
+	2.3. Functions have at most 25 lines
+	2.4. Functions longer than 25 lines are OK if they have some symmetry
+	2.7. Structs are never used in the interface of a reusable algorithm
+	2.8. Structs are OK for internal implementation details
+	2.9. In particular, there is no user-visible image struct
+	2.10. Algorithms may use an internal image struct adapted to their needs
+	2.11. Global and static variables are frowned upon
+	2.13. Void pointers are never explicitly casted to other pointer types
+	2.14. Actually, casts are forbidden, use conversion functions
+	2.15. Struct typedefs are forbidden, use the structure tag
+	2.16. Pointer typedefs are forbidden
+	2.17. Typedefs are alowed for complicated function types
+	2.18. Typedef are allowed for plain C data types
+	2.19. A typedef always ends in "_t"
+	2.20. All functions are declared static except for public API functions
+	2.21. The ideal internal function:
+		* is static
+		* has a very long name
+		* has two or three single-letter arguments 
+		* has no local variables
+		* is only used once
+	2.22. The ideal interface function:
+		* is the only non-static function in its file
+		* has a very long name
+		* has a few arguments with long names explaining their purpose
+		* has many single-letter local variables
+		* does not do any actual computation, just passes stuff around
+
+	
+2. Naming conventions
+
+	3.1. All C symbols are 100% lowercase
+	3.2. All macros are 100% uppercase
+	3.3. Function names are very long and descriptive
+	3.4. Local variables are typically single letters
+	3.5. Struct tags have long and descriptive names
+	3.6. Struct fields have short names (preferably single letters)
+	3.7. Global and static variables must have very long and obnoxious names
