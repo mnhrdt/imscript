@@ -2,11 +2,17 @@
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h> // only for XDestroyImage, that can be easily removed
+#include <X11/XKBlib.h> // only for XkbKeycodeToKeysym
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <math.h>
+#include <ctype.h>
+
+void firechar(unsigned char *buf, int w, int h);
 
 
 struct FTR;
@@ -27,6 +33,8 @@ struct FTR {
 	ftr_event_handler_t handle_resize;
 	//ftr_event_handler handle_key;
 	//ftr_event_handler handle_keydepress;
+
+	int changed;
 
 	// X11-related internal data
 	Display *display;
@@ -107,6 +115,8 @@ struct FTR *ftr_new_window(void)
 	f->ximage = NULL;
 	f->imgupdate = 1;
 
+	f->changed = 0;
+
 	//XSelectInput(f->display, f->window, ExposureMask | KeyPressMask);
 	XSelectInput(f->display, f->window, (1L<<25)-1-(1L<<7)-ResizeRedirectMask);
 	//XSelectInput(f->display, f->window, (1L<<25)-1);
@@ -140,17 +150,19 @@ int ftr_loop_run(struct FTR *f)
 
 	while (!f->do_exit)
 	{
+		if (XPending(f->display) > 0) {
 		XNextEvent(f->display, &event);
 		//fprintf(stderr, "ev %d\t\"%s\"\n", event.type,
 		//		event_names[event.type]);
 
-		static int pos = 0;
-		for (int i = 0; i < 42; i++)
-			f->rgb8_buffer[pos++] = 0;
+		//static int pos = 0;
+		//for (int i = 0; i < 42; i++)
+		//	f->rgb8_buffer[pos++] = 0;
 
-		if (event.type == Expose)
+		if (event.type == Expose || f->changed)
 		{
-			fprintf(stderr, "\texpose event\n");
+			f->changed = 0;
+			//fprintf(stderr, "\texpose event\n");
 			//XFillRectangle(f->display, f->window, f->gc,
 			//		20, 20, f->w - 40, f->h - 40);
 			//XDrawString(f->display, f->window, f->gc,
@@ -208,12 +220,24 @@ int ftr_loop_run(struct FTR *f)
 				f->imgupdate = 1;
 			}
 		}
+	}//Xpending
+		//fprintf(stderr, "idle\n");
+		XLockDisplay(f->display);
+		{
+			event.type = Expose;
+			XSendEvent(f->display, f->window, 0,NoEventMask, &event);
+			XFlush(f->display);
+		}
+		XUnlockDisplay(f->display);
+	firechar((unsigned char *)f->rgb8_buffer, f->w, f->h);
+	f->changed = 1;
 	}
 	XCloseDisplay(f->display);// actually, not needed
 	if (f->ximage) XDestroyImage(f->ximage);
 	//free(f->rgb8_buffer);
 	free(f);
 	return 0;
+
 
 }
 
@@ -232,6 +256,77 @@ int ftr_set_handler(struct FTR *f, char *id, ftr_event_handler_t e)
 	else return fprintf(stderr, "WARNING: unrecognized event \"%s\"\n", id);
 }
 
+void firechar(unsigned char *buf, int w, int h)
+{
+	static unsigned char *pal = NULL;
+	if (!pal) {
+		// build palette
+		pal = malloc(3*256);
+		for (int i = 0; i < 256; i++) {
+			pal[3*i+0] = 0;     //blue
+			pal[3*i+2] = i;//i<128?0:2*(i-128); //green
+			pal[3*i+1] = i<128?2*i:255;//i<128?2*i:255;     //red
+		}
+	}
+
+	static float *f = NULL;
+	static int iw = 0;
+	static int ih = 0;
+	if (!f || iw!=w || ih!=h) { iw = w; ih = h; f = malloc(w*h*sizeof*f); }
+	f[0] = 0;
+
+	int num_lines_bottom = 3;
+
+	// draw random values at the bottom
+	int p = 0;
+	for (int j = 0; j < num_lines_bottom; j++)
+	for (int i = 0; i < w; i++) {
+		//f[p] = sin(0.1*(f[p] + 0.1*(cos(3.14*(i-w/2.0)/w))*sin(rand())));
+		f[p] += 0.3*(cos(3.14*(i-w/2.0)/w))*sin(rand());
+		p++;
+	}
+
+	// paint pixels by combining lower rows
+	//for (int j = num_lines_bottom; j < h; j++)
+	for (int j = h-1; j > num_lines_bottom; j--)
+	for (int i = 0; i < w; i++) {
+		p = j*w+i;
+		f[p] = (1.5*f[p-w] + 1.7 * f[p-2*w+1] + 1.5 * f[p-2*w] + 2.3 * f[p-2*w-1])
+			/7;
+	}
+
+	// render with palette
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		int iidx = w*(h-j-1) + i;
+		int idx = (unsigned char)(127+100*f[iidx]);
+		int pos = w*j + i;
+		buf[4*pos+0] = 255*pal[3*idx+0];
+		buf[4*pos+1] = 255*pal[3*idx+1];
+		buf[4*pos+2] = 255*pal[3*idx+2];
+		buf[4*pos+3] = 255;
+	}
+
+	////for (int i = 0; i < w*h*3; i++)
+	////	buf[i] = rand();
+	//int numlines = 3;
+	//for (int j = h - 1; j >= h-numlines-1; j--)
+	//for (int i = 1; i < w; i++)
+	//for (int l = 0; l < 4; l++)
+	//	buf[(j*w+i)*4+l] = (buf[(j*w+i-1)*4+l]+(13.0*(rand()/(1.0+RAND_MAX))));
+
+	//for (int j = h-numlines-1; j >= 0; j--)
+	//for (int i = 0; i < w; i++)
+	//for (int l = 0; l < 4; l++)
+	//{
+	//	float x1 = buf[((j+1)*w+i-1)*4+l];
+	//	float x2 = buf[((j+1)*w+i  )*4+l];
+	//	float x3 = buf[((j+1)*w+i+1)*4+l];
+	//	float g = 0.7*x2 + 0.2*x1 + 0.1*x3;
+	//	buf[(j*w+i)*4+l] = (buf[(j*w+i)*4+l] + g)/2;
+	//}
+}
 
 
 // begin the actual program here
@@ -239,18 +334,30 @@ int ftr_set_handler(struct FTR *f, char *id, ftr_event_handler_t e)
 void my_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
 	fprintf(stderr, "GOT key %d, %d at (%d %d)\n", k, m, x, y);
+	//int ks = XKeycodeToKeysym(f->display, k, 0);
+	int ks = XkbKeycodeToKeysym(f->display, k, 0, 0);
+	int ks1 = XkbKeycodeToKeysym(f->display, k, 0, m);
+	if (isprint(ks))
+		fprintf(stderr, "\t'%c' '%c'\n", ks, ks1);
 	if (k == 9)
 		f->do_exit = 1;
+	//fprintf(stderr, "\tw h = %d %d\n", f->w, f->h);
+	firechar((unsigned char *)f->rgb8_buffer, f->w, f->h);
+	f->changed = 1;
 }
 
 void my_button_handler(struct FTR *f, int b, int m, int x, int y)
 {
 	fprintf(stderr, "GOT button %d, %d at (%d %d)\n", b, m, x, y);
+	firechar((unsigned char *)f->rgb8_buffer, f->w, f->h);
+	f->changed = 1;
 }
 
 void my_motion_handler(struct FTR *f, int h, int m, int x, int y)
 {
 	fprintf(stderr, "GOT motion %d, %d at (%d %d)\n", h, m, x, y);
+	firechar((unsigned char *)f->rgb8_buffer, f->w, f->h);
+	f->changed = 1;
 }
 
 void my_resize_handler(struct FTR *f, int x, int y, int w, int d)

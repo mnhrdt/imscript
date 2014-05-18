@@ -95,3 +95,14 @@ int main_fire(void)
 	ftr_set_handler(f, "key", ftr_handler_exit_on_ESC);
 	return ftr_loop_run(f);
 }
+
+
+
+
+// Two modes of interaction:
+// 1. procedural (actions explicitly called by the programmer)
+// 2. event-based (actions triggered by events: mouse  click, screen refresh)
+//
+
+
+// pensem-ho en abstracte... ¿com ens agradaria que fos?
