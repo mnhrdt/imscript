@@ -1,5 +1,25 @@
 // c99 -O3 xhw.c -lX11
 
+#define _POSIX_C_SOURCE 199309L
+#include <assert.h>
+#include <unistd.h>
+#include <time.h>
+double seconds(void)
+{
+	static int initialized = 0;
+	static time_t first_seconds;
+	struct timespec t[1];
+	if (!initialized) {
+		clock_gettime(CLOCK_REALTIME, t);
+		first_seconds = t->tv_sec;
+		initialized = 1;
+	}
+	clock_gettime(CLOCK_REALTIME, t);
+	assert(t->tv_sec >= first_seconds);
+	double r = (t->tv_sec - first_seconds) + 1e-9*t->tv_nsec;
+	return r;
+}
+
 #include <X11/Xlib.h>
 #include <X11/Xutil.h> // only for XDestroyImage, that can be easily removed
 #include <X11/XKBlib.h> // only for XkbKeycodeToKeysym
@@ -11,6 +31,7 @@
 
 #include <math.h>
 #include <ctype.h>
+
 
 void firechar(unsigned char *buf, int w, int h);
 
@@ -96,6 +117,8 @@ struct FTR *ftr_new_window(void)
 
 	f->w = 320;
 	f->h = 200;
+	//f->w = 1000;
+	//f->h = 1000;
 	f->max_w = 1000;
 	f->max_h = 1000;
 	int bufsize = 4 * f->max_w * f->max_h;
@@ -258,15 +281,33 @@ int ftr_set_handler(struct FTR *f, char *id, ftr_event_handler_t e)
 
 void firechar(unsigned char *buf, int w, int h)
 {
+	static int cx = 0;
+	cx += 1;
+	if (0 == cx % 100) {
+		double static os = 0;
+		double s = seconds();
+		double dif = s - os;
+		double fps = 100/dif;
+		fprintf(stderr, "CX = %d (%g) {%g} %f FPS\n", cx, s, dif, fps);
+		os = s;
+	}
 	static unsigned char *pal = NULL;
 	if (!pal) {
 		// build palette
 		pal = malloc(3*256);
 		for (int i = 0; i < 256; i++) {
-			pal[3*i+0] = 0;     //blue
-			pal[3*i+2] = i;//i<128?0:2*(i-128); //green
-			pal[3*i+1] = i<128?2*i:255;//i<128?2*i:255;     //red
+			pal[3*i+0] = (1*i)%256;     //blue
+			pal[3*i+1] = (3*i)%256;     //blue
+			pal[3*i+2] = (4*i)%256;     //blue
+			//pal[3*i+0] = (2*i)%256;     //blue
+			//pal[3*i+1] = i<128?0:2*(i-128); //green
+			//pal[3*i+2] = i<128?2*i:255;//i<128?2*i:255;     //red
+			//pal[3*i+1] = i<64?0:2*(i-64);
+			//pal[3*i+2] = i<64?4*i:255;
 		}
+		//for (int i = 128; i <= 255; i++)
+		//for (int l = 0; l < 3; l++)
+		//	pal[3*i+l] = pal[3*(255-i)+l];
 	}
 
 	static float *f = NULL;
@@ -275,6 +316,7 @@ void firechar(unsigned char *buf, int w, int h)
 	if (!f || iw!=w || ih!=h) { iw = w; ih = h; f = malloc(w*h*sizeof*f); }
 	f[0] = 0;
 
+	//if (cx > 2000) return;
 	int num_lines_bottom = 3;
 
 	// draw random values at the bottom
@@ -282,17 +324,18 @@ void firechar(unsigned char *buf, int w, int h)
 	for (int j = 0; j < num_lines_bottom; j++)
 	for (int i = 0; i < w; i++) {
 		//f[p] = sin(0.1*(f[p] + 0.1*(cos(3.14*(i-w/2.0)/w))*sin(rand())));
-		f[p] += 0.3*(cos(3.14*(i-w/2.0)/w))*sin(rand());
+		//f[p] += 0.3*(cos(3.14*(i-w/2.0)/w))*sin(rand());
+		f[p] = fmod(f[p] + 15*(rand()/(1.0+RAND_MAX)),256);
 		p++;
 	}
 
 	// paint pixels by combining lower rows
 	//for (int j = num_lines_bottom; j < h; j++)
-	for (int j = h-1; j > num_lines_bottom; j--)
+	for (int j = h-1; j >= num_lines_bottom-1; j--)
 	for (int i = 0; i < w; i++) {
 		p = j*w+i;
 		f[p] = (1.5*f[p-w] + 1.7 * f[p-2*w+1] + 1.5 * f[p-2*w] + 2.3 * f[p-2*w-1])
-			/7;
+			/7.01;
 	}
 
 	// render with palette
@@ -300,11 +343,11 @@ void firechar(unsigned char *buf, int w, int h)
 	for (int i = 0; i < w; i++)
 	{
 		int iidx = w*(h-j-1) + i;
-		int idx = (unsigned char)(127+100*f[iidx]);
+		int idx = (unsigned char)(f[iidx]/1.2);
 		int pos = w*j + i;
-		buf[4*pos+0] = 255*pal[3*idx+0];
-		buf[4*pos+1] = 255*pal[3*idx+1];
-		buf[4*pos+2] = 255*pal[3*idx+2];
+		buf[4*pos+0] = pal[3*idx+0];
+		buf[4*pos+1] = pal[3*idx+1];
+		buf[4*pos+2] = pal[3*idx+2];
 		buf[4*pos+3] = 255;
 	}
 
