@@ -115,12 +115,12 @@ struct FTR *ftr_new_window(void)
 	if (!f->display)
 		exit(fprintf(stderr, "Cannot open display\n"));
 
-	f->w = 320;
-	f->h = 200;
-	//f->w = 1000;
-	//f->h = 1000;
-	f->max_w = 1000;
-	f->max_h = 1000;
+	//f->w = 320;
+	//f->h = 200;
+	f->w = 1000;
+	f->h = 800;
+	f->max_w = 2000;
+	f->max_h = 2000;
 	int bufsize = 4 * f->max_w * f->max_h;
 	f->rgb8_buffer = malloc(bufsize);
 	memset(f->rgb8_buffer, 0, bufsize);
@@ -162,7 +162,48 @@ struct FTR *ftr_new_window(void)
 	f->handle_resize = NULL;
 	f->do_exit = 0;
 
+	if (1) {
+		XEvent event;
+		while (1) {
+		XNextEvent(f->display, &event);
+		if (event.type != Expose) continue;
+
+		f->ximage = XGetImage(f->display, f->window,
+					0, 0, f->w, f->h, AllPlanes, ZPixmap);
+		if (f->ximage) {
+			if (f->imgupdate) {
+				f->ximage->data = f->rgb8_buffer;
+				f->ximage->width = f->w;
+				f->ximage->height = f->h;
+				f->ximage->bytes_per_line = 0;
+				if (!XInitImage(f->ximage))
+					exit(fprintf(stderr,"e:xinit image\n"));
+				f->imgupdate = 0;
+			}
+			XPutImage(f->display, f->window, f->gc, f->ximage, 0, 0, 0, 0, f->w, f->h);
+		}
+		break;
+		}
+	}
+
 	return f;
+}
+
+void ftr_wait_for_mouse_click(struct FTR *f, int *x, int *y, int *b, int *m)
+{
+	while (1)
+	{
+		XEvent event;
+		XNextEvent(f->display, &event);
+		if (event.type == ButtonPress) {
+			XButtonEvent e = event.xbutton;
+			if (x) *x = e.x;
+			if (y) *y = e.y;
+			if (b) *b = e.button;
+			if (m) *m = e.state;
+			break;
+		}
+	}
 }
 
 int ftr_loop_run(struct FTR *f)
@@ -191,6 +232,9 @@ int ftr_loop_run(struct FTR *f)
 			//XDrawString(f->display, f->window, f->gc,
 			//		50, 12, msg, strlen(msg));
 
+			// TODO : move all this from the event loop
+			// to the new_window function.  Ideally, calling
+			// "new_window" should show a new window.
 			if (!f->ximage && event.type == Expose) {
 				f->ximage = XGetImage(f->display, f->window,
 					0, 0, f->w, f->h, AllPlanes, ZPixmap);
@@ -245,6 +289,7 @@ int ftr_loop_run(struct FTR *f)
 		}
 	}//Xpending
 		//fprintf(stderr, "idle\n");
+		//
 		XLockDisplay(f->display);
 		{
 			event.type = Expose;
@@ -252,8 +297,8 @@ int ftr_loop_run(struct FTR *f)
 			XFlush(f->display);
 		}
 		XUnlockDisplay(f->display);
-	firechar((unsigned char *)f->rgb8_buffer, f->w, f->h);
-	f->changed = 1;
+		firechar((unsigned char *)f->rgb8_buffer, f->w, f->h);
+		f->changed = 1;
 	}
 	XCloseDisplay(f->display);// actually, not needed
 	if (f->ximage) XDestroyImage(f->ximage);
@@ -281,6 +326,7 @@ int ftr_set_handler(struct FTR *f, char *id, ftr_event_handler_t e)
 
 void firechar(unsigned char *buf, int w, int h)
 {
+	// measure time
 	static int cx = 0;
 	cx += 1;
 	if (0 == cx % 100) {
@@ -288,54 +334,61 @@ void firechar(unsigned char *buf, int w, int h)
 		double s = seconds();
 		double dif = s - os;
 		double fps = 100/dif;
-		fprintf(stderr, "CX = %d (%g) {%g} %f FPS\n", cx, s, dif, fps);
+		fprintf(stderr, "CX = %d, %g FPS\n", cx, fps);
 		os = s;
-	}
-	static unsigned char *pal = NULL;
-	if (!pal) {
-		// build palette
-		pal = malloc(3*256);
-		for (int i = 0; i < 256; i++) {
-			pal[3*i+0] = (1*i)%256;     //blue
-			pal[3*i+1] = (3*i)%256;     //blue
-			pal[3*i+2] = (4*i)%256;     //blue
-			//pal[3*i+0] = (2*i)%256;     //blue
-			//pal[3*i+1] = i<128?0:2*(i-128); //green
-			//pal[3*i+2] = i<128?2*i:255;//i<128?2*i:255;     //red
-			//pal[3*i+1] = i<64?0:2*(i-64);
-			//pal[3*i+2] = i<64?4*i:255;
-		}
-		//for (int i = 128; i <= 255; i++)
-		//for (int l = 0; l < 3; l++)
-		//	pal[3*i+l] = pal[3*(255-i)+l];
+
 	}
 
+	// build palette
+	static unsigned char *pal = NULL;
+	if (!pal) {
+		pal = malloc(3*256);
+		for (int i = 0; i < 256; i++) {
+			pal[3*i+0] = ((int)(1.0*255*tan(1.999*pow(i/255.0,0.52))))%256;
+			pal[3*i+1] = ((int)(3.0*255*pow(i/255.0,1.00)))%256;
+			pal[3*i+2] = ((int)(2.0*255*pow(i/255.0,1.00)))%256;
+		}
+	}
+
+	// build buffer
 	static float *f = NULL;
 	static int iw = 0;
 	static int ih = 0;
-	if (!f || iw!=w || ih!=h) { iw = w; ih = h; f = malloc(w*h*sizeof*f); }
+	if (!f || iw!=w || ih!=h) { 
+		iw = w; ih = h; f = malloc(w*h*sizeof*f); 
+		for (int i = 0; i < w*h; i++)
+			f[i] = 104;
+	}
 	f[0] = 0;
 
-	//if (cx > 2000) return;
-	int num_lines_bottom = 3;
+	//if (0 == cx % 100 && f) {
+	//	double avg = 0;
+	//	for (int i = w*h/2; i < w*h; i++)
+	//		avg += f[i];
+	//	avg /= (w*h-w*h/2);
+	//	fprintf(stderr, "\tavg = %g\n", avg);
+	//}
+
+	//if (cx > 300) return;
+	int num_lines_bottom = 5;
 
 	// draw random values at the bottom
 	int p = 0;
 	for (int j = 0; j < num_lines_bottom; j++)
 	for (int i = 0; i < w; i++) {
-		//f[p] = sin(0.1*(f[p] + 0.1*(cos(3.14*(i-w/2.0)/w))*sin(rand())));
-		//f[p] += 0.3*(cos(3.14*(i-w/2.0)/w))*sin(rand());
 		f[p] = fmod(f[p] + 15*(rand()/(1.0+RAND_MAX)),256);
 		p++;
 	}
 
 	// paint pixels by combining lower rows
-	//for (int j = num_lines_bottom; j < h; j++)
-	for (int j = h-1; j >= num_lines_bottom-1; j--)
+	for (int j = h-3; j >= num_lines_bottom; j--)
 	for (int i = 0; i < w; i++) {
 		p = j*w+i;
-		f[p] = (1.5*f[p-w] + 1.7 * f[p-2*w+1] + 1.5 * f[p-2*w] + 2.3 * f[p-2*w-1])
-			/7.01;
+		f[p+2*w+1] = (1.5*f[p-3*w] + 1.7 * f[p-2*w+1] 
+				+ 1.5 * f[p-4*w] + 1.9 * f[p-3*w-1]
+				+ 1.0 * f[p-1*w-2]
+				+1.9 * f[p-4*w+1]
+			) / 9.51;
 	}
 
 	// render with palette
@@ -343,32 +396,13 @@ void firechar(unsigned char *buf, int w, int h)
 	for (int i = 0; i < w; i++)
 	{
 		int iidx = w*(h-j-1) + i;
-		int idx = (unsigned char)(f[iidx]/1.2);
+		int idx = (unsigned char)(f[iidx]/1.25);
 		int pos = w*j + i;
 		buf[4*pos+0] = pal[3*idx+0];
 		buf[4*pos+1] = pal[3*idx+1];
 		buf[4*pos+2] = pal[3*idx+2];
 		buf[4*pos+3] = 255;
 	}
-
-	////for (int i = 0; i < w*h*3; i++)
-	////	buf[i] = rand();
-	//int numlines = 3;
-	//for (int j = h - 1; j >= h-numlines-1; j--)
-	//for (int i = 1; i < w; i++)
-	//for (int l = 0; l < 4; l++)
-	//	buf[(j*w+i)*4+l] = (buf[(j*w+i-1)*4+l]+(13.0*(rand()/(1.0+RAND_MAX))));
-
-	//for (int j = h-numlines-1; j >= 0; j--)
-	//for (int i = 0; i < w; i++)
-	//for (int l = 0; l < 4; l++)
-	//{
-	//	float x1 = buf[((j+1)*w+i-1)*4+l];
-	//	float x2 = buf[((j+1)*w+i  )*4+l];
-	//	float x3 = buf[((j+1)*w+i+1)*4+l];
-	//	float g = 0.7*x2 + 0.2*x1 + 0.1*x3;
-	//	buf[(j*w+i)*4+l] = (buf[(j*w+i)*4+l] + g)/2;
-	//}
 }
 
 
@@ -411,6 +445,12 @@ void my_resize_handler(struct FTR *f, int x, int y, int w, int d)
 int main(void)
 {
 	struct FTR *f = ftr_new_window();
+	int m[4] = {0};
+	ftr_wait_for_mouse_click(f, m+0, m+1, NULL, NULL);
+	fprintf(stderr, "got mouse: %d %d %d %d\n", m[0], m[1], m[2], m[3]);
+	ftr_wait_for_mouse_click(f, m+0, m+1, NULL, NULL);
+	fprintf(stderr, "got mouse: %d %d %d %d\n", m[0], m[1], m[2], m[3]);
+	//sleep(1);
 	ftr_set_handler(f, "key", my_key_handler);
 	ftr_set_handler(f, "button", my_button_handler);
 	ftr_set_handler(f, "motion", my_motion_handler);
