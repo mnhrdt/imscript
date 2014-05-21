@@ -1,3 +1,4 @@
+#include "seconds.c"
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
@@ -8,34 +9,26 @@
 
 #include "iio.h"
 
-// read an image into 32-bit BGRA (the "native" X format)
-static unsigned char *read_image_uint8_argb(char *fname, int *w, int *h)
+
+static unsigned char *read_image_uint8_rgb(char *fname, int *w, int *h)
 {
 	int pd;
 	unsigned char *x = iio_read_image_uint8_vec(fname, w, h, &pd);
-	if (pd == 4) return x;
-	unsigned char *y = malloc(4**w**h);
+	if (pd == 3) return x;
+	unsigned char *y = malloc(3**w**h);
 	for (int i = 0; i < *w**h; i++) {
-		y[4*i+3] = 255;
 		switch(pd) {
 		case 1:
-			y[4*i+0] = y[4*i+1] = y[4*i+2] = x[i];
+			y[3*i+0] = y[3*i+1] = y[3*i+2] = x[i];
 			break;
 		case 2:
-			y[4*i+0] = x[2*i+1];
-			y[4*i+1] = y[4*i+2] = y[4*i+3] = x[2*i+0];
-			break;
-		case 3:
-			y[4*i+0] = x[3*i+2];
-			y[4*i+1] = x[3*i+1];
-			y[4*i+2] = x[3*i+0];
-			y[4*i+3] = 255;
-			//for (int l = 0; l < 3; l++)
-			//	y[4*i+(3-l)] = x[pd*i+l];
+			y[3*i+0] = x[2*i+0];
+			y[3*i+1] = y[3*i+2] = x[2*i+1];
 			break;
 		default:
+			assert(pd > 3);
 			for (int l = 0; l < 3; l++)
-				y[4*i+l] = x[pd*i+l];
+				y[3*i+l] = x[pd*i+l];
 			break;
 		}
 	}
@@ -43,21 +36,16 @@ static unsigned char *read_image_uint8_argb(char *fname, int *w, int *h)
 	return y;
 }
 
-static void write_imnage_uint8_argb(char *fname, unsigned char *x, int w, int h)
+static void write_image_uint8_rgb(char *fname, unsigned char *x, int w, int h)
 {
-	unsigned char *t = malloc(3*w*h);
-	for (int i = 0; i < w*h; i++) {
-		t[3*i+0] = x[4*i+2];
-		t[3*i+1] = x[4*i+1];
-		t[3*i+2] = x[4*i+0];
-	}
-	iio_save_image_uint8_vec(fname, t, w, h, 3);
-	free(t);
+	iio_save_image_uint8_vec(fname, x, w, h, 3);
 }
 
 
+// simple image viewer
 int main_viewimage(int c, char *v[])
 {
+	// process input arguments
 	if (c != 2 && c != 1) {
 		fprintf(stderr, "usage:\n\t%s [image]\n", *v);
 		//                          0  1
@@ -65,39 +53,25 @@ int main_viewimage(int c, char *v[])
 	}
 	char *filename_in = c > 1 ? v[1] : "-";
 
+	// read image
 	int w, h;
-	unsigned char *x = read_image_uint8_argb(filename_in, &w, &h);
+	unsigned char *x = read_image_uint8_rgb(filename_in, &w, &h);
 
-	struct FTR f = ftr_new_window_with_image_uint8_argb(x, w, h);
-	//ftr_change_title(&f, filename_in);
+	// show image in window
+	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
 	int r = ftr_loop_run(&f);
+
+	// cleanup and exit (optional)
 	free(x);
+	ftr_close(&f);
 	return r;
 }
 
-//int main_viewimage2(int c, char *v[])
-//{
-//	if (c != 2 && c != 1) {
-//		fprintf(stderr, "usage:\n\t%s [image]\n", *v);
-//		//                          0  1
-//		return 1;
-//	}
-//	char *filename_in = c > 1 ? v[1] : "-";
-//
-//	int w, h;
-//	unsigned char *x = read_image_uint8_argb(filename_in, &w, &h);
-//
-//	struct FTR f = ftr_new_window(x, w, h);
-//
-//	int r = ftr_loop_run(&f);
-//	free(x);
-//	return r;
-//}
 
 #define BAD_MIN(a,b) a<b?a:b
 #define BAD_MAX(a,b) a>b?a:b
 
-static void do_inline_crop(unsigned char *x, int *w, int *h, int crop[4])
+static void do_inline_crop_rgb(unsigned char *x, int *w, int *h, int crop[4])
 {
 	int from[2], to[2];
 	from[0] = BAD_MIN(crop[0], crop[2]);
@@ -111,15 +85,17 @@ static void do_inline_crop(unsigned char *x, int *w, int *h, int crop[4])
 	{
 		int o_idx = j*ow + i;
 		int i_idx = (j+from[1])* *w + i+from[0];
-		for (int l = 0; l < 4; l++)
-			x[4*o_idx+l] = x[4*i_idx+l];
+		for (int l = 0; l < 3; l++)
+			x[3*o_idx+l] = x[3*i_idx+l];
 	}
 	*w = ow;
 	*h = oh;
 }
 
+// interactive crop
 int main_icrop(int c, char *v[])
 {
+	// process input arguments
 	if (c != 2 && c != 1 && c != 3) {
 		fprintf(stderr, "usage:\n\t%s [in [out]]\n", *v);
 		//                          0  1   2
@@ -128,24 +104,34 @@ int main_icrop(int c, char *v[])
 	char *filename_in = c > 1 ? v[1] : "-";
 	char *filename_out = c > 2 ? v[2] : "-";
 
+	// read image
 	int w, h;
-	unsigned char *x = read_image_uint8_argb(filename_in, &w, &h);
+	unsigned char *x = read_image_uint8_rgb(filename_in, &w, &h);
 
-	struct FTR f = ftr_new_window_with_image_uint8_argb(x, w, h);
+	// show image in window
+	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
 
+	// read the two corners of the crop rectangle
 	int crop_param[4];
 	ftr_wait_for_mouse_click(&f, crop_param+0, crop_param+1, NULL, NULL);
 	ftr_wait_for_mouse_click(&f, crop_param+2, crop_param+3, NULL, NULL);
 
-	do_inline_crop(x, &w, &h, crop_param);
+	// perform the crop on the image data
+	do_inline_crop_rgb(x, &w, &h, crop_param);
 
-	write_imnage_uint8_argb(filename_out, x, w, h);
+	// write outpuf file
+	write_image_uint8_rgb(filename_out, x, w, h);
+
+	// cleanup and exit (optional)
+	ftr_close(&f);
 	free(x);
 	return 0;
 }
 
+// print to stdout the coordinates of the first mouse click
 int main_pclick(int c, char *v[])
 {
+	// process input arguments
 	if (c != 2 && c != 1) {
 		fprintf(stderr, "usage:\n\t%s [in] > pos.txt\n", *v);
 		//                          0  1
@@ -153,35 +139,56 @@ int main_pclick(int c, char *v[])
 	}
 	char *filename_in = c > 1 ? v[1] : "-";
 
+	// read image
 	int w, h;
-	unsigned char *x = read_image_uint8_argb(filename_in, &w, &h);
+	unsigned char *x = read_image_uint8_rgb(filename_in, &w, &h);
 
-	struct FTR f = ftr_new_window_with_image_uint8_argb(x, w, h);
+	// show image on window
+	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
 
+	// get the first mouse click
 	int pos[2];
 	ftr_wait_for_mouse_click(&f, pos+0, pos+1, NULL, NULL);
+
+	// close the window
 	ftr_close(&f);
 
+	// print the coordinates to stdout
 	printf("%d %d\n", pos[0], pos[1]);
 
+	// cleanup and exit (optional)
 	free(x);
 	return 0;
 }
 
+
 static void draw_random(struct FTR *f, int x, int y, int k, int m)
 {
-	for (int i = 0; i < f->w * f->h * 4; i++)
-		f->argb[i] = rand()%256;
+	static int cx = 0;
+	cx += 1;
+	if (0 == cx % 100) {
+		static double os = 0;
+		double s = seconds();
+		double dif = s - os;
+		double fps = 100/dif;
+		fprintf(stdout, "CX = %d\t%g FPS\n", cx++, fps);
+		os = s;
+	}
+
+	f->rgb[0] = (512341*cx)%256;
+	for (int i = 1; i < f->w * f->h * 3; i++)
+		f->rgb[i] = (223+f->rgb[i-1]*912359+1234567*i+54321*cx)%256;
 	f->changed = 1;
 }
 
+// display an animation
 int main_fire(int c, char *v[])
 {
 	int w = 800;
 	int h = 600;
-	unsigned char *x = malloc(4*w*h);
+	unsigned char *x = malloc(3*w*h);
 
-	struct FTR f = ftr_new_window_with_image_uint8_argb(x, w, h);
+	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
 	ftr_set_handler(&f, "idle", draw_random);
 	ftr_loop_run(&f);
 

@@ -14,7 +14,7 @@
 struct _FTR {
 	// state
 	int w, h, max_w, max_h;
-	unsigned char *argb;
+	unsigned char *rgb;
 	int do_exit;
 	int changed;
 
@@ -102,7 +102,7 @@ struct FTR ftr_new_window(void)
 	f->h = 200;
 	f->max_w = 2000;
 	f->max_h = 2000;
-	f->argb = malloc(f->max_w * f->max_h * 4);
+	f->rgb = malloc(f->max_w * f->max_h * 3);
 
 	int s = DefaultScreen(f->display);
 	int white = WhitePixel(f->display, s);
@@ -144,7 +144,7 @@ struct FTR ftr_new_window(void)
 	return *(struct FTR *)f;
 }
 
-struct FTR ftr_new_window_with_image_uint8_argb(unsigned char *x, int w, int h)
+struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 {
 	struct _FTR f[1];
 
@@ -156,9 +156,9 @@ struct FTR ftr_new_window_with_image_uint8_argb(unsigned char *x, int w, int h)
 	f->h = h;
 	f->max_w = w;
 	f->max_h = h;
-	f->argb = malloc(f->max_w * f->max_h * 4);
-	for (int i = 0; i < 4*w*h; i++)
-		f->argb[i] = x[i];
+	f->rgb = malloc(f->max_w * f->max_h * 3);
+	for (int i = 0; i < 3*w*h; i++)
+		f->rgb[i] = x[i];
 
 	int s = DefaultScreen(f->display);
 	int white = WhitePixel(f->display, s);
@@ -203,7 +203,7 @@ void ftr_close(struct FTR *ff)
 {
 	struct _FTR *f = (void*)ff;
 	if (f->ximage) XDestroyImage(f->ximage);
-	else free(f->argb);
+	if (f->rgb) free(f->rgb);
 	XCloseDisplay(f->display);
 }
 
@@ -247,12 +247,13 @@ static void process_next_event(struct FTR *ff)
 				f->imgupdate = 0;
 			}
 			for (int i = 0; i < f->w*f->h; i++) {
-				f->ximage->data[4*i+0] = f->argb[4*i+0];
-				f->ximage->data[4*i+1] = f->argb[4*i+1];
-				f->ximage->data[4*i+2] = f->argb[4*i+2];
-				f->ximage->data[4*i+3] = f->argb[4*i+3];
+				f->ximage->data[4*i+0] = f->rgb[3*i+2];
+				f->ximage->data[4*i+1] = f->rgb[3*i+1];
+				f->ximage->data[4*i+2] = f->rgb[3*i+0];
+				f->ximage->data[4*i+3] = 255;
 			}
-			XPutImage(f->display, f->window, f->gc, f->ximage, 0, 0, 0, 0, f->w, f->h);
+			XPutImage(f->display, f->window, f->gc, f->ximage,
+						0, 0, 0, 0, f->w, f->h);
 		}
 
 	}

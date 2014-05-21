@@ -8,8 +8,9 @@ typedef void (*ftr_event_handler_t)(struct FTR*,int,int,int,int);
 
 // window management
 struct FTR ftr_new_window(void);
-struct FTR ftr_new_window_and_malloc_buffer(int w, int h);
-struct FTR ftr_new_window_with_image_uint8_argb(unsigned char *i, int w, int h);
+//struct FTR ftr_new_window_and_malloc_buffer(int w, int h);
+struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *i, int w, int h);
+//struct FTR ftr_new_window_with_image_uint8_argb(unsigned char *i, int w, int h);
 void ftr_change_title(struct FTR *f, char *title);
 void ftr_close(struct FTR *f);
 
@@ -34,7 +35,7 @@ int ftr_set_handler(struct FTR *f, char *id, ftr_event_handler_t e);
 struct FTR {
 	// state
 	int w, h, max_w, max_h;
-	unsigned char *argb;
+	unsigned char *rgb;
 	int do_exit;
 	int changed;
 
