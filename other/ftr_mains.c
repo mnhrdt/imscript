@@ -180,9 +180,12 @@ int main_fire(int c, char *v[])
 	int w = 800;
 	int h = 600;
 	unsigned char *x = malloc(4*w*h);
+
 	struct FTR f = ftr_new_window_with_image_uint8_argb(x, w, h);
-	f.handle_idle = draw_random;
+	ftr_set_handler(&f, "idle", draw_random);
 	ftr_loop_run(&f);
+
+	ftr_close(&f);
 	free(x);
 	return 0;
 }
@@ -193,7 +196,8 @@ int main(int c, char *v[])
 	if (c < 2) return fprintf(stderr, "name a main\n");
 	else if (0 == strcmp(v[1], "viewimage")) f = main_viewimage;
 	else if (0 == strcmp(v[1], "icrop"))     f = main_icrop;
-	else if (0 == strcmp(v[1], "pclick"))     f = main_pclick;
+	else if (0 == strcmp(v[1], "pclick"))    f = main_pclick;
+	else if (0 == strcmp(v[1], "fire"))      f = main_fire;
 	//else if (0 == strcmp(*v, "simplest"))  f = main_simplest;
 	//else if (0 == strcmp(*v, "simplest2")) f = main_simplest2;
 	else return fprintf(stderr, "bad main \"%s\"\n", v[1]);

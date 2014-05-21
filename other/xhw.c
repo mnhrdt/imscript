@@ -298,8 +298,9 @@ int ftr_loop_run(struct FTR *f)
 		//
 		XLockDisplay(f->display);
 		{
-			event.type = Expose;
-			XSendEvent(f->display, f->window, 0,NoEventMask, &event);
+			XEvent eee;
+			eee.type = Expose;
+			XSendEvent(f->display, f->window, 0,NoEventMask, &eee);
 			XFlush(f->display);
 		}
 		XUnlockDisplay(f->display);
