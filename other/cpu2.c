@@ -97,8 +97,9 @@ void set_up_global_state(void)
 	e->pw = e->w < e->max_pw ? e->w : e->max_pw;
 	e->ph = e->h < e->max_ph ? e->h : e->max_ph;
 
-	e->px = 0;
-	e->py = 0;
+	e->px = e->pw < e->w ? (e->w - e->pw)/2: 0;
+	e->px = e->ph < e->h ? (e->h - e->ph)/2: 0;
+
 	//e->a = 1;
 	//e->b = 0;
 	e->qmin = 0;
@@ -186,7 +187,7 @@ void handle_keyboard(unsigned char key,int x, int y)
 // event: special key (arrow, function, etc)
 void handle_keyboard_special(int key, int x, int y)
 {
-	//fprintf(stderr, "special key %d (%d %d)\n", key, x, y);
+	fprintf(stderr, "special key %d (%d %d)\n", key, x, y);
 
 	int d = 1 * (1 << (glutGetModifiers()*2));
 
