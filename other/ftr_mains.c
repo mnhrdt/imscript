@@ -146,15 +146,15 @@ int main_icrop(int c, char *v[])
 
 int main_pclick(int c, char *v[])
 {
-	//if (c != 2 && c != 1) {
-	//	fprintf(stderr, "usage:\n\t%s [in] > pos.txt\n", *v);
-	//	//                          0  1
-	//	return 1;
-	//}
-	//char *filename_in = c > 1 ? v[1] : "-";
+	if (c != 2 && c != 1) {
+		fprintf(stderr, "usage:\n\t%s [in] > pos.txt\n", *v);
+		//                          0  1
+		return 1;
+	}
+	char *filename_in = c > 1 ? v[1] : "-";
 
 	int w, h;
-	unsigned char *x = read_image_uint8_argb("-", &w, &h);
+	unsigned char *x = read_image_uint8_argb(filename_in, &w, &h);
 
 	struct FTR f = ftr_new_window_with_image_uint8_argb(x, w, h);
 
@@ -164,6 +164,25 @@ int main_pclick(int c, char *v[])
 
 	printf("%d %d\n", pos[0], pos[1]);
 
+	free(x);
+	return 0;
+}
+
+static void draw_random(struct FTR *f, int x, int y, int k, int m)
+{
+	for (int i = 0; i < f->w * f->h * 4; i++)
+		f->argb[i] = rand()%256;
+	f->changed = 1;
+}
+
+int main_fire(int c, char *v[])
+{
+	int w = 800;
+	int h = 600;
+	unsigned char *x = malloc(4*w*h);
+	struct FTR f = ftr_new_window_with_image_uint8_argb(x, w, h);
+	f.handle_idle = draw_random;
+	ftr_loop_run(&f);
 	free(x);
 	return 0;
 }

@@ -34,7 +34,7 @@ int ftr_set_handler(struct FTR *f, char *id, ftr_event_handler_t e);
 struct FTR {
 	// state
 	int w, h, max_w, max_h;
-	char *argb;
+	unsigned char *argb;
 	int do_exit;
 	int changed;
 

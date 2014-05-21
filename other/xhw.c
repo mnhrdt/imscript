@@ -241,13 +241,19 @@ int ftr_loop_run(struct FTR *f)
 			}
 			if (f->ximage) {
 				if (f->imgupdate) {
-				f->ximage->data = f->rgb8_buffer;
+				//f->ximage->data = f->rgb8_buffer;
 				f->ximage->width = f->w;
 				f->ximage->height = f->h;
 				f->ximage->bytes_per_line = 0;
 				if (!XInitImage(f->ximage))
 					exit(fprintf(stderr,"e:xinit image\n"));
 				f->imgupdate = 0;
+				}
+				for (int i = 0; i < f->w*f->h; i++) {
+					f->ximage->data[4*i+0] = f->rgb8_buffer[4*i+0];
+					f->ximage->data[4*i+1] = f->rgb8_buffer[4*i+1];
+					f->ximage->data[4*i+2] = f->rgb8_buffer[4*i+2];
+					f->ximage->data[4*i+3] = f->rgb8_buffer[4*i+3];
 				}
 				XPutImage(f->display, f->window, f->gc, f->ximage, 0, 0, 0, 0, f->w, f->h);
 			}
