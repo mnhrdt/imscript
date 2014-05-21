@@ -1,5 +1,8 @@
+// cc99 -Ofast ftr_mains.c ftr_x11.c iio.o -o fm -ltiff -lpng -lm -lX11 -lrt
+
 #include "seconds.c"
 #include <assert.h>
+#include <math.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -65,6 +68,28 @@ int main_viewimage(int c, char *v[])
 	free(x);
 	ftr_close(&f);
 	return r;
+}
+
+// even simpler
+int main_viewimage0(int c, char *v[])
+{
+	// process input arguments
+	if (c != 2 && c != 1) {
+		fprintf(stderr, "usage:\n\t%s [image]\n", *v);
+		//                          0  1
+		return 1;
+	}
+	char *filename_in = c > 1 ? v[1] : "-";
+
+	// read image
+	int w, h;
+	unsigned char *x = read_image_uint8_rgb(filename_in, &w, &h);
+
+	// show image in window
+	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
+
+	sleep(4);
+	return 42;
 }
 
 
@@ -182,7 +207,7 @@ static void draw_random(struct FTR *f, int x, int y, int k, int m)
 }
 
 // display an animation
-int main_fire(int c, char *v[])
+int main_random(int c, char *v[])
 {
 	int w = 800;
 	int h = 600;
@@ -197,13 +222,120 @@ int main_fire(int c, char *v[])
 	return 0;
 }
 
+static float lstep(float a, float b, float t, float x)
+{
+	if (x < a) return 0;
+	if (x > b) return t;
+	return t*(x-a)/(b-a);
+}
+
+static float fbound(float a, float b, float x)
+{
+	if (x < a) return a;
+	if (x > b) return b;
+	return x;
+}
+
+static void draw_fire(struct FTR *f, int x, int y, int k, int m)
+{
+	// measure time
+	static int cx = 0;
+	cx += 1;
+	if (0 == cx % 100) {
+		static double os = 0;
+		double s = seconds();
+		double dif = s - os;
+		double fps = 100/dif;
+		fprintf(stdout, "CX = %d\t%g FPS\n", cx++, fps);
+		os = s;
+	}
+
+	// build palette
+	static unsigned char *pal = NULL;
+	if (!pal) {
+		pal = malloc(3*256);
+		for (int i = 0; i < 256; i++) {
+			pal[3*i+0] = lstep(0,105,255,i);
+			pal[3*i+1] = lstep(60,120,255,i);
+			pal[3*i+2] = lstep(150,160,255,i);
+		}
+	}
+
+	int num_lines_bottom = 5;
+	int num_lines_hidden = 25;
+
+	// build buffer
+	static float *t = NULL;
+	static int w = 0;
+	static int h = 0;
+	if (!f || w != f->w || h != f->h+num_lines_hidden) { 
+		w = f->w;
+		h = f->h + num_lines_hidden;
+		t = malloc(w * h * sizeof*f); 
+		for (int i = 0; i < w*h; i++)
+			t[i] = 104;
+	}
+	t[0] = 0;
+
+
+	// draw random values at the bottom
+	int p = 0;
+	int rfac = cx < 75 ? 75 : 10;
+	for (int j = 0; j < num_lines_bottom; j++)
+	for (int i = 0; i < w; i++) {
+		t[p] = fmod(t[p] + rfac*(rand()/(1.0+RAND_MAX)),256);
+		p++;
+	}
+
+	// paint pixels by combining lower rows
+	for (int j = h-1; j >= num_lines_bottom; j--)
+	for (int i = 0; i < w; i++) {
+		p = j*w+i;
+		t[p+2*w+1] = (1.5*t[p-3*w] + 1.7 * t[p-2*w+1] 
+				+ 1.5 * t[p-4*w] + 1.9 * t[p-3*w-1]
+				+ 1.0 * t[p-1*w-2]
+				+1.9 * t[p-4*w+1]
+			) / 9.51;
+	}
+
+	// render with palette
+	for (int j = 0; j < h-num_lines_hidden; j++)
+	for (int i = 0; i < w; i++)
+	{
+		int iidx = w*(h-j-1) + i;
+		int idx = (unsigned char)(lstep(105,145,255,t[iidx]));
+		int pos = w*j + i;
+		f->rgb[3*pos+0] = pal[3*idx+0];
+		f->rgb[3*pos+1] = pal[3*idx+1];
+		f->rgb[3*pos+2] = pal[3*idx+2];
+	}
+}
+
+// display another animation
+int main_fire(int c, char *v[])
+{
+	int w = 800;
+	int h = 600;
+	unsigned char *x = malloc(3*w*h);
+
+	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
+	ftr_set_handler(&f, "idle", draw_fire);
+	ftr_loop_run(&f);
+
+	ftr_close(&f);
+	free(x);
+	return 0;
+}
+
 int main(int c, char *v[])
 {
 	int (*f)(int,char*[]);
 	if (c < 2) return fprintf(stderr, "name a main\n");
 	else if (0 == strcmp(v[1], "viewimage")) f = main_viewimage;
+	else if (0 == strcmp(v[1], "viewimage0")) f = main_viewimage0;
 	else if (0 == strcmp(v[1], "icrop"))     f = main_icrop;
 	else if (0 == strcmp(v[1], "pclick"))    f = main_pclick;
+	else if (0 == strcmp(v[1], "random"))    f = main_random;
 	else if (0 == strcmp(v[1], "fire"))      f = main_fire;
 	//else if (0 == strcmp(*v, "simplest"))  f = main_simplest;
 	//else if (0 == strcmp(*v, "simplest2")) f = main_simplest2;

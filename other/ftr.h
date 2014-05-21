@@ -39,13 +39,13 @@ struct FTR {
 	int do_exit;
 	int changed;
 
-	// user-supplied handlers
-	ftr_event_handler_t handle_key;
-	ftr_event_handler_t handle_button;
-	ftr_event_handler_t handle_motion;
-	ftr_event_handler_t handle_expose;
-	ftr_event_handler_t handle_resize;
-	ftr_event_handler_t handle_idle;
+	//// user-supplied handlers
+	//ftr_event_handler_t handle_key;
+	//ftr_event_handler_t handle_button;
+	//ftr_event_handler_t handle_motion;
+	//ftr_event_handler_t handle_expose;
+	//ftr_event_handler_t handle_resize;
+	//ftr_event_handler_t handle_idle;
 
 
 	char pad[100];

@@ -12,20 +12,20 @@
 #include "ftr.h"
 
 struct _FTR {
-	// state
+	// visible state
 	int w, h, max_w, max_h;
 	unsigned char *rgb;
 	int do_exit;
 	int changed;
 
-	// user-supplied handlers
+	// user-supplied handlers (not publicly visible)
 	ftr_event_handler_t handle_key;
 	ftr_event_handler_t handle_button;
 	ftr_event_handler_t handle_motion;
 	ftr_event_handler_t handle_expose;
+	ftr_event_handler_t handle_expose2;
 	ftr_event_handler_t handle_resize;
 	ftr_event_handler_t handle_idle;
-
 
 	// X11-related internal data
 	Display *display;
@@ -87,6 +87,12 @@ static void ftr_handler_exit_on_ESC(struct FTR *f, int k, int m, int x,int y)
 	if  (k == 9)
 		f->do_exit = 1;
 }
+
+static void ftr_handler_do_exit(struct FTR *f, int k, int m, int x,int y)
+{
+	f->do_exit = 1;
+}
+
 
 
 // create an open a new window of size 320x200
@@ -196,6 +202,10 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	f->handle_idle = NULL;
 	f->do_exit = 0;
 
+	f->handle_expose2 = ftr_handler_do_exit;
+	ftr_loop_run((struct FTR *)f);
+	f->handle_expose2 = 0;
+
 	return *(struct FTR *)f;
 }
 
@@ -213,8 +223,8 @@ static void process_next_event(struct FTR *ff)
 
 	XEvent event;
 	XNextEvent(f->display, &event);
-	fprintf(stderr, "ev %d\t\"%s\"\n", event.type,
-			event_names[event.type]);
+	//fprintf(stderr, "ev %d\t\"%s\"\n", event.type,
+	//		event_names[event.type]);
 
 	//static int pos = 0;
 	//for (int i = 0; i < 42; i++)
@@ -255,6 +265,8 @@ static void process_next_event(struct FTR *ff)
 			XPutImage(f->display, f->window, f->gc, f->ximage,
 						0, 0, 0, 0, f->w, f->h);
 		}
+		if (f->handle_expose2)
+			f->handle_expose2(ff, 0, 0, 0, 0);
 
 	}
 	if (event.type == KeyPress && f->handle_key)
@@ -323,8 +335,9 @@ int ftr_loop_run(struct FTR *ff)
 	return r;
 }
 
-int ftr_set_handler(struct FTR *f, char *id, ftr_event_handler_t e)
+int ftr_set_handler(struct FTR *ff, char *id, ftr_event_handler_t e)
 {
+	struct _FTR *f = (void*)ff;
 	if (false) ;
 	else if (0 == strcmp(id, "key"))    { f->handle_key    = e; return 0; }
 	else if (0 == strcmp(id, "button")) { f->handle_button = e; return 0; }
