@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include <unistd.h> // only for "fork"
+
 #include <X11/Xlib.h>
 #include <X11/Xutil.h> // only for XDestroyImage, that can be easily removed
 #include <X11/XKBlib.h> // only for XkbKeycodeToKeysym
@@ -15,10 +17,12 @@ struct _FTR {
 	// visible state
 	int w, h, max_w, max_h;
 	unsigned char *rgb;
-	int do_exit;
+	int stop_loop;
 	int changed;
+	void *userdata;
 
-	// user-supplied handlers (not publicly visible)
+
+	// user-supplied handlers (not visible, but common to all backends)
 	ftr_event_handler_t handle_key;
 	ftr_event_handler_t handle_button;
 	ftr_event_handler_t handle_motion;
@@ -28,7 +32,7 @@ struct _FTR {
 	ftr_event_handler_t handle_idle;
 	ftr_event_handler_t handle_idle_toggled;
 
-	// X11-related internal data
+	// X11-only internal data
 	Display *display;
 	Visual *visual;
 	Window window;
@@ -83,82 +87,6 @@ char *event_names[] ={
 "LASTEvent		36"};
 
 
-void ftr_handler_exit_on_ESC(struct FTR *f, int k, int m, int x, int y)
-{
-	if  (k == 9)
-		f->do_exit = 1;
-}
-
-void ftr_handler_do_exit(struct FTR *f, int k, int m, int x, int y)
-{
-	f->do_exit = 1;
-}
-
-void ftr_handler_toggle_idle(struct FTR *ff, int k, int m, int x, int y)
-{
-	struct _FTR *f = (void*)ff;
-	ftr_event_handler_t tmp = f->handle_idle;
-	f->handle_idle = f->handle_idle_toggled;
-	f->handle_idle_toggled = tmp;
-}
-
-
-
-//// create an open a new window of size 320x200
-//struct FTR ftr_new_window(void)
-//{
-//	struct _FTR f[1];
-//
-//	f->display = XOpenDisplay(NULL);
-//	if (!f->display)
-//		exit(fprintf(stderr, "Cannot open display\n"));
-//
-//	f->w = 320;
-//	f->h = 200;
-//	f->max_w = 2000;
-//	f->max_h = 2000;
-//	f->rgb = malloc(f->max_w * f->max_h * 3);
-//
-//	int s = DefaultScreen(f->display);
-//	int white = WhitePixel(f->display, s);
-//	int black = BlackPixel(f->display, s);
-//	f->gc = DefaultGC(f->display, s);
-//	f->visual = DefaultVisual(f->display, s);
-//	f->window = XCreateSimpleWindow(f->display,
-//			RootWindow(f->display, s), 10, 10, f->w, f->h, 1,
-//			black, white);
-//	f->ximage = NULL;
-//	f->imgupdate = 1;
-//
-//	f->changed = 0;
-//
-//	//XSelectInput(f->display, f->window, ExposureMask | KeyPressMask);
-//	XSelectInput(f->display, f->window, (1L<<25)-1-(1L<<7)-ResizeRedirectMask);
-//	//XSelectInput(f->display, f->window, (1L<<25)-1);
-//	//XSelectInput(f->display, f->window, (1L<<25)-1);
-//	//XSelectInput(f->display, f->window,
-//	//	       	ExposureMask
-//	//		| KeyPressMask
-//	//		| ButtonPressMask
-//	//		| PointerMotionMask
-//	//		//| ResizeRedirectMask
-//	//		| StructureNotifyMask
-//	//		);
-//
-//	XMapWindow(f->display, f->window);
-//
-//	f->handle_key = ftr_handler_exit_on_ESC;
-//	f->handle_button = NULL;
-//	f->handle_motion = NULL;
-//	f->handle_expose = NULL;
-//	f->handle_resize = NULL;
-//	f->handle_idle = NULL;
-//	f->handle_idle_toggled = NULL;
-//	f->do_exit = 0;
-//
-//
-//	return *(struct FTR *)f;
-//}
 
 struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 {
@@ -212,9 +140,9 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	f->handle_resize = NULL;
 	f->handle_idle = NULL;
 	f->handle_idle_toggled = NULL;
-	f->do_exit = 0;
+	f->stop_loop = 0;
 
-	f->handle_expose2 = ftr_handler_do_exit;
+	f->handle_expose2 = ftr_handler_stop_loop;
 	ftr_loop_run((struct FTR *)f);
 	f->handle_expose2 = 0;
 
@@ -240,14 +168,8 @@ static void process_next_event(struct FTR *ff)
 
 	if (event.type == Expose || f->changed) {
 		f->changed = 0;
-		//fprintf(stderr, "\texpose event\n");
-		//XFillRectangle(f->display, f->window, f->gc,
-		//		20, 20, f->w - 40, f->h - 40);
-		//XDrawString(f->display, f->window, f->gc,
-		//		50, 12, msg, strlen(msg));
 
 		if (!f->ximage || f->imgupdate) {
-			fprintf(stderr, "\timgupdate\n");
 			if (f->ximage) XDestroyImage(f->ximage);
 			f->ximage = XGetImage(f->display, f->window,
 					0, 0, f->w, f->h, AllPlanes, ZPixmap);
@@ -292,9 +214,9 @@ int ftr_loop_run(struct FTR *ff)
 {
 	struct _FTR *f = (void*)ff;
 
-	while (!f->do_exit)
+	while (!f->stop_loop)
 	{
-		if (XPending(f->display) > 0)
+		if (!f->handle_idle || XPending(f->display) > 0)
 			process_next_event(ff);
 		else if (f->handle_idle) {
 			XEvent ev;
@@ -307,10 +229,51 @@ int ftr_loop_run(struct FTR *ff)
 			f->changed = 1;
 		}
 	}
-	int r = f->do_exit;
-	f->do_exit = 0;
+
+	int r = f->stop_loop;
+	f->stop_loop = 0;
 	return r;
 }
+
+void ftr_fork_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
+{
+	if (!fork())
+	{
+		struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
+		exit(ftr_loop_run(&f));
+	}
+}
+
+void ftr_loop_fork(struct FTR *f)
+{
+	if (!fork())
+		exit(ftr_loop_run(f));
+}
+
+void ftr_handler_exit_on_ESC(struct FTR *f, int k, int m, int x, int y)
+{
+	if  (k == 9)
+		f->stop_loop = 1;
+}
+
+void ftr_handler_stop_loop(struct FTR *f, int k, int m, int x, int y)
+{
+	f->stop_loop = 1;
+}
+
+void ftr_handler_dummy(struct FTR *f, int k, int m, int x, int y)
+{
+}
+
+void ftr_handler_toggle_idle(struct FTR *ff, int k, int m, int x, int y)
+{
+	struct _FTR *f = (void*)ff;
+	ftr_event_handler_t tmp = f->handle_idle;
+	f->handle_idle = f->handle_idle_toggled;
+	f->handle_idle_toggled = tmp;
+}
+
+
 
 int ftr_set_handler(struct FTR *ff, char *id, ftr_event_handler_t e)
 {
@@ -339,11 +302,10 @@ ftr_event_handler_t ftr_get_handler(struct FTR *ff, char *id)
 		(ftr_event_handler_t)NULL;
 }
 
-
 static void handle_click_wait(struct FTR *f, int b, int m, int x, int y)
 {
 	if (b == 1 || b == 2 || b == 3)
-		f->do_exit = 10000*y + x;
+		f->stop_loop = 10000*y + x;
 }
 
 void ftr_wait_for_mouse_click(struct FTR *f, int *x, int *y, int *b, int *m)

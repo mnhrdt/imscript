@@ -92,6 +92,86 @@ int main_viewimage0(int c, char *v[])
 	return 42;
 }
 
+// forking image viewer
+int main_viewimage2(int c, char *v[])
+{
+	// process input arguments
+	if (c != 2 && c != 1) {
+		fprintf(stderr, "usage:\n\t%s [image]\n", *v);
+		//                          0  1
+		return 1;
+	}
+	char *filename_in = c > 1 ? v[1] : "-";
+
+	// read image
+	int w, h;
+	unsigned char *x = read_image_uint8_rgb(filename_in, &w, &h);
+
+	// show image in window
+	ftr_fork_window_with_image_uint8_rgb(x, w, h);
+
+	// cleanup and exit (optional)
+	free(x);
+	return 0;
+}
+
+// simple image viewer
+int main_twoimages(int c, char *v[])
+{
+	// process input arguments
+	if (c != 3) {
+		fprintf(stderr, "usage:\n\t%s image1 image2\n", *v);
+		//                          0 1      2
+		return 1;
+	}
+	char *filename1 = v[1];
+	char *filename2 = v[2];
+
+	// read images
+	int w[2], h[2];
+	unsigned char *x[2];
+	x[0] = read_image_uint8_rgb(filename1, w+0, h+0);
+	x[1] = read_image_uint8_rgb(filename2, w+1, h+1);
+
+	// show image in window
+	struct FTR f[2];
+	f[0] = ftr_new_window_with_image_uint8_rgb(x[0], w[0], h[0]);
+	f[1] = ftr_new_window_with_image_uint8_rgb(x[1], w[1], h[1]);
+
+	sleep(4);
+
+	// cleanup and exit (optional)
+	return 0;
+}
+
+// simple image viewer
+int main_twoimages2(int c, char *v[])
+{
+	// process input arguments
+	if (c != 3) {
+		fprintf(stderr, "usage:\n\t%s image1 image2\n", *v);
+		//                          0 1      2
+		return 1;
+	}
+	char *filename1 = v[1];
+	char *filename2 = v[2];
+
+	// read images
+	int w[2], h[2];
+	unsigned char *x1 = read_image_uint8_rgb(filename1, w+0, h+0);
+	unsigned char *x2 = read_image_uint8_rgb(filename2, w+1, h+1);
+
+	// show image in window
+	ftr_fork_window_with_image_uint8_rgb(x1, w[0], h[0]);
+	ftr_fork_window_with_image_uint8_rgb(x2, w[1], h[1]);
+
+	// cleanup and exit (optional)
+	free(x1);
+	free(x2);
+	return 0;
+}
+
+
 
 #define BAD_MIN(a,b) a<b?a:b
 #define BAD_MAX(a,b) a>b?a:b
@@ -328,6 +408,7 @@ static void draw_minifire(struct FTR *f, int x, int y, int k, int m)
 	if (!f || w != f->w || h != f->h) { 
 		w = f->w;
 		h = f->h;
+		if (t) free(t);
 		t = malloc(w * h * sizeof*t); 
 		for (int i = 0; i < w*h; i++)
 			t[i] = 104;
@@ -374,7 +455,7 @@ static void toggle_idle2(struct FTR *f, int b, int m, int x, int y)
 
 static void fire_resize(struct FTR *f, int b, int m, int x, int y)
 {
-	fprintf(stderr, "resize %d %d %d %d\n", b, m, x, y);
+	fprintf(stderr, "resize %d %d\n", x, y);
 }
 
 // display another animation
@@ -386,7 +467,8 @@ int main_fire(int c, char *v[])
 
 	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
 	ftr_set_handler(&f, "idle", draw_fire);
-	ftr_set_handler(&f, "button", toggle_idle2);
+	//ftr_set_handler(&f, "button", toggle_idle2);
+	ftr_set_handler(&f, "button", ftr_handler_toggle_idle);
 	ftr_set_handler(&f, "resize", fire_resize);
 	ftr_loop_run(&f);
 
@@ -404,6 +486,8 @@ int main_minifire(int c, char *v[])
 
 	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
 	ftr_set_handler(&f, "idle", draw_minifire);
+	//ftr_set_handler(&f, "button", ftr_handler_toggle_idle);
+	ftr_set_handler(&f, "resize", fire_resize);
 	ftr_loop_run(&f);
 
 	ftr_close(&f);
@@ -417,6 +501,9 @@ int main(int c, char *v[])
 	if (c < 2) return fprintf(stderr, "name a main\n");
 	else if (0 == strcmp(v[1], "viewimage")) f = main_viewimage;
 	else if (0 == strcmp(v[1], "viewimage0")) f = main_viewimage0;
+	else if (0 == strcmp(v[1], "viewimage2")) f = main_viewimage2;
+	else if (0 == strcmp(v[1], "twoimages"))     f = main_twoimages;
+	else if (0 == strcmp(v[1], "twoimages2"))     f = main_twoimages2;
 	else if (0 == strcmp(v[1], "icrop"))     f = main_icrop;
 	else if (0 == strcmp(v[1], "pclick"))    f = main_pclick;
 	else if (0 == strcmp(v[1], "random"))    f = main_random;
