@@ -1,16 +1,9 @@
-
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
-
-#include <unistd.h> // only for "fork"
-
 #include <X11/Xlib.h>
 #include <X11/Xutil.h> // only for XDestroyImage, that can be easily removed
-#include <X11/XKBlib.h> // only for XkbKeycodeToKeysym
-
+#include <unistd.h> // only for "fork"
 #include "ftr.h"
 
 struct _FTR {
@@ -20,7 +13,6 @@ struct _FTR {
 	int stop_loop;
 	int changed;
 	void *userdata;
-
 
 	// user-supplied handlers (not visible, but common to all backends)
 	ftr_event_handler_t handle_key;
@@ -92,18 +84,18 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 {
 	struct _FTR f[1];
 
-	f->display = XOpenDisplay(NULL);
-	if (!f->display)
-		exit(fprintf(stderr, "Cannot open display\n"));
-
+	// general
 	f->w = w;
 	f->h = h;
 	f->max_w = 2000;
 	f->max_h = 2000;
 	f->rgb = malloc(f->max_w * f->max_h * 3);
 	for (int i = 0; i < 3*w*h; i++)
-		f->rgb[i] = x[i];
+		f->rgb[i] = x ? x[i] : 0;
 
+	// specific to X11 backend
+	f->display = XOpenDisplay(NULL);
+	if (!f->display) exit(fprintf(stderr, "Cannot open display\n"));
 	int s = DefaultScreen(f->display);
 	int white = WhitePixel(f->display, s);
 	int black = BlackPixel(f->display, s);
@@ -116,10 +108,9 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	f->ximage = NULL;
 	f->imgupdate = 1;
 
-	f->changed = 0;
+	XSelectInput(f->display, f->window, (1L<<25)-1-(1L<<7)-ResizeRedirectMask);
 
 	//XSelectInput(f->display, f->window, ExposureMask | KeyPressMask);
-	XSelectInput(f->display, f->window, (1L<<25)-1-(1L<<7)-ResizeRedirectMask);
 	//XSelectInput(f->display, f->window, (1L<<25)-1);
 	//XSelectInput(f->display, f->window, (1L<<25)-1);
 	//XSelectInput(f->display, f->window,
@@ -133,6 +124,7 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 
 	XMapWindow(f->display, f->window);
 
+	// general again
 	f->handle_key = ftr_handler_exit_on_ESC;
 	f->handle_button = NULL;
 	f->handle_motion = NULL;
@@ -141,7 +133,9 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	f->handle_idle = NULL;
 	f->handle_idle_toggled = NULL;
 	f->stop_loop = 0;
+	f->changed = 0;
 
+	// run the loop until the first expose
 	f->handle_expose2 = ftr_handler_stop_loop;
 	ftr_loop_run((struct FTR *)f);
 	f->handle_expose2 = 0;
@@ -149,10 +143,15 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	return *(struct FTR *)f;
 }
 
+struct FTR ftr_new_window(int w, int h)
+{
+	return ftr_new_window_with_image_uint8_rgb(NULL, w, h);
+}
+
 void ftr_close(struct FTR *ff)
 {
 	struct _FTR *f = (void*)ff;
-	if (f->ximage) XDestroyImage(f->ximage);
+	if (f->ximage) f->ximage->f.destroy_image(f->ximage);
 	if (f->rgb) free(f->rgb);
 	XCloseDisplay(f->display);
 }
@@ -170,7 +169,7 @@ static void process_next_event(struct FTR *ff)
 		f->changed = 0;
 
 		if (!f->ximage || f->imgupdate) {
-			if (f->ximage) XDestroyImage(f->ximage);
+			if (f->ximage) f->ximage->f.destroy_image(f->ximage);
 			f->ximage = XGetImage(f->display, f->window,
 					0, 0, f->w, f->h, AllPlanes, ZPixmap);
 			f->imgupdate = 0;
@@ -199,12 +198,13 @@ static void process_next_event(struct FTR *ff)
 		XMotionEvent e = event.xmotion;
 		f->handle_motion(ff, e.is_hint, e.state, e.x, e.y);
 	}
-	if (event.type == ConfigureNotify && f->handle_resize) {
+	if (event.type == ConfigureNotify) {
 		XConfigureEvent e = event.xconfigure;
 		if (f->w != e.width || f->h != e.height) {
 			f->w = e.width < f->max_w ? e.width : f->max_w;
 			f->h = e.height< f->max_h ? e.height : f->max_h;
-			f->handle_resize(ff, 0, 0, f->w, f->h);
+			if (f->handle_resize)
+				f->handle_resize(ff, 0, 0, f->w, f->h);
 			f->imgupdate = 1;
 		}
 	}
@@ -273,12 +273,10 @@ void ftr_handler_toggle_idle(struct FTR *ff, int k, int m, int x, int y)
 	f->handle_idle_toggled = tmp;
 }
 
-
-
 int ftr_set_handler(struct FTR *ff, char *id, ftr_event_handler_t e)
 {
 	struct _FTR *f = (void*)ff;
-	if (false) ;
+	if (0) ;
 	else if (0 == strcmp(id, "key"))    { f->handle_key    = e; return 0; }
 	else if (0 == strcmp(id, "button")) { f->handle_button = e; return 0; }
 	else if (0 == strcmp(id, "motion")) { f->handle_motion = e; return 0; }
@@ -291,7 +289,7 @@ int ftr_set_handler(struct FTR *ff, char *id, ftr_event_handler_t e)
 ftr_event_handler_t ftr_get_handler(struct FTR *ff, char *id)
 {
 	struct _FTR *f = (void*)ff;
-	if (false) ;
+	if (0) ;
 	else if (0 == strcmp(id, "key"))    return f->handle_key   ;
 	else if (0 == strcmp(id, "button")) return f->handle_button;
 	else if (0 == strcmp(id, "motion")) return f->handle_motion;

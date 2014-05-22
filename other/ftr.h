@@ -16,6 +16,7 @@ struct FTR {
 typedef void (*ftr_event_handler_t)(struct FTR*,int,int,int,int);
 
 // window management
+struct FTR ftr_new_window(int w, int h);
 struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *i, int w, int h);
 void ftr_fork_window_with_image_uint8_rgb(unsigned char *i, int w, int h);
 void ftr_change_title(struct FTR *f, char *title);
