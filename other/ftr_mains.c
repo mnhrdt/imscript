@@ -189,6 +189,7 @@ int main_pclick(int c, char *v[])
 
 static void draw_random(struct FTR *f, int x, int y, int k, int m)
 {
+	// benchmarking control
 	static int cx = 0;
 	cx += 1;
 	if (0 == cx % 100) {
@@ -200,6 +201,7 @@ static void draw_random(struct FTR *f, int x, int y, int k, int m)
 		os = s;
 	}
 
+	// actual drawing
 	f->rgb[0] = (512341*cx)%256;
 	for (int i = 1; i < f->w * f->h * 3; i++)
 		f->rgb[i] = (223+f->rgb[i-1]*912359+1234567*i+54321*cx)%256;
@@ -222,6 +224,7 @@ int main_random(int c, char *v[])
 	return 0;
 }
 
+
 static float lstep(float a, float b, float t, float x)
 {
 	if (x < a) return 0;
@@ -229,12 +232,6 @@ static float lstep(float a, float b, float t, float x)
 	return t*(x-a)/(b-a);
 }
 
-static float fbound(float a, float b, float x)
-{
-	if (x < a) return a;
-	if (x > b) return b;
-	return x;
-}
 
 static void draw_fire(struct FTR *f, int x, int y, int k, int m)
 {
@@ -268,15 +265,16 @@ static void draw_fire(struct FTR *f, int x, int y, int k, int m)
 	static float *t = NULL;
 	static int w = 0;
 	static int h = 0;
-	if (!f || w != f->w || h != f->h+num_lines_hidden) { 
+	if (!f || w != f->w || h != f->h + num_lines_hidden) { 
 		w = f->w;
 		h = f->h + num_lines_hidden;
+		if (t) free(t);
 		t = malloc(w * h * sizeof*f); 
 		for (int i = 0; i < w*h; i++)
 			t[i] = 104;
+		cx = 0;
+		f->changed = 1;
 	}
-	t[0] = 0;
-
 
 	// draw random values at the bottom
 	int p = 0;
@@ -311,6 +309,74 @@ static void draw_fire(struct FTR *f, int x, int y, int k, int m)
 	}
 }
 
+static void draw_minifire(struct FTR *f, int x, int y, int k, int m)
+{
+	// build palette
+	unsigned char pal[3*256];
+	for (int i = 0; i < 256; i++) {
+		pal[3*i+0] = -7*i;
+		pal[3*i+1] = 5*i;;
+		pal[3*i+2] = 3*i;
+	}
+
+	int num_lines_bottom = 5;
+
+	// build buffer
+	static float *t = NULL;
+	static int w = 0;
+	static int h = 0;
+	if (!f || w != f->w || h != f->h) { 
+		w = f->w;
+		h = f->h;
+		t = malloc(w * h * sizeof*t); 
+		for (int i = 0; i < w*h; i++)
+			t[i] = 104;
+		f->changed = 1;
+	}
+
+	// draw random values at the bottom
+	int p = 0;
+	for (int j = 0; j < num_lines_bottom; j++)
+	for (int i = 0; i < w; i++) {
+		t[p] = fmod(t[p] + 15*(rand()/(1.0+RAND_MAX)),256);
+		p++;
+	}
+
+	// paint pixels by combining lower rows
+	for (int j = h-3; j >= num_lines_bottom; j--)
+	for (int i = 0; i < w; i++) {
+		p = j*w+i;
+		t[p+2*w+1] = (1.5*t[p-3*w] + 1.7 * t[p-2*w+1] 
+				+ 1.5 * t[p-4*w] + 1.9 * t[p-3*w-1]
+				+ 1.0 * t[p-1*w-2]
+				+1.9 * t[p-4*w+1]
+			) / 9.51;
+	}
+
+	// render with palette
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		int idx = (unsigned char)(t[w*(h-j-1) + i]);
+		f->rgb[3*(w*j+i)+0] = pal[3*idx+0];
+		f->rgb[3*(w*j+i)+1] = pal[3*idx+1];
+		f->rgb[3*(w*j+i)+2] = pal[3*idx+2];
+	}
+}
+
+static void toggle_idle2(struct FTR *f, int b, int m, int x, int y)
+{
+	static ftr_event_handler_t prev = NULL;
+	ftr_event_handler_t new = ftr_get_handler(f, "idle");
+	ftr_set_handler(f, "idle", prev);
+	prev = new;
+}
+
+static void fire_resize(struct FTR *f, int b, int m, int x, int y)
+{
+	fprintf(stderr, "resize %d %d %d %d\n", b, m, x, y);
+}
+
 // display another animation
 int main_fire(int c, char *v[])
 {
@@ -320,6 +386,24 @@ int main_fire(int c, char *v[])
 
 	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
 	ftr_set_handler(&f, "idle", draw_fire);
+	ftr_set_handler(&f, "button", toggle_idle2);
+	ftr_set_handler(&f, "resize", fire_resize);
+	ftr_loop_run(&f);
+
+	ftr_close(&f);
+	free(x);
+	return 0;
+}
+
+// display another animation
+int main_minifire(int c, char *v[])
+{
+	int w = 800;
+	int h = 600;
+	unsigned char *x = malloc(3*w*h);
+
+	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
+	ftr_set_handler(&f, "idle", draw_minifire);
 	ftr_loop_run(&f);
 
 	ftr_close(&f);
@@ -337,6 +421,7 @@ int main(int c, char *v[])
 	else if (0 == strcmp(v[1], "pclick"))    f = main_pclick;
 	else if (0 == strcmp(v[1], "random"))    f = main_random;
 	else if (0 == strcmp(v[1], "fire"))      f = main_fire;
+	else if (0 == strcmp(v[1], "minifire"))      f = main_minifire;
 	//else if (0 == strcmp(*v, "simplest"))  f = main_simplest;
 	//else if (0 == strcmp(*v, "simplest2")) f = main_simplest2;
 	else return fprintf(stderr, "bad main \"%s\"\n", v[1]);

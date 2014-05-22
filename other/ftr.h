@@ -21,10 +21,16 @@ void ftr_wait_for_key_depress(struct FTR *f, int *x, int *y, int *k, int *m);
 // event loop
 int ftr_loop_run(struct FTR *f); // returns when the loop is finished
 int ftr_set_handler(struct FTR *f, char *id, ftr_event_handler_t e);
+ftr_event_handler_t ftr_get_handler(struct FTR *f, char *id);
 //int ftr_loop_fork(struct FTR *f); // returns immediately
 
-//// default and example handlers
-//ftr_event_handler ftr_handler_exit_on_ESC;
+// default and example handlers
+//ftr_event_handler_t ftr_handler_exit_on_ESC;
+//ftr_event_handler_t ftr_handler_toggle_idle;
+//ftr_event_handler_t ftr_handler_do_exit;
+void ftr_handler_exit_on_ESC(struct FTR*,int,int,int,int);
+void ftr_handler_toggle_idle(struct FTR*,int,int,int,int);
+void ftr_handler_do_exit(struct FTR*,int,int,int,int);
 
 // convenience functions
 //void ftr_fork_window_with_rgba32_image(unsigned char *buf, int w, int h);
