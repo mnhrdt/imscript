@@ -6,7 +6,7 @@ struct FTR {
 	int stop_loop;
 	int changed;
 
-	void *userdata; // not touched by the library
+	void *userdata; // ignored by the library
 
 	// hidden implementation details
 	char pad[100];
@@ -31,6 +31,7 @@ int ftr_loop_run(struct FTR *f); // returns when the loop is finished
 void ftr_loop_fork(struct FTR *f); // returns immediately, forks a new process
 int ftr_set_handler(struct FTR *f, char *id, ftr_event_handler_t e);
 ftr_event_handler_t ftr_get_handler(struct FTR *f, char *id);
+int ftr_num_pending(struct FTR *f);
 
 // default and example handlers
 void ftr_handler_exit_on_ESC(struct FTR*,int,int,int,int);

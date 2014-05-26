@@ -115,7 +115,7 @@ int main_viewimage2(int c, char *v[])
 	return 0;
 }
 
-// simple image viewer
+// simple image viewer (does not actually work)
 int main_twoimages(int c, char *v[])
 {
 	// process input arguments
@@ -144,7 +144,7 @@ int main_twoimages(int c, char *v[])
 	return 0;
 }
 
-// simple image viewer
+// forking image viewer
 int main_twoimages2(int c, char *v[])
 {
 	// process input arguments
@@ -219,6 +219,85 @@ int main_icrop(int c, char *v[])
 	// read the two corners of the crop rectangle
 	int crop_param[4];
 	ftr_wait_for_mouse_click(&f, crop_param+0, crop_param+1, NULL, NULL);
+	ftr_wait_for_mouse_click(&f, crop_param+2, crop_param+3, NULL, NULL);
+
+	// perform the crop on the image data
+	do_inline_crop_rgb(x, &w, &h, crop_param);
+
+	// write outpuf file
+	write_image_uint8_rgb(filename_out, x, w, h);
+
+	// cleanup and exit (optional)
+	ftr_close(&f);
+	free(x);
+	return 0;
+}
+
+struct icrop2_state {
+	unsigned char *original_image;
+	int step, ox, oy;
+};
+
+void icrop2_motion(struct FTR *f, int b, int m, int x, int y)
+{
+	if (ftr_num_pending(f)) return;
+
+	struct icrop2_state *e = f->userdata;
+	unsigned char *o = e->original_image;
+
+	if (e->step == 0) {
+		e->ox = x;
+		e->oy = y;
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < f->w; i++)
+		for (int l = 0; l < 3; l++)
+		{
+			int idx = 3*(j * f->w + i) + l;
+			f->rgb[idx] = (i>=x && j>=y) ? o[idx] : o[idx]/2;
+		}
+	} else {
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < f->w; i++)
+		for (int l = 0; l < 3; l++)
+		{
+			int idx = 3*(j * f->w + i) + l;
+			f->rgb[idx] = (i>=e->ox && j>=e->oy
+					&& i <= x && j <= y) ?
+				o[idx] : o[idx]/2;
+		}
+	}
+	f->changed = 1;
+}
+
+// interactive crop, just fancier
+int main_icrop2(int c, char *v[])
+{
+	// process input arguments
+	if (c != 2 && c != 1 && c != 3) {
+		fprintf(stderr, "usage:\n\t%s [in [out]]\n", *v);
+		//                          0  1   2
+		return 1;
+	}
+	char *filename_in = c > 1 ? v[1] : "-";
+	char *filename_out = c > 2 ? v[2] : "-";
+
+	// read image
+	int w, h;
+	unsigned char *x = read_image_uint8_rgb(filename_in, &w, &h);
+
+	// show image in window
+	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
+	struct icrop2_state e = {x, 0, 0, 0};
+	f.userdata = &e;
+
+
+	// set handlers
+	ftr_set_handler(&f, "motion", icrop2_motion);
+
+	// read the two corners of the crop rectangle
+	int crop_param[4];
+	ftr_wait_for_mouse_click(&f, crop_param+0, crop_param+1, NULL, NULL);
+	e.step = 1;
 	ftr_wait_for_mouse_click(&f, crop_param+2, crop_param+3, NULL, NULL);
 
 	// perform the crop on the image data
@@ -353,12 +432,11 @@ static void draw_fire(struct FTR *f, int x, int y, int k, int m)
 		for (int i = 0; i < w*h; i++)
 			t[i] = 104;
 		cx = 0;
-		f->changed = 1;
 	}
 
 	// draw random values at the bottom
 	int p = 0;
-	int rfac = cx < 75 ? 75 : 10;
+	int rfac = cx < 75 ? 200 : 10;
 	for (int j = 0; j < num_lines_bottom; j++)
 	for (int i = 0; i < w; i++) {
 		t[p] = fmod(t[p] + rfac*(rand()/(1.0+RAND_MAX)),256);
@@ -461,19 +539,13 @@ static void fire_resize(struct FTR *f, int b, int m, int x, int y)
 // display another animation
 int main_fire(int c, char *v[])
 {
-	int w = 800;
-	int h = 600;
-	unsigned char *x = malloc(3*w*h);
-
-	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
+	struct FTR f = ftr_new_window(800, 600);
 	ftr_set_handler(&f, "idle", draw_fire);
 	//ftr_set_handler(&f, "button", toggle_idle2);
 	ftr_set_handler(&f, "button", ftr_handler_toggle_idle);
 	ftr_set_handler(&f, "resize", fire_resize);
 	ftr_loop_run(&f);
-
 	ftr_close(&f);
-	free(x);
 	return 0;
 }
 
@@ -505,6 +577,7 @@ int main(int c, char *v[])
 	else if (0 == strcmp(v[1], "twoimages"))     f = main_twoimages;
 	else if (0 == strcmp(v[1], "twoimages2"))     f = main_twoimages2;
 	else if (0 == strcmp(v[1], "icrop"))     f = main_icrop;
+	else if (0 == strcmp(v[1], "icrop2"))     f = main_icrop2;
 	else if (0 == strcmp(v[1], "pclick"))    f = main_pclick;
 	else if (0 == strcmp(v[1], "random"))    f = main_random;
 	else if (0 == strcmp(v[1], "fire"))      f = main_fire;

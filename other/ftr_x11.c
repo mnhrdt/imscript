@@ -107,9 +107,7 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 			//white, black);
 	f->ximage = NULL;
 	f->imgupdate = 1;
-
 	XSelectInput(f->display, f->window, (1L<<25)-1-(1L<<7)-ResizeRedirectMask);
-
 	//XSelectInput(f->display, f->window, ExposureMask | KeyPressMask);
 	//XSelectInput(f->display, f->window, (1L<<25)-1);
 	//XSelectInput(f->display, f->window, (1L<<25)-1);
@@ -121,7 +119,6 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	//		//| ResizeRedirectMask
 	//		| StructureNotifyMask
 	//		);
-
 	XMapWindow(f->display, f->window);
 
 	// general again
@@ -233,6 +230,12 @@ int ftr_loop_run(struct FTR *ff)
 	int r = f->stop_loop;
 	f->stop_loop = 0;
 	return r;
+}
+
+int ftr_num_pending(struct FTR *ff)
+{
+	struct _FTR *f = (void*)ff;
+	return XPending(f->display);
 }
 
 void ftr_fork_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
