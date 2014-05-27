@@ -26,6 +26,13 @@ void ftr_close(struct FTR *f);
 void ftr_wait_for_mouse_click(struct FTR *f, int *x, int *y, int *b, int *m);
 void ftr_wait_for_key_depress(struct FTR *f, int *x, int *y, int *k, int *m);
 
+// default and example handlers
+void ftr_handler_exit_on_ESC(struct FTR*,int,int,int,int);
+void ftr_handler_exit_on_ESC_or_q(struct FTR*,int,int,int,int);
+void ftr_handler_toggle_idle(struct FTR*,int,int,int,int);
+void ftr_handler_stop_loop(struct FTR*,int,int,int,int);
+void ftr_handler_dummy(struct FTR*,int,int,int,int);
+
 // event loop
 int ftr_loop_run(struct FTR *f); // returns when the loop is finished
 void ftr_loop_fork(struct FTR *f); // returns immediately, forks a new process
@@ -33,15 +40,6 @@ int ftr_set_handler(struct FTR *f, char *id, ftr_event_handler_t e);
 ftr_event_handler_t ftr_get_handler(struct FTR *f, char *id);
 int ftr_num_pending(struct FTR *f);
 
-// default and example handlers
-void ftr_handler_exit_on_ESC(struct FTR*,int,int,int,int);
-void ftr_handler_toggle_idle(struct FTR*,int,int,int,int);
-void ftr_handler_stop_loop(struct FTR*,int,int,int,int);
-void ftr_handler_dummy(struct FTR*,int,int,int,int);
-
-// convenience functions
-//void ftr_fork_window_with_rgba32_image(unsigned char *buf, int w, int h);
-//void ftr_fork_window_with_rgb32_image(unsigned char *buf, int w, int h);
-//void ftr_fork_window_with_f32_image(float *buf, int w, int h);
-//void ftr_fork_window_with_f32_image_vec(float *buf, int w, int h, int pd);
-
+// forking interface (so far not implemented)
+//void ftr_signal_quit(struct FTR *);
+//void ftr_signal_update(struct FTR *);

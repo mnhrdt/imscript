@@ -1,8 +1,11 @@
+//#include <math.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <X11/Xlib.h>
-#include <X11/Xutil.h> // only for XDestroyImage, that can be easily removed
+//#include <X11/Xutil.h> // only for XDestroyImage, that can be easily removed
+#include <X11/XKBlib.h> // only for XkbKeycodeToKeysym
 #include <unistd.h> // only for "fork"
 #include "ftr.h"
 
@@ -153,6 +156,48 @@ void ftr_close(struct FTR *ff)
 	XCloseDisplay(f->display);
 }
 
+static int keycode_to_ascii(struct _FTR *f, int keycode, int keystate)
+{
+	//fprintf(stderr, "\tkeycode = %d (%d)\n", keycode, keystate);
+	//int key = XKeycodeToKeysym(f->display, keycode, keystate);
+	int key = XkbKeycodeToKeysym(f->display, keycode, 0, keystate);
+	if (keycode == 9)   return 27;    // ascii ESC
+	if (keycode == 119) return 127;   // ascii DEL
+	if (keycode == 22)  return '\b';
+	if (keycode == 23)  return '\t';
+	if (keycode == 36 || keycode == 105) return '\n';
+	return key;
+}
+
+static int do_bound(int a, int b, int x)
+{
+	if (b < a) return do_bound(b, a, x);
+	if (x < a) return a;
+	if (x > b) return b;
+	return x;
+}
+
+//static int do_snap(int a, int b, int x)
+//{
+//	if (b < a) return do_snap(b, a, x);
+//	if (2*x > a+b) return b;
+//	return a;
+//}
+//
+//static void do_doublesnap(int *ox, int *oy, int w, int h, int x, int y)
+//{
+//	if (x < 0) x = 0;
+//	if (y < 0) y = 0;
+//	if (x >= w) x = w-1;
+//	if (y >= h) y = h-1;
+//	int dhor = fmin(x, w - x);
+//	int dver = fmin(y, h - y);
+//	if (dhor < 100 && dver > 100) { x = x<100 ? 0 : w-1; }
+//	if (dver < 100 && dhor > 100) { y = y<100 ? 0 : h-1; }
+//	*ox = x;
+//	*oy = y;
+//}
+
 static void process_next_event(struct FTR *ff)
 {
 	struct _FTR *f = (void*)ff;
@@ -183,18 +228,7 @@ static void process_next_event(struct FTR *ff)
 			f->handle_expose2(ff, 0, 0, 0, 0);
 
 	}
-	if (event.type == KeyPress && f->handle_key) {
-		XKeyEvent e = event.xkey;
-		f->handle_key(ff, e.keycode, e.state, e.x, e.y);
-	}
-	if (event.type == ButtonPress && f->handle_button) {
-		XButtonEvent e = event.xbutton;
-		f->handle_button(ff, e.button, e.state, e.x, e.y);
-	}
-	if (event.type == MotionNotify && f->handle_motion) {
-		XMotionEvent e = event.xmotion;
-		f->handle_motion(ff, e.is_hint, e.state, e.x, e.y);
-	}
+
 	if (event.type == ConfigureNotify) {
 		XConfigureEvent e = event.xconfigure;
 		if (f->w != e.width || f->h != e.height) {
@@ -204,6 +238,41 @@ static void process_next_event(struct FTR *ff)
 				f->handle_resize(ff, 0, 0, f->w, f->h);
 			f->imgupdate = 1;
 		}
+	}
+
+	// call the motion handler also for enter/leave events
+	// (this is natural for most applications)
+	if (event.type == EnterNotify && f->handle_motion) {
+		XCrossingEvent e = event.xcrossing;
+		fprintf(stderr, "enter notify (%d %d)\n", e.x, e.y);
+		f->handle_motion(ff, -1, e.state, e.x, e.y);
+	}
+	if (event.type == LeaveNotify && f->handle_motion) {
+		XCrossingEvent e = event.xcrossing;
+		int x = do_bound(0, f->w - 1, e.x);
+		int y = do_bound(0, f->h - 1, e.y);
+		fprintf(stderr,"LEAVE notify (%d %d) => [%d %d]\n",e.x,e.y,x,y);
+		f->handle_motion(ff, -1, e.state, x, y);
+	}
+
+	// "expose" and "resize" are never lost
+	// the mouse and keyboard evends are ignored when too busy
+	if (XPending(f->display) > 0) return;
+
+	if (event.type == ButtonPress && f->handle_button) {
+		XButtonEvent e = event.xbutton;
+		f->handle_button(ff, e.button, e.state, e.x, e.y);
+	}
+	if (event.type == KeyPress && f->handle_key) {
+		XKeyEvent e = event.xkey;
+		//f->handle_key(ff, e.keycode, e.state, e.x, e.y);
+		//int keysym = XKeycodeToKeysym(f->display, e.keycode, e.state);
+		int key = keycode_to_ascii(f, e.keycode, e.state);
+		f->handle_key(ff, key, e.state, e.x, e.y);
+	}
+	if (event.type == MotionNotify && f->handle_motion) {
+		XMotionEvent e = event.xmotion;
+		f->handle_motion(ff, e.is_hint, e.state, e.x, e.y);
 	}
 }
 
@@ -255,7 +324,13 @@ void ftr_loop_fork(struct FTR *f)
 
 void ftr_handler_exit_on_ESC(struct FTR *f, int k, int m, int x, int y)
 {
-	if  (k == 9)
+	if  (k == '\033')
+		f->stop_loop = 1;
+}
+
+void ftr_handler_exit_on_ESC_or_q(struct FTR *f, int k, int m, int x, int y)
+{
+	if  (k == '\033' || tolower(k)=='q')
 		f->stop_loop = 1;
 }
 

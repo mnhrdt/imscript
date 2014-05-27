@@ -2,6 +2,7 @@
 
 #include "seconds.c"
 #include <assert.h>
+#include <ctype.h>
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
@@ -113,6 +114,33 @@ int main_viewimage2(int c, char *v[])
 	// cleanup and exit (optional)
 	free(x);
 	return 0;
+}
+
+// fancier image viewer
+int main_display(int c, char *v[])
+{
+	// process input arguments
+	if (c != 2 && c != 1) {
+		fprintf(stderr, "usage:\n\t%s [image]\n", *v);
+		//                          0  1
+		return 1;
+	}
+	char *filename_in = c > 1 ? v[1] : "-";
+
+	// read image
+	int w, h;
+	unsigned char *x = read_image_uint8_rgb(filename_in, &w, &h);
+
+	// show image in window
+	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
+	ftr_set_handler(&f, "key", ftr_handler_exit_on_ESC_or_q);
+	ftr_set_handler(&f, "button", ftr_handler_stop_loop);
+	int r = ftr_loop_run(&f);
+
+	// cleanup and exit (optional)
+	free(x);
+	ftr_close(&f);
+	return r;
 }
 
 // simple image viewer (does not actually work)
@@ -238,9 +266,14 @@ struct icrop2_state {
 	int step, ox, oy;
 };
 
+static int inbetween(int a, int b, int x)
+{
+	return (a <= x && x <= b) || (b <= x && x <= a);
+}
+
 void icrop2_motion(struct FTR *f, int b, int m, int x, int y)
 {
-	if (ftr_num_pending(f)) return;
+	//if (ftr_num_pending(f)) return;
 
 	struct icrop2_state *e = f->userdata;
 	unsigned char *o = e->original_image;
@@ -256,14 +289,17 @@ void icrop2_motion(struct FTR *f, int b, int m, int x, int y)
 			f->rgb[idx] = (i>=x && j>=y) ? o[idx] : o[idx]/2;
 		}
 	} else {
+		fprintf(stderr, "step2 (%d %d) (%d %d)\n", e->ox, e->oy, x, y);
 		for (int j = 0; j < f->h; j++)
 		for (int i = 0; i < f->w; i++)
 		for (int l = 0; l < 3; l++)
 		{
 			int idx = 3*(j * f->w + i) + l;
-			f->rgb[idx] = (i>=e->ox && j>=e->oy
-					&& i <= x && j <= y) ?
-				o[idx] : o[idx]/2;
+			f->rgb[idx] = inbetween(e->ox, x, i)
+				&& inbetween(e->oy, y, j)
+			//f->rgb[idx] = (i>=e->ox && j>=e->oy
+			//		&& i <= x && j <= y)
+				? o[idx] : o[idx]/2;
 		}
 	}
 	f->changed = 1;
@@ -567,6 +603,34 @@ int main_minifire(int c, char *v[])
 	return 0;
 }
 
+static void print_event_key(struct FTR *f, int k, int m, int x, int y)
+{
+	printf("event KEY     k=%d '%c'\tm=%d (%d %d)\n", k,
+			(isprint(k))?k:' ', m, x, y);
+}
+static void print_event_button(struct FTR *f, int k, int m, int x, int y)
+{
+	printf("event BUTTON  b=%d\tm=%d (%d %d)\n", k, m, x, y);
+}
+static void print_event_motion(struct FTR *f, int b, int m, int x, int y)
+{
+	printf("event MOTION  b=%d\tm=%d (%d %d)\n", b, m, x, y);
+}
+static void print_event_resize(struct FTR *f, int b, int m, int x, int y)
+{
+	printf("event RESIZE  b=%d\tm=%d (%d %d)\n", b, m, x, y);
+}
+
+int main_events(int c, char *v[])
+{
+	struct FTR f = ftr_new_window(320, 200);
+	ftr_set_handler(&f, "key", print_event_key);
+	ftr_set_handler(&f, "button", print_event_button);
+	ftr_set_handler(&f, "motion", print_event_motion);
+	ftr_set_handler(&f, "resize", print_event_resize);
+	return ftr_loop_run(&f);
+}
+
 int main(int c, char *v[])
 {
 	int (*f)(int,char*[]);
@@ -574,6 +638,7 @@ int main(int c, char *v[])
 	else if (0 == strcmp(v[1], "viewimage")) f = main_viewimage;
 	else if (0 == strcmp(v[1], "viewimage0")) f = main_viewimage0;
 	else if (0 == strcmp(v[1], "viewimage2")) f = main_viewimage2;
+	else if (0 == strcmp(v[1], "display")) f = main_display;
 	else if (0 == strcmp(v[1], "twoimages"))     f = main_twoimages;
 	else if (0 == strcmp(v[1], "twoimages2"))     f = main_twoimages2;
 	else if (0 == strcmp(v[1], "icrop"))     f = main_icrop;
@@ -582,6 +647,7 @@ int main(int c, char *v[])
 	else if (0 == strcmp(v[1], "random"))    f = main_random;
 	else if (0 == strcmp(v[1], "fire"))      f = main_fire;
 	else if (0 == strcmp(v[1], "minifire"))      f = main_minifire;
+	else if (0 == strcmp(v[1], "events")) f = main_events;
 	//else if (0 == strcmp(*v, "simplest"))  f = main_simplest;
 	//else if (0 == strcmp(*v, "simplest2")) f = main_simplest2;
 	else return fprintf(stderr, "bad main \"%s\"\n", v[1]);

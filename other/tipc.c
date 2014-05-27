@@ -2,12 +2,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
-#include <signal.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/mman.h>
 
+#include <signal.h>
 
 // this function is just like malloc, but the memory
 // is not copied by forking the program
@@ -39,8 +39,15 @@ int main()
 
 	pid_t pid = fork();
 	if (!pid) {
+		tab[37] = 0;
 		printf("i'm the child, my pid is %d\n", getpid());
-		raise(SIGSTOP);
+
+		while (tab[37] != 4900)
+			printf("\tchild not yet there (%g)...\n", tab[37]);
+
+		printf("the child got outta here!\n");
+
+		//raise(SIGSTOP);
 		for (int i = 0; i < n; i++)
 			tab[i] = 4900;
 		// idea: the child runs its event loop, processing user events
@@ -50,16 +57,32 @@ int main()
 		return 33;
 	} else {
 		printf("i'm the parent of %d, my pid is %d!\n", pid, getpid());
-		//kill(pid, SIGSTOP);
-		getchar();
+
+
+		int counter = 7;
+		while (counter--)
+		{
+			sleep(1);
+			kill(pid, SIGSTOP);
+			tab[37] = 4900 + counter;
+			printf("AT COUNTER %d (t=%g)\n", counter, tab[37]);
+			kill(pid, SIGCONT);
+		}
+		printf("I've changed it!\n");
 		kill(pid, SIGCONT);
+
+
+
+		//kill(pid, SIGSTOP);
+		//getchar();
+		//kill(pid, SIGCONT);
 		int rv;
 		waitpid(pid, &rv, 0);
 		printf("my child returned with value %d (%d %d)\n", rv,
 				WEXITSTATUS(rv), WIFEXITED(rv)
 				);
-		int idx = rand()%n;
-		printf("the magic number[%d] was %g\n", idx, tab[idx]);
+		//int idx = rand()%n;
+		//printf("the magic number[%d] was %g\n", idx, tab[idx]);
 	}
 	free_shareable_memory(tab, n);
 	printf("i'm the parent again\n");
