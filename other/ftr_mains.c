@@ -143,6 +143,89 @@ int main_display(int c, char *v[])
 	return r;
 }
 
+
+
+#define BAD_MIN(a,b) a<b?a:b
+#define BAD_MAX(a,b) a>b?a:b
+
+
+struct pan_state {
+	int w, h, ox, oy;
+	unsigned char *rgb;
+};
+
+static unsigned char *getpixel_0(unsigned char *x, int w, int h, int i, int j)
+{
+	static unsigned char black[3] = {0, 0, 0};
+	if (i < 0 || i >= w) return black;
+	if (j < 0 || j >= h) return black;
+	return x + 3*(j*w + i);
+}
+
+
+static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+	for (int j = 0; j < f->h; j++)
+	for (int i = 0; i < f->w; i++)
+	{
+		int ii = i - e->ox;
+		int jj = j - e->oy;
+		unsigned char *c = getpixel_0(e->rgb, e->w, e->h, ii, jj);
+		for (int l = 0; l < 3; l++)
+			f->rgb[3 * (j * f->w + i) + l] = c[l];
+	}
+	f->changed = 1;
+}
+
+static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
+{
+	static int ox = 0, oy = 0;
+	if (m == 0) {
+		ox = x;
+		oy = y;
+	}
+	if (m == 256) {
+		struct pan_state *e = f->userdata;
+		e->ox += x - ox;
+		e->oy += y - oy;
+		ox = x;
+		oy = y;
+		f->changed = 1;
+	}
+}
+
+// panning image viewer
+int main_pan(int c, char *v[])
+{
+	// process input arguments
+	if (c != 2 && c != 1) {
+		fprintf(stderr, "usage:\n\t%s [image]\n", *v);
+		//                          0  1
+		return 1;
+	}
+	char *filename_in = c > 1 ? v[1] : "-";
+
+	// read image
+	struct pan_state e[1];
+	e->rgb = read_image_uint8_rgb(filename_in, &e->w, &e->h);
+	e->ox = e->oy = 0;
+
+	// open window (of constant size)
+	struct FTR f = ftr_new_window(BAD_MIN(e->w,800), BAD_MIN(e->h,600));
+	f.userdata = e;
+	f.changed = 1;
+	ftr_set_handler(&f, "expose", pan_exposer);
+	ftr_set_handler(&f, "motion", pan_motion_handler);
+	ftr_set_handler(&f, "key", ftr_handler_exit_on_ESC_or_q);
+	int r = ftr_loop_run(&f);
+
+	// cleanup and exit (optional)
+	ftr_close(&f);
+	free(e->rgb);
+	return r;
+}
+
 // simple image viewer (does not actually work)
 int main_twoimages(int c, char *v[])
 {
@@ -200,9 +283,6 @@ int main_twoimages2(int c, char *v[])
 }
 
 
-
-#define BAD_MIN(a,b) a<b?a:b
-#define BAD_MAX(a,b) a>b?a:b
 
 static void do_inline_crop_rgb(unsigned char *x, int *w, int *h, int crop[4])
 {
@@ -289,7 +369,7 @@ void icrop2_motion(struct FTR *f, int b, int m, int x, int y)
 			f->rgb[idx] = (i>=x && j>=y) ? o[idx] : o[idx]/2;
 		}
 	} else {
-		fprintf(stderr, "step2 (%d %d) (%d %d)\n", e->ox, e->oy, x, y);
+		//fprintf(stderr, "step2 (%d %d) (%d %d)\n", e->ox, e->oy, x, y);
 		for (int j = 0; j < f->h; j++)
 		for (int i = 0; i < f->w; i++)
 		for (int l = 0; l < 3; l++)
@@ -635,21 +715,22 @@ int main(int c, char *v[])
 {
 	int (*f)(int,char*[]);
 	if (c < 2) return fprintf(stderr, "name a main\n");
-	else if (0 == strcmp(v[1], "viewimage")) f = main_viewimage;
+	else if (0 == strcmp(v[1], "viewimage"))  f = main_viewimage;
 	else if (0 == strcmp(v[1], "viewimage0")) f = main_viewimage0;
 	else if (0 == strcmp(v[1], "viewimage2")) f = main_viewimage2;
-	else if (0 == strcmp(v[1], "display")) f = main_display;
-	else if (0 == strcmp(v[1], "twoimages"))     f = main_twoimages;
-	else if (0 == strcmp(v[1], "twoimages2"))     f = main_twoimages2;
-	else if (0 == strcmp(v[1], "icrop"))     f = main_icrop;
+	else if (0 == strcmp(v[1], "display"))    f = main_display;
+	else if (0 == strcmp(v[1], "pan"))        f = main_pan;
+	else if (0 == strcmp(v[1], "twoimages"))  f = main_twoimages;
+	else if (0 == strcmp(v[1], "twoimages2")) f = main_twoimages2;
+	else if (0 == strcmp(v[1], "icrop"))      f = main_icrop;
 	else if (0 == strcmp(v[1], "icrop2"))     f = main_icrop2;
-	else if (0 == strcmp(v[1], "pclick"))    f = main_pclick;
-	else if (0 == strcmp(v[1], "random"))    f = main_random;
-	else if (0 == strcmp(v[1], "fire"))      f = main_fire;
-	else if (0 == strcmp(v[1], "minifire"))      f = main_minifire;
-	else if (0 == strcmp(v[1], "events")) f = main_events;
-	//else if (0 == strcmp(*v, "simplest"))  f = main_simplest;
-	//else if (0 == strcmp(*v, "simplest2")) f = main_simplest2;
+	else if (0 == strcmp(v[1], "pclick"))     f = main_pclick;
+	else if (0 == strcmp(v[1], "random"))     f = main_random;
+	else if (0 == strcmp(v[1], "fire"))       f = main_fire;
+	else if (0 == strcmp(v[1], "minifire"))   f = main_minifire;
+	else if (0 == strcmp(v[1], "events"))     f = main_events;
+	//else if (0 == strcmp(*v, "simplest"))     f = main_simplest;
+	//else if (0 == strcmp(*v, "simplest2"))    f = main_simplest2;
 	else return fprintf(stderr, "bad main \"%s\"\n", v[1]);
 	return f(c-1, v+1);
 }

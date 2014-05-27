@@ -208,6 +208,8 @@ static void process_next_event(struct FTR *ff)
 	//		event_names[event.type]);
 
 	if (event.type == Expose || f->changed) {
+		if (f->handle_expose)
+			f->handle_expose(ff, 0, 0, 0, 0);
 		f->changed = 0;
 
 		if (!f->ximage || f->imgupdate) {
@@ -240,24 +242,26 @@ static void process_next_event(struct FTR *ff)
 		}
 	}
 
+
 	// call the motion handler also for enter/leave events
 	// (this is natural for most applications)
 	if (event.type == EnterNotify && f->handle_motion) {
 		XCrossingEvent e = event.xcrossing;
-		fprintf(stderr, "enter notify (%d %d)\n", e.x, e.y);
+		//fprintf(stderr, "enter notify (%d %d)\n", e.x, e.y);
 		f->handle_motion(ff, -1, e.state, e.x, e.y);
 	}
 	if (event.type == LeaveNotify && f->handle_motion) {
 		XCrossingEvent e = event.xcrossing;
 		int x = do_bound(0, f->w - 1, e.x);
 		int y = do_bound(0, f->h - 1, e.y);
-		fprintf(stderr,"LEAVE notify (%d %d) => [%d %d]\n",e.x,e.y,x,y);
+		//fprintf(stderr,"LEAVE notify (%d %d)[%d %d]\n",e.x,e.y,x,y);
 		f->handle_motion(ff, -1, e.state, x, y);
 	}
 
 	// "expose" and "resize" are never lost
 	// the mouse and keyboard evends are ignored when too busy
 	if (XPending(f->display) > 0) return;
+
 
 	if (event.type == ButtonPress && f->handle_button) {
 		XButtonEvent e = event.xbutton;
@@ -292,7 +296,7 @@ int ftr_loop_run(struct FTR *ff)
 			XFlush(f->display);
 			XUnlockDisplay(f->display);
 			f->handle_idle(ff, 0, 0, 0, 0);
-			f->changed = 1;
+			f->changed = 1; // not sure if necessary...
 		}
 	}
 
