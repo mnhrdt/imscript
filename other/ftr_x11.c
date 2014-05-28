@@ -302,7 +302,7 @@ int ftr_loop_run(struct FTR *ff)
 
 	while (!f->stop_loop)
 	{
-		if (f->changed || !f->handle_idle || XPending(f->display) > 0)
+		if (!f->handle_idle || f->changed || XPending(f->display) > 0)
 			process_next_event(ff);
 		else if (f->handle_idle) {
 			XEvent ev;
@@ -312,7 +312,6 @@ int ftr_loop_run(struct FTR *ff)
 			XFlush(f->display);
 			XUnlockDisplay(f->display);
 			f->handle_idle(ff, 0, 0, 0, 0);
-			f->changed = 1; // not sure if necessary...
 		}
 	}
 
