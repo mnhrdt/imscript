@@ -110,7 +110,16 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 			//white, black);
 	f->ximage = NULL;
 	f->imgupdate = 1;
-	XSelectInput(f->display, f->window, (1L<<25)-1-(1L<<7)-ResizeRedirectMask);
+	XSelectInput(f->display, f->window, 0
+			| ExposureMask
+			| KeyPressMask
+			| ButtonPressMask
+			| PointerMotionMask
+			| EnterWindowMask
+			//| LeaveWindowMask
+			| StructureNotifyMask
+		    );
+	//XSelectInput(f->display, f->window, (1L<<25)-1-(1L<<7)-ResizeRedirectMask);
 	//XSelectInput(f->display, f->window, ExposureMask | KeyPressMask);
 	//XSelectInput(f->display, f->window, (1L<<25)-1);
 	//XSelectInput(f->display, f->window, (1L<<25)-1);
@@ -158,9 +167,10 @@ void ftr_close(struct FTR *ff)
 
 static int keycode_to_ascii(struct _FTR *f, int keycode, int keystate)
 {
-	//fprintf(stderr, "\tkeycode = %d (%d)\n", keycode, keystate);
+	fprintf(stderr, "\tkeycode = %d (%d)\n", keycode, keystate);
 	//int key = XKeycodeToKeysym(f->display, keycode, keystate);
 	int key = XkbKeycodeToKeysym(f->display, keycode, 0, keystate);
+	fprintf(stderr, "\tkeycode = %d (%d) => %d\n", keycode, keystate, key);
 	if (keycode == 9)   return 27;    // ascii ESC
 	if (keycode == 119) return 127;   // ascii DEL
 	if (keycode == 22)  return '\b';
@@ -202,10 +212,10 @@ static void process_next_event(struct FTR *ff)
 {
 	struct _FTR *f = (void*)ff;
 
-	XEvent event;
-	XNextEvent(f->display, &event);
-	//fprintf(stderr, "ev %d\t\"%s\"\n", event.type,
-	//		event_names[event.type]);
+	XEvent event = { .type = GenericEvent } ;
+	if (!f->changed)
+		XNextEvent(f->display, &event);
+	//fprintf(stderr,"ev %d\t\"%s\"\n",event.type,event_names[event.type]);
 
 	if (event.type == Expose || f->changed) {
 		if (f->handle_expose)
@@ -260,9 +270,19 @@ static void process_next_event(struct FTR *ff)
 
 	// "expose" and "resize" are never lost
 	// the mouse and keyboard evends are ignored when too busy
-	if (XPending(f->display) > 0) return;
+	//
+	int ne = XPending(f->display);
+	if (ne > 1) // magical "1" here
+	//{
+	//	fprintf(stderr, "\tlost{%d} %s\n", ne, event_names[event.type]);
+	      return;
+	//}
 
 
+	if (event.type == MotionNotify && f->handle_motion) {
+		XMotionEvent e = event.xmotion;
+		f->handle_motion(ff, e.is_hint, e.state, e.x, e.y);
+	}
 	if (event.type == ButtonPress && f->handle_button) {
 		XButtonEvent e = event.xbutton;
 		f->handle_button(ff, e.button, e.state, e.x, e.y);
@@ -274,10 +294,6 @@ static void process_next_event(struct FTR *ff)
 		int key = keycode_to_ascii(f, e.keycode, e.state);
 		f->handle_key(ff, key, e.state, e.x, e.y);
 	}
-	if (event.type == MotionNotify && f->handle_motion) {
-		XMotionEvent e = event.xmotion;
-		f->handle_motion(ff, e.is_hint, e.state, e.x, e.y);
-	}
 }
 
 int ftr_loop_run(struct FTR *ff)
@@ -286,7 +302,7 @@ int ftr_loop_run(struct FTR *ff)
 
 	while (!f->stop_loop)
 	{
-		if (!f->handle_idle || XPending(f->display) > 0)
+		if (f->changed || !f->handle_idle || XPending(f->display) > 0)
 			process_next_event(ff);
 		else if (f->handle_idle) {
 			XEvent ev;

@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 1
+//#define _POSIX_C_SOURCE 1
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -43,7 +43,10 @@ int main()
 		printf("i'm the child, my pid is %d\n", getpid());
 
 		while (tab[37] != 4900)
+		{
+			sleep(1);
 			printf("\tchild not yet there (%g)...\n", tab[37]);
+		}
 
 		printf("the child got outta here!\n");
 
@@ -62,7 +65,7 @@ int main()
 		int counter = 7;
 		while (counter--)
 		{
-			sleep(1);
+			sleep(3);
 			kill(pid, SIGSTOP);
 			tab[37] = 4900 + counter;
 			printf("AT COUNTER %d (t=%g)\n", counter, tab[37]);

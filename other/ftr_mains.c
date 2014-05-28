@@ -148,51 +148,341 @@ int main_display(int c, char *v[])
 #define BAD_MIN(a,b) a<b?a:b
 #define BAD_MAX(a,b) a>b?a:b
 
+#define NPYR 30
 
+
+
+
+
+
+
+// data structure for the "panning" image viewer
+//
+// this data goes into the "userdata" field of the FTR window structure
+//
 struct pan_state {
-	int w, h, ox, oy;
+	// the image data
+	int w, h;
 	unsigned char *rgb;
+
+	// the viewing port (the actual size of the viewing port
+	// is given by the "w" and "h" members of the FTR structure)
+	double ntiply, offset_x, offset_y;
+
+	// optional image pyramid
+	unsigned char *pyr_rgb[NPYR];
+	int pyr_w[NPYR], pyr_h[NPYR];
 };
 
-static unsigned char *getpixel_0(unsigned char *x, int w, int h, int i, int j)
+// change of coordinates
+static void window_to_image(double p[2], struct pan_state *e, int i, int j)
 {
-	static unsigned char black[3] = {0, 0, 0};
-	if (i < 0 || i >= w) return black;
-	if (j < 0 || j >= h) return black;
-	return x + 3*(j*w + i);
+	p[0] = e->offset_x + i / e->ntiply;
+	p[1] = e->offset_y + j / e->ntiply;
+}
+
+//// change of coordinates
+//static void image_to_window(int i[2], struct pan_state *e, double x, double y)
+//{
+//}
+
+
+
+
+typedef unsigned char (*getsample_operator)(unsigned char*,int,int,int,int,int,int);
+
+static unsigned char getsample_0(unsigned char *img, int w, int h, int pd,
+		int i, int j, int l)
+{
+	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
+		return 0;
+	return img[(i+j*w)*pd + l];
+}
+
+static float cubic_interpolation(float v[4], float x)
+{
+	return v[1] + 0.5 * x*(v[2] - v[0]
+			+ x*(2.0*v[0] - 5.0*v[1] + 4.0*v[2] - v[3]
+			+ x*(3.0*(v[1] - v[2]) + v[3] - v[0])));
+}
+
+static float bicubic_interpolation_cell(float p[4][4], float x, float y)
+{
+	float v[4];
+	v[0] = cubic_interpolation(p[0], y);
+	v[1] = cubic_interpolation(p[1], y);
+	v[2] = cubic_interpolation(p[2], y);
+	v[3] = cubic_interpolation(p[3], y);
+	return cubic_interpolation(v, x);
+}
+
+static unsigned char float_to_byte(float x)
+{
+	int ix = x;
+	if (ix < 0) return 0;
+	if (ix > 255) return 255;
+	return ix;
+}
+
+static void bicubic_interpolation(unsigned char *result,
+		unsigned char *img, int w, int h, int pd, float x, float y)
+{
+	x -= 1;
+	y -= 1;
+
+	getsample_operator p = getsample_0;
+
+	int ix = floor(x);
+	int iy = floor(y);
+	for (int l = 0; l < pd; l++) {
+		float c[4][4];
+		for (int j = 0; j < 4; j++)
+			for (int i = 0; i < 4; i++)
+				c[i][j] = p(img, w, h, pd, ix + i, iy + j, l);
+		float r = bicubic_interpolation_cell(c, x - ix, y - iy);
+		result[l] = float_to_byte(r);
+	}
 }
 
 
+static void getpixel_0(unsigned char *out, unsigned char *x, int w, int h, int i, int j)
+{
+	if (i < 0 || i >= w) { out[0]=out[1]=out[2]=0; return; }
+	if (j < 0 || j >= h) { out[0]=out[1]=out[2]=0; return; }
+	out[0] = x[3*(j*w+i)+0];
+	out[1] = x[3*(j*w+i)+1];
+	out[2] = x[3*(j*w+i)+2];
+}
+
+static void getpixel_1(unsigned char *out, unsigned char *x, int w, int h, int i, int j)
+{
+	if (i < 0) i = 0;
+	if (j < 0) j = 0;
+	if (i >= w) i = w-1;
+	if (j >= h) j = h-1;
+	out[0] = x[3*(j*w+i)+0];
+	out[1] = x[3*(j*w+i)+1];
+	out[2] = x[3*(j*w+i)+2];
+}
+
+static int good_modulus(int n, int p)
+{
+	if (!p) return 0;
+	if (p < 1) return good_modulus(n, -p);
+
+	int r;
+	if (n >= 0)
+		r = n % p;
+	else {
+		r = p - (-n) % p;
+		if (r == p)
+			r = 0;
+	}
+	//assert(r >= 0);
+	//assert(r < p);
+	return r;
+}
+
+static int positive_reflex(int n, int p)
+{
+	int r = good_modulus(n, 2*p);
+	if (r == p)
+		r -= 1;
+	if (r > p)
+		r = 2*p - r;
+	//assert(r >= 0);
+	//assert(r < p);
+	return r;
+}
+
+static void
+getpixel_2(unsigned char *out, unsigned char *x, int w, int h, int i, int j)
+{
+	i = positive_reflex(i, w);
+	j = positive_reflex(j, h);
+	out[0] = x[3*(j*w+i)+0];
+	out[1] = x[3*(j*w+i)+1];
+	out[2] = x[3*(j*w+i)+2];
+}
+
+static void interpolate_at(unsigned char *out,
+		unsigned char *x, int w, int h, double p, double q)
+{
+	//bicubic_interpolation(out, x, w, h, 3, p, q);
+	getpixel_0(out, x, w, h, p, q);
+}
+
+static void pixel(unsigned char *out, struct pan_state *e, double p, double q)
+{
+	if (e->ntiply >= 1)
+		interpolate_at(out, e->rgb, e->w, e->h, p, q);
+	else {
+		int s = -0 - log(e->ntiply) / log(2);
+		if (s < 0) s = 0;
+		if (s >= NPYR) s = NPYR-1;
+		int sfac = 1<<(s+1);
+		int w = e->pyr_w[s];
+		int h = e->pyr_h[s];
+		unsigned char *rgb = e->pyr_rgb[s];
+		interpolate_at(out, rgb, w, h, p/sfac, q/sfac);
+	}
+}
+
+
+// dump the image acording to the state of the viewport
 static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
 	struct pan_state *e = f->userdata;
+
 	for (int j = 0; j < f->h; j++)
 	for (int i = 0; i < f->w; i++)
 	{
-		int ii = i - e->ox;
-		int jj = j - e->oy;
-		unsigned char *c = getpixel_0(e->rgb, e->w, e->h, ii, jj);
-		for (int l = 0; l < 3; l++)
-			f->rgb[3 * (j * f->w + i) + l] = c[l];
+		double p[2];
+		window_to_image(p, e, i, j);
+		unsigned char *c = f->rgb + 3 * (j * f->w + i);
+		pixel(c, e, p[0], p[1]);
 	}
 	f->changed = 1;
 }
 
+#define FTR_BUTTON_LEFT 1
+#define FTR_BUTTON_MIDDLE 2
+#define FTR_BUTTON_RIGHT 3
+#define FTR_BUTTON_UP 4
+#define FTR_BUTTON_DOWN 5
+
+static void action_print_value_at_window_position(struct FTR *f, int x, int y)
+{
+	if (x<f->w && x>=0 && y<f->h && y>=0) {
+		struct pan_state *e = f->userdata;
+		double p[2];
+		window_to_image(p, e, x, y);
+		unsigned char c[3];
+		interpolate_at(c, e->rgb, e->w, e->h, p[0], p[1]);
+		printf("%g\t%g\t: %d\t%d\t%d\n", p[0], p[1], c[0], c[1], c[2]);
+	}
+}
+
+static void action_increment_port_offset_in_window_pixels(struct FTR *f,
+		int dx, int dy)
+{
+	struct pan_state *e = f->userdata;
+	e->offset_x -= dx/e->ntiply;
+	e->offset_y -= dy/e->ntiply;
+}
+
+// update offset variables by dragging
 static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 {
-	static int ox = 0, oy = 0;
-	if (m == 0) {
+	static double ox = 0, oy = 0;
+	if (m == 0) { // just relocate mouse center
 		ox = x;
 		oy = y;
 	}
-	if (m == 256) {
-		struct pan_state *e = f->userdata;
-		e->ox += x - ox;
-		e->oy += y - oy;
+	if (m == 256) { // when dragging, increment offset
+		action_increment_port_offset_in_window_pixels(f, x-ox, y-oy);
 		ox = x;
 		oy = y;
 		f->changed = 1;
 	}
+
+	// middle button: print pixel value
+	//if (b == FTR_BUTTON_MIDDLE) {
+	if (m == 512) 
+		action_print_value_at_window_position(f, x, y);
+
+}
+
+
+static void action_change_zoom_by_factor(struct FTR *f, int x, int y, double F)
+{
+	struct pan_state *e = f->userdata;
+
+	double c[2];
+	window_to_image(c, e, x, y);
+
+	e->ntiply *= F;
+	e->offset_x = c[0] - x/e->ntiply;
+	e->offset_y = c[1] - y/e->ntiply;
+}
+
+#define WHEELFACTOR 1.3
+
+static void action_increase_zoom(struct FTR *f, int x, int y)
+{
+	action_change_zoom_by_factor(f, x, y, WHEELFACTOR);
+}
+
+static void action_decrease_zoom(struct FTR *f, int x, int y)
+{
+	action_change_zoom_by_factor(f, x, y, 1.0/WHEELFACTOR);
+}
+
+static void action_reset_zoom_and_position(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+
+	e->ntiply = 1;
+	e->offset_x = 0;
+	e->offset_y = 0;
+}
+
+
+
+
+// use the mouse wheel to change zoom factor
+static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
+{
+	if (b == FTR_BUTTON_MIDDLE) {
+		action_print_value_at_window_position(f, x, y);
+		return;
+	}
+
+	if (b == FTR_BUTTON_DOWN)  action_increase_zoom(f, x, y);
+	if (b == FTR_BUTTON_UP  )  action_decrease_zoom(f, x, y);
+	if (b == FTR_BUTTON_RIGHT) action_reset_zoom_and_position(f);
+	f->changed = 1;
+}
+
+static void zoom_out_by_factor_two(unsigned char *out, int ow, int oh,
+		unsigned char *in, int iw, int ih)
+{
+	assert(abs(2*ow-iw) < 2);
+	assert(abs(2*oh-ih) < 2);
+	for (int j = 0; j < oh; j++)
+	for (int i = 0; i < ow; i++)
+	for (int l = 0; l < 3; l++)
+	{
+		float a[4];
+		a[0] = getsample_0(in, iw, ih, 3, 2*i  , 2*j  , l);
+		a[1] = getsample_0(in, iw, ih, 3, 2*i+1, 2*j  , l);
+		a[2] = getsample_0(in, iw, ih, 3, 2*i  , 2*j+1, l);
+		a[3] = getsample_0(in, iw, ih, 3, 2*i+1, 2*j+1, l);
+		out[3*(ow*j + i)+l] = (a[0] + a[1] + a[2] + a[3])/4;
+	}
+}
+
+static void create_pyr(struct pan_state *e)
+{
+	for (int s = 0; s < NPYR; s++)
+	{
+		int            lw   = s ? e->pyr_w  [s-1] : e->w  ;
+		int            lh   = s ? e->pyr_h  [s-1] : e->h  ;
+		unsigned char *lrgb = s ? e->pyr_rgb[s-1] : e->rgb;
+		int            sw   = ceil(lw / 2.0);
+		int            sh   = ceil(lh / 2.0);
+		unsigned char *srgb = malloc(3 * sw * sh);
+		zoom_out_by_factor_two(srgb, sw, sh, lrgb, lw, lh);
+		e->pyr_w[s]   = sw;
+		e->pyr_h[s]   = sh;
+		e->pyr_rgb[s] = srgb;
+	}
+}
+
+static void free_pyr(struct pan_state *e)
+{
+	for (int s = 0; s < NPYR; s++)
+		free(e->pyr_rgb[s]);
 }
 
 // panning image viewer
@@ -209,7 +499,9 @@ int main_pan(int c, char *v[])
 	// read image
 	struct pan_state e[1];
 	e->rgb = read_image_uint8_rgb(filename_in, &e->w, &e->h);
-	e->ox = e->oy = 0;
+	e->offset_x = e->offset_y = 0;
+	e->ntiply = 1;
+	create_pyr(e);
 
 	// open window (of constant size)
 	struct FTR f = ftr_new_window(BAD_MIN(e->w,800), BAD_MIN(e->h,600));
@@ -217,12 +509,14 @@ int main_pan(int c, char *v[])
 	f.changed = 1;
 	ftr_set_handler(&f, "expose", pan_exposer);
 	ftr_set_handler(&f, "motion", pan_motion_handler);
+	ftr_set_handler(&f, "button", pan_button_handler);
 	ftr_set_handler(&f, "key", ftr_handler_exit_on_ESC_or_q);
 	int r = ftr_loop_run(&f);
 
 	// cleanup and exit (optional)
 	ftr_close(&f);
 	free(e->rgb);
+	free_pyr(e);
 	return r;
 }
 
