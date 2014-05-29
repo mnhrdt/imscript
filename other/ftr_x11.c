@@ -380,7 +380,7 @@ int ftr_set_handler(struct FTR *ff, char *id, ftr_event_handler_t e)
 	else if (0 == strcmp(id, "expose")) { f->handle_expose = e; return 0; }
 	else if (0 == strcmp(id, "resize")) { f->handle_resize = e; return 0; }
 	else if (0 == strcmp(id, "idle"))   { f->handle_idle   = e; return 0; }
-	else return fprintf(stderr, "WARNING: unrecognized event \"%s\"\n", id);
+	return fprintf(stderr, "WARNING: unrecognized event \"%s\"\n", id);
 }
 
 ftr_event_handler_t ftr_get_handler(struct FTR *ff, char *id)
@@ -393,7 +393,7 @@ ftr_event_handler_t ftr_get_handler(struct FTR *ff, char *id)
 	else if (0 == strcmp(id, "expose")) return f->handle_expose;
 	else if (0 == strcmp(id, "resize")) return f->handle_resize;
 	else if (0 == strcmp(id, "idle"))   return f->handle_idle  ;
-	else return fprintf(stderr, "WARNING: bad event \"%s\"\n", id),
+	return fprintf(stderr, "WARNING: bad event \"%s\"\n", id),
 		(ftr_event_handler_t)NULL;
 }
 

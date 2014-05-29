@@ -1,4 +1,5 @@
-// cc99 -Ofast ftr_mains.c ftr_x11.c iio.o -o fm -ltiff -lpng -lm -lX11 -lrt
+// c99 -Ofast ftr_mains.c ftr_x11.c iio.o -o fm -ltiff -lpng -lm -lX11 -lrt
+// icc -std=c99 -Ofast ftr_mains.c ftr_x11.c iio.o -o fm -ltiff -lpng -lm -lX11 -lrt
 
 #include "seconds.c"
 #include <assert.h>
@@ -169,22 +170,24 @@ struct pan_state {
 	// is given by the "w" and "h" members of the FTR structure)
 	double ntiply, offset_x, offset_y;
 
-	// optional image pyramid
+	// image pyramid (optional)
 	unsigned char *pyr_rgb[NPYR];
 	int pyr_w[NPYR], pyr_h[NPYR];
 };
 
-// change of coordinates
+// change of coordinates: from window "int" pixels to image "double" point
 static void window_to_image(double p[2], struct pan_state *e, int i, int j)
 {
 	p[0] = e->offset_x + i / e->ntiply;
 	p[1] = e->offset_y + j / e->ntiply;
 }
 
-//// change of coordinates
-//static void image_to_window(int i[2], struct pan_state *e, double x, double y)
-//{
-//}
+// change of coordinates: from image "double" point to window "int" pixel
+static void image_to_window(int i[2], struct pan_state *e, double x, double y)
+{
+	i[0] = floor(x * e->ntiply - e->offset_x);
+	i[1] = floor(y * e->ntiply - e->offset_y);
+}
 
 
 
@@ -309,14 +312,16 @@ static void interpolate_at(unsigned char *out,
 		unsigned char *x, int w, int h, double p, double q)
 {
 	//bicubic_interpolation(out, x, w, h, 3, p, q);
-	getpixel_0(out, x, w, h, p, q);
+	getpixel_0(out, x, w, h, (int)p, (int)q);
 }
 
-static void pixel(unsigned char *out, struct pan_state *e, double p, double q)
+static inline void pixel(unsigned char *out, struct pan_state *e, double p, double q)
 {
 	if (e->ntiply >= 1)
 		interpolate_at(out, e->rgb, e->w, e->h, p, q);
 	else {
+		//if(p<0||q<0||p>=e->w||q>=e->h){out[0]=out[1]=out[2]=0;return;}
+		if(p<0||q<0){out[0]=out[1]=out[2]=0;return;}
 		int s = -0 - log(e->ntiply) / log(2);
 		if (s < 0) s = 0;
 		if (s >= NPYR) s = NPYR-1;
@@ -580,13 +585,10 @@ int main_twoimages2(int c, char *v[])
 
 static void do_inline_crop_rgb(unsigned char *x, int *w, int *h, int crop[4])
 {
-	int from[2], to[2];
-	from[0] = BAD_MIN(crop[0], crop[2]);
-	from[1] = BAD_MIN(crop[1], crop[3]);
-	to[0] = BAD_MAX(crop[0], crop[2]);
-	to[1] = BAD_MAX(crop[1], crop[3]);
-	int ow = to[0] - from[0]; assert(ow > 0); assert(ow <= *w);
-	int oh = to[1] - from[1]; assert(oh > 0); assert(oh <= *h);
+	int from[2] = {BAD_MIN(crop[0], crop[2]), BAD_MIN(crop[1], crop[3])};
+	int to[2]   = {BAD_MAX(crop[0], crop[2]), BAD_MAX(crop[1], crop[3])};
+	int ow = to[0] - from[0]; //assert(ow > 0); assert(ow <= *w);
+	int oh = to[1] - from[1]; //assert(oh > 0); assert(oh <= *h);
 	for (int j = 0; j < oh; j++)
 	for (int i = 0; i < ow; i++)
 	{
@@ -647,35 +649,24 @@ static int inbetween(int a, int b, int x)
 
 void icrop2_motion(struct FTR *f, int b, int m, int x, int y)
 {
-	//if (ftr_num_pending(f)) return;
-
 	struct icrop2_state *e = f->userdata;
 	unsigned char *o = e->original_image;
 
 	if (e->step == 0) {
 		e->ox = x;
 		e->oy = y;
-		for (int j = 0; j < f->h; j++)
-		for (int i = 0; i < f->w; i++)
-		for (int l = 0; l < 3; l++)
-		{
-			int idx = 3*(j * f->w + i) + l;
-			f->rgb[idx] = (i>=x && j>=y) ? o[idx] : o[idx]/2;
-		}
-	} else {
-		//fprintf(stderr, "step2 (%d %d) (%d %d)\n", e->ox, e->oy, x, y);
-		for (int j = 0; j < f->h; j++)
-		for (int i = 0; i < f->w; i++)
-		for (int l = 0; l < 3; l++)
-		{
-			int idx = 3*(j * f->w + i) + l;
-			f->rgb[idx] = inbetween(e->ox, x, i)
-				&& inbetween(e->oy, y, j)
-			//f->rgb[idx] = (i>=e->ox && j>=e->oy
-			//		&& i <= x && j <= y)
-				? o[idx] : o[idx]/2;
-		}
 	}
+
+	for (int j = 0; j < f->h; j++)
+	for (int i = 0; i < f->w; i++)
+	for (int l = 0; l < 3; l++)
+	{
+		int idx = 3*(j * f->w + i) + l;
+		int inside = (e->step == 0) ?  (i>=x && j >= y) :
+			inbetween(e->ox, x, i) && inbetween(e->oy, y, j);
+		f->rgb[idx] = inside ? o[idx] : o[idx]/2;
+	}
+
 	f->changed = 1;
 }
 
@@ -699,7 +690,6 @@ int main_icrop2(int c, char *v[])
 	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
 	struct icrop2_state e = {x, 0, 0, 0};
 	f.userdata = &e;
-
 
 	// set handlers
 	ftr_set_handler(&f, "motion", icrop2_motion);
