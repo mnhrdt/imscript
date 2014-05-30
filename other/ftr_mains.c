@@ -1,6 +1,7 @@
 // c99 -Ofast ftr_mains.c ftr_x11.c iio.o -o fm -ltiff -lpng -lm -lX11 -lrt
 // icc -std=c99 -Ofast ftr_mains.c ftr_x11.c iio.o -o fm -ltiff -lpng -lm -lX11 -lrt
 
+// includes and defines {{{1
 #include "seconds.c"
 #include <assert.h>
 #include <ctype.h>
@@ -14,7 +15,11 @@
 
 #include "iio.h"
 
+#define BAD_MIN(a,b) a<b?a:b
+#define BAD_MAX(a,b) a>b?a:b
 
+
+// image file input/output (wrapper around iio) {{{1
 static unsigned char *read_image_uint8_rgb(char *fname, int *w, int *h)
 {
 	int pd;
@@ -47,6 +52,7 @@ static void write_image_uint8_rgb(char *fname, unsigned char *x, int w, int h)
 }
 
 
+// main_viewimage {{{1
 // simple image viewer
 int main_viewimage(int c, char *v[])
 {
@@ -72,6 +78,7 @@ int main_viewimage(int c, char *v[])
 	return r;
 }
 
+// main_viewimage0 {{{1
 // even simpler
 int main_viewimage0(int c, char *v[])
 {
@@ -94,6 +101,7 @@ int main_viewimage0(int c, char *v[])
 	return 42;
 }
 
+// main_viewimage2 {{{1
 // forking image viewer
 int main_viewimage2(int c, char *v[])
 {
@@ -117,6 +125,7 @@ int main_viewimage2(int c, char *v[])
 	return 0;
 }
 
+// main_display {{{1
 // fancier image viewer
 int main_display(int c, char *v[])
 {
@@ -146,16 +155,10 @@ int main_display(int c, char *v[])
 
 
 
-#define BAD_MIN(a,b) a<b?a:b
-#define BAD_MAX(a,b) a>b?a:b
+// main_pan {{{1
 
+// pan: viewport data structure {{{2
 #define NPYR 30
-
-
-
-
-
-
 
 // data structure for the "panning" image viewer
 //
@@ -192,15 +195,8 @@ static void image_to_window(int i[2], struct pan_state *e, double x, double y)
 
 
 
-typedef unsigned char (*getsample_operator)(unsigned char*,int,int,int,int,int,int);
 
-static unsigned char getsample_0(unsigned char *img, int w, int h, int pd,
-		int i, int j, int l)
-{
-	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
-		return 0;
-	return img[(i+j*w)*pd + l];
-}
+// pan: bicubic interpolation {{{2
 
 static float cubic_interpolation(float v[4], float x)
 {
@@ -227,6 +223,16 @@ static unsigned char float_to_byte(float x)
 	return ix;
 }
 
+typedef unsigned char (*getsample_operator)(unsigned char*,int,int,int,int,int,int);
+
+static unsigned char getsample_0(unsigned char *img, int w, int h, int pd,
+		int i, int j, int l)
+{
+	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
+		return 0;
+	return img[(i+j*w)*pd + l];
+}
+
 static void bicubic_interpolation(unsigned char *result,
 		unsigned char *img, int w, int h, int pd, float x, float y)
 {
@@ -247,6 +253,8 @@ static void bicubic_interpolation(unsigned char *result,
 	}
 }
 
+
+// pan: getpixels {{{2
 
 static void getpixel_0(unsigned char *out, unsigned char *x, int w, int h, int i, int j)
 {
@@ -281,8 +289,6 @@ static int good_modulus(int n, int p)
 		if (r == p)
 			r = 0;
 	}
-	//assert(r >= 0);
-	//assert(r < p);
 	return r;
 }
 
@@ -293,8 +299,6 @@ static int positive_reflex(int n, int p)
 		r -= 1;
 	if (r > p)
 		r = 2*p - r;
-	//assert(r >= 0);
-	//assert(r < p);
 	return r;
 }
 
@@ -317,7 +321,7 @@ static void interpolate_at(unsigned char *out,
 
 static inline void pixel(unsigned char *out, struct pan_state *e, double p, double q)
 {
-	if (e->ntiply >= 1)
+	if (e->ntiply > 0.9999)
 		interpolate_at(out, e->rgb, e->w, e->h, p, q);
 	else {
 		//if(p<0||q<0||p>=e->w||q>=e->h){out[0]=out[1]=out[2]=0;return;}
@@ -333,7 +337,70 @@ static inline void pixel(unsigned char *out, struct pan_state *e, double p, doub
 	}
 }
 
+// pan: actions {{{2
+static void action_print_value_at_window_position(struct FTR *f, int x, int y)
+{
+	if (x<f->w && x>=0 && y<f->h && y>=0) {
+		struct pan_state *e = f->userdata;
+		double p[2];
+		window_to_image(p, e, x, y);
+		unsigned char c[3];
+		interpolate_at(c, e->rgb, e->w, e->h, p[0], p[1]);
+		printf("%g\t%g\t: %d\t%d\t%d\n", p[0], p[1], c[0], c[1], c[2]);
+	}
+}
 
+static void action_increment_port_offset_in_window_pixels(struct FTR *f,
+		int dx, int dy)
+{
+	struct pan_state *e = f->userdata;
+	e->offset_x -= dx/e->ntiply;
+	e->offset_y -= dy/e->ntiply;
+
+	f->changed = 1;
+}
+
+static void action_change_zoom_by_factor(struct FTR *f, int x, int y, double F)
+{
+	struct pan_state *e = f->userdata;
+
+	double c[2];
+	window_to_image(c, e, x, y);
+
+	e->ntiply *= F;
+	e->offset_x = c[0] - x/e->ntiply;
+	e->offset_y = c[1] - y/e->ntiply;
+
+	f->changed = 1;
+}
+
+#define WHEELFACTOR 1.3
+
+static void action_increase_zoom(struct FTR *f, int x, int y)
+{
+	action_change_zoom_by_factor(f, x, y, WHEELFACTOR);
+}
+
+static void action_decrease_zoom(struct FTR *f, int x, int y)
+{
+	action_change_zoom_by_factor(f, x, y, 1.0/WHEELFACTOR);
+}
+
+static void action_reset_zoom_and_position(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+
+	e->ntiply = 1;
+	e->offset_x = 0;
+	e->offset_y = 0;
+
+	f->changed = 1;
+}
+
+
+
+
+// pan: expose handler {{{2
 // dump the image acording to the state of the viewport
 static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
@@ -356,26 +423,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 #define FTR_BUTTON_UP 4
 #define FTR_BUTTON_DOWN 5
 
-static void action_print_value_at_window_position(struct FTR *f, int x, int y)
-{
-	if (x<f->w && x>=0 && y<f->h && y>=0) {
-		struct pan_state *e = f->userdata;
-		double p[2];
-		window_to_image(p, e, x, y);
-		unsigned char c[3];
-		interpolate_at(c, e->rgb, e->w, e->h, p[0], p[1]);
-		printf("%g\t%g\t: %d\t%d\t%d\n", p[0], p[1], c[0], c[1], c[2]);
-	}
-}
-
-static void action_increment_port_offset_in_window_pixels(struct FTR *f,
-		int dx, int dy)
-{
-	struct pan_state *e = f->userdata;
-	e->offset_x -= dx/e->ntiply;
-	e->offset_y -= dy/e->ntiply;
-}
-
+// pan: motion handler {{{2
 // update offset variables by dragging
 static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 {
@@ -399,42 +447,9 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 }
 
 
-static void action_change_zoom_by_factor(struct FTR *f, int x, int y, double F)
-{
-	struct pan_state *e = f->userdata;
-
-	double c[2];
-	window_to_image(c, e, x, y);
-
-	e->ntiply *= F;
-	e->offset_x = c[0] - x/e->ntiply;
-	e->offset_y = c[1] - y/e->ntiply;
-}
-
-#define WHEELFACTOR 1.3
-
-static void action_increase_zoom(struct FTR *f, int x, int y)
-{
-	action_change_zoom_by_factor(f, x, y, WHEELFACTOR);
-}
-
-static void action_decrease_zoom(struct FTR *f, int x, int y)
-{
-	action_change_zoom_by_factor(f, x, y, 1.0/WHEELFACTOR);
-}
-
-static void action_reset_zoom_and_position(struct FTR *f)
-{
-	struct pan_state *e = f->userdata;
-
-	e->ntiply = 1;
-	e->offset_x = 0;
-	e->offset_y = 0;
-}
 
 
-
-
+// pan: button handler {{{2
 // use the mouse wheel to change zoom factor
 static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 {
@@ -449,6 +464,21 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 	f->changed = 1;
 }
 
+// pan: key handler {{{2
+void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
+{
+	//fprintf(stderr, "k='%c' m=%d\n", k, m);
+
+	if (k == '+') action_increase_zoom(f, f->w/2, f->h/2);
+	if (k == '-') action_decrease_zoom(f, f->w/2, f->h/2);
+
+	// if ESC or q, exit
+	if  (k == '\033' || tolower(k)=='q')
+		f->stop_loop = 1;
+}
+
+
+// pan: multiscale pyramid {{{2
 static void zoom_out_by_factor_two(unsigned char *out, int ow, int oh,
 		unsigned char *in, int iw, int ih)
 {
@@ -490,6 +520,7 @@ static void free_pyr(struct pan_state *e)
 		free(e->pyr_rgb[s]);
 }
 
+// pan: main {{{2
 // panning image viewer
 int main_pan(int c, char *v[])
 {
@@ -515,7 +546,8 @@ int main_pan(int c, char *v[])
 	ftr_set_handler(&f, "expose", pan_exposer);
 	ftr_set_handler(&f, "motion", pan_motion_handler);
 	ftr_set_handler(&f, "button", pan_button_handler);
-	ftr_set_handler(&f, "key", ftr_handler_exit_on_ESC_or_q);
+	//ftr_set_handler(&f, "key", ftr_handler_exit_on_ESC_or_q);
+	ftr_set_handler(&f, "key", pan_key_handler);
 	int r = ftr_loop_run(&f);
 
 	// cleanup and exit (optional)
@@ -525,6 +557,7 @@ int main_pan(int c, char *v[])
 	return r;
 }
 
+// main_twoimages {{{1
 // simple image viewer (does not actually work)
 int main_twoimages(int c, char *v[])
 {
@@ -554,6 +587,7 @@ int main_twoimages(int c, char *v[])
 	return 0;
 }
 
+// main_twoimages2 {{{1
 // forking image viewer
 int main_twoimages2(int c, char *v[])
 {
@@ -583,6 +617,7 @@ int main_twoimages2(int c, char *v[])
 
 
 
+// main_icrop {{{1
 static void do_inline_crop_rgb(unsigned char *x, int *w, int *h, int crop[4])
 {
 	int from[2] = {BAD_MIN(crop[0], crop[2]), BAD_MIN(crop[1], crop[3])};
@@ -637,6 +672,7 @@ int main_icrop(int c, char *v[])
 	return 0;
 }
 
+// main_icrop2 {{{1
 struct icrop2_state {
 	unsigned char *original_image;
 	int step, ox, oy;
@@ -712,6 +748,7 @@ int main_icrop2(int c, char *v[])
 	return 0;
 }
 
+// main_pclick {{{1
 // print to stdout the coordinates of the first mouse click
 int main_pclick(int c, char *v[])
 {
@@ -746,6 +783,7 @@ int main_pclick(int c, char *v[])
 }
 
 
+// main_random {{{1
 static void draw_random(struct FTR *f, int x, int y, int k, int m)
 {
 	// benchmarking control
@@ -784,6 +822,9 @@ int main_random(int c, char *v[])
 }
 
 
+// main_fire {{{1
+
+// piecewise affine sigmoid
 static float lstep(float a, float b, float t, float x)
 {
 	if (x < a) return 0;
@@ -967,6 +1008,7 @@ int main_minifire(int c, char *v[])
 	return 0;
 }
 
+// main_events {{{1
 static void print_event_key(struct FTR *f, int k, int m, int x, int y)
 {
 	printf("event KEY     k=%d '%c'\tm=%d (%d %d)\n", k,
@@ -995,6 +1037,7 @@ int main_events(int c, char *v[])
 	return ftr_loop_run(&f);
 }
 
+// main {{{1
 int main(int c, char *v[])
 {
 	int (*f)(int,char*[]);
@@ -1018,3 +1061,4 @@ int main(int c, char *v[])
 	else return fprintf(stderr, "bad main \"%s\"\n", v[1]);
 	return f(c-1, v+1);
 }
+// vim:set foldmethod=marker:
