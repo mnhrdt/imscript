@@ -10,9 +10,8 @@
 
 struct _FTR {
 	// visible state
-	int w, h, max_w, max_h;
+	int w, h;
 	unsigned char *rgb;
-	int stop_loop;
 	int changed;
 	void *userdata;
 
@@ -26,6 +25,8 @@ struct _FTR {
 	ftr_event_handler_t handle_resize;
 	ftr_event_handler_t handle_idle;
 	ftr_event_handler_t handle_idle_toggled;
+	int max_w, max_h;
+	int stop_loop;
 
 	// glut-only internal data
 	// (there's none, glut requires using global variables)
@@ -33,6 +34,7 @@ struct _FTR {
 	int handle_mute;
 	int glut_initted;
 	int glut_button_mask;
+	int glut_keymod_mask;
 	int glut_window_x;
 	int glut_window_y;
 };
@@ -87,20 +89,6 @@ static void my_reshapefunc(int w, int h)
 		f->handle_resize((void*)f, 0, 0, f->w, f->h);
 }
 
-static void my_keyboardfunc(unsigned char k, int x, int y)
-{
-	//fprintf(stderr, "GLUT keyboardfunc  %d '%c' %d %d\n",
-	//		k, isalnum(k)?k:' ', x, y);
-
-	struct _FTR *f = ftr_freeglut_global_state;
-
-	if (f->handle_key) {
-		f->handle_key((void*)f, k, 0, x, y);
-		if (f->changed)
-			glutPostRedisplay();
-	}
-}
-
 static int key_from_glut_to_ftr(int k)
 {
 	return k + 1000;
@@ -111,13 +99,42 @@ static int button_from_glut_to_ftr(int b)
 	return 1 << ( b + 8 );
 }
 
+static int modifiers_from_glut_to_ftr(int m)
+{
+	int r = 0;
+	if (m & GLUT_ACTIVE_SHIFT) r |= FTR_MASK_SHIFT;
+	if (m & GLUT_ACTIVE_CTRL ) r |= FTR_MASK_CONTROL;
+	if (m & GLUT_ACTIVE_ALT  ) r |= FTR_MASK_MOD1;
+	return r;
+}
+
 static void my_specialfunc(int k, int x, int y)
 {
 	//fprintf(stderr, "GLUT specialfunc  %d '%c' %d %d\n",
 	//		k, isalnum(k)?k:' ', x, y);
 
-	//if (f->handle_key)
-	//	f->handle_key(f, from_glut_key_to_ftr(k), 0, x, y);
+	struct _FTR *f = ftr_freeglut_global_state;
+	if (f->handle_key) {
+		int m = modifiers_from_glut_to_ftr(glutGetModifiers());
+		f->handle_key((void*)f, key_from_glut_to_ftr(k), m, x, y);
+		if (f->changed)
+			glutPostRedisplay();
+	}
+}
+
+static void my_keyboardfunc(unsigned char k, int x, int y)
+{
+	//fprintf(stderr, "GLUT keyboardfunc  %d '%c' %d %d\n",
+	//		k, isalnum(k)?k:' ', x, y);
+
+	struct _FTR *f = ftr_freeglut_global_state;
+
+	if (f->handle_key) {
+		int m = modifiers_from_glut_to_ftr(glutGetModifiers());
+		f->handle_key((void*)f, k, m, x, y);
+		if (f->changed)
+			glutPostRedisplay();
+	}
 }
 
 static void my_mousefunc(int b, int s, int x, int y)
@@ -197,6 +214,7 @@ static void setup_glut_environment(struct _FTR *f)
 	glutSpecialFunc(my_specialfunc);
 	f->glut_initted = 1;
 	f->glut_button_mask = 0; // not sure
+	f->glut_keymod_mask = 0;
 	//fprintf(stderr, "setup glut rgb = %p\n", f->rgb);
 	if (f->glut_window_x >= 0)
 		glutPositionWindow(f->glut_window_x, f->glut_window_y);

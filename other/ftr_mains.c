@@ -432,7 +432,6 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 		action_increment_port_offset_in_window_pixels(f, x-ox, y-oy);
 		ox = x;
 		oy = y;
-		f->changed = 1;
 	}
 
 	// middle button: print pixel value
@@ -461,7 +460,7 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 // pan: key handler {{{2
 void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
-	fprintf(stderr, "k='%c' m=%d\n", k, m);
+	//fprintf(stderr, "k='%c' m=%d\n", k, m);
 
 	if (k == '+') action_increase_zoom(f, f->w/2, f->h/2);
 	if (k == '-') action_decrease_zoom(f, f->w/2, f->h/2);
@@ -469,7 +468,22 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	// if ESC or q, exit
 	if  (k == '\033' || tolower(k)=='q')
 		ftr_notify_the_desire_to_stop_this_loop(f, 0);
-		//f->stop_loop = 1;
+
+	// arrows move the viewport
+	if (k > 1000) {
+		int d[2] = {0, 0};
+		int inc = -10;
+		if (m & FTR_MASK_SHIFT  ) inc /= 10;
+		if (m & FTR_MASK_CONTROL) inc *= 10;
+		switch (k) {
+		case FTR_KEY_LEFT : d[0] -= inc; break;
+		case FTR_KEY_RIGHT: d[0] += inc; break;
+		case FTR_KEY_UP   : d[1] -= inc; break;
+		case FTR_KEY_DOWN : d[1] += inc; break;
+		}
+		action_increment_port_offset_in_window_pixels(f, d[0], d[1]);
+	}
+
 }
 
 
@@ -543,6 +557,7 @@ int main_pan(int c, char *v[])
 	ftr_set_handler(&f, "button", pan_button_handler);
 	//ftr_set_handler(&f, "key", ftr_handler_exit_on_ESC_or_q);
 	ftr_set_handler(&f, "key", pan_key_handler);
+	//int r = 0; ftr_loop_fork(&f);
 	int r = ftr_loop_run(&f);
 
 

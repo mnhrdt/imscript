@@ -12,9 +12,8 @@
 // X11-specific part {{{1
 struct _FTR {
 	// visible state
-	int w, h, max_w, max_h;
+	int w, h;
 	unsigned char *rgb;
-	int stop_loop;
 	int changed;
 	void *userdata;
 
@@ -27,6 +26,8 @@ struct _FTR {
 	ftr_event_handler_t handle_resize;
 	ftr_event_handler_t handle_idle;
 	ftr_event_handler_t handle_idle_toggled;
+	int max_w, max_h;
+	int stop_loop;
 
 	// X11-only internal data
 	Display *display;
@@ -161,17 +162,22 @@ void ftr_close(struct FTR *ff)
 	XCloseDisplay(f->display);
 }
 
-static int keycode_to_ascii(struct _FTR *f, int keycode, int keystate)
+static int keycode_to_ftr(struct _FTR *f, int keycode, int keystate)
 {
 	//fprintf(stderr, "\tkeycode = %d (%d)\n", keycode, keystate);
 	//int key = XKeycodeToKeysym(f->display, keycode, keystate);
 	int key = XkbKeycodeToKeysym(f->display, keycode, 0, keystate);
-	//fprintf(stderr, "\tkeycode = %d (%d) => %d\n", keycode, keystate, key);
+	//fprintf(stderr, "\tkeycode = %d (%d) => %d\n", keycode,keystate,key);
+
 	if (keycode == 9)   return 27;    // ascii ESC
 	if (keycode == 119) return 127;   // ascii DEL
 	if (keycode == 22)  return '\b';
 	if (keycode == 23)  return '\t';
 	if (keycode == 36 || keycode == 105) return '\n';
+	if (keycode == 111) return FTR_KEY_UP;
+	if (keycode == 113) return FTR_KEY_LEFT;
+	if (keycode == 114) return FTR_KEY_RIGHT;
+	if (keycode == 116) return FTR_KEY_DOWN;
 	return key;
 }
 
@@ -287,7 +293,7 @@ static void process_next_event(struct FTR *ff)
 		XKeyEvent e = event.xkey;
 		//f->handle_key(ff, e.keycode, e.state, e.x, e.y);
 		//int keysym = XKeycodeToKeysym(f->display, e.keycode, e.state);
-		int key = keycode_to_ascii(f, e.keycode, e.state);
+		int key = keycode_to_ftr(f, e.keycode, e.state);
 		f->handle_key(ff, key, e.state, e.x, e.y);
 	}
 }
