@@ -24,6 +24,7 @@ static unsigned char *read_image_uint8_rgb(char *fname, int *w, int *h)
 {
 	int pd;
 	unsigned char *x = iio_read_image_uint8_vec(fname, w, h, &pd);
+	fprintf(stderr, "riur got %d %d %d\n", *w, *h, pd);
 	if (pd == 3) return x;
 	unsigned char *y = malloc(3**w**h);
 	for (int i = 0; i < *w**h; i++) {
@@ -315,11 +316,11 @@ getpixel_2(unsigned char *out, unsigned char *x, int w, int h, int i, int j)
 static void interpolate_at(unsigned char *out,
 		unsigned char *x, int w, int h, double p, double q)
 {
-	//bicubic_interpolation(out, x, w, h, 3, p, q);
 	getpixel_0(out, x, w, h, (int)p, (int)q);
+	//bicubic_interpolation(out, x, w, h, 3, p, q);
 }
 
-static inline void pixel(unsigned char *out, struct pan_state *e, double p, double q)
+static void pixel(unsigned char *out, struct pan_state *e, double p, double q)
 {
 	if (e->ntiply > 0.9999)
 		interpolate_at(out, e->rgb, e->w, e->h, p, q);
@@ -360,6 +361,17 @@ static void action_increment_port_offset_in_window_pixels(struct FTR *f,
 	f->changed = 1;
 }
 
+static void action_reset_zoom_and_position(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+
+	e->ntiply = 1;
+	e->offset_x = 0;
+	e->offset_y = 0;
+
+	f->changed = 1;
+}
+
 static void action_change_zoom_by_factor(struct FTR *f, int x, int y, double F)
 {
 	struct pan_state *e = f->userdata;
@@ -386,24 +398,13 @@ static void action_decrease_zoom(struct FTR *f, int x, int y)
 	action_change_zoom_by_factor(f, x, y, 1.0/WHEELFACTOR);
 }
 
-static void action_reset_zoom_and_position(struct FTR *f)
-{
-	struct pan_state *e = f->userdata;
-
-	e->ntiply = 1;
-	e->offset_x = 0;
-	e->offset_y = 0;
-
-	f->changed = 1;
-}
-
-
 
 
 // pan: expose handler {{{2
 // dump the image acording to the state of the viewport
 static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
+	fprintf(stderr, "pan exposer\n");
 	struct pan_state *e = f->userdata;
 
 	for (int j = 0; j < f->h; j++)
@@ -417,22 +418,17 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	f->changed = 1;
 }
 
-#define FTR_BUTTON_LEFT 1
-#define FTR_BUTTON_MIDDLE 2
-#define FTR_BUTTON_RIGHT 3
-#define FTR_BUTTON_UP 4
-#define FTR_BUTTON_DOWN 5
-
 // pan: motion handler {{{2
 // update offset variables by dragging
 static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 {
 	static double ox = 0, oy = 0;
-	if (m == 0) { // just relocate mouse center
+	if (m == 0) { // no buttons or keys, just relocate mouse center
 		ox = x;
 		oy = y;
 	}
-	if (m == 256) { // when dragging, increment offset
+
+	if (m == FTR_BUTTON_LEFT) { // when dragging, increment offset
 		action_increment_port_offset_in_window_pixels(f, x-ox, y-oy);
 		ox = x;
 		oy = y;
@@ -440,8 +436,7 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 	}
 
 	// middle button: print pixel value
-	//if (b == FTR_BUTTON_MIDDLE) {
-	if (m == 512) 
+	if (m == FTR_BUTTON_MIDDLE) 
 		action_print_value_at_window_position(f, x, y);
 
 }
@@ -461,20 +456,20 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 	if (b == FTR_BUTTON_DOWN)  action_increase_zoom(f, x, y);
 	if (b == FTR_BUTTON_UP  )  action_decrease_zoom(f, x, y);
 	if (b == FTR_BUTTON_RIGHT) action_reset_zoom_and_position(f);
-	f->changed = 1;
 }
 
 // pan: key handler {{{2
 void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
-	//fprintf(stderr, "k='%c' m=%d\n", k, m);
+	fprintf(stderr, "k='%c' m=%d\n", k, m);
 
 	if (k == '+') action_increase_zoom(f, f->w/2, f->h/2);
 	if (k == '-') action_decrease_zoom(f, f->w/2, f->h/2);
 
 	// if ESC or q, exit
 	if  (k == '\033' || tolower(k)=='q')
-		f->stop_loop = 1;
+		ftr_notify_the_desire_to_stop_this_loop(f, 0);
+		//f->stop_loop = 1;
 }
 
 
@@ -618,12 +613,12 @@ int main_twoimages2(int c, char *v[])
 
 
 // main_icrop {{{1
-static void do_inline_crop_rgb(unsigned char *x, int *w, int *h, int crop[4])
+static void do_inline_crop_rgb(unsigned char *x, int *w, int *h, int c[4])
 {
-	int from[2] = {BAD_MIN(crop[0], crop[2]), BAD_MIN(crop[1], crop[3])};
-	int to[2]   = {BAD_MAX(crop[0], crop[2]), BAD_MAX(crop[1], crop[3])};
-	int ow = to[0] - from[0]; //assert(ow > 0); assert(ow <= *w);
-	int oh = to[1] - from[1]; //assert(oh > 0); assert(oh <= *h);
+	int from[2] = {BAD_MIN(c[0], c[2]), BAD_MIN(c[1], c[3])};
+	int to[2]   = {BAD_MAX(c[0], c[2]), BAD_MAX(c[1], c[3])};
+	int ow = to[0] - from[0]; assert(ow > 0); assert(ow <= *w);
+	int oh = to[1] - from[1]; assert(oh > 0); assert(oh <= *h);
 	for (int j = 0; j < oh; j++)
 	for (int i = 0; i < ow; i++)
 	{
@@ -1030,10 +1025,12 @@ static void print_event_resize(struct FTR *f, int b, int m, int x, int y)
 int main_events(int c, char *v[])
 {
 	struct FTR f = ftr_new_window(320, 200);
+	fprintf(stderr, "i'm here!\n");
 	ftr_set_handler(&f, "key", print_event_key);
 	ftr_set_handler(&f, "button", print_event_button);
 	ftr_set_handler(&f, "motion", print_event_motion);
 	ftr_set_handler(&f, "resize", print_event_resize);
+	fprintf(stderr, "i'm still here!\n");
 	return ftr_loop_run(&f);
 }
 

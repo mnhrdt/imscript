@@ -37,6 +37,7 @@ void ftr_handler_dummy(struct FTR*,int,int,int,int);
 int ftr_loop_run(struct FTR *f); // returns when the loop is finished
 void ftr_loop_fork(struct FTR *f); // returns immediately, forks a new process
 int ftr_num_pending(struct FTR *f);
+void ftr_notify_the_desire_to_stop_this_loop(struct FTR *f, int return_value);
 
 int ftr_set_handler(struct FTR *f, char *id, ftr_event_handler_t e);
 ftr_event_handler_t ftr_get_handler(struct FTR *f, char *id);
@@ -44,3 +45,37 @@ ftr_event_handler_t ftr_get_handler(struct FTR *f, char *id);
 // forking interface (so far not implemented)
 //void ftr_signal_quit(struct FTR *);
 //void ftr_signal_update(struct FTR *);
+
+
+// ascii keys with name (necessary because '\e' is not standard)
+#define FTR_KEY_ESC        27 
+#define FTR_KEY_DEL        127
+
+// non-ascii keys (inspired by glut)
+#define FTR_KEY_FN         1000
+#define FTR_KEY_LEFT       1100
+#define FTR_KEY_UP         1101
+#define FTR_KEY_RIGHT      1102
+#define FTR_KEY_DOWN       1103
+#define FTR_KEY_PAGE_UP    1104
+#define FTR_KEY_PAGE_DOWN  1105
+#define FTR_KEY_HOME       1106
+#define FTR_KEY_END        1107
+#define FTR_KEY_INSERT     1108
+
+// key modifiers (inspired by X)
+#define FTR_MASK_SHIFT     1    //(1<<0)
+#define FTR_MASK_LOCK      2    //(1<<1)
+#define FTR_MASK_CONTROL   4    //(1<<2)
+#define FTR_MASK_MOD1      8    //(1<<3)
+#define FTR_MASK_MOD2      16   //(1<<4)
+#define FTR_MASK_MOD3      32   //(1<<5)
+#define FTR_MASK_MOD4      64   //(1<<6)
+#define FTR_MASK_MOD5      128  //(1<<7)
+
+// button modifiers (inspired by X)
+#define FTR_BUTTON_LEFT    256  //(1<<8)
+#define FTR_BUTTON_MIDDLE  512  //(1<<9)
+#define FTR_BUTTON_RIGHT   1024 //(1<<10)
+#define FTR_BUTTON_UP      2048 //(1<<11)
+#define FTR_BUTTON_DOWN    4096 //(1<<12)

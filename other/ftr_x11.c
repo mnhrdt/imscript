@@ -9,6 +9,7 @@
 #include <unistd.h> // only for "fork"
 #include "ftr.h"
 
+// X11-specific part {{{1
 struct _FTR {
 	// visible state
 	int w, h, max_w, max_h;
@@ -152,11 +153,6 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	return *(struct FTR *)f;
 }
 
-struct FTR ftr_new_window(int w, int h)
-{
-	return ftr_new_window_with_image_uint8_rgb(NULL, w, h);
-}
-
 void ftr_close(struct FTR *ff)
 {
 	struct _FTR *f = (void*)ff;
@@ -269,7 +265,7 @@ static void process_next_event(struct FTR *ff)
 	}
 
 	// "expose" and "resize" are never lost
-	// the mouse and keyboard evends are ignored when too busy
+	// the mouse and keyboard events are ignored when too busy
 	//
 	int ne = XPending(f->display);
 	if (ne > 1) // magical "1" here
@@ -285,7 +281,7 @@ static void process_next_event(struct FTR *ff)
 	}
 	if (event.type == ButtonPress && f->handle_button) {
 		XButtonEvent e = event.xbutton;
-		f->handle_button(ff, e.button, e.state, e.x, e.y);
+		f->handle_button(ff, 1<<(7+e.button), e.state, e.x, e.y);
 	}
 	if (event.type == KeyPress && f->handle_key) {
 		XKeyEvent e = event.xkey;
@@ -324,6 +320,19 @@ int ftr_num_pending(struct FTR *ff)
 {
 	struct _FTR *f = (void*)ff;
 	return XPending(f->display);
+}
+
+void ftr_notify_the_desire_to_stop_this_loop(struct FTR *ff, int retval)
+{
+	struct _FTR *f = (void*)ff;
+	f->stop_loop = retval?retval:-1;
+}
+
+// common to all implementations {{{1
+
+struct FTR ftr_new_window(int w, int h)
+{
+	return ftr_new_window_with_image_uint8_rgb(NULL, w, h);
 }
 
 void ftr_fork_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
@@ -400,7 +409,8 @@ ftr_event_handler_t ftr_get_handler(struct FTR *ff, char *id)
 static void handle_click_wait(struct FTR *f, int b, int m, int x, int y)
 {
 	if (b == 1 || b == 2 || b == 3)
-		f->stop_loop = 10000*y + x;
+		ftr_notify_the_desire_to_stop_this_loop(f, 10000*y + x);
+		//f->stop_loop = 10000*y + x;
 }
 
 void ftr_wait_for_mouse_click(struct FTR *f, int *x, int *y, int *b, int *m)
@@ -410,3 +420,6 @@ void ftr_wait_for_mouse_click(struct FTR *f, int *x, int *y, int *b, int *m)
 	if (x) *x = r % 10000;
 	if (y) *y = r / 10000;
 }
+
+
+// vim:set foldmethod=marker:
