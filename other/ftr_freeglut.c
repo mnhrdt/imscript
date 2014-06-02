@@ -33,6 +33,8 @@ struct _FTR {
 	int handle_mute;
 	int glut_initted;
 	int glut_button_mask;
+	int glut_window_x;
+	int glut_window_y;
 };
 
 // Check that _FTR can fit inside a FTR
@@ -45,6 +47,8 @@ typedef char check_FTR_size[sizeof(struct _FTR)<=sizeof(struct FTR)?1:-1];
 // global variable
 struct _FTR *ftr_freeglut_global_state = NULL;
 
+static void my_idle(void);
+
 // glut handlers {{{2
 static void my_displayfunc(void)
 {
@@ -54,6 +58,9 @@ static void my_displayfunc(void)
 
 	if (f->handle_expose)
 		f->handle_expose((void*)f, 0, 0, 0, 0);
+
+	if (f->handle_idle)
+		glutIdleFunc(my_idle); // ugly hack to allow toggling
 
 	glViewport(0, 0, f->w, f->h);
 
@@ -69,7 +76,15 @@ static void my_displayfunc(void)
 
 static void my_reshapefunc(int w, int h)
 {
-	fprintf(stderr, "GLUT reshapefunc %d %d\n", w, h);
+	//fprintf(stderr, "GLUT reshapefunc %d %d\n", w, h);
+
+	struct _FTR *f = ftr_freeglut_global_state;
+
+	f->w = w < f->max_w ? w : f->max_w;
+	f->h = h < f->max_h ? h : f->max_h;
+
+	if (f->handle_resize)
+		f->handle_resize((void*)f, 0, 0, f->w, f->h);
 }
 
 static void my_keyboardfunc(unsigned char k, int x, int y)
@@ -107,7 +122,7 @@ static void my_specialfunc(int k, int x, int y)
 
 static void my_mousefunc(int b, int s, int x, int y)
 {
-	fprintf(stderr, "GLUT mousefunc %d %d (%d %d)\n", b, s, x, y);
+	//fprintf(stderr, "GLUT mousefunc %d %d (%d %d)\n", b, s, x, y);
 
 	struct _FTR *f = ftr_freeglut_global_state;
 
@@ -129,7 +144,7 @@ static void my_passivemotionfunc(int x, int y)
 	struct _FTR *f = ftr_freeglut_global_state;
 	if (f->handle_mute) return;
 
-	fprintf(stderr, "GLUT passive motionfunc %d %d\n", x, y);
+	//fprintf(stderr, "GLUT passive motionfunc %d %d\n", x, y);
 
 	f->handle_mute = 1;
 	if (f->handle_motion) {
@@ -142,7 +157,7 @@ static void my_passivemotionfunc(int x, int y)
 
 static void my_motionfunc(int x, int y)
 {
-	fprintf(stderr, "GLUT motionfunc %d %d\n", x, y);
+	//fprintf(stderr, "GLUT motionfunc %d %d\n", x, y);
 	my_passivemotionfunc(x, y);
 }
 
@@ -152,9 +167,13 @@ static void my_idle(void)
 	//fprintf(stderr, "GLUT idle handler\n");
 
 	struct _FTR *f = ftr_freeglut_global_state;
-	f->handle_idle((void*)f, 0, 0, 0, 0);
-	if (f->changed)
-		glutPostRedisplay();
+	if (f->handle_idle) {
+		f->handle_idle((void*)f, 0, 0, 0, 0);
+		if (f->changed)
+			glutPostRedisplay();
+	} else {
+		glutIdleFunc(NULL);
+	}
 }
 
 // setup_glut_environment {{{2
@@ -178,7 +197,9 @@ static void setup_glut_environment(struct _FTR *f)
 	glutSpecialFunc(my_specialfunc);
 	f->glut_initted = 1;
 	f->glut_button_mask = 0; // not sure
-	fprintf(stderr, "setup glut rgb = %p\n", f->rgb);
+	//fprintf(stderr, "setup glut rgb = %p\n", f->rgb);
+	if (f->glut_window_x >= 0)
+		glutPositionWindow(f->glut_window_x, f->glut_window_y);
 }
 
 
@@ -195,7 +216,6 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	for (int i = 0; i < 3*w*h; i++)
 		f->rgb[i] = x? x[i] : 0;
 
-
 	f->handle_key = ftr_handler_exit_on_ESC;
 	f->handle_button = NULL;
 	f->handle_motion = NULL;
@@ -207,8 +227,8 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	f->handle_mute = 0;
 	f->glut_initted = 0;
 	f->glut_button_mask = 0;
+	f->glut_window_x = f->glut_window_y = -1;
 
-	//f->glut_stopped = 0;
 	// freeglut specific part
 	setup_glut_environment(f);
 
@@ -219,6 +239,7 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	return *(struct FTR *)f;
 }
 
+// ftr_close {{{2
 void ftr_close(struct FTR *ff)
 {
 	// do nothing by now
@@ -229,9 +250,10 @@ void ftr_close(struct FTR *ff)
 	//XCloseDisplay(f->display);
 }
 
+// ftr_loop_run {{{2
 int ftr_loop_run(struct FTR *ff)
 {
-	fprintf(stderr, "going to start loop\n");
+	//fprintf(stderr, "going to start loop\n");
 	struct _FTR *f = (void*)ff;
 
 	// after window creation, we jumped into the air
@@ -245,19 +267,25 @@ int ftr_loop_run(struct FTR *ff)
 		glutIdleFunc(my_idle);
 
 	glutMainLoop();
-	fprintf(stderr, "returned from glut loop (%d)\n", f->stop_loop);
+	//fprintf(stderr, "returned from glut loop (%d)\n", f->stop_loop);
 
 	int r = f->stop_loop;
 	f->stop_loop = 0;
 	return r;
 }
 
+// ftr_notify_the_desire_to_stop_this_loop {{{2
 void ftr_notify_the_desire_to_stop_this_loop(struct FTR *ff, int retval)
 {
-	fprintf(stderr, "stop notification retval = %d\n", retval);
+	//fprintf(stderr, "stop notification retval = %d\n", retval);
 	struct _FTR *f = (void*)ff;
 	f->stop_loop = retval;
 	f->glut_initted = 0;
+
+	// save window position
+	f->glut_window_x = glutGet(GLUT_WINDOW_X);
+	f->glut_window_y = glutGet(GLUT_WINDOW_Y);
+
 	glutLeaveMainLoop();
 }
 

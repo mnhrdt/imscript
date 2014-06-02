@@ -163,10 +163,10 @@ void ftr_close(struct FTR *ff)
 
 static int keycode_to_ascii(struct _FTR *f, int keycode, int keystate)
 {
-	fprintf(stderr, "\tkeycode = %d (%d)\n", keycode, keystate);
+	//fprintf(stderr, "\tkeycode = %d (%d)\n", keycode, keystate);
 	//int key = XKeycodeToKeysym(f->display, keycode, keystate);
 	int key = XkbKeycodeToKeysym(f->display, keycode, 0, keystate);
-	fprintf(stderr, "\tkeycode = %d (%d) => %d\n", keycode, keystate, key);
+	//fprintf(stderr, "\tkeycode = %d (%d) => %d\n", keycode, keystate, key);
 	if (keycode == 9)   return 27;    // ascii ESC
 	if (keycode == 119) return 127;   // ascii DEL
 	if (keycode == 22)  return '\b';
@@ -295,6 +295,8 @@ static void process_next_event(struct FTR *ff)
 int ftr_loop_run(struct FTR *ff)
 {
 	struct _FTR *f = (void*)ff;
+
+	//f->changed = 1;
 
 	while (!f->stop_loop)
 	{

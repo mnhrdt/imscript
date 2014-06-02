@@ -24,7 +24,7 @@ static unsigned char *read_image_uint8_rgb(char *fname, int *w, int *h)
 {
 	int pd;
 	unsigned char *x = iio_read_image_uint8_vec(fname, w, h, &pd);
-	fprintf(stderr, "riur got %d %d %d\n", *w, *h, pd);
+	//fprintf(stderr, "riur got %d %d %d\n", *w, *h, pd);
 	if (pd == 3) return x;
 	unsigned char *y = malloc(3**w**h);
 	for (int i = 0; i < *w**h; i++) {
@@ -404,7 +404,7 @@ static void action_decrease_zoom(struct FTR *f, int x, int y)
 // dump the image acording to the state of the viewport
 static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
-	fprintf(stderr, "pan exposer\n");
+	//fprintf(stderr, "pan exposer\n");
 	struct pan_state *e = f->userdata;
 
 	for (int j = 0; j < f->h; j++)
@@ -544,6 +544,7 @@ int main_pan(int c, char *v[])
 	//ftr_set_handler(&f, "key", ftr_handler_exit_on_ESC_or_q);
 	ftr_set_handler(&f, "key", pan_key_handler);
 	int r = ftr_loop_run(&f);
+
 
 	// cleanup and exit (optional)
 	ftr_close(&f);
@@ -901,6 +902,8 @@ static void draw_fire(struct FTR *f, int x, int y, int k, int m)
 		f->rgb[3*pos+1] = pal[3*idx+1];
 		f->rgb[3*pos+2] = pal[3*idx+2];
 	}
+
+	f->changed = 1;
 }
 
 static void draw_minifire(struct FTR *f, int x, int y, int k, int m)
@@ -926,7 +929,6 @@ static void draw_minifire(struct FTR *f, int x, int y, int k, int m)
 		t = malloc(w * h * sizeof*t);
 		for (int i = 0; i < w*h; i++)
 			t[i] = 104;
-		f->changed = 1;
 	}
 
 	// draw random values at the bottom
@@ -957,6 +959,8 @@ static void draw_minifire(struct FTR *f, int x, int y, int k, int m)
 		f->rgb[3*(w*j+i)+1] = pal[3*idx+1];
 		f->rgb[3*(w*j+i)+2] = pal[3*idx+2];
 	}
+
+	f->changed = 1;
 }
 
 static void toggle_idle2(struct FTR *f, int b, int m, int x, int y)
