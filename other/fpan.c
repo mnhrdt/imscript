@@ -2,7 +2,6 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 
 #include "ftr_mini.h"
 #include "iio.h"
@@ -11,12 +10,12 @@
 #define MAX_PYRAMID_LEVELS 30
 
 // image file input/output (wrapper around iio) {{{1
-static unsigned char *read_image_uint8_rgb(char *fname, int *w, int *h)
+static float *read_image_float_rgb(char *fname, int *w, int *h)
 {
 	int pd;
-	unsigned char *x = iio_read_image_uint8_vec(fname, w, h, &pd);
+	float *x = iio_read_image_float_vec(fname, w, h, &pd);
 	if (pd == 3) return x;
-	unsigned char *y = malloc(3**w**h);
+	float *y = malloc(3**w**h*sizeof*y);
 	for (int i = 0; i < *w**h; i++) {
 		switch(pd) {
 		case 1:
@@ -42,13 +41,14 @@ static unsigned char *read_image_uint8_rgb(char *fname, int *w, int *h)
 struct pan_state {
 	// 1. image data
 	int w, h;
-	unsigned char *rgb;
+	float *frgb;
 
 	// 2. view port parameters
 	double zoom_factor, offset_x, offset_y;
+	double a, b;
 
 	// 3. image pyramid
-	unsigned char *pyr_rgb[MAX_PYRAMID_LEVELS];
+	float *pyr_rgb[MAX_PYRAMID_LEVELS];
 	int pyr_w[MAX_PYRAMID_LEVELS], pyr_h[MAX_PYRAMID_LEVELS];
 };
 
@@ -66,16 +66,14 @@ static void image_to_window(int i[2], struct pan_state *e, double x, double y)
 	i[1] = floor(y * e->zoom_factor - e->offset_y);
 }
 
-static unsigned char getsample_0(unsigned char *x, int w, int h,
-						int i, int j, int l)
+static float getsample_0(float *x, int w, int h, int i, int j, int l)
 {
 	if (i < 0 || i >= w) return 0;
 	if (j < 0 || j >= h) return 0;
 	return x[3*(j*w+i)+l];
 }
 
-static void interpolate_at(unsigned char *out,
-		unsigned char *x, int w, int h, double p, double q)
+static void interpolate_at(float *out, float *x, int w, int h, float p, float q)
 {
 	out[0] = getsample_0(x, w, h, (int)p, (int)q, 0);
 	out[1] = getsample_0(x, w, h, (int)p, (int)q, 1);
@@ -83,10 +81,10 @@ static void interpolate_at(unsigned char *out,
 }
 
 // evaluate the value a position (p,q) in image coordinates
-static void pixel(unsigned char *out, struct pan_state *e, double p, double q)
+static void pixel(float *out, struct pan_state *e, double p, double q)
 {
 	if (e->zoom_factor > 0.9999)
-		interpolate_at(out, e->rgb, e->w, e->h, p, q);
+		interpolate_at(out, e->frgb, e->w, e->h, p, q);
 	else {
 		if(p<0||q<0){out[0]=out[1]=out[2]=0;return;}
 		int s = -0 - log(e->zoom_factor) / log(2);
@@ -95,7 +93,7 @@ static void pixel(unsigned char *out, struct pan_state *e, double p, double q)
 		int sfac = 1<<(s+1);
 		int w = e->pyr_w[s];
 		int h = e->pyr_h[s];
-		unsigned char *rgb = e->pyr_rgb[s];
+		float *rgb = e->pyr_rgb[s];
 		interpolate_at(out, rgb, w, h, p/sfac, q/sfac);
 	}
 }
@@ -106,9 +104,9 @@ static void action_print_value_under_cursor(struct FTR *f, int x, int y)
 		struct pan_state *e = f->userdata;
 		double p[2];
 		window_to_image(p, e, x, y);
-		unsigned char c[3];
-		interpolate_at(c, e->rgb, e->w, e->h, p[0], p[1]);
-		printf("%g\t%g\t: %d\t%d\t%d\n", p[0], p[1], c[0], c[1], c[2]);
+		float c[3];
+		interpolate_at(c, e->frgb, e->w, e->h, p[0], p[1]);
+		printf("%g\t%g\t: %g\t%g\t%g\n", p[0], p[1], c[0], c[1], c[2]);
 	}
 }
 
@@ -128,6 +126,18 @@ static void action_reset_zoom_and_position(struct FTR *f)
 	e->zoom_factor = 1;
 	e->offset_x = 0;
 	e->offset_y = 0;
+	e->a = 1;
+	e->b = 0;
+
+	f->changed = 1;
+}
+
+static void action_contrast_change(struct FTR *f, float afac, float bshift)
+{
+	struct pan_state *e = f->userdata;
+
+	e->a *= afac;
+	e->b += bshift;
 
 	f->changed = 1;
 }
@@ -166,8 +176,16 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	{
 		double p[2];
 		window_to_image(p, e, i, j);
-		unsigned char *c = f->rgb + 3 * (j * f->w + i);
+		float c[3];
 		pixel(c, e, p[0], p[1]);
+		unsigned char *cc = f->rgb + 3 * (j * f->w + i);
+		for (int l = 0; l < 3; l++)
+		{
+			float g = e->a * c[l] + e->b;
+			if      (g < 0)   cc[l] = 0  ;
+			else if (g > 255) cc[l] = 255;
+			else              cc[l] = g  ;
+		}
 	}
 	f->changed = 1;
 }
@@ -197,9 +215,14 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == '+') action_increase_zoom(f, f->w/2, f->h/2);
 	if (k == '-') action_decrease_zoom(f, f->w/2, f->h/2);
 
+	if (k == 'a') action_contrast_change(f, 1.3, 0);
+	if (k == 'A') action_contrast_change(f, 1/1.3, 0);
+	if (k == 'b') action_contrast_change(f, 1, 1);
+	if (k == 'B') action_contrast_change(f, 1, -1);
+
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
-		ftr_notify_the_desire_to_stop_this_loop(f, 0);
+		ftr_notify_the_desire_to_stop_this_loop(f, 1);
 
 	// arrows move the viewport
 	if (k > 1000) {
@@ -217,8 +240,8 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	}
 }
 
-static void zoom_out_by_factor_two(unsigned char *out, int ow, int oh,
-		unsigned char *in, int iw, int ih)
+static void zoom_out_by_factor_two(float *out, int ow, int oh,
+		float *in, int iw, int ih)
 {
 	assert(abs(2*ow-iw) < 2);
 	assert(abs(2*oh-ih) < 2);
@@ -239,12 +262,12 @@ static void create_pyramid(struct pan_state *e)
 {
 	for (int s = 0; s < MAX_PYRAMID_LEVELS; s++)
 	{
-		int            lw   = s ? e->pyr_w  [s-1] : e->w  ;
-		int            lh   = s ? e->pyr_h  [s-1] : e->h  ;
-		unsigned char *lrgb = s ? e->pyr_rgb[s-1] : e->rgb;
-		int            sw   = ceil(lw / 2.0);
-		int            sh   = ceil(lh / 2.0);
-		unsigned char *srgb = malloc(3 * sw * sh);
+		int      lw   = s ? e->pyr_w  [s-1] : e->w   ;
+		int      lh   = s ? e->pyr_h  [s-1] : e->h   ;
+		float   *lrgb = s ? e->pyr_rgb[s-1] : e->frgb;
+		int      sw   = ceil(lw / 2.0);
+		int      sh   = ceil(lh / 2.0);
+		float   *srgb = malloc(3 * sw * sh * sizeof*srgb);
 		zoom_out_by_factor_two(srgb, sw, sh, lrgb, lw, lh);
 		e->pyr_w[s]   = sw;
 		e->pyr_h[s]   = sh;
@@ -272,7 +295,7 @@ int main_pan(int c, char *v[])
 
 	// read image
 	struct pan_state e[1];
-	e->rgb = read_image_uint8_rgb(filename_in, &e->w, &e->h);
+	e->frgb = read_image_float_rgb(filename_in, &e->w, &e->h);
 	create_pyramid(e);
 
 	// open window
@@ -287,7 +310,7 @@ int main_pan(int c, char *v[])
 
 	// cleanup and exit (optional)
 	ftr_close(&f);
-	free(e->rgb);
+	free(e->frgb);
 	free_pyramid(e);
 	return r;
 }
