@@ -436,7 +436,7 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 	}
 
 	// middle button: print pixel value
-	if (m == FTR_BUTTON_MIDDLE) 
+	if (m == FTR_BUTTON_MIDDLE)
 		action_print_value_at_window_position(f, x, y);
 
 }
@@ -919,11 +919,11 @@ static void draw_minifire(struct FTR *f, int x, int y, int k, int m)
 	static float *t = NULL;
 	static int w = 0;
 	static int h = 0;
-	if (!f || w != f->w || h != f->h) { 
+	if (!f || w != f->w || h != f->h) {
 		w = f->w;
 		h = f->h;
 		if (t) free(t);
-		t = malloc(w * h * sizeof*t); 
+		t = malloc(w * h * sizeof*t);
 		for (int i = 0; i < w*h; i++)
 			t[i] = 104;
 		f->changed = 1;
@@ -941,7 +941,7 @@ static void draw_minifire(struct FTR *f, int x, int y, int k, int m)
 	for (int j = h-3; j >= num_lines_bottom; j--)
 	for (int i = 0; i < w; i++) {
 		p = j*w+i;
-		t[p+2*w+1] = (1.5*t[p-3*w] + 1.7 * t[p-2*w+1] 
+		t[p+2*w+1] = (1.5*t[p-3*w] + 1.7 * t[p-2*w+1]
 				+ 1.5 * t[p-4*w] + 1.9 * t[p-3*w-1]
 				+ 1.0 * t[p-1*w-2]
 				+1.9 * t[p-4*w+1]

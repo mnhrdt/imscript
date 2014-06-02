@@ -32,8 +32,7 @@ struct _FTR {
 	//int glut_stopped;
 	int handle_mute;
 	int glut_initted;
-	int glut_right_button_pressed;
-	
+	int glut_button_mask;
 };
 
 // Check that _FTR can fit inside a FTR
@@ -54,7 +53,7 @@ static void my_displayfunc(void)
 	struct _FTR *f = ftr_freeglut_global_state;
 
 	if (f->handle_expose)
-		f->handle_expose((void*)f, 0, 0, 0, 0); 
+		f->handle_expose((void*)f, 0, 0, 0, 0);
 
 	glViewport(0, 0, f->w, f->h);
 
@@ -75,25 +74,35 @@ static void my_reshapefunc(int w, int h)
 
 static void my_keyboardfunc(unsigned char k, int x, int y)
 {
-	fprintf(stderr, "GLUT keyboardfunc  %d '%c' %d %d\n",
-			k, isalnum(k)?k:' ', x, y);
+	//fprintf(stderr, "GLUT keyboardfunc  %d '%c' %d %d\n",
+	//		k, isalnum(k)?k:' ', x, y);
 
 	struct _FTR *f = ftr_freeglut_global_state;
 
 	if (f->handle_key) {
-		f->handle_key((void*)f, k, 0, x, y); 
+		f->handle_key((void*)f, k, 0, x, y);
 		if (f->changed)
 			glutPostRedisplay();
 	}
 }
 
+static int key_from_glut_to_ftr(int k)
+{
+	return k + 1000;
+}
+
+static int button_from_glut_to_ftr(int b)
+{
+	return 1 << ( b + 8 );
+}
+
 static void my_specialfunc(int k, int x, int y)
 {
-	fprintf(stderr, "GLUT specialfunc  %d '%c' %d %d\n",
-			k, isalnum(k)?k:' ', x, y);
+	//fprintf(stderr, "GLUT specialfunc  %d '%c' %d %d\n",
+	//		k, isalnum(k)?k:' ', x, y);
 
 	//if (f->handle_key)
-	//	f->handle_key(f, from_glut_key_to_ftr(k), 0, x, y); 
+	//	f->handle_key(f, from_glut_key_to_ftr(k), 0, x, y);
 }
 
 static void my_mousefunc(int b, int s, int x, int y)
@@ -102,16 +111,17 @@ static void my_mousefunc(int b, int s, int x, int y)
 
 	struct _FTR *f = ftr_freeglut_global_state;
 
+	int B = button_from_glut_to_ftr(b);
+	if (s == 0) // pressed
+		f->glut_button_mask |= B;
+	if (s == 1) // de-pressed
+		f->glut_button_mask &= ~B;
+
 	if (f->handle_button && 0 == s) {
-		f->handle_button((void*)f, b+1, 0, x, y); 
+		f->handle_button((void*)f, B, 0, x, y);
 		if (f->changed)
 			glutPostRedisplay();
 	}
-}
-
-static void my_motionfunc(int x, int y)
-{
-	fprintf(stderr, "GLUT motionfunc %d %d\n", x, y);
 }
 
 static void my_passivemotionfunc(int x, int y)
@@ -123,12 +133,19 @@ static void my_passivemotionfunc(int x, int y)
 
 	f->handle_mute = 1;
 	if (f->handle_motion) {
-		f->handle_motion((void*)f, 0, 0, x, y); 
+		f->handle_motion((void*)f, 0, f->glut_button_mask, x, y);
 		if (f->changed)
 			glutPostRedisplay();
 	}
 	f->handle_mute = 0;
 }
+
+static void my_motionfunc(int x, int y)
+{
+	fprintf(stderr, "GLUT motionfunc %d %d\n", x, y);
+	my_passivemotionfunc(x, y);
+}
+
 
 static void my_idle(void)
 {
@@ -160,6 +177,7 @@ static void setup_glut_environment(struct _FTR *f)
 	glutKeyboardFunc(my_keyboardfunc);
 	glutSpecialFunc(my_specialfunc);
 	f->glut_initted = 1;
+	f->glut_button_mask = 0; // not sure
 	fprintf(stderr, "setup glut rgb = %p\n", f->rgb);
 }
 
@@ -188,6 +206,7 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	f->stop_loop = 0;
 	f->handle_mute = 0;
 	f->glut_initted = 0;
+	f->glut_button_mask = 0;
 
 	//f->glut_stopped = 0;
 	// freeglut specific part
@@ -217,11 +236,11 @@ int ftr_loop_run(struct FTR *ff)
 
 	// after window creation, we jumped into the air
 	// here, we get hold of a new branch
-	ftr_freeglut_global_state = f; 
+	ftr_freeglut_global_state = f;
 
 	if (!f->glut_initted)
 		setup_glut_environment(f);
-	
+
 	if (f->handle_idle)
 		glutIdleFunc(my_idle);
 
@@ -242,97 +261,6 @@ void ftr_notify_the_desire_to_stop_this_loop(struct FTR *ff, int retval)
 	glutLeaveMainLoop();
 }
 
-// common to all implementations {{{1
-
-struct FTR ftr_new_window(int w, int h)
-{
-	return ftr_new_window_with_image_uint8_rgb(NULL, w, h);
-}
-
-void ftr_fork_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
-{
-	if (!fork())
-	{
-		struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
-		exit(ftr_loop_run(&f));
-	}
-}
-
-void ftr_loop_fork(struct FTR *f)
-{
-	if (!fork())
-		exit(ftr_loop_run(f));
-}
-
-void ftr_handler_exit_on_ESC(struct FTR *f, int k, int m, int x, int y)
-{
-	if  (k == '\033')
-		ftr_notify_the_desire_to_stop_this_loop(f, 0);
-}
-
-void ftr_handler_exit_on_ESC_or_q(struct FTR *f, int k, int m, int x, int y)
-{
-	if  (k == '\033' || k=='q' || k=='Q')
-		ftr_notify_the_desire_to_stop_this_loop(f, 0);
-}
-
-void ftr_handler_stop_loop(struct FTR *f, int k, int m, int x, int y)
-{
-	ftr_notify_the_desire_to_stop_this_loop(f, 0);
-}
-
-void ftr_handler_dummy(struct FTR *f, int k, int m, int x, int y)
-{
-}
-
-void ftr_handler_toggle_idle(struct FTR *ff, int k, int m, int x, int y)
-{
-	struct _FTR *f = (void*)ff;
-	ftr_event_handler_t tmp = f->handle_idle;
-	f->handle_idle = f->handle_idle_toggled;
-	f->handle_idle_toggled = tmp;
-}
-
-int ftr_set_handler(struct FTR *ff, char *id, ftr_event_handler_t e)
-{
-	struct _FTR *f = (void*)ff;
-	if (0) ;
-	else if (0 == strcmp(id, "key"))    { f->handle_key    = e; return 0; }
-	else if (0 == strcmp(id, "button")) { f->handle_button = e; return 0; }
-	else if (0 == strcmp(id, "motion")) { f->handle_motion = e; return 0; }
-	else if (0 == strcmp(id, "expose")) { f->handle_expose = e; return 0; }
-	else if (0 == strcmp(id, "resize")) { f->handle_resize = e; return 0; }
-	else if (0 == strcmp(id, "idle"))   { f->handle_idle   = e; return 0; }
-	return fprintf(stderr, "WARNING: unrecognized event \"%s\"\n", id);
-}
-
-ftr_event_handler_t ftr_get_handler(struct FTR *ff, char *id)
-{
-	struct _FTR *f = (void*)ff;
-	if (0) ;
-	else if (0 == strcmp(id, "key"))    return f->handle_key   ;
-	else if (0 == strcmp(id, "button")) return f->handle_button;
-	else if (0 == strcmp(id, "motion")) return f->handle_motion;
-	else if (0 == strcmp(id, "expose")) return f->handle_expose;
-	else if (0 == strcmp(id, "resize")) return f->handle_resize;
-	else if (0 == strcmp(id, "idle"))   return f->handle_idle  ;
-	return fprintf(stderr, "WARNING: bad event \"%s\"\n", id),
-		(ftr_event_handler_t)NULL;
-}
-
-static void handle_click_wait(struct FTR *f, int b, int m, int x, int y)
-{
-	if (b == 1 || b == 2 || b == 3)
-		ftr_notify_the_desire_to_stop_this_loop(f, 10000*y + x);
-}
-
-void ftr_wait_for_mouse_click(struct FTR *f, int *x, int *y, int *b, int *m)
-{
-	ftr_set_handler(f, "button", handle_click_wait);
-	int r = ftr_loop_run(f);
-	if (x) *x = r % 10000;
-	if (y) *y = r / 10000;
-}
-
+#include "ftr_common_inc.c"
 
 // vim:set foldmethod=marker:
