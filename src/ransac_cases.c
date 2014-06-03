@@ -215,7 +215,8 @@ static float homographic_match_error(float *hom, float *pair, void *usr)
 	double Hp[2];
 	homography_transform(p, H, Hp);
 	double r = hypot(Hp[0] - q[0], Hp[1] - q[1]);
-	return r;
+
+	return isfinite(r) ? r : INFINITY;
 }
 
 // instance of "ransac_model_generating_function"
