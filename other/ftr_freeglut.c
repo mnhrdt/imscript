@@ -110,8 +110,8 @@ static int modifiers_from_glut_to_ftr(int m)
 
 static void my_specialfunc(int k, int x, int y)
 {
-	//fprintf(stderr, "GLUT specialfunc  %d '%c' %d %d\n",
-	//		k, isalnum(k)?k:' ', x, y);
+	fprintf(stderr, "GLUT specialfunc  %d '%c' %d %d\n",
+			k, isalnum(k)?k:' ', x, y);
 
 	struct _FTR *f = ftr_freeglut_global_state;
 	if (f->handle_key) {
@@ -124,8 +124,8 @@ static void my_specialfunc(int k, int x, int y)
 
 static void my_keyboardfunc(unsigned char k, int x, int y)
 {
-	//fprintf(stderr, "GLUT keyboardfunc  %d '%c' %d %d\n",
-	//		k, isalnum(k)?k:' ', x, y);
+	fprintf(stderr, "GLUT keyboardfunc  %d '%c' %d %d\n",
+			k, isalnum(k)?k:' ', x, y);
 
 	struct _FTR *f = ftr_freeglut_global_state;
 
@@ -149,8 +149,10 @@ static void my_mousefunc(int b, int s, int x, int y)
 	if (s == 1) // de-pressed
 		f->glut_button_mask &= ~B;
 
+
 	if (f->handle_button && 0 == s) {
-		f->handle_button((void*)f, B, 0, x, y);
+		int m = modifiers_from_glut_to_ftr(glutGetModifiers());
+		f->handle_button((void*)f, B, m, x, y);
 		if (f->changed)
 			glutPostRedisplay();
 	}
@@ -165,7 +167,8 @@ static void my_passivemotionfunc(int x, int y)
 
 	f->handle_mute = 1;
 	if (f->handle_motion) {
-		f->handle_motion((void*)f, 0, f->glut_button_mask, x, y);
+		int m = modifiers_from_glut_to_ftr(glutGetModifiers());
+		f->handle_motion((void*)f, 0, m|f->glut_button_mask, x, y);
 		if (f->changed)
 			glutPostRedisplay();
 	}

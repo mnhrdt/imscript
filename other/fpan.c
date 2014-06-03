@@ -142,6 +142,32 @@ static void action_contrast_change(struct FTR *f, float afac, float bshift)
 	f->changed = 1;
 }
 
+static void action_center_contrast_at_point(struct FTR *f, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+
+	double p[2];
+	window_to_image(p, e, x, y);
+	float c[3];
+	pixel(c, e, p[0], p[1]);
+	float C = (c[0] + c[1] + c[2])/3;
+
+	e->b = 127.5 - e->a * C;
+
+	f->changed = 1;
+}
+
+static void action_contrast_span(struct FTR *f, float factor)
+{
+	struct pan_state *e = f->userdata;
+
+	float c = (127.5 - e->b)/ e->a;
+	e->a *= factor;
+	e->b = 127.5 - e->a * c;
+
+	f->changed = 1;
+}
+
 static void action_change_zoom_by_factor(struct FTR *f, int x, int y, double F)
 {
 	struct pan_state *e = f->userdata;
@@ -197,6 +223,7 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 
 	if (m == FTR_BUTTON_LEFT)   action_offset_viewport(f, x - ox, y - oy);
 	if (m == FTR_BUTTON_MIDDLE) action_print_value_under_cursor(f, x, y);
+	if (m == FTR_MASK_SHIFT)    action_center_contrast_at_point(f, x, y);
 
 	ox = x;
 	oy = y;
@@ -204,6 +231,11 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 
 static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 {
+	fprintf(stderr, "button b=%d m=%d\n", b, m);
+	if (b == FTR_BUTTON_UP && m == FTR_MASK_SHIFT) {
+		action_contrast_span(f, 1/1.3); return; }
+	if (b == FTR_BUTTON_DOWN && m == FTR_MASK_SHIFT) {
+		action_contrast_span(f, 1.3); return; }
 	if (b == FTR_BUTTON_MIDDLE) action_print_value_under_cursor(f, x, y);
 	if (b == FTR_BUTTON_DOWN)   action_increase_zoom(f, x, y);
 	if (b == FTR_BUTTON_UP  )   action_decrease_zoom(f, x, y);
@@ -215,10 +247,10 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == '+') action_increase_zoom(f, f->w/2, f->h/2);
 	if (k == '-') action_decrease_zoom(f, f->w/2, f->h/2);
 
-	if (k == 'a') action_contrast_change(f, 1.3, 0);
-	if (k == 'A') action_contrast_change(f, 1/1.3, 0);
-	if (k == 'b') action_contrast_change(f, 1, 1);
-	if (k == 'B') action_contrast_change(f, 1, -1);
+	//if (k == 'a') action_contrast_change(f, 1.3, 0);
+	//if (k == 'A') action_contrast_change(f, 1/1.3, 0);
+	//if (k == 'b') action_contrast_change(f, 1, 1);
+	//if (k == 'B') action_contrast_change(f, 1, -1);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')

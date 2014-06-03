@@ -229,12 +229,27 @@ static void process_next_event(struct FTR *ff)
 			f->ximage = XGetImage(f->display, f->window,
 					0, 0, f->w, f->h, AllPlanes, ZPixmap);
 			f->imgupdate = 0;
+			fprintf(stderr, "XIMAGE:\n");
+			fprintf(stderr, "\tformat = %d\n", f->ximage->format);
+			fprintf(stderr, "\twidth = %d\n", f->ximage->width);
+			fprintf(stderr, "\theight = %d\n", f->ximage->height);
+			fprintf(stderr, "\tbpad = %d\n", f->ximage->bitmap_pad);
+			fprintf(stderr, "\tbord = %d\n", f->ximage->bitmap_bit_order);
+			fprintf(stderr, "\tbunit = %d\n", f->ximage->bitmap_unit);
+			fprintf(stderr, "\tdepth = %d\n", f->ximage->depth);
+			fprintf(stderr, "\tBpl = %d\n", f->ximage->bytes_per_line);
+			fprintf(stderr, "\tbpp = %d\n", f->ximage->bits_per_pixel);
+			fprintf(stderr, "\tR = %x\n", f->ximage->red_mask);
+			fprintf(stderr, "\tG = %x\n", f->ximage->green_mask);
+			fprintf(stderr, "\tB = %x\n", f->ximage->blue_mask);
+			//f->ximage->blue_mask = 0xff0000;
+			//f->ximage->red_mask = 0xff;
 		}
 		for (int i = 0; i < f->w*f->h; i++) {
 			f->ximage->data[4*i+0] = f->rgb[3*i+2];
 			f->ximage->data[4*i+1] = f->rgb[3*i+1];
 			f->ximage->data[4*i+2] = f->rgb[3*i+0];
-			f->ximage->data[4*i+3] = -1;
+			f->ximage->data[4*i+3] = 0;
 		}
 		XPutImage(f->display, f->window, f->gc, f->ximage,
 				0, 0, 0, 0, f->w, f->h);
