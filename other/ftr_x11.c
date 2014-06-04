@@ -26,6 +26,7 @@ struct _FTR {
 	ftr_event_handler_t handle_resize;
 	ftr_event_handler_t handle_idle;
 	ftr_event_handler_t handle_idle_toggled;
+	ftr_event_handler_t handle_wheel;
 	int max_w, max_h;
 	int stop_loop;
 
@@ -36,6 +37,8 @@ struct _FTR {
 	GC gc;
 	XImage *ximage;
 	int imgupdate;
+
+	int wheel_ax;
 };
 
 // Check that _FTR can fit inside a FTR
@@ -112,27 +115,17 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 			//white, black);
 	f->ximage = NULL;
 	f->imgupdate = 1;
-	XSelectInput(f->display, f->window, 0
-			| ExposureMask
-			| KeyPressMask
-			| ButtonPressMask
-			| PointerMotionMask
-			| EnterWindowMask
-			//| LeaveWindowMask
-			| StructureNotifyMask
-		    );
-	//XSelectInput(f->display, f->window, (1L<<25)-1-(1L<<7)-ResizeRedirectMask);
-	//XSelectInput(f->display, f->window, ExposureMask | KeyPressMask);
-	//XSelectInput(f->display, f->window, (1L<<25)-1);
-	//XSelectInput(f->display, f->window, (1L<<25)-1);
-	//XSelectInput(f->display, f->window,
-	//	       	ExposureMask
-	//		| KeyPressMask
-	//		| ButtonPressMask
-	//		| PointerMotionMask
-	//		//| ResizeRedirectMask
-	//		| StructureNotifyMask
-	//		);
+	f->wheel_ax = 0;
+	int mask = 0
+		| ExposureMask
+		| KeyPressMask
+		| ButtonPressMask
+		| PointerMotionMask
+		| StructureNotifyMask
+		| EnterWindowMask
+		| LeaveWindowMask
+		;
+	XSelectInput(f->display, f->window, mask);
 	XMapWindow(f->display, f->window);
 
 	// general again
@@ -143,6 +136,7 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	f->handle_resize = NULL;
 	f->handle_idle = NULL;
 	f->handle_idle_toggled = NULL;
+	f->handle_wheel = NULL;
 	f->stop_loop = 0;
 	f->changed = 0;
 
@@ -217,7 +211,7 @@ static void process_next_event(struct FTR *ff)
 	XEvent event = { .type = GenericEvent } ;
 	if (!f->changed)
 		XNextEvent(f->display, &event);
-	//fprintf(stderr,"ev %d\t\"%s\"\n",event.type,event_names[event.type]);
+	fprintf(stderr,"ev %d\t\"%s\"\n",event.type,event_names[event.type]);
 
 	if (event.type == Expose || f->changed) {
 		if (f->handle_expose)
@@ -229,23 +223,9 @@ static void process_next_event(struct FTR *ff)
 			f->ximage = XGetImage(f->display, f->window,
 					0, 0, f->w, f->h, AllPlanes, ZPixmap);
 			f->imgupdate = 0;
-			fprintf(stderr, "XIMAGE:\n");
-			fprintf(stderr, "\tformat = %d\n", f->ximage->format);
-			fprintf(stderr, "\twidth = %d\n", f->ximage->width);
-			fprintf(stderr, "\theight = %d\n", f->ximage->height);
-			fprintf(stderr, "\tbpad = %d\n", f->ximage->bitmap_pad);
-			fprintf(stderr, "\tbord = %d\n", f->ximage->bitmap_bit_order);
-			fprintf(stderr, "\tbunit = %d\n", f->ximage->bitmap_unit);
-			fprintf(stderr, "\tdepth = %d\n", f->ximage->depth);
-			fprintf(stderr, "\tBpl = %d\n", f->ximage->bytes_per_line);
-			fprintf(stderr, "\tbpp = %d\n", f->ximage->bits_per_pixel);
-			fprintf(stderr, "\tR = %x\n", f->ximage->red_mask);
-			fprintf(stderr, "\tG = %x\n", f->ximage->green_mask);
-			fprintf(stderr, "\tB = %x\n", f->ximage->blue_mask);
-			//f->ximage->blue_mask = 0xff0000;
-			//f->ximage->red_mask = 0xff;
 		}
 		for (int i = 0; i < f->w*f->h; i++) {
+			// drain bramage
 			f->ximage->data[4*i+0] = f->rgb[3*i+2];
 			f->ximage->data[4*i+1] = f->rgb[3*i+1];
 			f->ximage->data[4*i+2] = f->rgb[3*i+0];
@@ -269,20 +249,18 @@ static void process_next_event(struct FTR *ff)
 		}
 	}
 
-
-	// call the motion handler also for enter/leave events
-	// (this is natural for most applications)
-	if (event.type == EnterNotify && f->handle_motion) {
-		XCrossingEvent e = event.xcrossing;
-		//fprintf(stderr, "enter notify (%d %d)\n", e.x, e.y);
-		f->handle_motion(ff, -1, e.state, e.x, e.y);
-	}
-	if (event.type == LeaveNotify && f->handle_motion) {
-		XCrossingEvent e = event.xcrossing;
-		int x = do_bound(0, f->w - 1, e.x);
-		int y = do_bound(0, f->h - 1, e.y);
-		//fprintf(stderr,"LEAVE notify (%d %d)[%d %d]\n",e.x,e.y,x,y);
-		f->handle_motion(ff, -1, e.state, x, y);
+	if (event.type == ButtonPress && f->handle_wheel) {
+		XButtonEvent e = event.xbutton;
+		if (e.button == 4 || e.button == 5) {
+			int np = XPending(f->display);
+			f->wheel_ax += e.button==4 ? 1 : -1;
+			fprintf(stderr, "\twheel acc(%d) %d\n", f->wheel_ax, np);
+			if (np < 2) {
+				f->handle_wheel(ff,f->wheel_ax,e.state,e.x,e.y);
+				f->wheel_ax = 0;
+			}
+			return;
+		}
 	}
 
 	// "expose" and "resize" are never lost
@@ -290,18 +268,46 @@ static void process_next_event(struct FTR *ff)
 	//
 	int ne = XPending(f->display);
 	if (ne > 1) // magical "1" here
-	//{
-	//	fprintf(stderr, "\tlost{%d} %s\n", ne, event_names[event.type]);
+	//if (ne > 0) // magical "1" here
+	{
+		fprintf(stderr, "\tlost{%d} %s\n", ne, event_names[event.type]);
 	      return;
-	//}
+	}
+
+	// call the motion handler also for enter/leave events
+	// (this is natural for most applications)
+	if (!f->handle_wheel) {//wheel accumulation does not work well with this
+	if (event.type == EnterNotify && f->handle_motion) {
+		XCrossingEvent e = event.xcrossing;
+		//fprintf(stderr, "enter notify (%d %d)\n", e.x, e.y);
+		if (XPending(f->display)) return;
+		f->handle_motion(ff, -1, e.state, e.x, e.y);
+	}
+	if (event.type == LeaveNotify && f->handle_motion) {
+		XCrossingEvent e = event.xcrossing;
+		int x = do_bound(0, f->w - 1, e.x);
+		int y = do_bound(0, f->h - 1, e.y);
+		//fprintf(stderr,"LEAVE notify (%d %d)[%d %d]\n",e.x,e.y,x,y);
+		if (XPending(f->display)) return;
+		f->handle_motion(ff, -2, e.state, x, y);
+	}
+	}
 
 
 	if (event.type == MotionNotify && f->handle_motion) {
 		XMotionEvent e = event.xmotion;
 		f->handle_motion(ff, e.is_hint, e.state, e.x, e.y);
 	}
-	if (event.type == ButtonPress && f->handle_button) {
+	if (event.type == ButtonPress && (f->handle_button||f->handle_wheel)) {
 		XButtonEvent e = event.xbutton;
+		if (f->handle_wheel && (e.button == 4 || e.button == 5)) {
+			f->wheel_ax += e.button==4 ? 1 : -1;
+			fprintf(stderr, "\twheel ack %d\n", f->wheel_ax);
+			//if (!XPending(f->display)) {
+				f->handle_wheel(ff,f->wheel_ax,e.state,e.x,e.y);
+				f->wheel_ax = 0;
+			//}
+		}
 		f->handle_button(ff, 1<<(7+e.button), e.state, e.x, e.y);
 	}
 	if (event.type == KeyPress && f->handle_key) {
