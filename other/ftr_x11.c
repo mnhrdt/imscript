@@ -211,7 +211,7 @@ static void process_next_event(struct FTR *ff)
 	XEvent event = { .type = GenericEvent } ;
 	if (!f->changed)
 		XNextEvent(f->display, &event);
-	fprintf(stderr,"ev %d\t\"%s\"\n",event.type,event_names[event.type]);
+	//fprintf(stderr,"ev %d\t\"%s\"\n",event.type,event_names[event.type]);
 
 	if (event.type == Expose || f->changed) {
 		if (f->handle_expose)
@@ -269,10 +269,10 @@ static void process_next_event(struct FTR *ff)
 	int ne = XPending(f->display);
 	if (ne > 1) // magical "1" here
 	//if (ne > 0) // magical "1" here
-	{
-		fprintf(stderr, "\tlost{%d} %s\n", ne, event_names[event.type]);
+	//{
+	//	fprintf(stderr, "\tlost{%d} %s\n", ne, event_names[event.type]);
 	      return;
-	}
+	//}
 
 	// call the motion handler also for enter/leave events
 	// (this is natural for most applications)
