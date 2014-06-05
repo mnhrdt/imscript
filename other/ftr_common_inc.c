@@ -80,7 +80,7 @@ static void handle_click_wait(struct FTR *f, int b, int m, int x, int y)
 		ftr_notify_the_desire_to_stop_this_loop(f, 10000*y + x);
 }
 
-void ftr_wait_for_mouse_click(struct FTR *f, int *x, int *y, int *b, int *m)
+void ftr_wait_for_mouse_click(struct FTR *f, int *x, int *y)
 {
 	ftr_set_handler(f, "button", handle_click_wait);
 	int r = ftr_loop_run(f);

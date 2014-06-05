@@ -668,8 +668,8 @@ int main_icrop(int c, char *v[])
 
 	// read the two corners of the crop rectangle
 	int crop_param[4];
-	ftr_wait_for_mouse_click(&f, crop_param+0, crop_param+1, NULL, NULL);
-	ftr_wait_for_mouse_click(&f, crop_param+2, crop_param+3, NULL, NULL);
+	ftr_wait_for_mouse_click(&f, crop_param + 0, crop_param + 1);
+	ftr_wait_for_mouse_click(&f, crop_param + 2, crop_param + 3);
 
 	// perform the crop on the image data
 	do_inline_crop_rgb(x, &w, &h, crop_param);
@@ -743,9 +743,9 @@ int main_icrop2(int c, char *v[])
 
 	// read the two corners of the crop rectangle
 	int crop_param[4];
-	ftr_wait_for_mouse_click(&f, crop_param+0, crop_param+1, NULL, NULL);
+	ftr_wait_for_mouse_click(&f, crop_param + 0, crop_param + 1);
 	e.step = 1;
-	ftr_wait_for_mouse_click(&f, crop_param+2, crop_param+3, NULL, NULL);
+	ftr_wait_for_mouse_click(&f, crop_param + 2, crop_param + 3);
 
 	// perform the crop on the image data
 	do_inline_crop_rgb(x, &w, &h, crop_param);
@@ -780,7 +780,7 @@ int main_pclick(int c, char *v[])
 
 	// get the first mouse click
 	int pos[2];
-	ftr_wait_for_mouse_click(&f, pos+0, pos+1, NULL, NULL);
+	ftr_wait_for_mouse_click(&f, pos+0, pos+1);
 
 	// close the window
 	ftr_close(&f);
@@ -1054,27 +1054,43 @@ int main_events(int c, char *v[])
 }
 
 // main {{{1
+
+#define MAIN(x) { #x, main_ ## x }
+
+static const struct { char *n; int(*f)(int,char*[]); } mains[] = {
+	MAIN(viewimage),
+	MAIN(viewimage0),
+	MAIN(viewimage0),
+	MAIN(display),
+	MAIN(pan),
+	MAIN(twoimages),
+	MAIN(twoimages2),
+	MAIN(icrop),
+	MAIN(icrop2),
+	MAIN(pclick),
+	MAIN(random),
+	MAIN(fire),
+	MAIN(minifire),
+	MAIN(events),
+	{ 0 }
+};
+
+static char *base_name(char *p)
+{
+	char *b = strrchr(p, '/');
+	return b ? b + 1 : p;
+}
+
 int main(int c, char *v[])
 {
-	int (*f)(int,char*[]);
-	if (c < 2) return fprintf(stderr, "name a main\n");
-	else if (0 == strcmp(v[1], "viewimage"))  f = main_viewimage;
-	else if (0 == strcmp(v[1], "viewimage0")) f = main_viewimage0;
-	else if (0 == strcmp(v[1], "viewimage2")) f = main_viewimage2;
-	else if (0 == strcmp(v[1], "display"))    f = main_display;
-	else if (0 == strcmp(v[1], "pan"))        f = main_pan;
-	else if (0 == strcmp(v[1], "twoimages"))  f = main_twoimages;
-	else if (0 == strcmp(v[1], "twoimages2")) f = main_twoimages2;
-	else if (0 == strcmp(v[1], "icrop"))      f = main_icrop;
-	else if (0 == strcmp(v[1], "icrop2"))     f = main_icrop2;
-	else if (0 == strcmp(v[1], "pclick"))     f = main_pclick;
-	else if (0 == strcmp(v[1], "random"))     f = main_random;
-	else if (0 == strcmp(v[1], "fire"))       f = main_fire;
-	else if (0 == strcmp(v[1], "minifire"))   f = main_minifire;
-	else if (0 == strcmp(v[1], "events"))     f = main_events;
-	//else if (0 == strcmp(*v, "simplest"))     f = main_simplest;
-	//else if (0 == strcmp(*v, "simplest2"))    f = main_simplest2;
-	else return fprintf(stderr, "bad main \"%s\"\n", v[1]);
-	return f(c-1, v+1);
+	char *t, *s = base_name(*v);
+	if (0 == strcmp(s, "fm"))
+		return main(c - 1, v + 1);
+	int i = 0;
+	while ((t = mains[i++].n))
+		if (0 == strcmp(s, t))
+			return mains[i-1].f(c, v);
+	return 1;
 }
+
 // vim:set foldmethod=marker:

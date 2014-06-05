@@ -142,6 +142,25 @@ static void action_contrast_change(struct FTR *f, float afac, float bshift)
 	f->changed = 1;
 }
 
+static void action_qauto(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+
+	float m = INFINITY, M = -m;
+	int pid = 3;
+	for (int i = 0; i < 3 * e->pyr_w[pid] * e->pyr_h[pid]; i++)
+	{
+		float g = e->pyr_rgb[pid][i];
+		m = fmin(m, g);
+		M = fmax(M, g);
+	}
+
+	e->a = 255 / ( M - m );
+	e->b = 255 * m / ( m - M );
+
+	f->changed = 1;
+}
+
 static void action_center_contrast_at_point(struct FTR *f, int x, int y)
 {
 	struct pan_state *e = f->userdata;
@@ -231,7 +250,7 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 
 static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 {
-	fprintf(stderr, "button b=%d m=%d\n", b, m);
+	//fprintf(stderr, "button b=%d m=%d\n", b, m);
 	if (b == FTR_BUTTON_UP && m == FTR_MASK_SHIFT) {
 		action_contrast_span(f, 1/1.3); return; }
 	if (b == FTR_BUTTON_DOWN && m == FTR_MASK_SHIFT) {
@@ -251,6 +270,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	//if (k == 'A') action_contrast_change(f, 1/1.3, 0);
 	//if (k == 'b') action_contrast_change(f, 1, 1);
 	//if (k == 'B') action_contrast_change(f, 1, -1);
+	if (k == 'n') action_qauto(f);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
@@ -331,13 +351,13 @@ int main_pan(int c, char *v[])
 	create_pyramid(e);
 
 	// open window
-	struct FTR f = ftr_new_window(BAD_MIN(e->w,800), BAD_MIN(e->h,600));
+	struct FTR f = ftr_new_window(BAD_MIN(e->w,1200), BAD_MIN(e->h,800));
 	f.userdata = e;
 	action_reset_zoom_and_position(&f);
 	ftr_set_handler(&f, "expose", pan_exposer);
 	ftr_set_handler(&f, "motion", pan_motion_handler);
 	ftr_set_handler(&f, "button", pan_button_handler);
-	ftr_set_handler(&f, "key", pan_key_handler);
+	ftr_set_handler(&f, "key"   , pan_key_handler);
 	int r = ftr_loop_run(&f);
 
 	// cleanup and exit (optional)

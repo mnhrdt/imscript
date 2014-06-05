@@ -110,8 +110,8 @@ static int modifiers_from_glut_to_ftr(int m)
 
 static void my_specialfunc(int k, int x, int y)
 {
-	fprintf(stderr, "GLUT specialfunc  %d '%c' %d %d\n",
-			k, isalnum(k)?k:' ', x, y);
+	//fprintf(stderr, "GLUT specialfunc  %d '%c' %d %d\n",
+	//		k, isalnum(k)?k:' ', x, y);
 
 	struct _FTR *f = ftr_freeglut_global_state;
 	if (f->handle_key) {
@@ -124,8 +124,8 @@ static void my_specialfunc(int k, int x, int y)
 
 static void my_keyboardfunc(unsigned char k, int x, int y)
 {
-	fprintf(stderr, "GLUT keyboardfunc  %d '%c' %d %d\n",
-			k, isalnum(k)?k:' ', x, y);
+	//fprintf(stderr, "GLUT keyboardfunc  %d '%c' %d %d\n",
+	//		k, isalnum(k)?k:' ', x, y);
 
 	struct _FTR *f = ftr_freeglut_global_state;
 
