@@ -86,6 +86,13 @@ static void pixel(float *out, struct pan_state *e, double p, double q)
 	if (e->zoom_factor > 0.9999)
 		interpolate_at(out, e->frgb, e->w, e->h, p, q);
 	else {
+		//static int first_run = 1;
+		//if (first_run) {
+		//	fprintf(stderr, "create pyramid\n");
+		//	void create_pyramid(struct pan_state *e);
+		//	create_pyramid(e);
+		//	first_run = 0;
+		//}
 		if(p<0||q<0){out[0]=out[1]=out[2]=0;return;}
 		int s = -0 - log(e->zoom_factor) / log(2);
 		if (s < 0) s = 0;
@@ -288,6 +295,8 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 		case FTR_KEY_UP   : d[1] -= inc; break;
 		case FTR_KEY_DOWN : d[1] += inc; break;
 		}
+		if (m == FTR_KEY_PAGE_UP)   d[0] += f->w/3;
+		if (m == FTR_KEY_PAGE_DOWN) d[0] -= f->w/3;
 		action_offset_viewport(f, d[0], d[1]);
 	}
 }
