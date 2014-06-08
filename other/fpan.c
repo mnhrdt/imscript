@@ -295,8 +295,8 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 		case FTR_KEY_UP   : d[1] -= inc; break;
 		case FTR_KEY_DOWN : d[1] += inc; break;
 		}
-		if (m == FTR_KEY_PAGE_UP)   d[0] += f->w/3;
-		if (m == FTR_KEY_PAGE_DOWN) d[0] -= f->w/3;
+		if (k == FTR_KEY_PAGE_UP)   d[1] = +f->h/3;
+		if (k == FTR_KEY_PAGE_DOWN) d[1] = -f->h/3;
 		action_offset_viewport(f, d[0], d[1]);
 	}
 }
