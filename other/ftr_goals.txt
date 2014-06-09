@@ -1,0 +1,66 @@
+***
+FTR
+***
+
+FTR is a portable (but not ported) library for opening a window, drawing pixels
+to it, and reading mouse and keyboard input.  It is crippled, slow, and
+extremely minimal.  The main goal is to write tiny portable programs that open
+windows with images.
+
+
+Goals of FTR:
+
+* Be written in standard C
+* The "ftr.h" file is as small as possible (ideally, one printed page)
+* The "ftr.c" file contains the whole library
+* The "ftr.c" file can be directly included, so the header is unnecessary
+* Deal only with WINDOWS, KEYBOARD and MOUSE
+* The keyboard input is read in ascii, when possible
+* The mouse wheel works, somehow
+* It works "natively" in unix, windows and mac
+* The same API hides different backends: Xlib, windows, cocoa, glut, text
+* In Unix, it uses only Xlib (already implemented)
+* In Windows, it uses the Windows Api (not yet implemented)
+* In mac, it uses the COCOA C interface (not yet implemented)
+* There is a fall-back GLUT backend (not yet implemented)
+* There is a fall-back freeglut backend (already implemented)
+* There is a fall-back text-based backend, where events are read from stdin
+* Programs must have exactly the same behaviour on all backends
+* The complete API is implemented on all supported backends
+* Multiple user interface paradigms are supported:
+	1. event-based, automatic loop (set event handlers and call ftr_loop)
+	2. event based, explicit loop (write the event loop yourself)
+	3. blocking calls (explicitly wait for user input)
+	4. forked windows (each window has its own process, and communication
+		is done via signals and shared memory)
+	5. contiuously-redrawn window showing the evolution of an image
+* A pixel is defined as three bytes containing the RGB components.
+* An image is an array of pixels
+* Do not use typedef structs, useless pointers or ugly C code
+
+
+Non-goals of FTR:
+
+* Be written in other languages than C
+* Image input/output
+* Any kind of image processing
+* Drawing widgets
+* Drawing text
+* OpenGL access
+* Accelerated or otherwise efficient operations
+* Deal with anything else than WINDOWS, KEYBOARD or MOUSE
+* Pixel types other than 24bit RGB
+* Transparency, broken pixels (separate color channels), gray-level images, etc
+* Floating-point samples
+
+
+The API may change to adapt to future needs, and new functions may be added
+without problem.  However, the non-goals are strong decisions and I accept no
+compromise on them.  For example, FTR will never perform a contrast change.
+This is up to the user of the library.  On the other hand, some "helper" and
+"convenience" functions are defined to ease common usages.  For example, the
+"ftr_open_window_with_image" function.
+
+
+The first user who guesses correcly the meaning of the acronym "FTR" will be
+invited to a beer of his choice.

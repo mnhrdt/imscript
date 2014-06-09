@@ -1,0 +1,15 @@
+# implementacions "natives"
+ftr_x11.c
+ftr_cocoa.m
+ftr_windows.c++
+
+# implementacions "semi-natives"
+ftr_glut.c
+ftr_glfw.c
+ftr_freeglut.c
+
+# implementacions experimentals
+ftr_gtk.c
+ftr_fltk.c++
+ftr_qt.c++
+ftr_xcb.c

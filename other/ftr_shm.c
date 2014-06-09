@@ -12,14 +12,16 @@
 #include <signal.h>
 
 
-#include "ftr_x11.c"
+#include "ftr.c"
+
+#define I_CAN_HAS_MMAP_ANONYMOUS
 
 static void *alloc_shareable_memory(size_t n)
 {
 	// note MAP_ANONYMOUS is nicer, but less portable than /dev/zero
 #ifdef I_CAN_HAS_MMAP_ANONYMOUS
 	int prot = PROT_READ | PROT_WRITE;
-	int flags = MAP_SHARED | MAP_ANONYMOUS;
+	int flags = MAP_SHARED | 32;//MAP_ANON;
 	void *r = mmap(NULL, n, prot, flags, -1, 0);
 	if (r == MAP_FAILED) { perror("mmap"); exit(43); }
 	return r;
@@ -39,6 +41,12 @@ static void my_wait(struct FTR *ff)
 {
 	struct _FTR *f = (void*)ff;
 	waitpid(f->child_pid, 0, 0);
+}
+
+static void my_wait_all()
+{
+	// wait for any child in a loop until it returns erro
+	//waitpid();
 }
 
 void my_sigusr1_handler(int s)
@@ -163,8 +171,10 @@ int main_forks(int c, char *v[])
 	}
 	my_notify_change(f);
 	my_notify_change(g);
+	my_wait_all();
 	my_wait(f);
 	my_wait(g);
+	fprintf(stderr, "all is well\n");
 	return 0;
 }
 
