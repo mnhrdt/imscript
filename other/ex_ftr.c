@@ -9,7 +9,7 @@ int main() {
 
 	// OBS: "fork window" creates a new process with shared memory.
 	// In unix and os/x: mmap(shared, anonymous) + fork()
-	// In windows: CreateFileMapping and RunProcess
+	// In windows: CreateFileMapping and CreateProcess
 	struct FTR fx = ftr_fork_window_with_image(x, w, h);
 	struct FTR fg = ftr_fork_window_with_image(0, 500, 400);
 

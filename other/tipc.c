@@ -14,16 +14,20 @@
 static void *alloc_shareable_memory(size_t n)
 {
 	// note MAP_ANONYMOUS is nicer, but less portable than /dev/zero
-	//
-	//void *r = mmap(NULL, n, PROT_READ|PROT_WRITE,
-	//MAP_SHARED|MAP_ANONYMOUS, -1, 0);
-	//
+#ifdef I_CAN_HAS_MMAP_ANONYMOUS
+	int prot = PROT_READ | PROT_WRITE;
+	int flags = MAP_SHARED | MAP_ANONYMOUS;
+	void *r = mmap(NULL, n, prod, flags, -1, 0)
+	if (r == MAP_FAILED) { perror("mmap"); exit(43); }
+	return r;
+#else
 	int fd = open("/dev/zero", O_RDWR);
 	if (fd == -1) { perror("open(\"/dev/zero\")"); exit(42); }
 	void *r = mmap(NULL, n, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (r == MAP_FAILED) { perror("mmap"); exit(43); }
 	if (close(fd)) { perror("close(\"/dev/zero\")"); exit(44); }
 	return r;
+#endif
 }
 
 static void free_shareable_memory(void *p, size_t n)

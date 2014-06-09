@@ -35,6 +35,12 @@ static void *alloc_shareable_memory(size_t n)
 
 static struct _FTR *global_variable_for_the_child;
 
+static void my_wait(struct FTR *ff)
+{
+	struct _FTR *f = (void*)ff;
+	waitpid(f->child_pid, 0, 0);
+}
+
 void my_sigusr1_handler(int s)
 {
 	struct _FTR *f = global_variable_for_the_child;
@@ -67,8 +73,18 @@ struct FTR *my_fork_window(int w, int h)
 	pid_t p = fork();
 	if (p) // I'm the parent
 	{
-		fprintf(stderr, "forked %d\n", (unsigned int)p);
-		sleep(1);
+		fprintf(stderr,"P: I'm a process with pid %d\n",(int)getpid());
+		fprintf(stderr, "P: I've just forked %d\n", (unsigned int)p);
+		// todo: stop parent until child starts loop
+		//sleep(1);
+		int pstatus;
+		fprintf(stderr, "P: going to wait for child to send signal\n");
+		waitpid(p, &pstatus, WUNTRACED);
+		fprintf(stderr, "P: child has stopped (status=%d)\n", pstatus);
+		fprintf(stderr, "P: telling the child he can go along\n");
+		kill(p, SIGCONT);
+
+		// save the pid of the child
 		((struct _FTR*)f)->child_pid = p;
 		//f->w = w;
 		//f->h = h;
@@ -78,6 +94,8 @@ struct FTR *my_fork_window(int w, int h)
 	}
 	else // I'm the child
 	{
+		fprintf(stderr,"C: I'm a process with pid %d\n",(int)getpid());
+		fprintf(stderr, "C: My parent has pid %d\n", (int)getppid());
 		*f = ftr_new_window_with_image_uint8_rgb(NULL, w, h);
 		free(f->rgb);
 		f->rgb = data;
@@ -90,6 +108,11 @@ struct FTR *my_fork_window(int w, int h)
 		sigaction(SIGUSR1, &a, NULL);
 		global_variable_for_the_child = (struct _FTR*)f;
 
+		// todo, stop ourselves, so that the parent will
+		// know that he can go on
+		fprintf(stderr, "C: going to stop myself\n");
+		kill(getpid(), SIGSTOP);
+		fprintf(stderr, "C: i've somehow unstopped\n");
 		exit(ftr_loop_run(f));
 	}
 }
@@ -112,12 +135,36 @@ void my_notify_change(struct FTR *ff)
 int main_forks(int c, char *v[])
 {
 	struct FTR *f = my_fork_window(320,200);
+	struct FTR *g = my_fork_window(320,200);
 	for (int i = 0; i < f->w * f->h; i++) {
-		f->rgb[3*i+0] = 0;
-		f->rgb[3*i+1] = 255;
-		f->rgb[3*i+2] = 0;
+		f->rgb[3*i+0] = 0; f->rgb[3*i+1] = 255; f->rgb[3*i+2] = 0;
+		g->rgb[3*i+0] = 0; g->rgb[3*i+1] = 255; g->rgb[3*i+2] = 127;
 	}
 	my_notify_change(f);
+	my_notify_change(g);
+	sleep(1);
+	for (int i = 0; i < f->w * f->h; i++) {
+		f->rgb[3*i+0] = 255; f->rgb[3*i+1] = 0; f->rgb[3*i+2] = 0;
+		g->rgb[3*i+0] = 255; g->rgb[3*i+1] = 0; g->rgb[3*i+2] = 127;
+	}
+	my_notify_change(f);
+	my_notify_change(g);
+	sleep(1);
+	for (int i = 0; i < f->w * f->h; i++) {
+		f->rgb[3*i+0] = 0; f->rgb[3*i+1] = 0; f->rgb[3*i+2] = 255;
+		g->rgb[3*i+0] = 0; g->rgb[3*i+1] = 0; g->rgb[3*i+2] = 127;
+	}
+	my_notify_change(f);
+	my_notify_change(g);
+	sleep(1);
+	for (int i = 0; i < f->w * f->h; i++) {
+		f->rgb[3*i+0] = 255; f->rgb[3*i+1] = 255; f->rgb[3*i+2] = 255;
+		g->rgb[3*i+0] = 255; g->rgb[3*i+1] = 255; g->rgb[3*i+2] = 127;
+	}
+	my_notify_change(f);
+	my_notify_change(g);
+	my_wait(f);
+	my_wait(g);
 	return 0;
 }
 

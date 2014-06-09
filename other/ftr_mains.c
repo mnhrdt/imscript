@@ -1022,6 +1022,7 @@ int main_minifire(int c, char *v[])
 	return 0;
 }
 
+
 // main_events {{{1
 static void print_event_key(struct FTR *f, int k, int m, int x, int y)
 {

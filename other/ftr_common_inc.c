@@ -12,6 +12,7 @@ void ftr_fork_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	}
 }
 
+
 void ftr_loop_fork(struct FTR *f)
 {
 	if (!fork())

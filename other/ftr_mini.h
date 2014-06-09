@@ -4,11 +4,11 @@
 // data structure to store the state of a window
 struct FTR {
 	// visible state
-	int w, h;
-	unsigned char *rgb;
-	int changed;
+	int w, h;           // size of the image
+	unsigned char *rgb; // rgb 24-bit image
+	int changed;        // variable to indicate that the image has changed
 
-	void *userdata; // ignored by the library
+	void *userdata;     // ignored by the library
 
 	// hidden implementation details
 	char pad[100];
@@ -20,7 +20,7 @@ typedef void (*ftr_event_handler_t)(struct FTR*,int,int,int,int);
 // core API
 struct FTR ftr_new_window(int w, int h);
 void       ftr_change_title(struct FTR *f, char *title);
-int        ftr_set_handler(struct FTR *f, char *id, ftr_event_handler_t e);
+int        ftr_set_handler(struct FTR *f, char *event, ftr_event_handler_t h);
 int        ftr_loop_run(struct FTR *f);
 void       ftr_notify_the_desire_to_stop_this_loop(struct FTR *f, int retval);
 
@@ -28,7 +28,7 @@ void       ftr_notify_the_desire_to_stop_this_loop(struct FTR *f, int retval);
 struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *i, int w, int h);
 void       ftr_close(struct FTR *f);
 void       ftr_wait_for_mouse_click(struct FTR *f, int *x, int *y);
-void       ftr_wait_for_key_depress(struct FTR *f, int *k, int *m);
+void       ftr_wait_for_key_depress(struct FTR *f, int *key, int *modifiers);
 int        ftr_num_pending(struct FTR *f);
 void       ftr_loop_fork(struct FTR *f);
 void       ftr_fork_window_with_image_uint8_rgb(unsigned char *i, int w, int h);

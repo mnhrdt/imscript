@@ -1,3 +1,4 @@
+#define _POSIX_SOURCE
 //#include <math.h>
 #include <ctype.h>
 #include <stdio.h>
@@ -7,6 +8,10 @@
 //#include <X11/Xutil.h> // only for XDestroyImage, that can be easily removed
 #include <X11/XKBlib.h> // only for XkbKeycodeToKeysym
 #include <unistd.h> // only for "fork"
+
+#include <sys/types.h>
+#include <signal.h>
+
 #include "ftr.h"
 
 // X11-specific part {{{1
@@ -39,6 +44,8 @@ struct _FTR {
 	int imgupdate;
 
 	int wheel_ax;
+
+	pid_t child_pid;
 };
 
 // Check that _FTR can fit inside a FTR
@@ -172,6 +179,8 @@ static int keycode_to_ftr(struct _FTR *f, int keycode, int keystate)
 	if (keycode == 113) return FTR_KEY_LEFT;
 	if (keycode == 114) return FTR_KEY_RIGHT;
 	if (keycode == 116) return FTR_KEY_DOWN;
+	if (keycode == 112) return FTR_KEY_PAGE_UP;
+	if (keycode == 117) return FTR_KEY_PAGE_DOWN;
 	return key;
 }
 
@@ -203,6 +212,19 @@ static int do_bound(int a, int b, int x)
 //	*ox = x;
 //	*oy = y;
 //}
+
+
+static void ugly_hack_disable_enter_events(struct _FTR *f)
+{
+	int mask = 0
+		| ExposureMask
+		| KeyPressMask
+		| ButtonPressMask
+		| PointerMotionMask
+		| StructureNotifyMask
+		;
+	XSelectInput(f->display, f->window, mask);
+}
 
 static void process_next_event(struct FTR *ff)
 {
@@ -309,6 +331,12 @@ static void process_next_event(struct FTR *ff)
 			//}
 		}
 		f->handle_button(ff, 1<<(7+e.button), e.state, e.x, e.y);
+		static int ugly_disable = 1;
+		if (ugly_disable && (e.button == 4 || e.button == 5))
+		{
+			ugly_hack_disable_enter_events(f);
+			ugly_disable = 0;
+		}
 	}
 	if (event.type == KeyPress && f->handle_key) {
 		XKeyEvent e = event.xkey;
@@ -330,13 +358,13 @@ int ftr_loop_run(struct FTR *ff)
 		if (!f->handle_idle || f->changed || XPending(f->display) > 0)
 			process_next_event(ff);
 		else if (f->handle_idle) {
+			f->handle_idle(ff, 0, 0, 0, 0);
 			XEvent ev;
 			ev.type = Expose;
-			XLockDisplay(f->display);
+			//XLockDisplay(f->display);
 			XSendEvent(f->display, f->window, 0, NoEventMask, &ev);
 			XFlush(f->display);
-			XUnlockDisplay(f->display);
-			f->handle_idle(ff, 0, 0, 0, 0);
+			//XUnlockDisplay(f->display);
 		}
 	}
 
