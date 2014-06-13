@@ -15,14 +15,13 @@
 #include "ftr.c"
 
 #define I_CAN_HAS_MMAP_ANONYMOUS
+#define MAP_ANON 32
 
 static void *alloc_shareable_memory(size_t n)
 {
 	// note MAP_ANONYMOUS is nicer, but less portable than /dev/zero
 #ifdef I_CAN_HAS_MMAP_ANONYMOUS
-	int prot = PROT_READ | PROT_WRITE;
-	int flags = MAP_SHARED | 32;//MAP_ANON;
-	void *r = mmap(NULL, n, prot, flags, -1, 0);
+	void *r = mmap(0, n, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANON, -1, 0);
 	if (r == MAP_FAILED) { perror("mmap"); exit(43); }
 	return r;
 #else

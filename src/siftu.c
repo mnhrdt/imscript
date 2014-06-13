@@ -152,6 +152,60 @@ static int main_siftcpairsr(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
+// compute pairs using sift-nn (non-sym, grided, explicit)
+static int main_siftcpairsg(int c, char *v[])
+{
+	if (c != 7) {
+		fprintf(stderr,"usage:\n\t%s t k1 k2 rx ry pairs.txt\n",*v);
+		//                         0 1 2  3  4  5  6
+		return EXIT_FAILURE;
+	}
+	struct sift_keypoint *p[2];
+	int n[2];
+	FORI(2) {
+		FILE *f = xfopen(v[2+i], "r");
+		p[i] = read_raw_sifts(f, n+i);
+		xfclose(f);
+	}
+	int npairs;
+	struct ann_pair *pairs;
+	float t = atof(v[1]);
+	float rx = atof(v[4]);
+	float ry = atof(v[5]);
+
+	// compute bounding box
+	int w = 0, h = 0;
+	for (int i = 0; i < n[0]; i++) {
+		w = fmax(w, ceil(p[0][i].pos[0]));
+		w = fmax(w, ceil(p[1][i].pos[0]));
+		h = fmax(h, ceil(p[0][i].pos[1]));
+		h = fmax(h, ceil(p[1][i].pos[1]));
+	}
+
+	pairs = compute_sift_matches_locally(&npairs, p[0], n[0], p[1], n[1],
+			t, rx, ry, w, h);
+
+	//pairs = siftlike_get_accpairsrad(p[0], n[0], p[1], n[1], &npairs, t, rx, ry);
+
+	fprintf(stderr, "CSML: produced %d pairs "
+			"(from %d and %d){%d}[%g%%]\n",
+			npairs, n[0], n[1], n[0]*n[1],npairs*100.0/(n[0]*n[1]));
+
+	FILE *f = xfopen(v[6], "w");
+	FORI(npairs) {
+		struct sift_keypoint *ka = p[0] + pairs[i].from;
+		struct sift_keypoint *kb = p[1] + pairs[i].to;
+		fprintf(f, "%g %g %g %g\n",
+				ka->pos[0], ka->pos[1],
+				kb->pos[0], kb->pos[1]);
+	}
+	xfclose(f);
+	FORI(2) if (p[i]) xfree(p[i]);
+	if (pairs) xfree(pairs);
+	return EXIT_SUCCESS;
+}
+
+
 // compute pairs using sift-nn (non-sym, initial segment, explicit)
 static int main_siftcpairst(int c, char *v[])
 {
@@ -442,6 +496,7 @@ int main(int c, char *v[])
 	if (c < 2) goto usage;
 	else if (0 == strcmp(v[1],"pair"))   return main_siftcpairs(c-1, v+1);
 	else if (0 == strcmp(v[1],"pairr"))  return main_siftcpairsr(c-1, v+1);
+	else if (0 == strcmp(v[1],"pairg"))  return main_siftcpairsg(c-1, v+1);
 	else if (0 == strcmp(v[1],"pairt"))  return main_siftcpairst(c-1, v+1);
 	else if (0 == strcmp(v[1],"pairR"))  return main_siftcpairsR(c-1, v+1);
 	else if (0 == strcmp(v[1],"pairR2")) return main_siftcpairsR2(c-1, v+1);

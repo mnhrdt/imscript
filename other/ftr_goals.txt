@@ -2,10 +2,14 @@
 FTR
 ***
 
+GOALS AND NON-GOALS
+===================
+
 FTR is a portable (but not ported) library for opening a window, drawing pixels
 to it, and reading mouse and keyboard input.  It is crippled, slow, and
 extremely minimal.  The main goal is to write tiny portable programs that open
-windows with images.
+windows and show images.  It is a thin wrapper around native libraries,
+intended to be as thin as possible, but not thinner.
 
 
 Goals of FTR:
@@ -36,7 +40,17 @@ Goals of FTR:
 	5. contiuously-redrawn window showing the evolution of an image
 * A pixel is defined as three bytes containing the RGB components.
 * An image is an array of pixels
-* Do not use typedef structs, useless pointers or ugly C code
+* Do not use typedef structs, useless casts or otherwise ugly C code
+* To port FTR to a new unix backend, you have to write only 7 "core" functions:
+	ftr_new_window
+	ftr_change_title
+	ftr_set_handler
+	ftr_loop_run
+	ftr_notify_that_the_framebuffer_has_changed
+	ftr_notify_the_desire_to_stop_this_loop
+	ftr_close_window
+* To port FTR to a non-unix backend, this other function has to be re-written:
+	ftr_fork_window
 
 
 Non-goals of FTR:
@@ -61,6 +75,71 @@ This is up to the user of the library.  On the other hand, some "helper" and
 "convenience" functions are defined to ease common usages.  For example, the
 "ftr_open_window_with_image" function.
 
+
+
+MOTIVATION
+==========
+
+FTR is inspired and tries to imitate many other libraries.  The principal
+sources of inspiration are CIMG and GLUT.
+
+
+* Why not use CImg?
+
+* There's no real reason to not use CImg in C++.  Sometimes I would
+like to use CImgDdisplay only, without need for CImg.  For example, when I want
+to publish an image processing algorithm of my own (that does not use the CImg
+image processing capabilities), and I want to provide a small interface.  CImg
+is perfect for that, but a bit overkill if you do not work with the CImg class.
+CImg.h is 46.000 lines of code.  My objective is that ftr.c should never go
+beyond 1000.
+
+
+* Why not use GLUT?
+
+* GLUT is essentially perfect for this purpose, it has a very beautiful API
+and provides a neat cross-platform way to open a window and show pixels on it.
+There are, however a few problems: you can not exit easily the main loop, the
+mouse wheel does not generate events, and you are forced to draw your pixels
+using OpenGL.  The freeglut re-implementation of GLUT solves the problem of the
+mouse wheel (but is not native on mac osx) and it lets you exit the event loop
+(but it closes the window when you do that).  Freeglut is about 20.000 lines of
+code in about 30 files, including font data.
+
+
+* How is FTR different?
+
+* Besides its limited scope (no image processing, no opengl access), FTR gives
+you more flexibility in the way you write your program.  The idea is that you
+write your whole program (e.g., an algorithm in image processing), without
+needing FTR at all.  Then, as an afterthought, you decide to add, at some
+scattered places in your program, a few calls to FTR to do things like:
+
+	1. Nested deep inside your algorithm, you want to open a window
+	containing a temporary image, and then continuoe running the  program.
+	The window is kept open until it is closed by the user or until the
+	program ends.  This involves a single call to this function:
+
+		ftr_new_window_with_image(char *rgb, int w, int h);
+
+	and nothing else.  No initialization, no boilerplate.  This function
+	returns immediately.
+
+	2. In the main loop of your program, you want to see how the iterations
+	progress.  Thus, you open a window with the image before the loop, and
+	inside the loop you update the pixels of the image and then call the
+	function "ftr_notify_that_the_framebuffer_has_changed".
+
+	3. Your example program uses a hard-coded pixel position.  By calling
+	"ftr_wait_for_mouse_click" you let the user to click on a pixel.
+
+	4. See the tutorial for further examples.
+
+
+
+
+PRIZE
+=====
 
 The first user who guesses correcly the meaning of the acronym "FTR" will be
 invited to a beer of his choice.

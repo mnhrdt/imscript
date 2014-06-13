@@ -3,10 +3,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "ftr_mini.h"
 #include "iio.h"
 
-#define WHEEL_FACTOR 1.3
+#ifndef FTR_BACKEND
+#define FTR_BACKEND 'f'
+#endif
+#include "ftr.c"
+
+#define WHEEL_FACTOR 1.4
 #define MAX_PYRAMID_LEVELS 30
 
 // image file input/output (wrapper around iio) {{{1
@@ -208,6 +212,15 @@ static void action_change_zoom_by_factor(struct FTR *f, int x, int y, double F)
 	f->changed = 1;
 }
 
+static void action_reset_zoom_only(struct FTR *f, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+
+	action_change_zoom_by_factor(f, x, y, 1/e->zoom_factor);
+}
+
+
+
 static void action_increase_zoom(struct FTR *f, int x, int y)
 {
 	action_change_zoom_by_factor(f, x, y, WHEEL_FACTOR);
@@ -262,14 +275,24 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 		action_contrast_span(f, 1/1.3); return; }
 	if (b == FTR_BUTTON_DOWN && m == FTR_MASK_SHIFT) {
 		action_contrast_span(f, 1.3); return; }
+	if (b == FTR_BUTTON_RIGHT && m == FTR_MASK_CONTROL) {
+		action_reset_zoom_only(f, x, y); return; }
 	if (b == FTR_BUTTON_MIDDLE) action_print_value_under_cursor(f, x, y);
 	if (b == FTR_BUTTON_DOWN)   action_increase_zoom(f, x, y);
 	if (b == FTR_BUTTON_UP  )   action_decrease_zoom(f, x, y);
 	if (b == FTR_BUTTON_RIGHT)  action_reset_zoom_and_position(f);
 }
 
+void key_handler_print(struct FTR *f, int k, int m, int x, int y)
+{
+	fprintf(stderr, "key pressed %d '%c' (%d) at %d %d\n",
+			k, isalpha(k)?k:' ', m, x, y);
+}
+
 void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
+	fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
+			k, isalpha(k)?k:' ', m, x, y);
 	if (k == '+') action_increase_zoom(f, f->w/2, f->h/2);
 	if (k == '-') action_decrease_zoom(f, f->w/2, f->h/2);
 
@@ -299,6 +322,12 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 		if (k == FTR_KEY_PAGE_DOWN) d[1] = -f->h/3;
 		action_offset_viewport(f, d[0], d[1]);
 	}
+
+	// if 'k', do weird things
+	if (k == 'k') {
+		fprintf(stderr, "setting key_handler_print\n");
+		ftr_set_handler(f, "key", key_handler_print);
+	}
 }
 
 static void zoom_out_by_factor_two(float *out, int ow, int oh,
@@ -319,8 +348,30 @@ static void zoom_out_by_factor_two(float *out, int ow, int oh,
 	}
 }
 
+static void zoom_out_by_factor_two_max(float *out, int ow, int oh,
+		float *in, int iw, int ih)
+{
+	assert(abs(2*ow-iw) < 2);
+	assert(abs(2*oh-ih) < 2);
+	for (int j = 0; j < oh; j++)
+	for (int i = 0; i < ow; i++)
+	for (int l = 0; l < 3; l++)
+	{
+		float a[4];
+		a[0] = getsample_0(in, iw, ih, 2*i  , 2*j  , l);
+		a[1] = getsample_0(in, iw, ih, 2*i+1, 2*j  , l);
+		a[2] = getsample_0(in, iw, ih, 2*i  , 2*j+1, l);
+		a[3] = getsample_0(in, iw, ih, 2*i+1, 2*j+1, l);
+		out[3*(ow*j + i)+l] = fmax(fmax(a[0],a[1]),fmax(a[2],a[3]));
+	}
+}
+
+// type of a "zoom-out" function
+typedef void (*zoom_out_function_t)(float*,int,int,float*,int,int);
+
 static void create_pyramid(struct pan_state *e)
 {
+	zoom_out_function_t z = zoom_out_by_factor_two_max;
 	for (int s = 0; s < MAX_PYRAMID_LEVELS; s++)
 	{
 		int      lw   = s ? e->pyr_w  [s-1] : e->w   ;
@@ -329,7 +380,7 @@ static void create_pyramid(struct pan_state *e)
 		int      sw   = ceil(lw / 2.0);
 		int      sh   = ceil(lh / 2.0);
 		float   *srgb = malloc(3 * sw * sh * sizeof*srgb);
-		zoom_out_by_factor_two(srgb, sw, sh, lrgb, lw, lh);
+		z(srgb, sw, sh, lrgb, lw, lh);
 		e->pyr_w[s]   = sw;
 		e->pyr_h[s]   = sh;
 		e->pyr_rgb[s] = srgb;

@@ -7,6 +7,7 @@
 #include <X11/Xlib.h>
 //#include <X11/Xutil.h> // only for XDestroyImage, that can be easily removed
 #include <X11/XKBlib.h> // only for XkbKeycodeToKeysym
+#include <X11/extensions/XShm.h> // only for XkbKeycodeToKeysym
 #include <unistd.h> // only for "fork"
 
 #include <sys/types.h>
@@ -242,6 +243,8 @@ static void process_next_event(struct FTR *ff)
 
 		if (!f->ximage || f->imgupdate) {
 			if (f->ximage) f->ximage->f.destroy_image(f->ximage);
+			//f->ximage = XShmGetImage(f->display, f->window,
+			//		0, 0, f->w, f->h, AllPlanes, ZPixmap);
 			f->ximage = XGetImage(f->display, f->window,
 					0, 0, f->w, f->h, AllPlanes, ZPixmap);
 			f->imgupdate = 0;
@@ -253,6 +256,8 @@ static void process_next_event(struct FTR *ff)
 			f->ximage->data[4*i+2] = f->rgb[3*i+0];
 			f->ximage->data[4*i+3] = 0;
 		}
+		//XShmPutImage(f->display, f->window, f->gc, f->ximage,
+		//		0, 0, 0, 0, f->w, f->h, 0);
 		XPutImage(f->display, f->window, f->gc, f->ximage,
 				0, 0, 0, 0, f->w, f->h);
 		if (f->handle_expose2)

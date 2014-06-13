@@ -9,7 +9,7 @@ ftr_glfw.c
 ftr_freeglut.c
 
 # implementacions experimentals
-ftr_gtk.c
+ftr_gdk.c
 ftr_fltk.c++
 ftr_qt.c++
 ftr_xcb.c
