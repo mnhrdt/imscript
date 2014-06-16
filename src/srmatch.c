@@ -183,6 +183,7 @@ int main(int c, char *v[])
 	bool *omask = xmalloc(n[0]*sizeof*omask);
 	FORI(n[0]) omask[i] = false;
 
+	fprintf(stderr, "input read\n");
 	pairs = srmatch(&npairs, omask, h, p[0],n[0], p[1],n[1], t,top,rad,rad);
 
 	fprintf(stderr, "H = "); FORI(9) fprintf(stderr, "%g%c", h[i], (i==8)?'\n':' ');

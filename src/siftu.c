@@ -425,6 +425,21 @@ int main_siftaff(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
+// (bad) homographic transform of sift descriptors
+int main_siftbad_hom(int c, char *v[])
+{
+	if (c != 10) {
+		fprintf(stderr, "usage:\n\t%s a b p c d q r s t <sift.in >sift.out\n", *v);
+		return 1;
+	}
+	float A[9]; FORI(9) A[i] = atof(v[i+1]);
+	int n;
+	struct sift_keypoint *s = read_raw_sifts(stdin, &n);
+	sifthom(s, n, A);
+	write_raw_sifts(stdout, s, n);
+	return 0;
+}
+
 //// mask sift descriptors according to a binary mask
 //int main_siftmask(int c, char *v[])
 //{
@@ -503,6 +518,7 @@ int main(int c, char *v[])
 	else if (0 == strcmp(v[1],"trip"))   return main_sifttriplets(c-1, v+1);
 	else if (0 == strcmp(v[1],"tripr"))  return main_sifttripletsr(c-1,v+1);
 	else if (0 == strcmp(v[1],"aff"))    return main_siftaff(c-1, v+1);
+	else if (0 == strcmp(v[1],"bad_hom"))return main_siftbad_hom(c-1, v+1);
 	else if (0 == strcmp(v[1],"split"))  return main_siftsplit(c-1, v+1);
 	//else if (0 == strcmp(v[1],"mask")) return main_siftmask(c-1, v+1);
 	else if (0 == strcmp(v[1],"clean"))  return main_siftrr(c-1, v+1);
