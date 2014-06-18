@@ -1,12 +1,13 @@
 CC = c99
 
 LFLAGS = -ltiff -lpng -lm
+WFLAGS = -Wall -Wextra
 
 # NOTE: to change the optimization settings swap the following two lines
-CFLAGS = -g
-CFLAGS = -O3 -Wall -Wextra
+CFLAGS = $(WFLAGS) -g
+CFLAGS = $(WFLAGS) -Ofast
 
-PROGRAMS = cut3 join3 translation quantize registration
+PROGRAMS = cut3 join3 translation quantize registration tiles paircrop combine_homographies viewflow
 
 all: $(PROGRAMS)
 
