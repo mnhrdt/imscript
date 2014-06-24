@@ -1,5 +1,4 @@
-// tiff utils
-//
+// tiff utils //
 // info   f.tiff            # print misc info
 // ntiles f.tiff            # print the total number of tiles
 // tget   f.tiff n t.tiff   # get the nth tile (sizes must coincide)
@@ -116,7 +115,7 @@ static int tiff_samplesperpixel(TIFF *tif)
 static int tiff_bitspersample(TIFF *tif)
 {
 	uint16_t bps;
-	TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLESPERPIXEL, &bps);
+	TIFFGetFieldDefaulted(tif, TIFFTAG_BITSPERSAMPLE, &bps);
 	return bps;
 }
 
@@ -164,6 +163,27 @@ static int tiff_tilesdown(TIFF *tif)
 	return how_many(h, th);
 }
 
+static int tiff_tile_corner(int p[2], TIFF *tif, int tidx)
+{
+	p[0] = p[1] = -1;
+
+	int tw = tiff_tilewidth(tif);
+	int th = tiff_tilelength(tif);
+	int ta = tiff_tilesacross(tif);
+	int td = tiff_tilesdown(tif);
+
+	int i = tidx % ta;
+	int j = tidx / ta;
+
+	if (!(i < ta && j < td))
+		return 0;
+
+	p[0] = tw*i;
+	p[1] = th*j;
+	return 1;
+}
+
+
 
 // write a non-tiled TIFF image
 static void write_tile_to_file(char *filename, struct tiff_tile *t)
@@ -190,6 +210,37 @@ static void write_tile_to_file(char *filename, struct tiff_tile *t)
 		int r = TIFFWriteScanline(tif, line, i, 0);
 		if (r < 0) fail("error writing %dth TIFF scanline", i);
 	}
+
+	TIFFClose(tif);
+}
+
+// overwrite a tile on an existing tiled TIFF image
+static void put_tile_into_file(char *filename, struct tiff_tile *t, int tidx)
+{
+	if (t->broken) fail("can not save broken tiles yet");
+
+	// Note, the mode "r+" is officially undocumented, but its behaviour is
+	// described on file tif_open.c from libtiff.
+	TIFF *tif = TIFFOpen(filename, "r+");
+	if (!tif) fail("could not open TIFF file \"%s\" for writing", filename);
+
+	int tw = tiff_tilewidth(tif);
+	int th = tiff_tilewidth(tif);
+	int spp = tiff_samplesperpixel(tif);
+	int bps = tiff_bitspersample(tif);
+	int fmt = tiff_sampleformat(tif);
+	if (tw != t->w) fail("tw=%d different to t->w=%d", tw, t->w);
+	if (th != t->h) fail("th=%d different to t->h=%d", th, t->h);
+	if (spp != t->spp) fail("spp=%d different to t->spp=%d", spp, t->spp);
+	if (bps != t->bps) fail("bps=%d different to t->bps=%d", bps, t->bps);
+	if (spp != t->spp) fail("spp=%d different to t->spp=%d", spp, t->spp);
+
+	int ii[2];
+	int r = tiff_tile_corner(ii, tif, tidx);
+	if (!r) fail("bad tile %d", tidx);
+
+	r = TIFFWriteTile(tif, t->data, ii[0], ii[1], 0, 0);
+	fprintf(stderr, "TIFFWrite returned %d\n", r);
 
 	TIFFClose(tif);
 }
@@ -226,6 +277,38 @@ static void dalloc_tile_from_open_file(struct tiff_tile *t, TIFF *tif, int tidx)
 
 }
 
+static void read_scanlines(struct tiff_tile *tout, TIFF *tif)
+{
+	// read all file info
+	struct tiff_file_info tinfo[1];
+	get_tiff_file_info(tinfo, tif);
+
+	// fill-in output information
+	tout->w = tinfo->w;
+	tout->h = tinfo->h;
+	tout->bps = tinfo->bps;
+	tout->fmt = tinfo->fmt;
+	tout->spp = tinfo->spp;
+
+	// define useful constants
+	int pixel_size = tinfo->spp * tinfo->bps/8;
+	int output_size = tout->w * tout->h * pixel_size;
+
+	// allocate space for output data
+	fprintf(stderr, "malloc output size %d\n", output_size);
+	tout->data = xmalloc(output_size);
+
+	// copy scanlines
+	int scanline_size = TIFFScanlineSize(tif);
+	assert(scanline_size == tinfo->w * pixel_size);
+	for (int j = 0; j < tinfo->h; j++)
+	{
+		uint8_t *buf = tout->data + scanline_size*j;
+		int r = TIFFReadScanline(tif, buf, j, 0);
+		if (r < 0) fail("could not read scanline %d", j);
+	}
+}
+
 static void read_tile_from_file(struct tiff_tile *t, char *filename, int tidx)
 {
 	TIFF *tif = TIFFOpen(filename, "r");
@@ -252,30 +335,22 @@ static void read_tile_from_file(struct tiff_tile *t, char *filename, int tidx)
 		if (tidx < 0 || tidx >= nt)
 			fail("bad tile index %d", tidx);
 
-		int tw = tiff_tilewidth(tif);
-		int th = tiff_tilelength(tif);
-		int ta = tiff_tilesacross(tif);
-		int td = tiff_tilesdown(tif);
+		t->w = tiff_tilewidth(tif);;
+		t->h = tiff_tilelength(tif);
 
-		t->w = tw;
-		t->h = th;
 
-		int i = tidx % ta;
-		int j = tidx / ta;
-
-		int ii = tw*i;
-		int jj = th*j;
+		int ii[2];
+		tiff_tile_corner(ii, tif, tidx);
+		//int ii = tw*i;
+		//int jj = th*j;
 
 		int tbytes = TIFFTileSize(tif);
 		t->data = xmalloc(tbytes);
 		memset(t->data, 0, tbytes);
-		int r = TIFFReadTile(tif, t->data, ii, jj, 0, 0);
+		int r = TIFFReadTile(tif, t->data, ii[0], ii[1], 0, 0);
 		if (r != tbytes) fail("could not read tile");
-	} else { // not tiled, read the whole image
-		fail("image \"%s\" has no tiles!", filename);
-		//int scanline_size = t->w * t->spp * t->bps/8;
-		//for (int i = 0; i < t->h; i++)
-		//	TIFFR
+	} else { // not tiled, read the whole image into 0th tile
+		read_scanlines(t, tif);
 	}
 
 	TIFFClose(tif);
@@ -422,14 +497,14 @@ static int tiffu_ntiles(char *filename)
 
 static int tiffu_ntiles2(char *filename)
 {
-	int r = 1;
+	int r = 0;
 
 	TIFF *tif = TIFFOpen(filename, "r");
 	if (!tif) fail("could not open TIFF file \"%s\"", filename);
 
-	//if (TIFFIsTiled(tif)) {
+	if (TIFFIsTiled(tif)) {
 		r = TIFFNumberOfTiles(tif);
-	//}
+	}
 
 	TIFFClose(tif);
 	return r;
@@ -503,6 +578,14 @@ static void tiffu_tget_hl(char *filename_out, char *filename_in, int tile_idx)
 
 	write_tile_to_file(filename_out, t);
 	free(t->data);
+}
+
+static void tiffu_tput_hl(char *fname_whole, int tile_idx, char *fname_part)
+{
+	struct tiff_tile t[1];
+	read_tile_from_file(t, fname_part, 0);
+
+	put_tile_into_file(fname_whole, t, tile_idx);
 }
 
 //void tcrop_old(char *fname_out, char *fname_in, int x0, int xf, int y0, int yf)
@@ -715,7 +798,7 @@ void tcrop(char *fname_out, char *fname_in, int x0, int xf, int y0, int yf)
 
 	// write output data
 	write_tile_to_file(fname_out, tout);
-	
+
 	// cleanup
 	free(tout->data);
 }
@@ -728,7 +811,18 @@ static int main_info(int c, char *v[])
 	}
 	char *filename = v[1];
 
-	tiffu_print_info(filename);
+	struct tiff_file_info t[1];
+	get_tiff_file_info_filename(t, filename);
+
+	printf("TIFF %d x %d\n", t->w, t->h);
+	printf("TIFF spp = %d\n", t->spp);
+	printf("TIFF bps = %d\n", t->bps);
+	printf("TIFF fmt = %d\n", t->fmt);
+	if (t->tiled) {
+		printf("TIFF ntiles = %d\n", t->ta * t->td);
+		printf("TIFF tsize = %d (%d x %d)\n",t->tw*t->th, t->tw, t->th);
+		printf("TIFF tconfig %d x %d (%d)\n",t->ta, t->td, t->ta*t->td);
+	}
 
 	return 0;
 }
@@ -791,6 +885,23 @@ static int main_tget(int c, char *v[])
 	char *filename_out = v[3];
 
 	tiffu_tget_hl(filename_out, filename_in, tile_idx);
+
+	return 0;
+}
+
+static int main_tput(int c, char *v[])
+{
+	if (c != 4) {
+		fprintf(stderr, "usage:\n\t"
+				"%s out_whole.tiff idx in_part.tiff\n", *v);
+		//                0 1              2   3
+		return 1;
+	}
+	char *filename_whole = v[1];
+	int tile_idx = atoi(v[2]);
+	char *filename_part = v[3];
+
+	tiffu_tput_hl(filename_whole, tile_idx, filename_part);
 
 	return 0;
 }
@@ -894,7 +1005,7 @@ int main(int c, char *v[])
 	if (0 == strcmp(v[1], "tget"))     return main_tget(c-1, v+1);
 	if (0 == strcmp(v[1], "whatever")) return main_whatever(c-1, v+1);
 	if (0 == strcmp(v[1], "crop"))     return main_crop(c-1, v+1);
-	//if (0 == strcmp(v[1], "tput"))   return main_tput(c-1, v+1);
+	if (0 == strcmp(v[1], "tput"))     return main_tput(c-1, v+1);
 
 	goto err;
 }
