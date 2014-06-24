@@ -3,6 +3,9 @@
 // ntiles f.tiff            # print the total number of tiles
 // tget   f.tiff n t.tiff   # get the nth tile (sizes must coincide)
 // tput   f.tiff n t.tiff   # an image into the nth tile (sizes must coincide)
+// tzout  a.tiff b.tiff     # zoom out by a factor 2 (keeping tile size)
+// retile in.t tw th out.t
+// tzero  w h tw th spp bps fmt
 //
 // meta   prog in.tiff ... out.tiff # run "prog" for all the tiles
 
@@ -906,6 +909,72 @@ static int main_tput(int c, char *v[])
 	return 0;
 }
 
+static int fmt_from_string(char *f)
+{
+	if (0 == strcmp(f, "uint")) return SAMPLEFORMAT_UINT;
+	if (0 == strcmp(f, "int")) return SAMPLEFORMAT_INT;
+	if (0 == strcmp(f, "ieeefp")) return SAMPLEFORMAT_IEEEFP;
+	//if (0 == strcmp(f, "void")) return SAMPLEFORMAT_VOID;
+	if (0 == strcmp(f, "complexint")) return SAMPLEFORMAT_COMPLEXINT;
+	if (0 == strcmp(f, "complexieeefp")) return SAMPLEFORMAT_COMPLEXIEEEFP;
+	return SAMPLEFORMAT_VOID;
+}
+
+static void create_zero_tiff_file(char *filename, int w, int h,
+		int tw, int th, int spp, int bps, char *fmt)
+{
+	//if (bps != 8 && bps != 16 && bps == 32 && bps != 64
+	//		&& bps != 128 && bps != 92)
+	//	fail("bad bps=%d", bps);
+	//if (spp < 1) fail("bad spp=%d", spp);
+	int fmt_id = fmt_from_string(fmt);
+	TIFF *tif = TIFFOpen(filename, "w");
+	TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, w);
+	TIFFSetField(tif, TIFFTAG_IMAGELENGTH, h);
+	TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, spp);
+	TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, bps);
+	TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT, fmt_id);
+	TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+	TIFFSetField(tif, TIFFTAG_TILEWIDTH, tw);
+	TIFFSetField(tif, TIFFTAG_TILELENGTH, th);
+
+	int tilesize = tw * th * bps/8 * spp;
+	uint8_t *buf = xmalloc(tilesize);
+	for (int i = 0; i < tilesize; i++)
+	{
+		float x = ((i/3)%tw)/((double)tw)-0.5;
+		float y = ((i/3)/th)/((double)tw)-0.5;
+		buf[i] = 128+128*sin(90*pow(hypot(x,y+0.3*x),1+(i%3-1)/1.3));
+	}
+	for (int j = 0; j < h; j += th)
+	for (int i = 0; i < w; i += tw)
+		TIFFWriteTile(tif, buf, i, j, 0, 0);
+	free(buf);
+	TIFFClose(tif);
+}
+
+static int main_tzero(int c, char *v[])
+{
+	if (c != 9)  {
+		fprintf(stderr, "usage:\n\t"
+				"%s w h tw th spp bps fmt out.tiff\n", *v);
+		//                0 1 2 3  4  5   6   7   8
+		return 0;
+	}
+	int w = atoi(v[1]);
+	int h = atoi(v[2]);
+	int tw = atoi(v[3]);
+	int th = atoi(v[4]);
+	int spp = atoi(v[5]);
+	int bps = atoi(v[6]);
+	char *fmt = v[7];
+	char *filename = v[8];
+
+	create_zero_tiff_file(filename, w, h, tw, th, spp, bps, fmt);
+
+	return 0;
+}
+
 static int main_crop(int c, char *v[])
 {
 	if (c != 6) {
@@ -999,13 +1068,14 @@ int main(int c, char *v[])
 		return 1;
 	}
 
-	if (0 == strcmp(v[1], "info"))     return main_info(c-1, v+1);
+	if (0 == strcmp(v[1], "info"))     return main_info    (c-1, v+1);
 	if (0 == strcmp(v[1], "imprintf")) return main_imprintf(c-1, v+1);
-	if (0 == strcmp(v[1], "ntiles"))   return main_ntiles(c-1, v+1);
-	if (0 == strcmp(v[1], "tget"))     return main_tget(c-1, v+1);
+	if (0 == strcmp(v[1], "ntiles"))   return main_ntiles  (c-1, v+1);
+	if (0 == strcmp(v[1], "tget"))     return main_tget    (c-1, v+1);
 	if (0 == strcmp(v[1], "whatever")) return main_whatever(c-1, v+1);
-	if (0 == strcmp(v[1], "crop"))     return main_crop(c-1, v+1);
-	if (0 == strcmp(v[1], "tput"))     return main_tput(c-1, v+1);
+	if (0 == strcmp(v[1], "crop"))     return main_crop    (c-1, v+1);
+	if (0 == strcmp(v[1], "tput"))     return main_tput    (c-1, v+1);
+	if (0 == strcmp(v[1], "tzero"))    return main_tzero   (c-1, v+1);
 
 	goto err;
 }
