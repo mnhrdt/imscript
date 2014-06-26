@@ -68,7 +68,7 @@ void ftr_handler_dummy           (struct FTR*,int,int,int,int);
 #define FTR_MASK_MOD4      64
 #define FTR_MASK_MOD5      128
 
-// button modifiers (inspired by X)
+// buttons and button modifiers (inspired by X)
 #define FTR_BUTTON_LEFT    256
 #define FTR_BUTTON_MIDDLE  512
 #define FTR_BUTTON_RIGHT   1024

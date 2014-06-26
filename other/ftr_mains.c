@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <complex.h>
 
 #include "ftr.h"
 
@@ -1022,6 +1023,341 @@ int main_minifire(int c, char *v[])
 	return 0;
 }
 
+// main_mandelbrot {{{1
+
+// state of the view: crop and palette
+struct mandelbrot_state {
+	complex long double from, to;
+	unsigned char palette[256][3];
+};
+
+// wether a number has "diverged"
+static bool small(complex long double z)
+{
+	long double a = creall(z);
+	long double b = cimagl(z);
+	return a*a + b*b < 16;
+}
+
+static float mandelpoint(complex long double c, int niter)
+{
+	int k = 0;
+	complex long double z = 0, oz = z;
+	//while (cabs(z) < 4 && k++ < niter)
+	//while (fabs(creall(z)) + fabs(cimagl(z)) < 4 && k++ < niter)
+	while (small(z) && k++ < niter)
+	{
+		oz = z;
+		z = z * z + c;
+	}
+	return cabs(oz);//k%2;
+}
+
+struct mandel_site {
+	int i, j, iter;
+	complex long double c, z;
+};
+
+struct mandel_state {
+	int w, h;
+	complex long double from, to;
+	int nsites;
+	struct mandel_site *t;
+};
+
+// assumes the table of sites is already allocated
+static void mandel_state_start(struct mandel_state *e, int w, int h,
+		complex long double from, complex long double to)
+{
+	long double sx = (creall(to) - creall(from)) / (w - 1);
+	long double sy = (cimagl(to) - cimagl(from)) / (h - 1);
+	long double ox = creall(from);
+	long double oy = cimagl(from);
+	fprintf(stderr, "mandel start sx = %Lg\n", sx);
+	fprintf(stderr, "mandel start sy = %Lg\n", sy);
+	fprintf(stderr, "mandel start ox = %Lg\n", ox);
+	fprintf(stderr, "mandel start oy = %Lg\n", oy);
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		struct mandel_site *s = e->t + j*w + i;
+		s->c = ox + i * sx + I * (oy + j * sy);
+		s->z = 0;
+		s->i = i;
+		s->j = j;
+		s->iter = 0;
+	}
+	e->w = w;
+	e->h = h;
+	e->from = from;
+	e->to = to;
+	e->nsites = w * h;
+}
+
+static void mandelbrot_resize(struct FTR *f, int d1, int d2, int w, int h)
+{
+	struct mandel_state *e = f->userdata;
+	free(e->t);
+	e->t = malloc(w*h*sizeof*e->t);
+	mandel_state_start(e, w, h, e->from, e->to);
+	memset(f->rgb, 0, 3*w*h);
+}
+
+static void action_mandel_translation(struct FTR *f, int dx, int dy)
+{
+	struct mandel_state *e = f->userdata;
+	long double offx = dx * (creall(e->to) - creall(e->from)) / (f->w - 1);
+	long double offy = dy * (cimagl(e->to) - cimagl(e->from)) / (f->h - 1);
+	complex long double off = offx + I * offy;
+	mandel_state_start(e, f->w, f->h, e->from + off, e->to + off);
+	unsigned char *tmp = malloc(3 * f->w * f->h);
+	memcpy(tmp, f->rgb, 3 * f->w * f->h);
+	memset(f->rgb, 0, 3 * f->w * f->h);
+	for (int j = 0; j < f->h; j++)
+	for (int i = 0; i < f->w; i++)
+	for (int l = 0; l < 3; l++)
+	{
+		int ii = i + dx;
+		int jj = j + dy; 
+		if (ii < 0 || jj < 0 || ii >= f->w || jj >= f->h)
+			continue;
+		int idxto   = (  j * f->w +  i ) * 3 + l;
+		int idxfrom = ( jj * f->w + ii ) * 3 + l;
+		f->rgb[idxto] = tmp[idxfrom];
+	}
+	free(tmp);
+}
+
+static void mandelbrot_key(struct FTR *f, int k, int m, int x, int y)
+{
+	if (k == FTR_KEY_ESC || k == 'q')
+		ftr_notify_the_desire_to_stop_this_loop(f, 0);
+
+	struct mandel_state *e = f->userdata;
+	complex long double c = (e->from + e->to)/2;
+	if (k == 'k') memset(f->rgb, 0, 3 * f->w * f->h);
+	if (k == 'r') {
+		mandel_state_start(e, f->w, f->h, e->from, e->to);
+		memset(f->rgb, 0, 3 * f->w * f->h);
+	}
+	if (k == '+') {
+		// ACTION: mandel zoom in
+		mandel_state_start(e, f->w, f->h, (c+e->from)/2, (c+e->to)/2);
+		unsigned char *tmp = malloc(3 * f->w * f->h);
+		memcpy(tmp, f->rgb, 3 * f->w * f->h);
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < f->w; i++)
+		for (int l = 0; l < 3; l++)
+		{
+			int ii = f->w/4 + i/2;
+			int jj = f->h/4 + j/2;
+			int idxto   = (  j * f->w +  i ) * 3 + l;
+			int idxfrom = ( jj * f->w + ii ) * 3 + l;
+			f->rgb[idxto] = tmp[idxfrom];
+			// todo morphological erosion of black pixels
+			// (to avoid block artifacts)
+		}
+		free(tmp);
+	}
+	if (k == '-') {
+		// ACTION: mandel zoom out
+		mandel_state_start(e, f->w, f->h, 2*e->from-c, 2*e->to-c);
+		unsigned char *tmp = malloc(3 * f->w * f->h);
+		memcpy(tmp, f->rgb, 3 * f->w * f->h);
+		memset(f->rgb, 0, 3 * f->w * f->h);
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < f->w; i++)
+		for (int l = 0; l < 3; l++)
+		{
+			int ii = 2*i - f->w/2;
+			int jj = 2*j - f->h/2;
+			if (ii < 0 || jj < 0 || ii >= f->w || jj >= f->h)
+				continue;
+			int idxto   = (  j * f->w +  i ) * 3 + l;
+			int idxfrom = ( jj * f->w + ii ) * 3 + l;
+			f->rgb[idxto] = tmp[idxfrom];
+		}
+		free(tmp);
+	}
+	int poff = 30;
+	if (k == FTR_KEY_UP)    action_mandel_translation(f, 0, -poff);
+	if (k == FTR_KEY_DOWN)  action_mandel_translation(f, 0, poff);
+	if (k == FTR_KEY_LEFT)  action_mandel_translation(f, -poff, 0);
+	if (k == FTR_KEY_RIGHT) action_mandel_translation(f, poff, 0);
+	//if (k == FTR_KEY_UP)    action_mandel_translation(f, 0, f->h/2);
+	//if (k == FTR_KEY_DOWN)  action_mandel_translation(f, 0, -f->h/2);
+	//if (k == FTR_KEY_LEFT)  action_mandel_translation(f, -f->w/2, 0);
+	//if (k == FTR_KEY_RIGHT) action_mandel_translation(f, f->w/2, 0);
+
+}
+
+static void mandel_remove_site(struct FTR *f, struct mandel_state *e, int i)
+{
+	struct mandel_site *s = e->t + i;
+	int k = s->j * f->w + s->i;
+	//uint8_t g1 = 255.0 * cabs(s->z) / 4;
+	//uint8_t g2 = 255*pow(sin(s->iter/255.0),2);
+	//f->rgb[3*k+0] = g2;
+	//f->rgb[3*k+1] = g2;
+	//f->rgb[3*k+2] = g1;
+	f->rgb[3*k+0] = 255*pow(sin(2.0*s->iter/255.0),2);
+	f->rgb[3*k+1] = 255*pow(sin(7.618*s->iter/255.0),2);
+	f->rgb[3*k+2] = 255*pow(sin(19.271*s->iter/255.0),2);
+	
+	e->nsites -= 1;
+	struct mandel_site tmp = e->t[i];
+	e->t[i] = e->t[e->nsites];
+	e->t[e->nsites] = tmp;
+}
+
+static void mandel_state_one_iteration(struct FTR *f, struct mandel_state *e)
+{
+	for (int i = 0; i < e->nsites; i++)
+	{
+		struct mandel_site *s = e->t + i;
+		complex long double z = s->z * s->z + s->c;
+		if (!small(z))
+			mandel_remove_site(f, e, i);
+		else {
+			s->z = z;
+			s->iter += 1;
+		}
+		//if (!i) {
+		//	fprintf(stderr, "i %d %d : c = %Lg %Lg : z = %Lg %Lg\n",
+		//			s->i, s->j,
+		//			crealll(s->c), cimagll(s->c),
+		//			crealll(s->z), cimagll(s->z));
+		//}
+	}
+}
+
+static void draw_mandelbrot(float *t, int w, int h,
+		complex long double from, complex long double to, int niter)
+{
+	long double sx = (creall(to) - creall(from)) / (w - 1);
+	long double sy = (cimagl(to) - cimagl(from)) / (h - 1);
+	long double ox = creall(from);
+	long double oy = cimagl(from);
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+		t[j*w+i] = mandelpoint(ox + i * sx + I * (oy + j * sy), niter);
+}
+
+static void draw_mandelbrot_idle(struct FTR *f, int k, int m, int x, int y)
+{
+	static bool firstrun = true;
+	if (firstrun) {
+		firstrun = false;
+	}
+
+	struct mandel_state *e = f->userdata;
+
+	mandel_state_one_iteration(f, e);
+
+	//for (int k = 0; k < e->nsites; k++)
+	//{
+	//	struct mandel_site *s = e->t + k;
+	//	int i = s->j * f->w + abs(s->i);
+	//	//f->rgb[3*i+0] = 255;
+	//	uint8_t g = cabs(s->z) < 2 ? 0 : 255.0*cabs(s->z)/4;
+	//	f->rgb[3*i+0] = g;
+	//	f->rgb[3*i+1] = 0;
+	//	f->rgb[3*i+2] = 0;
+	//}
+
+	//for (int k = e->nsites; k < f->w * f->h; k++)
+	//{
+	//	struct mandel_site *s = e->t + k;
+	//	int i = s->j * f->w + abs(s->i);
+	//	f->rgb[3*i+0] = f->rgb[3*i+1] = f->rgb[3*i+2] = s->iter;
+	//}
+	//
+	//for (int k = 0; k < f->w * f->h; k++)
+	//{
+	//	if (k < e->nsites) {
+	//		struct mandel_site *s = e->t + k;
+	//		int i = s->j * f->w + abs(s->i);
+	//		//uint8_t g = s->iter%255;
+	//		//uint8_t g = 255.0 * cabs(s->z) / 4;
+	//		//f->rgb[3*i+0] = f->rgb[3*i+1] = f->rgb[3*i+2] = g;
+	//		f->rgb[3*i+0] = f->rgb[3*i+1] = f->rgb[3*i+2] = 0;
+	//	} else {
+	//		struct mandel_site *s = e->t + k;
+	//		int i = s->j * f->w + abs(s->i);
+	//		f->rgb[3*i+0] = f->rgb[3*i+1] = f->rgb[3*i+2] = s->iter;
+	//	}
+	//}
+
+	fprintf(stderr, "changed %d\n", e->nsites);
+	f->changed = 1;
+
+}
+
+static void draw_mandelbrot_idle_old(struct FTR *f, int k, int m, int x, int y)
+{
+	complex long double from = -3 -2*I;
+	complex long double to = 2 +2*I;
+
+	//memset(f->rgb, rand(), 3*f->w*f->h);
+	static float *t = NULL;
+	static complex long double *tab_c, *tab_z;
+	if (!t) {
+		t     = malloc(f->w * f->h * sizeof*t);
+		tab_c = malloc(f->w * f->h * sizeof*tab_c);
+		tab_z = malloc(f->w * f->h * sizeof*tab_z);
+
+		long double sx = (creall(to) - creall(from)) / (f->w - 1);
+		long double sy = (cimagl(to) - cimagl(from)) / (f->h - 1);
+		long double ox = creall(from);
+		long double oy = cimagl(from);
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < f->w; i++)
+		{
+			tab_c[j*f->w+i] = ox + i * sx + I * (oy + j * sy);
+			tab_z[j*f->w+i] = 0;
+		}
+	}
+
+	for (int i = 0; i < f->w * f->h; i++)
+	{
+		complex long double z = tab_z[i];
+		complex long double c = tab_c[i];
+		z = z * z + c;
+		if (small(z))
+			tab_z[i] = z;
+	}
+
+	for (int i = 0; i < f->w * f->h; i++)
+		t[i] = cabs(tab_z[i]);
+
+	for (int i = 0; i < f->w * f->h; i++)
+		f->rgb[3*i+0] = f->rgb[3*i+1] = f->rgb[3*i+2] = 255.0*t[i]/4;
+	f->changed = 1;
+}
+
+int main_mandelbrot(int c, char *v[])
+{
+	int w = 1000;
+	int h = 800;
+	struct FTR f = ftr_new_window(w, h);
+
+	struct mandel_state e[1];
+	e->t = malloc(w*h*sizeof*e->t);
+
+	//complex double from = 0.385+0.375*I;//-3 -2*I;
+	//complex double to = 0.395+0.384*I;// +1*I;
+	complex long double from = -3 -2*I;
+	complex long double to = 1+2*I;
+
+	mandel_state_start(e, w, h, from, to);
+	f.userdata = e;
+
+	ftr_set_handler(&f, "idle", draw_mandelbrot_idle);
+	ftr_set_handler(&f, "resize", mandelbrot_resize);
+	ftr_set_handler(&f, "key", mandelbrot_key);
+	return ftr_loop_run(&f);
+}
+
 
 // main_events {{{1
 static void print_event_key(struct FTR *f, int k, int m, int x, int y)
@@ -1054,6 +1390,34 @@ int main_events(int c, char *v[])
 	return ftr_loop_run(&f);
 }
 
+// main_paint {{{1
+static void paint_event_button(struct FTR *f, int b, int m, int x, int y)
+{
+	if (x < f->w && y < f->h && x >= 0 && y >= 0)
+	{
+		int idx = f->w * y + x;
+		f->rgb[3*idx+0] = f->rgb[3*idx+1] = f->rgb[3*idx+2] = 255;
+	}
+	f->changed = 1;
+}
+static void paint_event_motion(struct FTR *f, int b, int m, int x, int y)
+{
+	if (x < f->w && y < f->h && x >= 0 && y >= 0)
+	{
+		int idx = f->w * y + x;
+		f->rgb[3*idx+0] = f->rgb[3*idx+1] = f->rgb[3*idx+2] = 127;
+	}
+	f->changed = 1;
+}
+
+int main_paint(int c, char *v[])
+{
+	struct FTR f = ftr_new_window(320, 200);
+	ftr_set_handler(&f, "button", paint_event_button);
+	ftr_set_handler(&f, "motion", paint_event_motion);
+	return ftr_loop_run(&f);
+}
+
 // main {{{1
 
 #define MAIN(x) { #x, main_ ## x }
@@ -1072,7 +1436,9 @@ static const struct { char *n; int(*f)(int,char*[]); } mains[] = {
 	MAIN(random),
 	MAIN(fire),
 	MAIN(minifire),
+	MAIN(mandelbrot),
 	MAIN(events),
+	MAIN(paint),
 	{ 0 }
 };
 

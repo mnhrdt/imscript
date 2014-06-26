@@ -1,3 +1,4 @@
+// icc -std=c99 -Ofast fpan.c iio.o -o fpan -lglut -lGL -ltiff -ljpeg -lpng -lz -lm
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -293,6 +294,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
 	fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
 			k, isalpha(k)?k:' ', m, x, y);
+
 	if (k == '+') action_increase_zoom(f, f->w/2, f->h/2);
 	if (k == '-') action_decrease_zoom(f, f->w/2, f->h/2);
 
@@ -371,7 +373,9 @@ typedef void (*zoom_out_function_t)(float*,int,int,float*,int,int);
 
 static void create_pyramid(struct pan_state *e)
 {
-	zoom_out_function_t z = zoom_out_by_factor_two_max;
+	zoom_out_function_t z;
+       	z = zoom_out_by_factor_two_max;
+       	z = zoom_out_by_factor_two;
 	for (int s = 0; s < MAX_PYRAMID_LEVELS; s++)
 	{
 		int      lw   = s ? e->pyr_w  [s-1] : e->w   ;

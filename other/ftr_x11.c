@@ -128,6 +128,7 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 		| ExposureMask
 		| KeyPressMask
 		| ButtonPressMask
+		| ButtonReleaseMask
 		| PointerMotionMask
 		| StructureNotifyMask
 		| EnterWindowMask
@@ -221,6 +222,7 @@ static void ugly_hack_disable_enter_events(struct _FTR *f)
 		| ExposureMask
 		| KeyPressMask
 		| ButtonPressMask
+		| ButtonReleaseMask
 		| PointerMotionMask
 		| StructureNotifyMask
 		;
@@ -342,6 +344,12 @@ static void process_next_event(struct FTR *ff)
 			ugly_hack_disable_enter_events(f);
 			ugly_disable = 0;
 		}
+	}
+	if (event.type == ButtonRelease && f->handle_button) {
+		XButtonEvent e = event.xbutton;
+		if (e.button != 4 && e.button != 5)
+			f->handle_button(ff, -(1<<(7+e.button)),
+					e.state, e.x, e.y);
 	}
 	if (event.type == KeyPress && f->handle_key) {
 		XKeyEvent e = event.xkey;

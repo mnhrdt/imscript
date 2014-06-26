@@ -150,9 +150,11 @@ static void my_mousefunc(int b, int s, int x, int y)
 		f->glut_button_mask &= ~B;
 
 
-	if (f->handle_button && 0 == s) {
+	if (f->handle_button /*&& 0 == s*/) {
+		if (s && (B == FTR_BUTTON_UP || B == FTR_BUTTON_DOWN))
+			return;
 		int m = modifiers_from_glut_to_ftr(glutGetModifiers());
-		f->handle_button((void*)f, B, m, x, y);
+		f->handle_button((void*)f, B*(s?-1:1), m, x, y);
 		if (f->changed)
 			glutPostRedisplay();
 	}
