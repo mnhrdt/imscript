@@ -953,7 +953,7 @@ static void create_zero_tiff_file(char *filename, int w, int h,
 	//	fail("bad bps=%d", bps);
 	//if (spp < 1) fail("bad spp=%d", spp);
 	int fmt_id = fmt_from_string(fmt);
-	TIFF *tif = TIFFOpen(filename, "w");
+	TIFF *tif = TIFFOpen(filename, "w8");
 	TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, w);
 	TIFFSetField(tif, TIFFTAG_IMAGELENGTH, h);
 	TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, spp);
