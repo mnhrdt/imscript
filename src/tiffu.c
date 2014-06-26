@@ -42,6 +42,7 @@ struct tiff_file_info {
 	bool packed; // whether bps=1,2 or 4
 	bool tiled;  // whether data is organized into tiles
 	bool compressed;
+	int ntiles;
 
 	// only if tiled
 	int32_t tw;  // tile width
@@ -59,6 +60,30 @@ static int how_many(int n, int u)
 	return n/u + (bool)(n%u);
 
 }
+
+static int fmt_from_string(char *f)
+{
+	if (0 == strcmp(f, "uint")) return SAMPLEFORMAT_UINT;
+	if (0 == strcmp(f, "int")) return SAMPLEFORMAT_INT;
+	if (0 == strcmp(f, "ieeefp")) return SAMPLEFORMAT_IEEEFP;
+	//if (0 == strcmp(f, "void")) return SAMPLEFORMAT_VOID;
+	if (0 == strcmp(f, "complexint")) return SAMPLEFORMAT_COMPLEXINT;
+	if (0 == strcmp(f, "complexieeefp")) return SAMPLEFORMAT_COMPLEXIEEEFP;
+	return SAMPLEFORMAT_VOID;
+}
+
+static const char *fmt_to_string(int fmt)
+{
+	switch(fmt) {
+	case SAMPLEFORMAT_UINT: return "uint";
+	case SAMPLEFORMAT_INT: return "int";
+	case SAMPLEFORMAT_IEEEFP: return "ieeefp";
+	case SAMPLEFORMAT_COMPLEXINT: return "complexint";
+	case SAMPLEFORMAT_COMPLEXIEEEFP: return "complexieeefp";
+	}
+	return "unrecognized";
+}
+
 
 static void get_tiff_file_info(struct tiff_file_info *t, TIFF *tif)
 {
@@ -81,6 +106,7 @@ static void get_tiff_file_info(struct tiff_file_info *t, TIFF *tif)
 		TIFFGetField(tif, TIFFTAG_TILELENGTH, &t->th);
 		t->ta = how_many(t->w, t->tw);
 		t->td = how_many(t->h, t->th);
+		t->ntiles = TIFFNumberOfTiles(tif);
 	}
 }
 
@@ -312,6 +338,14 @@ static void read_scanlines(struct tiff_tile *tout, TIFF *tif)
 	}
 }
 
+static tsize_t my_readtile(TIFF *tif, tdata_t buf,
+		uint32 x, uint32 y, uint32 z, tsample_t sample)
+{
+	tsize_t r = TIFFReadTile(tif, buf, x, y, z, sample);
+	if (r == -1) memset(buf, 0, r = TIFFTileSize(tif));
+	return r;
+}
+
 static void read_tile_from_file(struct tiff_tile *t, char *filename, int tidx)
 {
 	TIFF *tif = TIFFOpen(filename, "r");
@@ -350,7 +384,7 @@ static void read_tile_from_file(struct tiff_tile *t, char *filename, int tidx)
 		int tbytes = TIFFTileSize(tif);
 		t->data = xmalloc(tbytes);
 		memset(t->data, 0, tbytes);
-		int r = TIFFReadTile(tif, t->data, ii[0], ii[1], 0, 0);
+		int r = my_readtile(tif, t->data, ii[0], ii[1], 0, 0);
 		if (r != tbytes) fail("could not read tile");
 	} else { // not tiled, read the whole image into 0th tile
 		read_scanlines(t, tif);
@@ -694,7 +728,7 @@ static void crop_tiles(struct tiff_tile *tout, struct tiff_file_info *tinfo,
 	for (int j = tiy0; j <= tiyf; j++)
 	for (int i = tix0; i <= tixf; i++)
 	{
-		int r = TIFFReadTile(tif, buf, i*tinfo->tw, j*tinfo->th, 0, 0);
+		int r = my_readtile(tif, buf, i*tinfo->tw, j*tinfo->th, 0, 0);
 		if (r < 0) fail("could not read tile (%d,%d)");
 		int i_0 = i > tix0 ? 0 : x0 % tinfo->tw; // first pixel in tile
 		int j_0 = j > tiy0 ? 0 : y0 % tinfo->th;
@@ -817,12 +851,14 @@ static int main_info(int c, char *v[])
 	struct tiff_file_info t[1];
 	get_tiff_file_info_filename(t, filename);
 
+
+
 	printf("TIFF %d x %d\n", t->w, t->h);
 	printf("TIFF spp = %d\n", t->spp);
 	printf("TIFF bps = %d\n", t->bps);
-	printf("TIFF fmt = %d\n", t->fmt);
+	printf("TIFF fmt = \"%s\"\n", fmt_to_string(t->fmt));
 	if (t->tiled) {
-		printf("TIFF ntiles = %d\n", t->ta * t->td);
+		printf("TIFF ntiles = %d (%d)\n", t->ta * t->td, t->ntiles);
 		printf("TIFF tsize = %d (%d x %d)\n",t->tw*t->th, t->tw, t->th);
 		printf("TIFF tconfig %d x %d (%d)\n",t->ta, t->td, t->ta*t->td);
 	}
@@ -909,19 +945,8 @@ static int main_tput(int c, char *v[])
 	return 0;
 }
 
-static int fmt_from_string(char *f)
-{
-	if (0 == strcmp(f, "uint")) return SAMPLEFORMAT_UINT;
-	if (0 == strcmp(f, "int")) return SAMPLEFORMAT_INT;
-	if (0 == strcmp(f, "ieeefp")) return SAMPLEFORMAT_IEEEFP;
-	//if (0 == strcmp(f, "void")) return SAMPLEFORMAT_VOID;
-	if (0 == strcmp(f, "complexint")) return SAMPLEFORMAT_COMPLEXINT;
-	if (0 == strcmp(f, "complexieeefp")) return SAMPLEFORMAT_COMPLEXIEEEFP;
-	return SAMPLEFORMAT_VOID;
-}
-
 static void create_zero_tiff_file(char *filename, int w, int h,
-		int tw, int th, int spp, int bps, char *fmt)
+		int tw, int th, int spp, int bps, char *fmt, bool incomplete)
 {
 	//if (bps != 8 && bps != 16 && bps == 32 && bps != 64
 	//		&& bps != 128 && bps != 92)
@@ -938,27 +963,38 @@ static void create_zero_tiff_file(char *filename, int w, int h,
 	TIFFSetField(tif, TIFFTAG_TILEWIDTH, tw);
 	TIFFSetField(tif, TIFFTAG_TILELENGTH, th);
 
+
 	int tilesize = tw * th * bps/8 * spp;
 	uint8_t *buf = xmalloc(tilesize);
 	for (int i = 0; i < tilesize; i++)
 	{
-		float x = ((i/3)%tw)/((double)tw)-0.5;
-		float y = ((i/3)/th)/((double)tw)-0.5;
-		buf[i] = 128+128*sin(90*pow(hypot(x,y+0.3*x),1+(i%3-1)/1.3));
+		float x = ((i/(spp*bps/8))%tw)/((double)tw)-0.5;
+		float y = ((i/(spp*bps/8))/th)/((double)th)-0.5;
+		buf[i] = 128+128*sin(90*pow(hypot(x,y+0.3*x),1+(i%spp-1)/1.3));
 	}
-	for (int j = 0; j < h; j += th)
-	for (int i = 0; i < w; i += tw)
-		TIFFWriteTile(tif, buf, i, j, 0, 0);
-	free(buf);
+	TIFFWriteTile(tif, buf, 0, 0, 0, 0);
 	TIFFClose(tif);
+	if (!incomplete) {
+		for (int j = 0; j < h; j += th)
+		for (int i = 0; i < w; i += tw)
+		{
+			tif = TIFFOpen(filename, "r+");
+			TIFFWriteTile(tif, buf, i, j, 0, 0);
+			TIFFClose(tif);
+		}
+	}
+	free(buf);
 }
+
+#include "pickopt.c"
 
 static int main_tzero(int c, char *v[])
 {
+	bool i = pick_option(&c, &v, "i", NULL);
 	if (c != 9)  {
 		fprintf(stderr, "usage:\n\t"
-				"%s w h tw th spp bps fmt out.tiff\n", *v);
-		//                0 1 2 3  4  5   6   7   8
+		"%s [-i] w h tw th spp bps {int|uint|ieeefp} out.tiff\n", *v);
+	//        0      1 2 3  4  5   6   7   8
 		return 0;
 	}
 	int w = atoi(v[1]);
@@ -970,7 +1006,7 @@ static int main_tzero(int c, char *v[])
 	char *fmt = v[7];
 	char *filename = v[8];
 
-	create_zero_tiff_file(filename, w, h, tw, th, spp, bps, fmt);
+	create_zero_tiff_file(filename, w, h, tw, th, spp, bps, fmt, i);
 
 	return 0;
 }
@@ -1059,9 +1095,18 @@ static int main_imprintf(int argc, char *argv[])
 	return 0;
 }
 
+void my_tifferror(const char *module, const char *fmt, va_list ap)
+{
+	if (0 == strcmp(fmt, "%llu: Invalid tile byte count, tile %lu"))
+		fprintf(stderr, "got a zero tile\n");
+	else
+		fprintf(stderr, "TIFF ERROR(%s): \"%s\"\n", module, fmt);
+}
+
 int main(int c, char *v[])
 {
 	TIFFSetWarningHandler(NULL);//suppress warnings
+	//TIFFSetErrorHandler(my_tifferror);
 
 	if (c < 2) {
 	err:	fprintf(stderr, "usage:\n\t%s {info|ntiles|tget|tput}\n", *v);

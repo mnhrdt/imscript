@@ -4,11 +4,12 @@ ENABLE_GSL = yes
 WFLAGS=
 WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wstrict-prototypes
 WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wstrict-prototypes -Wno-unused -Wno-parentheses
+WFLAGS=
 
 CFLAGS = $(WFLAGS)
 CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE -fopenmp
-CFLAGS = $(WFLAGS) -O3
 CFLAGS = $(WFLAGS) -g
+CFLAGS = $(WFLAGS) -O2
 
 SRCDIR = src
 BINDIR = bin
