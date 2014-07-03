@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <tiffio.h>
+#include <libgen.h>
 
 #include "fail.c"
 #include "xmalloc.c"
@@ -72,7 +73,7 @@ static int fmt_from_string(char *f)
 	return SAMPLEFORMAT_VOID;
 }
 
-static const char *fmt_to_string(int fmt)
+static char *fmt_to_string(int fmt)
 {
 	switch(fmt) {
 	case SAMPLEFORMAT_UINT: return "uint";
@@ -986,6 +987,13 @@ static void create_zero_tiff_file(char *filename, int w, int h,
 	free(buf);
 }
 
+static void create_zero_tiff_file_tinfo(char *filename,
+	       struct tiff_file_info *t, bool incomplete)
+{
+	create_zero_tiff_file(filename, t->w, t->h, t->tw, t->th,
+			t->spp, t->bps, fmt_to_string(t->fmt), incomplete);
+}
+
 #include "pickopt.c"
 
 static int main_tzero(int c, char *v[])
@@ -1007,6 +1015,327 @@ static int main_tzero(int c, char *v[])
 	char *filename = v[8];
 
 	create_zero_tiff_file(filename, w, h, tw, th, spp, bps, fmt, i);
+
+	return 0;
+}
+
+
+// metatiler {{{1
+
+#define CMDLINE_MAX 10000
+#define MARKER_INPUT  '^'
+#define MARKER_OUTPUT '@'
+
+static void add_item_to_cmdline(char *cmdline, char *item, char *fileprefix)
+{
+	//fprintf(stderr, "ADD \"%s%s\"\n", fileprefix?fileprefix:"", item);
+	if (*cmdline)
+		strncat(cmdline, " ", CMDLINE_MAX);
+	if (fileprefix)
+		strncat(cmdline, fileprefix, CMDLINE_MAX);
+	strncat(cmdline, item, CMDLINE_MAX);
+}
+
+static char *create_temporary_directory(void)
+{
+	//return "/tmp/metafilter_temporary_directory/";
+	return "/tmp/MTD/";
+}
+
+static char *bn(char *s)
+{
+	char *r = strrchr(s, '/');
+	r = r ? r + 1 : s;
+	return r;
+}
+
+static char *pn(char *p, char *s)
+{
+	static char r[CMDLINE_MAX];
+	snprintf(r, CMDLINE_MAX, "%s%s", p, bn(s));
+	return r;
+}
+
+static void fill_subs_cmdline(char *cmdline, char *cmd, char *fprefix,
+		char **fns_in, int n_in, char **fns_out, int n_out)
+{
+	*cmdline = 0;
+	char *tok = strtok(cmd, " ");
+	do {
+		if (*tok=='>' || *tok=='|' || *tok=='<') {
+			fprintf(stderr, "ERROR: must be a single "
+					"command line\n");
+			exit(1);
+		} else if (*tok == MARKER_INPUT) {
+			int idx = atoi(tok+1)-1;
+			if (idx >= 0 && idx < n_in)
+			add_item_to_cmdline(cmdline, bn(fns_in[idx]), fprefix);
+		} else if (*tok == MARKER_OUTPUT) {
+			int idx = atoi(tok+1)-1;
+			if (idx >= 0 && idx < n_out)
+			add_item_to_cmdline(cmdline, bn(fns_out[idx]), fprefix);
+		} else
+			add_item_to_cmdline(cmdline, tok, NULL);
+	} while (tok = strtok(NULL, " "));
+	fprintf(stderr, "CMDLINE = \"%s\"\n", cmdline);
+}
+
+static void extract_tile(char *tpd, char *filename, int idx)
+{
+	// 1. open large tiff image "filename"
+	// 2. locate idexed tile
+	// 3. read indexed tile data
+	// 4. close large tiff image
+	// 5. create new small tiff image "tpd/filename"
+	// 6. write data to new small tiff image
+}
+
+static void paste_tile(char *filename, int idx, char *tpd)
+{
+	// 1. read data from small tiff file
+	// 2. open large tiff file
+	// 3. locate position of indexed tile
+	// 4. rewrite indexed tile with new data
+	// 5. save and close the large tiff file
+}
+
+#include <stdarg.h>
+static int system_v(const char *fmt, ...)
+
+{
+	char buf[CMDLINE_MAX];
+	va_list argp;
+	va_start(argp, fmt);
+	vsnprintf(buf, CMDLINE_MAX, fmt, argp);
+	va_end(argp);
+	fprintf(stderr, "SYSTEM_V: %s\n", buf);
+	//return 0;
+	int r = system(buf);
+	if (r) fail("SYSTEM(\"%s\") failed\n", buf);
+	return 0;
+}
+
+void metatiler(char *command, char **fname_in, int n_in,
+		char **fname_out, int n_out)
+{
+	// build command line (will be the same at each run)
+	char cmdline[CMDLINE_MAX];
+	char *tpd = create_temporary_directory();
+	fill_subs_cmdline(cmdline, command, tpd,
+			fname_in, n_in, fname_out, n_out);
+
+	// create temporary filenames
+	char tname_in[n_in][FILENAME_MAX];
+	char tname_out[n_out][FILENAME_MAX];
+	for (int i = 0; i < n_in; i++)
+		snprintf(tname_in[i],FILENAME_MAX,"%s%s",tpd,bn(fname_in[i]));
+	for (int i = 0; i < n_out; i++)
+		snprintf(tname_out[i],FILENAME_MAX,"%s%s",tpd,bn(fname_out[i]));
+
+	// determine input tile geometry
+	struct tiff_file_info tinfo_in[n_in], tinfo_out[n_out];
+	for (int i = 0; i < n_in; i++)
+		get_tiff_file_info_filename(tinfo_in + i, fname_in[i]);
+
+	// check tile geometry consistency
+	for (int i = 1; i < n_in; i++)
+	{
+		struct tiff_file_info *ta = tinfo_in + 0;
+		struct tiff_file_info *tb = tinfo_in + i;
+		if (ta->w != tb->w || ta->h != ta->h)
+			fail("image \"%s\" size mismatch (%dx%d != %dx%d)\n",
+				fname_in[i], ta->w, ta->h, tb->w, tb->h);
+		if (ta->ntiles != tb->ntiles)
+			fail("image \"%s\" ntiles mismatch (%d != %d)\n",
+				fname_in[i], ta->ntiles, tb->ntiles);
+	}
+
+	for (int i = 0; i < tinfo_in->ntiles; i++)
+	{
+		fprintf(stderr, "process tile %d\n", i);
+		for (int k = 0; k < n_in; k++)
+			system_v("tiffu tget %s %d %s",
+				fname_in[k], i, tname_in[k]);
+		system_v("%s", cmdline);
+		if (!i) for (int k = 0; k < n_out; k++)
+		{
+			struct tiff_file_info *t = tinfo_out + k;
+			get_tiff_file_info_filename(t, tname_out[k]);
+			t->w = tinfo_in->w;
+			t->h = tinfo_in->h;
+			t->tw = tinfo_in->tw;
+			t->th = tinfo_in->th;
+			create_zero_tiff_file_tinfo(fname_out[k], t, true);
+		}
+		for (int k = 0; k < n_out; k++)
+			system_v("tiffu tput %s %d %s",
+				fname_out[k], i, tname_out[k]);
+	}
+
+	//for (int i = 0; i < ntiles; i++)
+	//{
+	//	// 1. extract ith tile from input images
+	//	// 2. run cmdline
+	//	fprintf(stderr, "run \"%s\"\n", cmdline);
+	//	// 3. paste results to output files
+	//}
+}
+
+int main_meta(int argc, char *argv[])
+{
+	if (argc < 3) {
+		fprintf(stderr, "usage:\n\t"
+			"%s \"CMD <1 <2 >1\" in1 in2 -- out1\n", *argv);
+		//       0   1               2   3   ...
+		return 1;
+	}
+
+	// get input arguments
+	char *command = argv[1];
+	int n_in = 0, n_out = 0;
+	char *filenames_in[argc];
+	char *filenames_out[argc];
+	for (int i = 2; i < argc && strcmp(argv[i], "--"); i++)
+		filenames_in[n_in++] = argv[i];
+	for (int i = 3+n_in; i < argc; i++)
+		filenames_out[n_out++] = argv[i];
+
+	// print debug info
+	fprintf(stderr, "%d input files:\n", n_in);
+	for (int i = 0; i < n_in; i++)
+		fprintf(stderr, "\t%s\n", filenames_in[i]);
+	fprintf(stderr, "%d output files:\n", n_out);
+	for (int i = 0; i < n_out; i++)
+		fprintf(stderr, "\t%s\n", filenames_out[i]);
+	fprintf(stderr, "COMMAND = \"%s\"\n", command);
+
+	// run program
+	metatiler(command, filenames_in, n_in, filenames_out, n_out);
+
+	// exit
+	return 0;
+}
+
+void metatiler_low_level(char *command, char **filenames_in, int n_in,
+		char **filenames_out, int n_out)
+{
+	// build command line (will be the same at each run)
+	char cmdline[CMDLINE_MAX];
+	char *tpd = create_temporary_directory();
+	fill_subs_cmdline(cmdline, command, tpd,
+			filenames_in, n_in, filenames_out, n_out);
+
+	// determine tile geometry
+	int ntiles = 4;//=get_number_of_tiles(*filename_in)
+
+	// create output files as empty files with the required tile geometry
+	// to solve: what pixel dimension and type?
+	// solution: run the program with the first tile and see what happens
+
+	for (int i = 0; i < ntiles; i++)
+	{
+		// 1. extract ith tile from input images
+		// 2. run cmdline
+		fprintf(stderr, "run \"%s\"\n", cmdline);
+		// 3. paste results to output files
+	}
+}
+
+static void metatiler_bad(int argc, char *argv[],
+		int *idx_in, int n_in, int *idx_out, int n_out)
+{
+	// 1. build generic command line
+	//char command[CMDLINE_MAX]; ncommand = 0;
+	int patn = 0;
+	char pat[argc][3];
+	char *pat_argv[argc];
+
+	for (int i = 0; i < argc; i++)
+	{
+		pat_argv[i] = argv[i];
+		fprintf(stderr, "pat_argv[%d] = \"%s\"\n", i, pat_argv[i]);
+	}
+
+	fprintf(stderr, "COMMAND = %s\n", argv[1]);
+	for (int i = 0; i < n_in; i++)
+	{
+		fprintf(stderr, "IN_%d = %s\n", 1+i, argv[idx_in[i]]);
+		pat[patn][0] = '<';
+		pat[patn][1] = '1' + i;
+		pat[patn][2] = '\0';
+		pat_argv[idx_in[i]] = pat[patn];
+		patn += 1;
+	}
+	for (int i = 0; i < n_out; i++)
+	{
+		fprintf(stderr, "OUT_%d = %s\n", 1+i, argv[idx_out[i]]);
+		pat[patn][0] = '>';
+		pat[patn][1] = '1' + i;
+		pat[patn][2] = '\0';
+		pat_argv[idx_out[i]] = pat[patn];
+		patn += 1;
+	}
+
+	for (int i = 0; i < argc; i++)
+		fprintf(stderr, "pat_argv[%d] = \"%s\"\n", i, pat_argv[i]);
+
+
+	// 2. assess input files consistency
+
+	// 3. create output file
+	
+	// 4. create temporary directory
+	
+	// 5. execute command for each tile, copying back the tile to 
+}
+
+static bool hassuffix(const char *s, const char *suf)
+{
+	int len_s = strlen(s);
+	int len_suf = strlen(suf);
+	if (len_s < len_suf)
+		return false;
+	return 0 == strcmp(suf, s + (len_s - len_suf));
+}
+
+#define LENGTH(t) sizeof((t))/sizeof((t)[0])
+
+static bool filename_is_tiff(char *s)
+{
+	char *suf[] = { ".tiff", ".tif", ".TIFF", ".TIF" };
+	for (int i = 0; i < LENGTH(suf); i++)
+		if (hassuffix(s, suf[i]))
+			return true;
+	return false;
+}
+
+// by default, the last "TIFF" argument is the output, and the rest are
+// the input files.  At least one input file is needed, with the desired
+// tile configuration.
+static int main_meta_old(int argc, char *argv[])
+{
+	if (argc < 3) {
+		fprintf(stderr, "usage:\n\t%s cmd arg1 ... argn\n", *argv);
+		//                          0 1   2        c-1
+		return 1;
+	}
+	char *command = argv[1];
+	int n_in = 0, n_out = 0;
+	int filenames_in[argc];
+	int filenames_out[argc];
+	for (int i = 2; i < argc; i++)
+		if (filename_is_tiff(argv[i]))
+			filenames_in[n_in++] = i;
+	if (n_in < 2) fail("need at least 2 tiff filenames");
+	filenames_out[n_out++] = filenames_in[--n_in];
+
+	//fprintf(stderr, "CMD = %s\n", command);
+	//for (int i = 0; i < n_in; i++)
+	//	fprintf(stderr, "in_%d = %s\n", 1+i, argv[filenames_in[i]]);
+	//for (int i = 0; i < n_out; i++)
+	//	fprintf(stderr, "out_%d = %s\n", 1+i, argv[filenames_out[i]]);
+
+	metatiler_bad(argc, argv, filenames_in, n_in, filenames_out, n_out);
 
 	return 0;
 }
@@ -1121,6 +1450,7 @@ int main(int c, char *v[])
 	if (0 == strcmp(v[1], "crop"))     return main_crop    (c-1, v+1);
 	if (0 == strcmp(v[1], "tput"))     return main_tput    (c-1, v+1);
 	if (0 == strcmp(v[1], "tzero"))    return main_tzero   (c-1, v+1);
+	if (0 == strcmp(v[1], "meta"))     return main_meta   (c-1, v+1);
 
 	goto err;
 }
