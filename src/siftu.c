@@ -175,7 +175,7 @@ static int main_siftcpairsg(int c, char *v[])
 
 	// compute bounding box
 	int w = 0, h = 0;
-	for (int i = 0; i < n[0]; i++) {
+	for (int i = 0; i < fmin(n[0],n[1]); i++) {
 		w = fmax(w, ceil(p[0][i].pos[0]));
 		w = fmax(w, ceil(p[1][i].pos[0]));
 		h = fmax(h, ceil(p[0][i].pos[1]));
