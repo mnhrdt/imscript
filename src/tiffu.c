@@ -53,6 +53,20 @@ struct tiff_info {
 	int32_t td;  // tiles down
 };
 
+static int tinfo_pixelsize(struct tiff_info *t)
+{
+	if (t->packed)
+		fail("packed bad");
+	return t->spp * t->bps / 8;
+}
+
+static int tinfo_tilesize(struct tiff_info *t)
+{
+	//if (!t->tiled || t->broken || t->packed || t->compressed)
+	if (!t->tiled || t->packed)
+		fail("this combination is not supported");
+	return t->tw * t->th * t->spp * (t->bps/8);
+}
 
 // tell how many units "u" are needed to cover a length "n"
 static int how_many(int n, int u)
@@ -365,7 +379,7 @@ static void read_tile_from_file(struct tiff_tile *t, char *filename, int tidx)
 	t->broken = false;
 
 	if (planarity != PLANARCONFIG_CONTIG)
-		fail("broken pixels not supporte yet");
+		fail("broken pixels not supported yet");
 
 	if (TIFFIsTiled(tif)) {
 		int nt = TIFFNumberOfTiles(tif);
@@ -374,7 +388,6 @@ static void read_tile_from_file(struct tiff_tile *t, char *filename, int tidx)
 
 		t->w = tiff_tilewidth(tif);;
 		t->h = tiff_tilelength(tif);
-
 
 		int ii[2];
 		tiff_tile_corner(ii, tif, tidx);
@@ -851,12 +864,19 @@ static int main_info(int c, char *v[])
 	struct tiff_info t[1];
 	get_tiff_info_filename(t, filename);
 
-
-
 	printf("TIFF %d x %d\n", t->w, t->h);
 	printf("TIFF spp = %d\n", t->spp);
 	printf("TIFF bps = %d\n", t->bps);
-	printf("TIFF fmt = \"%s\"\n", fmt_to_string(t->fmt));
+	printf("TIFF fmt = \"%s\"", fmt_to_string(t->fmt));
+	if (t->tiled) printf(", tiled");
+	if (t->broken) printf(", broken");
+	if (t->compressed) printf(", compressed");
+	if (t->packed) printf(", packed");
+	printf("\n");
+	//printf("TIFF tiled = %s\n", t->tiled ? "yes" : "no");
+	//printf("TIFF broken = %s\n", t->broken ? "yes" : "no");
+	//printf("TIFF compressed = %s\n", t->compressed ? "yes" : "no");
+	//printf("TIFF packed = %s\n", t->packed ? "yes" : "no");
 	if (t->tiled) {
 		printf("TIFF ntiles = %d (%d)\n", t->ta * t->td, t->ntiles);
 		printf("TIFF tsize = %d (%d x %d)\n",t->tw*t->th, t->tw, t->th);
@@ -953,7 +973,9 @@ static void create_zero_tiff_file(char *filename, int w, int h,
 	//	fail("bad bps=%d", bps);
 	//if (spp < 1) fail("bad spp=%d", spp);
 	int fmt_id = fmt_from_string(fmt);
-	TIFF *tif = TIFFOpen(filename, "w8");
+	double gigabytes = (spp/8.0) * w * h * bps / 1024.0 / 1024.0 / 1024.0;
+	fprintf(stderr, "gigabytes = %g\n", gigabytes);
+	TIFF *tif = TIFFOpen(filename, gigabytes > 1 ? "w8" : "w");
 	TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, w);
 	TIFFSetField(tif, TIFFTAG_IMAGELENGTH, h);
 	TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, spp);
@@ -968,8 +990,8 @@ static void create_zero_tiff_file(char *filename, int w, int h,
 	uint8_t *buf = xmalloc(tilesize);
 	for (int i = 0; i < tilesize; i++)
 	{
-		float x = ((i/(spp*bps/8))%tw)/((double)tw)-0.5;
-		float y = ((i/(spp*bps/8))/th)/((double)th)-0.5;
+		float x = ((i/((spp*bps)/8))%tw)/((double)tw)-0.5;
+		float y = ((i/((spp*bps)/8))/th)/((double)th)-0.5;
 		buf[i] = 128+128*sin(90*pow(hypot(x,y+0.3*x),1+(i%spp-1)/1.3));
 	}
 	TIFFWriteTile(tif, buf, 0, 0, 0, 0);
@@ -1389,13 +1411,14 @@ void tiff_tile_cache_free(struct tiff_tile_cache *t)
 	for (int i = 0; i < t->i->ntiles; i++)
 		free(t->c[i]);
 	free(t->c);
+	free(t->a);
 }
 
-// assumes pixel coordinates are valid
 static int my_computetile(struct tiff_info *t, int i, int j)
 {
 	if (i < 0 || j < 0 || i >= t->w || j >= t->h)
-		fail("got bad pixel");
+		return -1;
+		//fail("got bad pixel (%d %d) [%d %d]", i, j, t->w, t->h);
 	int ti = i / t->tw;
 	int tj = j / t->th;
 	int r = tj * t->ta + ti;
@@ -1430,19 +1453,20 @@ static void free_oldest_tile(struct tiff_tile_cache *t)
 	t->c[imin] = 0;
 	t->a[imin] = 0;
 	t->curtiles -= 1;
-	fprintf(stderr, "left tile %d\n", imin);
+	//fprintf(stderr, "left tile %d\n", imin);
 }
 
 // assumes pixel coordinates are valid
 void *tiff_tile_cache_getpixel(struct tiff_tile_cache *t, int i, int j)
 {
 	int tidx = my_computetile(t->i, i, j);
+	if (tidx < 0) return NULL;
 	if (!t->c[tidx]) {
 		if (t->a && t->curtiles == t->maxtiles)
 			free_oldest_tile(t);
 
 		struct tiff_tile tmp[1];
-		fprintf(stderr, "got: tile %d\n", tidx);
+		//fprintf(stderr, "got: tile %d\n", tidx);
 		read_tile_from_file(tmp, t->filename, tidx);
 		t->c[tidx] = tmp->data;
 
@@ -1454,7 +1478,7 @@ void *tiff_tile_cache_getpixel(struct tiff_tile_cache *t, int i, int j)
 	int jj = j % t->i->th;
 	int pixel_index = jj * t->i->tw + ii;
 	int pixel_position = pixel_index * t->i->spp * (t->i->bps / 8);
-	return (char*)t->c[tidx] + pixel_index;
+	return pixel_position + (char*)t->c[tidx];
 }
 
 static void convert_pixel_to_float(float *out, struct tiff_info *t, void *in)
@@ -1515,6 +1539,80 @@ static int main_getpixel(int c, char *v[])
 	}
 
 	tiff_tile_cache_free(t);
+	return 0;
+}
+
+static void zoom_out_by_factor_two(char *fname_out, char *fname_in, int type)
+{
+	// get information of input file
+	struct tiff_info tin[1], tout[1];
+	get_tiff_info_filename(tin, fname_in);
+	if (!tin->tiled) fail("I can only zoom out tiled images");
+
+	// create output file
+	tout[0] = tin[0];
+	tout->w = ceil(tin->w/2.0);
+	tout->h = ceil(tin->h/2.0);
+	create_zero_tiff_file_tinfo(fname_out, tout, true);
+	get_tiff_info_filename(tout, fname_out);
+
+	// create buffer tile for output file
+	struct tiff_tile buf[1];
+	read_tile_from_file(buf, fname_out, 0);
+
+	// create cache structure for input file
+	int tilesize = tinfo_tilesize(tin);
+	int megabytes = tilesize / 250000;
+	if (megabytes < 100) megabytes = 100;
+	struct tiff_tile_cache cin[1];
+	tiff_tile_cache_init(cin, fname_in, megabytes);
+
+	// fill-in tiles
+	for (int tj = 0; tj < tout->td; tj++)
+	for (int ti = 0; ti < tout->ta; ti++)
+	{
+		int offx = ti * tout->tw;
+		int offy = tj * tout->th;
+		int tidx = my_computetile(tout, offx, offy);
+		memset(buf->data, tidx, tilesize);
+		if (tidx < 0) fail("offsets %d %d outside", offx, offy);
+		for (int j = 0; j < tout->th; j++)
+		for (int i = 0; i < tout->tw; i++)
+		{
+			int neig[4][2] = { {0,0}, {1,0}, {0,1}, {1,1}};
+			void *p[4];
+			for (int k = 0; k < 4; k++)
+			{
+				int ii = 2 * (offx + i) + neig[k][0];
+				int jj = 2 * (offy + j) + neig[k][1];
+				p[k] = tiff_tile_cache_getpixel(cin, ii, jj);
+			}
+			if (!p[0]) continue;
+			int psiz = tinfo_pixelsize(tout);
+			int ppos = (i + j * buf->w) * psiz;
+			void *pdest = ppos + (char*)buf->data;
+			memcpy(pdest, p[0], psiz);
+		}
+		put_tile_into_file(fname_out, buf, tidx);
+	}
+	free(buf->data);
+	tiff_tile_cache_free(cin);
+}
+
+static int main_zoomout(int c, char *v[])
+{
+	if (c != 4) {
+		fprintf(stderr, "usage:\n\t"
+				"%s {f|v|i|a} in.tiff out.tiff\n", *v);
+		//                0  1        2       3
+		return 1;
+	}
+	int type = v[1][0];
+	char *filename_in = v[2];
+	char *filename_out = v[3];
+
+	zoom_out_by_factor_two(filename_out, filename_in, type);
+
 	return 0;
 }
 
@@ -1630,6 +1728,7 @@ int main(int c, char *v[])
 	if (0 == strcmp(v[1], "tzero"))    return main_tzero   (c-1, v+1);
 	if (0 == strcmp(v[1], "meta"))     return main_meta    (c-1, v+1);
 	if (0 == strcmp(v[1], "getpixel")) return main_getpixel(c-1, v+1);
+	if (0 == strcmp(v[1], "zoomout"))  return main_zoomout (c-1, v+1);
 
 	goto err;
 }
