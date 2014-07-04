@@ -8,6 +8,8 @@
 // tzero  w h tw th spp bps fmt
 //
 // meta   prog in.tiff ... out.tiff # run "prog" for all the tiles
+//
+// TODO: resample, tileize
 
 
 #include <assert.h>
@@ -974,7 +976,7 @@ static void create_zero_tiff_file(char *filename, int w, int h,
 	//if (spp < 1) fail("bad spp=%d", spp);
 	int fmt_id = fmt_from_string(fmt);
 	double gigabytes = (spp/8.0) * w * h * bps / 1024.0 / 1024.0 / 1024.0;
-	fprintf(stderr, "gigabytes = %g\n", gigabytes);
+	//fprintf(stderr, "gigabytes = %g\n", gigabytes);
 	TIFF *tif = TIFFOpen(filename, gigabytes > 1 ? "w8" : "w");
 	TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, w);
 	TIFFSetField(tif, TIFFTAG_IMAGELENGTH, h);
@@ -1399,7 +1401,7 @@ void tiff_tile_cache_init(struct tiff_tile_cache *t, char *fname, int megabytes)
 		double mbts = tilesize / (1024.0 * 1024);
 		t->maxtiles = megabytes / mbts;
 		t->curtiles = 0;
-		fprintf(stderr, "cache: %d tiles (%d megabytes)\n", t->maxtiles, megabytes);
+		//fprintf(stderr, "cache: %d tiles (%d megabytes)\n", t->maxtiles, megabytes);
 	} else {
 		// unlimited tile usage
 		t->a = NULL;
@@ -1542,7 +1544,86 @@ static int main_getpixel(int c, char *v[])
 	return 0;
 }
 
-static void zoom_out_by_factor_two(char *fname_out, char *fname_in, int type)
+static double from_sample_to_double(void *x, int fmt, int bps)
+{
+	if (!x) return NAN;
+	switch(fmt) {
+	case SAMPLEFORMAT_UINT:
+		if (8 == bps) return *(uint8_t*)x;
+		if (16 == bps) return *(uint16_t*)x;
+		if (32 == bps) return *(uint32_t*)x;
+		break;
+	case SAMPLEFORMAT_INT:
+		if (8 == bps) return *(int8_t*)x;
+		if (16 == bps) return *(int16_t*)x;
+		if (32 == bps) return *(int32_t*)x;
+		break;
+	case SAMPLEFORMAT_IEEEFP:
+		if (32 == bps) return *(float*)x;
+		if (64 == bps) return *(double*)x;
+		break;
+	}
+	return NAN;
+}
+
+static void from_double_to_sample(void *out, int fmt, int bps, double x)
+{
+	if (!out) return;
+	switch(fmt) {
+	case SAMPLEFORMAT_UINT:
+		if (8 == bps)  *(uint8_t *)out = x; break;
+		if (16 == bps) *(uint16_t*)out = x; break;
+		if (32 == bps) *(uint32_t*)out = x; break;
+		break;
+	case SAMPLEFORMAT_INT:
+		if (8 == bps)  *(int8_t  *)out = x; break;
+		if (16 == bps) *(int16_t *)out = x; break;
+		if (32 == bps) *(int32_t *)out = x; break;
+		break;
+	case SAMPLEFORMAT_IEEEFP:
+		if (32 == bps) *(float   *)out = x; break;
+		if (64 == bps) *(double  *)out = x; break;
+		break;
+	}
+}
+
+static double combine_4doubles(double v[4], int op)
+{
+	if (op == 'f') return v[0];
+	if (op == 'i') return fmin(fmin(v[0],v[1]), fmin(v[2],v[3]));
+	if (op == 'a') return fmax(fmax(v[0],v[1]), fmax(v[2],v[3]));
+	if (op == 'v') return (v[0]+v[1]+v[2]+v[3])/4;
+	fail("unrecognized operation %d ('%c')\n", op, op);
+	return NAN;
+}
+
+static void combine_4samples(void *out,
+		void *a, void *b, void *c, void *d,
+		int fmt, int bps, int op)
+{
+	double v[4];
+	v[0] = from_sample_to_double(a, fmt, bps);
+	v[1] = from_sample_to_double(b, fmt, bps);
+	v[2] = from_sample_to_double(c, fmt, bps);
+	v[3] = from_sample_to_double(d, fmt, bps);
+	double r = combine_4doubles(v, op);
+	from_double_to_sample(out, fmt, bps, r);
+}
+
+static void combine_4pixels(void *out,
+		void *in[4], int spp, int fmt, int bps, int op)
+{
+	int ss = bps/8;
+	for (int i = 0; i < spp; i++)
+		combine_4samples(i*ss + (char*)out,
+				i*ss + (char*)in[0],
+				i*ss + (char*)in[1],
+				i*ss + (char*)in[2],
+				i*ss + (char*)in[3],
+				fmt, bps, op);
+}
+
+static void zoom_out_by_factor_two(char *fname_out, char *fname_in, int op)
 {
 	// get information of input file
 	struct tiff_info tin[1], tout[1];
@@ -1571,10 +1652,12 @@ static void zoom_out_by_factor_two(char *fname_out, char *fname_in, int type)
 	for (int tj = 0; tj < tout->td; tj++)
 	for (int ti = 0; ti < tout->ta; ti++)
 	{
+		// variables used below:
+		// ti, tj, tout, buf, tilesize, cin, fname_out
 		int offx = ti * tout->tw;
 		int offy = tj * tout->th;
 		int tidx = my_computetile(tout, offx, offy);
-		memset(buf->data, tidx, tilesize);
+		//memset(buf->data, tidx, tilesize);
 		if (tidx < 0) fail("offsets %d %d outside", offx, offy);
 		for (int j = 0; j < tout->th; j++)
 		for (int i = 0; i < tout->tw; i++)
@@ -1591,7 +1674,8 @@ static void zoom_out_by_factor_two(char *fname_out, char *fname_in, int type)
 			int psiz = tinfo_pixelsize(tout);
 			int ppos = (i + j * buf->w) * psiz;
 			void *pdest = ppos + (char*)buf->data;
-			memcpy(pdest, p[0], psiz);
+			//memcpy(pdest, p[0], psiz);
+			combine_4pixels(pdest,p, tin->spp,tin->fmt,tin->bps,op);
 		}
 		put_tile_into_file(fname_out, buf, tidx);
 	}
@@ -1607,11 +1691,11 @@ static int main_zoomout(int c, char *v[])
 		//                0  1        2       3
 		return 1;
 	}
-	int type = v[1][0];
+	int op = v[1][0];
 	char *filename_in = v[2];
 	char *filename_out = v[3];
 
-	zoom_out_by_factor_two(filename_out, filename_in, type);
+	zoom_out_by_factor_two(filename_out, filename_in, op);
 
 	return 0;
 }
