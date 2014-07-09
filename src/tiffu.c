@@ -12,7 +12,10 @@
 // TODO: resample, tileize
 
 
+// includes {{{1
+
 #include <assert.h>
+#include <complex.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -25,7 +28,10 @@
 
 #include "fail.c"
 #include "xmalloc.c"
+#include "pickopt.c"
 
+
+// structs {{{1
 
 struct tiff_tile {
 	int32_t w, h;
@@ -54,6 +60,8 @@ struct tiff_info {
 	int32_t ta;  // tiles across
 	int32_t td;  // tiles down
 };
+
+// general utility functions {{{1
 
 static int tinfo_pixelsize(struct tiff_info *t)
 {
@@ -135,6 +143,17 @@ static void get_tiff_info_filename(struct tiff_info *t, char *fname)
 		fail("could not open TIFF file \"%s\" for reading", fname);
 	get_tiff_info(t, tif);
 	TIFFClose(tif);
+}
+
+static bool get_tiff_info_filename_e(struct tiff_info *t, char *fname)
+{
+	FILE *f = fopen(fname, "r");
+	if (!f)
+		return false;
+	fclose(f);
+
+	get_tiff_info_filename(t, fname);
+	return true;
 }
 
 static int tiff_imagewidth(TIFF *tif)
@@ -413,65 +432,6 @@ static void insert_tile_into_file(char *filename, struct tiff_tile *t, int idx)
 {
 }
 
-static void tiffu_whatever(char *filename)
-{
-	TIFF *tif = TIFFOpen(filename, "r");
-
-	int w = tiff_imagewidth(tif);
-	int h = tiff_imagelength(tif);
-	int spp = tiff_samplesperpixel(tif);
-	int Bps = tiff_bitspersample(tif)/8;
-	int fmt = tiff_sampleformat(tif);
-
-	if (TIFFIsTiled(tif)) {
-		int tw = tiff_tilewidth(tif);
-		int th = tiff_tilelength(tif);
-		int ta = tiff_tilesacross(tif);
-		int td = tiff_tilesdown(tif);
-		int nt = TIFFNumberOfTiles(tif);
-		bool broken = tiff_brokenpixels(tif);
-
-		printf("TIFF w = %d\n", w);
-		printf("TIFF h = %d\n", h);
-		printf("TIFF spp = %d\n", spp);
-		printf("TIFF Bps = %d\n", Bps);
-		printf("TIFF fmt = %d\n", fmt);
-		printf("TIFF broken pixels = %s\n", broken ? "yes" : "no");
-
-		printf("TIFF tw = %d\n", tw);
-		printf("TIFF th = %d\n", th);
-		printf("TIFF ta = %d\n", ta);
-		printf("TIFF td = %d\n", td);
-		printf("TIFF ta * td = %d\n", ta * td);
-		printf("TIFF nt = %d\n", nt);
-
-		for (int j = 0; j < td; j++)
-		for (int i = 0; i < ta; i++)
-		{
-			int ii = i*tw;
-			int jj = j*th;
-			int tidx = TIFFComputeTile(tif, ii, jj, 0, 0);
-			fprintf(stderr, "%d %d : %d %d : %d (%d)\n",
-					i, j, ii, jj, tidx, j*ta+i);
-		}
-
-		for (int t = 0; t < nt; t++)
-		{
-			int i = t % ta;
-			int j = t / ta;
-			int ii = i*tw;
-			int jj = j*th;
-			int tidx = TIFFComputeTile(tif, ii, jj, 0, 0);
-			//fprintf(stderr, "t=%d i=%d j=%d tidx=%d\n",
-			//		t, i, j, tidx);
-			fprintf(stderr, "%d %d\n", t, tidx);
-		}
-	} else {
-		printf("not tiled\n");
-	}
-
-	TIFFClose(tif);
-}
 
 static void tiffu_print_info(char *filename)
 {
@@ -855,6 +815,7 @@ void tcrop(char *fname_out, char *fname_in, int x0, int xf, int y0, int yf)
 	free(tout->data);
 }
 
+// main_info {{{1
 static int main_info(int c, char *v[])
 {
 	if (c != 2) {
@@ -888,23 +849,66 @@ static int main_info(int c, char *v[])
 	return 0;
 }
 
-static void tiffu_print_info2(char *filename)
-{
-	struct tiff_info t[1];
+// main_whatever {{{1
 
-}
-
-static int main_info2(int c, char *v[])
+static void tiffu_whatever(char *filename)
 {
-	if (c != 2) {
-		fprintf(stderr, "usage:\n\t%s file.tiff\n", *v);
-		return 1;
+	TIFF *tif = TIFFOpen(filename, "r");
+
+	int w = tiff_imagewidth(tif);
+	int h = tiff_imagelength(tif);
+	int spp = tiff_samplesperpixel(tif);
+	int Bps = tiff_bitspersample(tif)/8;
+	int fmt = tiff_sampleformat(tif);
+
+	if (TIFFIsTiled(tif)) {
+		int tw = tiff_tilewidth(tif);
+		int th = tiff_tilelength(tif);
+		int ta = tiff_tilesacross(tif);
+		int td = tiff_tilesdown(tif);
+		int nt = TIFFNumberOfTiles(tif);
+		bool broken = tiff_brokenpixels(tif);
+
+		printf("TIFF w = %d\n", w);
+		printf("TIFF h = %d\n", h);
+		printf("TIFF spp = %d\n", spp);
+		printf("TIFF Bps = %d\n", Bps);
+		printf("TIFF fmt = %d\n", fmt);
+		printf("TIFF broken pixels = %s\n", broken ? "yes" : "no");
+
+		printf("TIFF tw = %d\n", tw);
+		printf("TIFF th = %d\n", th);
+		printf("TIFF ta = %d\n", ta);
+		printf("TIFF td = %d\n", td);
+		printf("TIFF ta * td = %d\n", ta * td);
+		printf("TIFF nt = %d\n", nt);
+
+		for (int j = 0; j < td; j++)
+		for (int i = 0; i < ta; i++)
+		{
+			int ii = i*tw;
+			int jj = j*th;
+			int tidx = TIFFComputeTile(tif, ii, jj, 0, 0);
+			fprintf(stderr, "%d %d : %d %d : %d (%d)\n",
+					i, j, ii, jj, tidx, j*ta+i);
+		}
+
+		for (int t = 0; t < nt; t++)
+		{
+			int i = t % ta;
+			int j = t / ta;
+			int ii = i*tw;
+			int jj = j*th;
+			int tidx = TIFFComputeTile(tif, ii, jj, 0, 0);
+			//fprintf(stderr, "t=%d i=%d j=%d tidx=%d\n",
+			//		t, i, j, tidx);
+			fprintf(stderr, "%d %d\n", t, tidx);
+		}
+	} else {
+		printf("not tiled\n");
 	}
-	char *filename = v[1];
 
-	tiffu_print_info2(filename);
-
-	return 0;
+	TIFFClose(tif);
 }
 
 static int main_whatever(int c, char *v[])
@@ -920,6 +924,7 @@ static int main_whatever(int c, char *v[])
 	return 0;
 }
 
+// main_ntiles {{{1
 static int main_ntiles(int c, char *v[])
 {
 	if (c != 2) {
@@ -934,6 +939,7 @@ static int main_ntiles(int c, char *v[])
 	return 0;
 }
 
+// main_tget {{{1
 static int main_tget(int c, char *v[])
 {
 	if (c != 4) {
@@ -950,6 +956,7 @@ static int main_tget(int c, char *v[])
 	return 0;
 }
 
+// main_tput {{{1
 static int main_tput(int c, char *v[])
 {
 	if (c != 4) {
@@ -968,7 +975,8 @@ static int main_tput(int c, char *v[])
 }
 
 static void create_zero_tiff_file(char *filename, int w, int h,
-		int tw, int th, int spp, int bps, char *fmt, bool incomplete)
+		int tw, int th, int spp, int bps, char *fmt, bool incomplete,
+		bool compressed)
 {
 	//if (bps != 8 && bps != 16 && bps == 32 && bps != 64
 	//		&& bps != 128 && bps != 92)
@@ -986,6 +994,8 @@ static void create_zero_tiff_file(char *filename, int w, int h,
 	TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
 	TIFFSetField(tif, TIFFTAG_TILEWIDTH, tw);
 	TIFFSetField(tif, TIFFTAG_TILELENGTH, th);
+	if (compressed)
+		TIFFSetField(tif, TIFFTAG_COMPRESSION, COMPRESSION_LZW);
 
 
 	int tilesize = tw * th * bps/8 * spp;
@@ -994,7 +1004,8 @@ static void create_zero_tiff_file(char *filename, int w, int h,
 	{
 		float x = ((i/((spp*bps)/8))%tw)/((double)tw)-0.5;
 		float y = ((i/((spp*bps)/8))/th)/((double)th)-0.5;
-		buf[i] = 128+128*sin(90*pow(hypot(x,y+0.3*x),1+(i%spp-1)/1.3));
+		//buf[i] = 0;
+		buf[i] = 127.5+128*cos(90*pow(hypot(x,y+0.3*x),1+(i%spp-1)/1.3));
 	}
 	TIFFWriteTile(tif, buf, 0, 0, 0, 0);
 	TIFFClose(tif);
@@ -1011,21 +1022,23 @@ static void create_zero_tiff_file(char *filename, int w, int h,
 }
 
 static void create_zero_tiff_file_tinfo(char *filename,
-	       struct tiff_info *t, bool incomplete)
+	       struct tiff_info *t, bool incomplete, bool compressed)
 {
 	create_zero_tiff_file(filename, t->w, t->h, t->tw, t->th,
-			t->spp, t->bps, fmt_to_string(t->fmt), incomplete);
+		t->spp, t->bps, fmt_to_string(t->fmt), incomplete, compressed);
 }
 
-#include "pickopt.c"
 
+
+// main_tzero {{{1
 static int main_tzero(int c, char *v[])
 {
 	bool i = pick_option(&c, &v, "i", NULL);
+	bool k = pick_option(&c, &v, "c", NULL);
 	if (c != 9)  {
 		fprintf(stderr, "usage:\n\t"
-		"%s [-i] w h tw th spp bps {int|uint|ieeefp} out.tiff\n", *v);
-	//        0      1 2 3  4  5   6   7   8
+	"%s [-i] [-c] w h tw th spp bps {int|uint|ieeefp} out.tiff\n", *v);
+//        0           1 2 3  4  5   6   7   8
 		return 0;
 	}
 	int w = atoi(v[1]);
@@ -1037,7 +1050,7 @@ static int main_tzero(int c, char *v[])
 	char *fmt = v[7];
 	char *filename = v[8];
 
-	create_zero_tiff_file(filename, w, h, tw, th, spp, bps, fmt, i);
+	create_zero_tiff_file(filename, w, h, tw, th, spp, bps, fmt, i, k);
 
 	return 0;
 }
@@ -1188,7 +1201,7 @@ void metatiler(char *command, char **fname_in, int n_in,
 			t->h = tinfo_in->h;
 			t->tw = tinfo_in->tw;
 			t->th = tinfo_in->th;
-			create_zero_tiff_file_tinfo(fname_out[k], t, true);
+			create_zero_tiff_file_tinfo(fname_out[k], t,true,false);
 		}
 		for (int k = 0; k < n_out; k++)
 			system_v("tiffu tput %s %d %s",
@@ -1462,7 +1475,7 @@ static void free_oldest_tile(struct tiff_tile_cache *t)
 void *tiff_tile_cache_getpixel(struct tiff_tile_cache *t, int i, int j)
 {
 	int tidx = my_computetile(t->i, i, j);
-	if (tidx < 0) return NULL;
+	if (tidx < 0) {/*fprintf(stderr, "LOST %d %d\n",i,j);*/return NULL;}
 	if (!t->c[tidx]) {
 		if (t->a && t->curtiles == t->maxtiles)
 			free_oldest_tile(t);
@@ -1544,6 +1557,204 @@ static int main_getpixel(int c, char *v[])
 	return 0;
 }
 
+// getpixel cache with octaves {{{1
+
+#define MAX_OCTAVES 25
+struct tiff_octaves {
+	// essential data
+	//
+	int noctaves;
+	char filename[MAX_OCTAVES][FILENAME_MAX];
+	struct tiff_info i[MAX_OCTAVES];
+	void **c[MAX_OCTAVES];        // pointers to cached tiles
+
+	// data only necessary to delete tiles when the memory is full
+	//
+	unsigned int *a[MAX_OCTAVES]; // access counter for each tile
+	unsigned int ax; // global access counter
+	int curtiles;    // current number of tiles in memory
+	int maxtiles;    // number of tiles allowed to be in memory at once
+};
+
+void tiff_octaves_init(struct tiff_octaves *t, char *filepattern, int megabytes)
+{
+	// create filenames until possible
+	t->noctaves = 0;
+	for (int o = 0; o < MAX_OCTAVES; o++)
+	{
+		snprintf(t->filename[o], FILENAME_MAX, filepattern, o);
+		if (!get_tiff_info_filename_e(t->i + o, t->filename[o]))
+			break;
+		t->noctaves += 1;
+		if (t->i[o].bps < 8 || t->i[o].packed)
+			fail("caching of packed samples is not supported");
+		if (o > 0) { // check consistency
+			if (t->i[o].bps != t->i->bps) fail("inconsistent bps");
+			if (t->i[o].spp != t->i->spp) fail("inconsistent spp");
+			if (t->i[o].fmt != t->i->fmt) fail("inconsistent fmt");
+			if (t->i[o].tw != t->i->tw) fail("inconsistent tw");
+			if (t->i[o].th != t->i->th) fail("inconsistent th");
+		}
+
+	}
+	if (t->noctaves < 1)
+		fail("could not get any file with pattern \"%s\"", filepattern);
+
+	// set up essential data
+	for (int o = 0; o < t->noctaves; o++)
+	{
+		t->c[o] = xmalloc(t->i[o].ntiles * sizeof*t->c);
+		for (int j = 0; j < t->i[o].ntiles; j++)
+			t->c[o][j] = 0;
+	}
+
+	// print debug info
+	fprintf(stderr, "%d octaves:\n", t->noctaves);
+	for (int o = 0; o < t->noctaves; o++)
+	{
+		struct tiff_info *ti = t->i + o;
+		fprintf(stderr, "\toctave %d:", o);
+		fprintf(stderr, " %dx%d", ti->w, ti->h);
+		fprintf(stderr, " %d tiles (%dx%d) of size %dx%d",
+				ti->ntiles, ti->ta, ti->td, ti->tw, ti->th);
+		fprintf(stderr, "\n");
+	}
+
+	// set up data for obsolete tile deletion
+	if (megabytes) {
+		for (int o = 0; o < t->noctaves; o++)
+			t->a[o] = malloc(t->i[o].ntiles * sizeof*t->a[o]);
+		t->ax = 0;
+		int tilesize = t->i->tw * t->i->th * (t->i->bps/8) * t->i->spp;
+		double mbts = tilesize / (1024.0 * 1024);
+		t->maxtiles = megabytes / mbts;
+		t->curtiles = 0;
+	} else  {
+		// unlimited tile usage
+		t->a[0] = NULL;
+	}
+}
+
+void tiff_octaves_free(struct tiff_octaves *t)
+{
+	for (int i = 0; i < t->noctaves; i++)
+	{
+		for (int j = 0; j < t->i[i].ntiles; j++)
+			free(t->c[i][j]);
+		free(t->c[i]);
+	}
+}
+
+static int bound(int a, int x, int b)
+{
+	if (x < a) x = a;
+	if (x > b) x = b;
+	return x;
+}
+
+static void free_oldest_tile_octave(struct tiff_octaves *t)
+{
+	// find oldest tile
+	int omin = -1, imin = -1;
+	for (int o = 0; o < t->noctaves; o++)
+		for (int i = 0; i < t->i[o].ntiles; i++)
+			if (t->a[o][i]) {
+				if (imin >= 0) {
+					if (t->a[o][i] < t->a[omin][imin]) {
+						imin = i;
+						omin = o;
+					}
+				} else {
+					imin = i;
+					omin = o;
+				}
+			}
+	assert(imin >= 0);
+	assert(t->a[omin][imin] > 0);
+
+	// free it
+	free(t->c[omin][imin]);
+	t->c[omin][imin] = 0;
+	t->a[omin][imin] = 0;
+	t->curtiles -= 1;
+}
+
+//static void free_oldest_half_of_tiles(struct tiff_octaves *t)
+//{
+//
+//}
+
+static void notify_tile_access_octave(struct tiff_octaves *t, int o, int i)
+{
+	t->a[o][i] = ++t->ax;
+}
+
+void *tiff_octaves_getpixel(struct tiff_octaves *t, int o, int i, int j)
+{
+	// sanitize input
+	o = bound(0, o, t->noctaves - 1);
+	i = bound(0, i, t->i[o].w - 1);
+	j = bound(0, j, t->i[o].h - 1);
+
+	// get valid tile index
+	int tidx = my_computetile(t->i + o, i, j);
+	if (tidx < 0) return NULL;
+
+	// if tile does not exist, read it from file
+	if (!t->c[o][tidx]) {
+		if (t->a[0] && t->curtiles == t->maxtiles)
+			free_oldest_tile_octave(t);
+
+		struct tiff_tile tmp[1];
+		read_tile_from_file(tmp, t->filename[o], tidx);
+		t->c[o][tidx] = tmp->data;
+
+		t->curtiles += 1;
+	}
+	if (t->a[0]) notify_tile_access_octave(t, o, tidx);
+
+	// get pointer to requested pixel
+	struct tiff_info *ti = t->i + o;
+	int ii = i % ti->tw;
+	int jj = j % ti->th;
+	int pixel_index = jj * ti->tw + ii;
+	int pixel_position = pixel_index * ti->spp * (ti->bps / 8);
+	return pixel_position + (char*)t->c[o][tidx];
+}
+
+static int main_octaves(int c, char *v[])
+{
+	if (c != 3) {
+		fprintf(stderr, "usage:\n\t%s inpattern npixels\n", *v);
+		//                          0 1         2
+		return 1;
+	}
+	char *filepattern = v[1];
+	int npixels = atoi(v[2]);
+
+	int megabytes = 100;
+	struct tiff_octaves t[1];
+	tiff_octaves_init(t, filepattern, megabytes);
+
+	// do random stuff
+	for (int i = 0; i < npixels; i++)
+	{
+		int o = rand() % t->noctaves;
+		int p = rand() % t->i[o].w;
+		int q = rand() % t->i[o].h;
+		void *pixel = tiff_octaves_getpixel(t, o, p, q);
+		fprintf(stderr, "p = %p\n", pixel);
+	}
+
+	tiff_octaves_free(t);
+
+
+	return 0;
+}
+
+
+// zoom out {{{1
+
 static double from_sample_to_double(void *x, int fmt, int bps)
 {
 	if (!x) return NAN;
@@ -1571,19 +1782,23 @@ static void from_double_to_sample(void *out, int fmt, int bps, double x)
 	if (!out) return;
 	switch(fmt) {
 	case SAMPLEFORMAT_UINT:
-		if (8 == bps)  *(uint8_t *)out = x; break;
-		if (16 == bps) *(uint16_t*)out = x; break;
-		if (32 == bps) *(uint32_t*)out = x; break;
+		if (8 == bps)  {*(uint8_t *)out = x; break;}
+		if (16 == bps) {*(uint16_t*)out = x; break;}
+		if (32 == bps) {*(uint32_t*)out = x; break;}
+		fail("bad bps %d for uint\n", bps);
 		break;
 	case SAMPLEFORMAT_INT:
-		if (8 == bps)  *(int8_t  *)out = x; break;
-		if (16 == bps) *(int16_t *)out = x; break;
-		if (32 == bps) *(int32_t *)out = x; break;
+		if (8 == bps)  {*(int8_t  *)out = x; break;}
+		if (16 == bps) {*(int16_t *)out = x; break;}
+		if (32 == bps) {*(int32_t *)out = x; break;}
+		fail("bad bps %d for int\n", bps);
 		break;
 	case SAMPLEFORMAT_IEEEFP:
-		if (32 == bps) *(float   *)out = x; break;
-		if (64 == bps) *(double  *)out = x; break;
+		if (32 == bps) {*(float   *)out = x; break;}
+		if (64 == bps) {*(double  *)out = x; break;}
+		fail("bad bps %d for ieeefp\n", bps);
 		break;
+	default: fail("unrecognized sample format %d\n", fmt);
 	}
 }
 
@@ -1607,6 +1822,7 @@ static void combine_4samples(void *out,
 	v[2] = from_sample_to_double(c, fmt, bps);
 	v[3] = from_sample_to_double(d, fmt, bps);
 	double r = combine_4doubles(v, op);
+	//if (!isfinite(r)) fail("bad sample!\n");
 	from_double_to_sample(out, fmt, bps, r);
 }
 
@@ -1634,19 +1850,22 @@ static void zoom_out_by_factor_two(char *fname_out, char *fname_in, int op)
 	tout[0] = tin[0];
 	tout->w = ceil(tin->w/2.0);
 	tout->h = ceil(tin->h/2.0);
-	create_zero_tiff_file_tinfo(fname_out, tout, true);
+	create_zero_tiff_file_tinfo(fname_out, tout, true, tin->compressed);
 	get_tiff_info_filename(tout, fname_out);
 
-	// create buffer tile for output file
+	//// create buffer tile for output file
 	struct tiff_tile buf[1];
 	read_tile_from_file(buf, fname_out, 0);
+	TIFF *tif = TIFFOpen(fname_out, "r+");
 
 	// create cache structure for input file
 	int tilesize = tinfo_tilesize(tin);
 	int megabytes = tilesize / 250000;
 	if (megabytes < 100) megabytes = 100;
 	struct tiff_tile_cache cin[1];
+	//fprintf(stderr, "requesting %d cache megabytes\n", megabytes);
 	tiff_tile_cache_init(cin, fname_in, megabytes);
+
 
 	// fill-in tiles
 	for (int tj = 0; tj < tout->td; tj++)
@@ -1657,7 +1876,7 @@ static void zoom_out_by_factor_two(char *fname_out, char *fname_in, int op)
 		int offx = ti * tout->tw;
 		int offy = tj * tout->th;
 		int tidx = my_computetile(tout, offx, offy);
-		//memset(buf->data, tidx, tilesize);
+		memset(buf->data, tidx, tilesize);
 		if (tidx < 0) fail("offsets %d %d outside", offx, offy);
 		for (int j = 0; j < tout->th; j++)
 		for (int i = 0; i < tout->tw; i++)
@@ -1670,16 +1889,19 @@ static void zoom_out_by_factor_two(char *fname_out, char *fname_in, int op)
 				int jj = 2 * (offy + j) + neig[k][1];
 				p[k] = tiff_tile_cache_getpixel(cin, ii, jj);
 			}
-			if (!p[0]) continue;
+			if(!p[0]){/*fprintf(stderr,"\tlost %d %d\n",offx+i,offy+j);*/continue;}
 			int psiz = tinfo_pixelsize(tout);
 			int ppos = (i + j * buf->w) * psiz;
 			void *pdest = ppos + (char*)buf->data;
 			//memcpy(pdest, p[0], psiz);
 			combine_4pixels(pdest,p, tin->spp,tin->fmt,tin->bps,op);
 		}
-		put_tile_into_file(fname_out, buf, tidx);
+		TIFFWriteTile(tif, buf->data, offx, offy, 0, 0);
+		//fprintf(stderr, "writing tile %d\n", tidx);
+		//put_tile_into_file(fname_out, buf, tidx);
 	}
 	free(buf->data);
+	TIFFClose(tif);
 	tiff_tile_cache_free(cin);
 }
 
@@ -1700,6 +1922,7 @@ static int main_zoomout(int c, char *v[])
 	return 0;
 }
 
+// main_crop {{{1
 static int main_crop(int c, char *v[])
 {
 	if (c != 6) {
@@ -1723,6 +1946,7 @@ static int main_crop(int c, char *v[])
 	return 0;
 }
 
+// main_imprintf {{{1
 static void my_putchar(FILE *f, int c)
 {
 	fputc(c, f);
@@ -1784,6 +2008,87 @@ static int main_imprintf(int argc, char *argv[])
 	return 0;
 }
 
+// main_manwhole {{{1
+
+static bool small(complex long double z)
+{
+	long double a = creall(z);
+	long double b = cimagl(z);
+	return a*a + b*b < 16;
+}
+
+static int mandelbailout(double x, double y, int niter)
+{
+	complex long double c = x + I*y;
+	complex long double z = 0;
+	int i = 0;
+	while (true)
+	{
+		z = z*z + c;
+		i += 1;
+		if (!small(z)) return i;
+		if (i >= niter) return 0;
+	}
+}
+
+static int main_manwhole(int argc, char *argv[])
+{
+	if (argc != 7) {
+		fprintf(stderr, "usage:\n\t"
+				"%s w h tw th niter out.tiff\n", *argv);
+		//                0 1 2 3  4  5     6
+		return 1;
+	}
+	int w = atoi(argv[1]);
+	int h = atoi(argv[2]);
+	int tw = atoi(argv[3]);
+	int th = atoi(argv[4]);
+	int niter = atoi(argv[5]);
+	char *filename_out = argv[6];
+
+	struct tiff_info tinfo[1];
+	tinfo->w = w;
+	tinfo->h = h;
+	tinfo->tw = tw;
+	tinfo->th = th;
+	tinfo->spp = 1;
+	tinfo->bps = 16;
+	tinfo->fmt = SAMPLEFORMAT_UINT;
+	create_zero_tiff_file_tinfo(filename_out, tinfo, true, true);
+
+	int ta = how_many(w, tw);
+	int td = how_many(h, th);
+	double x0 = -2.05;
+	double xf = 0.5;
+
+	double y0 = -1.275;
+	double yf = 1.275;
+
+	uint16_t *buf = xmalloc(tw * th * sizeof*buf);
+	TIFF *tif = TIFFOpen(filename_out, "r+");
+
+	for (int tj = 0; tj < td; tj++)
+	for (int ti = 0; ti < ta; ti++)
+	{
+		for (int j = 0; j < th; j++)
+		for (int i = 0; i < tw; i++)
+		{
+			int ii = ti*tw + i;
+			int jj = tj*th + j;
+			double x = (xf - x0) * ii / (w - 1.0) + x0;
+			double y = (yf - y0) * jj / (h - 1.0) + y0;
+			buf[j*tw+i] = mandelbailout(x, y, niter);
+		}
+		TIFFWriteTile(tif, buf, ti*tw, tj*th, 0, 0);
+	}
+
+	TIFFClose(tif);
+	free(buf);
+
+	return 0;
+}
+
+// main {{{1
 void my_tifferror(const char *module, const char *fmt, va_list ap)
 {
 	if (0 == strcmp(fmt, "%llu: Invalid tile byte count, tile %lu"))
@@ -1813,6 +2118,9 @@ int main(int c, char *v[])
 	if (0 == strcmp(v[1], "meta"))     return main_meta    (c-1, v+1);
 	if (0 == strcmp(v[1], "getpixel")) return main_getpixel(c-1, v+1);
 	if (0 == strcmp(v[1], "zoomout"))  return main_zoomout (c-1, v+1);
+	if (0 == strcmp(v[1], "manwhole")) return main_manwhole(c-1, v+1);
+	if (0 == strcmp(v[1], "octaves"))  return main_octaves(c-1, v+1);
 
 	goto err;
 }
+// vim:set foldmethod=marker:
