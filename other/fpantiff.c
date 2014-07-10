@@ -13,7 +13,6 @@
 #include "ftr.c"
 
 #define WHEEL_FACTOR 1.4
-#define MAX_PYRAMID_LEVELS 30
 
 
 // data structure for the image viewer
@@ -28,6 +27,9 @@ struct pan_state {
 	int octave;
 	double zoom_factor, offset_x, offset_y;
 	double a, b;
+
+	// 3. silly options
+	bool infrared;
 };
 
 // change of coordinates: from window "int" pixels to image "double" point
@@ -90,62 +92,26 @@ static void pixel(float *out, struct pan_state *e, double p, double q)
 		out[0] = out[1] = out[2] = 127+val*64;
 		return;
 	}
-	int f = 1 << e->octave;
-	char *pix = tiff_octaves_getpixel(e->t, e->octave, p/f, q/f);
-	int ss = e->t->i->bps/8;
-	out[0] = from_sample_to_double(pix, e->t->i->fmt, e->t->i->bps);
-	if (e->t->i->spp == 3) {
-	out[1] = from_sample_to_double(pix+ss, e->t->i->fmt, e->t->i->bps);
-	out[2] = from_sample_to_double(pix+2*ss, e->t->i->fmt, e->t->i->bps);
-	} else out[1] = out[2] = out[0];
 
-	//if (e->zoom_factor > 0.9999)
-	//interpolate_at(out, e->frgb, e->w, e->h, p, q);
-	//else {
-	//	//static int first_run = 1;
-	//	//if (first_run) {
-	//	//	fprintf(stderr, "create pyramid\n");
-	//	//	void create_pyramid(struct pan_state *e);
-	//	//	create_pyramid(e);
-	//	//	first_run = 0;
-	//	//}
-	//	if(p<0||q<0){out[0]=out[1]=out[2]=0;return;}
-	//	int s = -0 - log(e->zoom_factor) / log(2);
-	//	if (s < 0) s = 0;
-	//	if (s >= MAX_PYRAMID_LEVELS) s = MAX_PYRAMID_LEVELS-1;
-	//	int sfac = 1<<(s+1);
-	//	int w = e->pyr_w[s];
-	//	int h = e->pyr_h[s];
-	//	float *rgb = e->pyr_rgb[s];
-	//	interpolate_at(out, rgb, w, h, p/sfac, q/sfac);
-	//}
-	//else {
-	//	if(p<0||q<0){out[0]=out[1]=out[2]=0;return;}
-	//	int s1 = -0 - log(e->zoom_factor) / log(2);
-	//	int s2 = s1 - 1;
+	int factor = 1 << e->octave;
 
-	//	if (s2 < 0) s2 = 0;
-	//	if (s2 >= MAX_PYRAMID_LEVELS) s2 = MAX_PYRAMID_LEVELS-1;
-	//	if (s1 < 0) s1 = 0;
-	//	if (s1 >= MAX_PYRAMID_LEVELS) s1 = MAX_PYRAMID_LEVELS-1;
+	int fmt = e->t->i->fmt;
+	int bps = e->t->i->bps;
+	int spp = e->t->i->spp;
+	int ss = bps / 8;
 
-	//	s1 = 1;
+	char *pix = tiff_octaves_getpixel(e->t, e->octave, p/factor, q/factor);
 
-	//	int sfac[2] = {1<<(s1+1), 1<<(s2+1)};
-	//	int w[2] = {e->pyr_w[s1], e->pyr_w[s2]};
-	//	int h[2] = {e->pyr_h[s1], e->pyr_h[s2]};
-	//	float *rgb1 = e->pyr_rgb[s1];
-	//	float *rgb2 = e->pyr_rgb[s2];
-	//	float out1[3], out2[3];
-	//	interpolate_at(out1, e->frgb, e->w, e->h, p/sfac[0], q/sfac[0]);
-	//	interpolate_at(out2, rgb2, w[1], h[1], p/sfac[1], q/sfac[1]);
-
-	//	float f = s1-log(e->zoom_factor)/log(2);
-	//	f = 0;
-	//	for (int i = 0; i < 3; i++)
-	//		out[i] = out1[i];
-	//		//out[i] = (1 - f) * out1[i] + f * out2[i];
-	//}
+	out[0] = from_sample_to_double(pix, fmt, bps);
+	if (spp >= 3) {
+		out[1] = from_sample_to_double(pix + ss,   fmt, bps);
+		out[2] = from_sample_to_double(pix + 2*ss, fmt, bps);
+		if (spp == 4 && e->infrared) {
+			double o4 = from_sample_to_double(pix + 3*ss, fmt, bps);
+			out[1] = 0.9*out[1] + 0.1 * o4;
+		}
+	} else
+		out[1] = out[2] = out[0];
 }
 
 static void action_print_value_under_cursor(struct FTR *f, int x, int y)
@@ -312,26 +278,44 @@ static void action_decrease_octave(struct FTR *f, int x, int y)
 	}
 }
 
+static void action_toggle_infrared(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+
+	e->infrared = !e->infrared;
+
+	f->changed = 1;
+}
+
+
+static unsigned char float_to_byte(float x)
+{
+	if (x < 0) return 0;
+	if (x > 255) return 255;
+	return x;
+}
+
 // dump the image acording to the state of the viewport
 static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
 	struct pan_state *e = f->userdata;
 
+	// for every pixel in the window
 	for (int j = 0; j < f->h; j++)
 	for (int i = 0; i < f->w; i++)
 	{
+		// compute the position of this pixel in the image
 		double p[2];
 		window_to_image(p, e, i, j);
+
+		// evaluate the color value of the image at this position
 		float c[3];
 		pixel(c, e, p[0], p[1]);
-		unsigned char *cc = f->rgb + 3 * (j * f->w + i);
+
+		// transform the value into RGB using the contrast change (a,b)
+		unsigned char *dest = f->rgb + 3 * (j * f->w + i);
 		for (int l = 0; l < 3; l++)
-		{
-			float g = e->a * c[l] + e->b;
-			if      (g < 0)   cc[l] = 0  ;
-			else if (g > 255) cc[l] = 255;
-			else              cc[l] = g  ;
-		}
+			dest[l] = float_to_byte(e->a * c[l] + e->b);
 	}
 	f->changed = 1;
 }
@@ -375,8 +359,10 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
 			k, isalpha(k)?k:' ', m, x, y);
 
+	if (k == 'i') action_toggle_infrared(f);
 	if (k == '+') action_decrease_octave(f, f->w/2, f->h/2);
 	if (k == '-') action_increase_octave(f, f->w/2, f->h/2);
+
 	//if (k == 'p') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1.1);
 	//if (k == 'm') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1/1.1);
 	//if (k == 'P') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1.006);
@@ -408,12 +394,6 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 		if (k == FTR_KEY_PAGE_DOWN) d[1] = -f->h/3;
 		action_offset_viewport(f, d[0], d[1]);
 	}
-
-	// if 'k', do weird things
-	if (k == 'k') {
-		fprintf(stderr, "setting key_handler_print\n");
-		ftr_set_handler(f, "key", key_handler_print);
-	}
 }
 
 #define BAD_MIN(a,b) a<b?a:b
@@ -434,15 +414,16 @@ int main_pan(int c, char *v[])
 	tiff_octaves_init(e->t, pyrpattern, megabytes);
 	e->w = 1200;
 	e->h = 800;
+	e->infrared = 4 == e->t->i->spp;
 
 	// open window
 	struct FTR f = ftr_new_window(BAD_MIN(e->w,1200), BAD_MIN(e->h,800));
 	f.userdata = e;
 	action_reset_zoom_and_position(&f);
-	ftr_set_handler(&f, "expose", pan_exposer);
-	ftr_set_handler(&f, "motion", pan_motion_handler);
-	ftr_set_handler(&f, "button", pan_button_handler);
 	ftr_set_handler(&f, "key"   , pan_key_handler);
+	ftr_set_handler(&f, "button", pan_button_handler);
+	ftr_set_handler(&f, "motion", pan_motion_handler);
+	ftr_set_handler(&f, "expose", pan_exposer);
 	int r = ftr_loop_run(&f);
 
 	// cleanup and exit (optional)
