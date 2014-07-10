@@ -1586,16 +1586,17 @@ void tiff_octaves_init(struct tiff_octaves *t, char *filepattern, int megabytes)
 		snprintf(t->filename[o], FILENAME_MAX, filepattern, o);
 		if (!get_tiff_info_filename_e(t->i + o, t->filename[o]))
 			break;
-		t->noctaves += 1;
 		if (t->i[o].bps < 8 || t->i[o].packed)
 			fail("caching of packed samples is not supported");
 		if (o > 0) { // check consistency
+			if (0 == strcmp(t->filename[o], t->filename[0])) break;
 			if (t->i[o].bps != t->i->bps) fail("inconsistent bps");
 			if (t->i[o].spp != t->i->spp) fail("inconsistent spp");
 			if (t->i[o].fmt != t->i->fmt) fail("inconsistent fmt");
 			if (t->i[o].tw != t->i->tw) fail("inconsistent tw");
 			if (t->i[o].th != t->i->th) fail("inconsistent th");
 		}
+		t->noctaves += 1;
 
 	}
 	if (t->noctaves < 1)
