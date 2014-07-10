@@ -133,6 +133,7 @@ static void get_tiff_info(struct tiff_info *t, TIFF *tif)
 		t->ta = how_many(t->w, t->tw);
 		t->td = how_many(t->h, t->th);
 		t->ntiles = TIFFNumberOfTiles(tif);
+		assert(t->ta * t->td == t->ntiles);
 	}
 }
 
@@ -1673,6 +1674,8 @@ static void free_oldest_tile_octave(struct tiff_octaves *t)
 	assert(t->a[omin][imin] > 0);
 
 	// free it
+	//
+	//fprintf(stderr, "CACHE: FREEing tile %d of octave %d\n", imin, omin);
 	free(t->c[omin][imin]);
 	t->c[omin][imin] = 0;
 	t->a[omin][imin] = 0;
@@ -1705,6 +1708,7 @@ void *tiff_octaves_getpixel(struct tiff_octaves *t, int o, int i, int j)
 		if (t->a[0] && t->curtiles == t->maxtiles)
 			free_oldest_tile_octave(t);
 
+		fprintf(stderr, "CACHE: LOADing tile %d of octave %d\n", tidx, o);
 		struct tiff_tile tmp[1];
 		read_tile_from_file(tmp, t->filename[o], tidx);
 		t->c[o][tidx] = tmp->data;
@@ -1757,7 +1761,7 @@ static int main_octaves(int c, char *v[])
 
 static double from_sample_to_double(void *x, int fmt, int bps)
 {
-	if (!x) return NAN;
+	if (!x) return -1;
 	switch(fmt) {
 	case SAMPLEFORMAT_UINT:
 		if (8 == bps) return *(uint8_t*)x;
@@ -1774,7 +1778,7 @@ static double from_sample_to_double(void *x, int fmt, int bps)
 		if (64 == bps) return *(double*)x;
 		break;
 	}
-	return NAN;
+	return -1;
 }
 
 static void from_double_to_sample(void *out, int fmt, int bps, double x)
@@ -2097,6 +2101,7 @@ void my_tifferror(const char *module, const char *fmt, va_list ap)
 		fprintf(stderr, "TIFF ERROR(%s): \"%s\"\n", module, fmt);
 }
 
+#ifndef TIFFU_OMIT_MAIN
 int main(int c, char *v[])
 {
 	TIFFSetWarningHandler(NULL);//suppress warnings
@@ -2123,4 +2128,5 @@ int main(int c, char *v[])
 
 	goto err;
 }
+#endif//TIFFU_OMIT_MAIN
 // vim:set foldmethod=marker:
