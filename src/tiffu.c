@@ -1893,7 +1893,7 @@ static void zoom_out_by_factor_two(char *fname_out, char *fname_in, int op)
 				int jj = 2 * (offy + j) + neig[k][1];
 				p[k] = tiff_tile_cache_getpixel(cin, ii, jj);
 			}
-			if(!p[0]){/*fprintf(stderr,"\tlost %d %d\n",offx+i,offy+j);*/continue;}
+			if(!p[0]||!p[3]){/*fprintf(stderr,"\tlost %d %d\n",offx+i,offy+j);*/continue;}
 			int psiz = tinfo_pixelsize(tout);
 			int ppos = (i + j * buf->w) * psiz;
 			void *pdest = ppos + (char*)buf->data;
