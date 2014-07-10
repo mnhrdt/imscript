@@ -30,6 +30,11 @@ struct pan_state {
 
 	// 3. silly options
 	bool infrared;
+	unsigned char *preview;
+	int pw, ph;
+	bool do_preview;
+	int preview_position_x;
+	int preview_position_y;
 };
 
 // change of coordinates: from window "int" pixels to image "double" point
@@ -144,9 +149,29 @@ static void action_reset_zoom_and_position(struct FTR *f)
 	e->octave = 0;
 	e->offset_x = 0;
 	e->offset_y = 0;
+	/*
 	e->a = 1;
 	e->b = 0;
+	*/
 
+	if (e->preview) {
+		e->do_preview = true;
+		e->zoom_factor = e->t->i->w / (double)e->pw;
+		fprintf(stderr, "preview zoom factor %g\n", e->zoom_factor);
+	}
+
+	f->changed = 1;
+}
+
+static void action_exit_preview(struct FTR *f, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+
+	e->do_preview = false;
+	e->octave = 0;
+	e->offset_x = x*e->zoom_factor - e->pw/2;
+	e->offset_y = y*e->zoom_factor - e->ph/2;
+	e->zoom_factor = 1;
 	f->changed = 1;
 }
 
@@ -287,6 +312,34 @@ static void action_toggle_infrared(struct FTR *f)
 	f->changed = 1;
 }
 
+static void dump_preview(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	if (!e->preview) return;
+
+	f->w = e->pw;
+	f->h = e->ph;
+	memcpy(f->rgb, e->preview, 3*e->pw*e->ph);
+
+	if (e->preview_position_x >= 0)
+	{
+		int icon_hw = (e->pw/e->zoom_factor)/2;
+		int icon_hh = (e->ph/e->zoom_factor)/2;
+		for (int jj = -icon_hh; jj <= icon_hh; jj++)
+		for (int ii = -icon_hw; ii <= icon_hw; ii++)
+		{
+			int i = ii + e->preview_position_x;
+			int j = jj + e->preview_position_y;
+			if (i >= 0 && j >= 0 && i < f->w && j < f->h)
+			{
+				int idx = j * f->w + i;
+				f->rgb[3*idx+2] = 255;
+			}
+		}
+	}
+
+	f->changed = 1;
+}
 
 static unsigned char float_to_byte(float x)
 {
@@ -299,6 +352,8 @@ static unsigned char float_to_byte(float x)
 static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
 	struct pan_state *e = f->userdata;
+
+	if (e->do_preview) {dump_preview(f); return;}
 
 	// for every pixel in the window
 	for (int j = 0; j < f->h; j++)
@@ -323,6 +378,14 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 // update offset variables by dragging
 static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 {
+	struct pan_state *e = f->userdata;
+	if (e->do_preview)
+	{
+		e->preview_position_x = x;
+		e->preview_position_y = y;
+		return;
+	}
+
 	static double ox = 0, oy = 0;
 
 	if (m == FTR_BUTTON_LEFT)   action_offset_viewport(f, x - ox, y - oy);
@@ -335,6 +398,10 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 
 static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 {
+	struct pan_state *e = f->userdata;
+	if (e->do_preview && b == FTR_BUTTON_LEFT) {
+		action_exit_preview(f, x, y); return; }
+
 	//fprintf(stderr, "button b=%d m=%d\n", b, m);
 	if (b == FTR_BUTTON_UP && m == FTR_MASK_SHIFT) {
 		action_contrast_span(f, 1/1.3); return; }
@@ -396,11 +463,52 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	}
 }
 
+// image file input/output (wrapper around iio) {{{1
+#include <stdint.h>
+#include "iio.h"
+static unsigned char *read_image_uint8_rgb(char *fname, int *w, int *h)
+{
+	int pd;
+	unsigned char *x = iio_read_image_uint8_vec(fname, w, h, &pd);
+	if (pd == 3) return x;
+	unsigned char *y = malloc(3**w**h);
+	for (int i = 0; i < *w**h; i++) {
+		switch(pd) {
+		case 1:
+			y[3*i+0] = y[3*i+1] = y[3*i+2] = x[i];
+			break;
+		case 2:
+			y[3*i+0] = x[2*i+0];
+			y[3*i+1] = y[3*i+2] = x[2*i+1];
+			break;
+		default:
+			assert(pd > 3);
+			for (int l = 0; l < 3; l++)
+				y[3*i+l] = x[pd*i+l];
+			break;
+		}
+	}
+	free(x);
+	return y;
+}
+
+static void add_preview(struct pan_state *e, char *filename)
+{
+	e->preview = read_image_uint8_rgb(filename, &e->pw, &e->ph);
+	e->w = e->pw;
+	e->h = e->ph;
+	e->do_preview = true;
+}
+
+
 #define BAD_MIN(a,b) a<b?a:b
 
 int main_pan(int c, char *v[])
 {
+	TIFFSetWarningHandler(NULL);//suppress warnings
+
 	// process input arguments
+	char *filename_preview = pick_option(&c, &v, "p", "");
 	if (c != 2) {
 		fprintf(stderr, "usage:\n\t%s pyrpattern\n", *v);
 		//                          0 1
@@ -415,9 +523,18 @@ int main_pan(int c, char *v[])
 	e->w = 1200;
 	e->h = 800;
 	e->infrared = 4 == e->t->i->spp;
+	e->preview = NULL;
+	e->do_preview = false;
+	e->a = 1;
+	e->b = 0;
+	if (*filename_preview) add_preview(e, filename_preview);
 
 	// open window
-	struct FTR f = ftr_new_window(BAD_MIN(e->w,1200), BAD_MIN(e->h,800));
+	struct FTR f;
+	if (e->preview)
+		f = ftr_new_window(e->pw, e->ph);
+	else
+		f = ftr_new_window(BAD_MIN(e->w,1200), BAD_MIN(e->h,800));
 	f.userdata = e;
 	action_reset_zoom_and_position(&f);
 	ftr_set_handler(&f, "key"   , pan_key_handler);
