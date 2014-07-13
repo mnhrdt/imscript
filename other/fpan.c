@@ -86,7 +86,7 @@ static void interpolate_at(float *out, float *x, int w, int h, float p, float q)
 }
 
 // evaluate the value a position (p,q) in image coordinates
-static void pixel(float *out, struct pan_state *e, double p, double q)
+static inline void pixel(float *out, struct pan_state *e, double p, double q)
 {
 	if (e->zoom_factor > 0.9999)
 		interpolate_at(out, e->frgb, e->w, e->h, p, q);
@@ -108,6 +108,33 @@ static void pixel(float *out, struct pan_state *e, double p, double q)
 		float *rgb = e->pyr_rgb[s];
 		interpolate_at(out, rgb, w, h, p/sfac, q/sfac);
 	}
+	//else {
+	//	if(p<0||q<0){out[0]=out[1]=out[2]=0;return;}
+	//	int s1 = -0 - log(e->zoom_factor) / log(2);
+	//	int s2 = s1 - 1;
+
+	//	if (s2 < 0) s2 = 0;
+	//	if (s2 >= MAX_PYRAMID_LEVELS) s2 = MAX_PYRAMID_LEVELS-1;
+	//	if (s1 < 0) s1 = 0;
+	//	if (s1 >= MAX_PYRAMID_LEVELS) s1 = MAX_PYRAMID_LEVELS-1;
+
+	//	s1 = 1;
+
+	//	int sfac[2] = {1<<(s1+1), 1<<(s2+1)};
+	//	int w[2] = {e->pyr_w[s1], e->pyr_w[s2]};
+	//	int h[2] = {e->pyr_h[s1], e->pyr_h[s2]};
+	//	float *rgb1 = e->pyr_rgb[s1];
+	//	float *rgb2 = e->pyr_rgb[s2];
+	//	float out1[3], out2[3];
+	//	interpolate_at(out1, e->frgb, e->w, e->h, p/sfac[0], q/sfac[0]);
+	//	interpolate_at(out2, rgb2, w[1], h[1], p/sfac[1], q/sfac[1]);
+
+	//	float f = s1-log(e->zoom_factor)/log(2);
+	//	f = 0;
+	//	for (int i = 0; i < 3; i++)
+	//		out[i] = out1[i];
+	//		//out[i] = (1 - f) * out1[i] + f * out2[i];
+	//}
 }
 
 static void action_print_value_under_cursor(struct FTR *f, int x, int y)
@@ -209,6 +236,7 @@ static void action_change_zoom_by_factor(struct FTR *f, int x, int y, double F)
 	e->zoom_factor *= F;
 	e->offset_x = c[0] - x/e->zoom_factor;
 	e->offset_y = c[1] - y/e->zoom_factor;
+	fprintf(stderr, "\t zoom changed %g\n", e->zoom_factor);
 
 	f->changed = 1;
 }
@@ -295,8 +323,14 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
 			k, isalpha(k)?k:' ', m, x, y);
 
-	if (k == '+') action_increase_zoom(f, f->w/2, f->h/2);
-	if (k == '-') action_decrease_zoom(f, f->w/2, f->h/2);
+	//if (k == '+') action_increase_zoom(f, f->w/2, f->h/2);
+	//if (k == '-') action_decrease_zoom(f, f->w/2, f->h/2);
+	if (k == '+') action_change_zoom_by_factor(f, f->w/2, f->h/2, 2);
+	if (k == '-') action_change_zoom_by_factor(f, f->w/2, f->h/2, 0.5);
+	if (k == 'p') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1.1);
+	if (k == 'm') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1/1.1);
+	if (k == 'P') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1.006);
+	if (k == 'M') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1/1.006);
 
 	//if (k == 'a') action_contrast_change(f, 1.3, 0);
 	//if (k == 'A') action_contrast_change(f, 1/1.3, 0);

@@ -1200,9 +1200,11 @@ static void mandel_remove_site(struct FTR *f, struct mandel_state *e, int i)
 	//f->rgb[3*k+0] = g2;
 	//f->rgb[3*k+1] = g2;
 	//f->rgb[3*k+2] = g1;
-	f->rgb[3*k+0] = 255*pow(sin(2.0*s->iter/255.0),2);
-	f->rgb[3*k+1] = 255*pow(sin(7.618*s->iter/255.0),2);
-	f->rgb[3*k+2] = 255*pow(sin(19.271*s->iter/255.0),2);
+	double idx1 = sqrt(s->iter/7.0);//log(1+s->iter/30.0)-1;
+	//double idx3 = log(1+s->iter/10.0);
+	f->rgb[3*k+0] = 127-127*cos(idx1-3.1416/3);
+	f->rgb[3*k+2] = 127-127*cos(idx1+3.1416/2);
+	f->rgb[3*k+1] = 127-127*cos(idx1*1.618);
 	
 	e->nsites -= 1;
 	struct mandel_site tmp = e->t[i];
@@ -1222,12 +1224,6 @@ static void mandel_state_one_iteration(struct FTR *f, struct mandel_state *e)
 			s->z = z;
 			s->iter += 1;
 		}
-		//if (!i) {
-		//	fprintf(stderr, "i %d %d : c = %Lg %Lg : z = %Lg %Lg\n",
-		//			s->i, s->j,
-		//			crealll(s->c), cimagll(s->c),
-		//			crealll(s->z), cimagll(s->z));
-		//}
 	}
 }
 
@@ -1245,94 +1241,13 @@ static void draw_mandelbrot(float *t, int w, int h,
 
 static void draw_mandelbrot_idle(struct FTR *f, int k, int m, int x, int y)
 {
-	static bool firstrun = true;
-	if (firstrun) {
-		firstrun = false;
-	}
-
 	struct mandel_state *e = f->userdata;
 
 	mandel_state_one_iteration(f, e);
 
-	//for (int k = 0; k < e->nsites; k++)
-	//{
-	//	struct mandel_site *s = e->t + k;
-	//	int i = s->j * f->w + abs(s->i);
-	//	//f->rgb[3*i+0] = 255;
-	//	uint8_t g = cabs(s->z) < 2 ? 0 : 255.0*cabs(s->z)/4;
-	//	f->rgb[3*i+0] = g;
-	//	f->rgb[3*i+1] = 0;
-	//	f->rgb[3*i+2] = 0;
-	//}
-
-	//for (int k = e->nsites; k < f->w * f->h; k++)
-	//{
-	//	struct mandel_site *s = e->t + k;
-	//	int i = s->j * f->w + abs(s->i);
-	//	f->rgb[3*i+0] = f->rgb[3*i+1] = f->rgb[3*i+2] = s->iter;
-	//}
-	//
-	//for (int k = 0; k < f->w * f->h; k++)
-	//{
-	//	if (k < e->nsites) {
-	//		struct mandel_site *s = e->t + k;
-	//		int i = s->j * f->w + abs(s->i);
-	//		//uint8_t g = s->iter%255;
-	//		//uint8_t g = 255.0 * cabs(s->z) / 4;
-	//		//f->rgb[3*i+0] = f->rgb[3*i+1] = f->rgb[3*i+2] = g;
-	//		f->rgb[3*i+0] = f->rgb[3*i+1] = f->rgb[3*i+2] = 0;
-	//	} else {
-	//		struct mandel_site *s = e->t + k;
-	//		int i = s->j * f->w + abs(s->i);
-	//		f->rgb[3*i+0] = f->rgb[3*i+1] = f->rgb[3*i+2] = s->iter;
-	//	}
-	//}
-
 	fprintf(stderr, "changed %d\n", e->nsites);
 	f->changed = 1;
 
-}
-
-static void draw_mandelbrot_idle_old(struct FTR *f, int k, int m, int x, int y)
-{
-	complex long double from = -3 -2*I;
-	complex long double to = 2 +2*I;
-
-	//memset(f->rgb, rand(), 3*f->w*f->h);
-	static float *t = NULL;
-	static complex long double *tab_c, *tab_z;
-	if (!t) {
-		t     = malloc(f->w * f->h * sizeof*t);
-		tab_c = malloc(f->w * f->h * sizeof*tab_c);
-		tab_z = malloc(f->w * f->h * sizeof*tab_z);
-
-		long double sx = (creall(to) - creall(from)) / (f->w - 1);
-		long double sy = (cimagl(to) - cimagl(from)) / (f->h - 1);
-		long double ox = creall(from);
-		long double oy = cimagl(from);
-		for (int j = 0; j < f->h; j++)
-		for (int i = 0; i < f->w; i++)
-		{
-			tab_c[j*f->w+i] = ox + i * sx + I * (oy + j * sy);
-			tab_z[j*f->w+i] = 0;
-		}
-	}
-
-	for (int i = 0; i < f->w * f->h; i++)
-	{
-		complex long double z = tab_z[i];
-		complex long double c = tab_c[i];
-		z = z * z + c;
-		if (small(z))
-			tab_z[i] = z;
-	}
-
-	for (int i = 0; i < f->w * f->h; i++)
-		t[i] = cabs(tab_z[i]);
-
-	for (int i = 0; i < f->w * f->h; i++)
-		f->rgb[3*i+0] = f->rgb[3*i+1] = f->rgb[3*i+2] = 255.0*t[i]/4;
-	f->changed = 1;
 }
 
 int main_mandelbrot(int c, char *v[])
@@ -1344,8 +1259,6 @@ int main_mandelbrot(int c, char *v[])
 	struct mandel_state e[1];
 	e->t = malloc(w*h*sizeof*e->t);
 
-	//complex double from = 0.385+0.375*I;//-3 -2*I;
-	//complex double to = 0.395+0.384*I;// +1*I;
 	complex long double from = -3 -2*I;
 	complex long double to = 1+2*I;
 
@@ -1357,6 +1270,26 @@ int main_mandelbrot(int c, char *v[])
 	ftr_set_handler(&f, "key", mandelbrot_key);
 	return ftr_loop_run(&f);
 }
+
+//#define MAX_PYR 12
+//
+//struct msmandel_state {
+//	int w, h;
+//	complex long double from, to;
+//
+//	int pyr_levels;
+//	int nsites[MAX_PYR], nactive[MAX_PYR];
+//	struct mandel_site *t[MAX_PYR];
+//};
+//
+//static void msmandel_alloc_sites(struct msmandel_state *e, int w, int h)
+//{
+//	e->w = w;
+//	e->h = h;
+//	for (int i = 0; i < MAX_PYR; i++)
+//
+//}
+
 
 
 // main_events {{{1
@@ -1451,7 +1384,7 @@ static char *base_name(char *p)
 int main(int c, char *v[])
 {
 	char *t, *s = base_name(*v);
-	if (0 == strcmp(s, "fm"))
+	if (s[0] == 'f' && s[1] == 'm')
 		return main(c - 1, v + 1);
 	int i = 0;
 	while ((t = mains[i++].n))

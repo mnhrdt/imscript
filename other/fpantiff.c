@@ -98,14 +98,22 @@ static void pixel(float *out, struct pan_state *e, double p, double q)
 		return;
 	}
 
-	int factor = 1 << e->octave;
+	//double factor;// = 1.0 << e->octave;
+	//if (e->octave >= 0)
+	//	factor = 1 << e->octave;
+	//else
+	//	factor = 1.0 / ( 1 << - e->octave );
+	
 
 	int fmt = e->t->i->fmt;
 	int bps = e->t->i->bps;
 	int spp = e->t->i->spp;
 	int ss = bps / 8;
 
-	char *pix = tiff_octaves_getpixel(e->t, e->octave, p/factor, q/factor);
+	double factor = 1.0/e->zoom_factor;
+	int o = e->octave;
+	if (o < 0) { o = 0; factor = 1; }
+	char *pix = tiff_octaves_getpixel(e->t, o, p/factor, q/factor);
 
 	out[0] = from_sample_to_double(pix, fmt, bps);
 	if (spp >= 3) {
@@ -220,6 +228,21 @@ static void action_center_contrast_at_point(struct FTR *f, int x, int y)
 	f->changed = 1;
 }
 
+static void action_base_contrast_at_point(struct FTR *f, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+
+	double p[2];
+	window_to_image(p, e, x, y);
+	float c[3];
+	pixel(c, e, p[0], p[1]);
+	float C = (c[0] + c[1] + c[2])/3;
+
+	e->b =  255 - e->a * C;
+
+	f->changed = 1;
+}
+
 static void action_contrast_span(struct FTR *f, float factor)
 {
 	struct pan_state *e = f->userdata;
@@ -234,6 +257,8 @@ static void action_contrast_span(struct FTR *f, float factor)
 static void action_change_zoom_to_factor(struct FTR *f, int x, int y, double F)
 {
 	struct pan_state *e = f->userdata;
+
+	if (F == 1) e->octave = 0;
 
 	double c[2];
 	window_to_image(c, e, x, y);
@@ -288,8 +313,11 @@ static void action_increase_octave(struct FTR *f, int x, int y)
 	if (e->octave < e->t->noctaves - 1) {
 		e->octave += 1;
 		double fac = 1 << e->octave;
+		if (e->octave < 0) fac = 1.0/(1<<-e->octave);
 		action_change_zoom_to_factor(f, x, y, fac);
 	}
+
+	fprintf(stderr, "increased octave to %d\n", e->octave);
 }
 
 static void action_decrease_octave(struct FTR *f, int x, int y)
@@ -301,6 +329,13 @@ static void action_decrease_octave(struct FTR *f, int x, int y)
 		double fac = 1 << e->octave;
 		action_change_zoom_to_factor(f, x, y, fac);
 	}
+	else if (e->octave <= 0) {
+		e->octave -= 1;
+		double fac = 1.0/(1 << -e->octave);
+		action_change_zoom_to_factor(f, x, y, fac);
+	}
+
+	fprintf(stderr, "decreased octave to %d\n", e->octave);
 }
 
 static void action_toggle_infrared(struct FTR *f)
@@ -345,7 +380,11 @@ static unsigned char float_to_byte(float x)
 {
 	if (x < 0) return 0;
 	if (x > 255) return 255;
-	return x;
+	// set gamma=2
+	//float r = x * x / 255;
+	float n = x / 255;
+	float r = (n*n)*n;
+	return r*255;
 }
 
 // dump the image acording to the state of the viewport
@@ -391,6 +430,7 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 	if (m == FTR_BUTTON_LEFT)   action_offset_viewport(f, x - ox, y - oy);
 	if (m == FTR_BUTTON_MIDDLE) action_print_value_under_cursor(f, x, y);
 	if (m == FTR_MASK_SHIFT)    action_center_contrast_at_point(f, x, y);
+	if (m == FTR_MASK_CONTROL)  action_base_contrast_at_point(f, x, y);
 
 	ox = x;
 	oy = y;
@@ -403,9 +443,9 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 		action_exit_preview(f, x, y); return; }
 
 	//fprintf(stderr, "button b=%d m=%d\n", b, m);
-	if (b == FTR_BUTTON_UP && m == FTR_MASK_SHIFT) {
+	if (b == FTR_BUTTON_UP && (m==FTR_MASK_SHIFT || m==FTR_MASK_CONTROL)) {
 		action_contrast_span(f, 1/1.3); return; }
-	if (b == FTR_BUTTON_DOWN && m == FTR_MASK_SHIFT) {
+	if (b == FTR_BUTTON_DOWN && ((m==FTR_MASK_SHIFT)||m==FTR_MASK_CONTROL)){
 		action_contrast_span(f, 1.3); return; }
 	//if (b == FTR_BUTTON_RIGHT && m == FTR_MASK_CONTROL) {
 	//	action_reset_zoom_only(f, x, y); return; }
@@ -429,6 +469,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'i') action_toggle_infrared(f);
 	if (k == '+') action_decrease_octave(f, f->w/2, f->h/2);
 	if (k == '-') action_increase_octave(f, f->w/2, f->h/2);
+	if (k == '1') action_change_zoom_to_factor(f, x, y, 1);
 
 	//if (k == 'p') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1.1);
 	//if (k == 'm') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1/1.1);
