@@ -41,8 +41,12 @@ int main(int c, char **v)
 {
 	printf("arguments before processing:\n");
 	print_args(c, v);
+
 	char *o = pick_option(&c, &v, "o", "42");
+	char *olong = pick_option(&c, &v, "-long", "4900");
+
 	printf("o = \"%s\"\n", o);
+	printf("olong = \"%s\"\n", olong);
 	printf("arguments after processing:\n");
 	print_args(c, v);
 	return 0;

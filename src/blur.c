@@ -70,7 +70,7 @@ static void fft_2dfloat(fftwf_complex *fx, float *x, int w, int h)
 }
 
 #include "smapa.h"
-SMART_PARAMETER_SILENT(FIWARN,1)
+SMART_PARAMETER_SILENT(FIWARN,0)
 
 // Wrapper around FFTW3 that computes the real-valued inverse Fourier transform
 // of a complex-valued frequantial image.

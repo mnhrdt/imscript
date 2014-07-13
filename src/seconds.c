@@ -12,7 +12,7 @@ double seconds(void)
 		initialized = 1;
 	}
 	clock_gettime(CLOCK_REALTIME, t);
-	assert(t->tv_sec >= first_seconds);
+	//assert(t->tv_sec >= first_seconds);
 	double r = (t->tv_sec - first_seconds) + 1e-9*t->tv_nsec;
 	return r;
 }

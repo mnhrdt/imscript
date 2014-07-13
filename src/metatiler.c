@@ -47,7 +47,8 @@ static void fill_subs_cmdline(char *cmdline, char *cmd, char *fileprefix,
 
 static char *create_temporary_directory(void)
 {
-	return "/tmp/metafilter_temporary_directory/";
+	return "/tmp/MTD/";
+	//return "/tmp/metafilter_temporary_directory/";
 }
 
 static void extract_tile(char *tpd, char *filename, int idx)
