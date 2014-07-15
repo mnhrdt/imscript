@@ -16,7 +16,7 @@
 
 
 
-// tiff file information (without data)
+// tiff file information (without the actual data)
 struct tiff_info {
 	int32_t w;       // image width
 	int32_t h;       // image height
@@ -61,6 +61,7 @@ struct tiff_octaves {
 };
 
 
+
 // print an error message and abort the program
 static void fail(const char *fmt, ...)
 {
@@ -80,19 +81,13 @@ static void *xmalloc(size_t size)
 		fail("xmalloc: zero size");
 	void *new = malloc(size);
 	if (!new)
-	{
-		double sm = size / (0x100000 * 1.0);
-		fail("xmalloc: out of memory when requesting "
-			"%zu bytes (%gMB)", size, sm);
-	}
+		fail("xmalloc: out of memory requesting %zu bytes", size);
 	return new;
 }
 
 // how many units "u" are needed to cover a length "n"
 static int how_many(int n, int u)
 {
-	assert(n > 0);
-	assert(u > 0);
 	return n/u + (bool)(n%u);
 
 }
@@ -125,24 +120,13 @@ static void get_tiff_info(struct tiff_info *t, TIFF *tif)
 }
 
 // read information from a named tiff file
-static void get_tiff_info_filename(struct tiff_info *t, char *fname)
+static bool get_tiff_info_filename(struct tiff_info *t, char *fname)
 {
 	TIFF *tif = TIFFOpen(fname, "r");
 	if (!tif)
-		fail("could not open TIFF file \"%s\" for reading", fname);
+		return false;
 	get_tiff_info(t, tif);
 	TIFFClose(tif);
-}
-
-// read information from a named file, checking for file existence
-static bool get_tiff_info_filename_e(struct tiff_info *t, char *fname)
-{
-	FILE *f = fopen(fname, "r");
-	if (!f)
-		return false;
-	fclose(f);
-
-	get_tiff_info_filename(t, fname);
 	return true;
 }
 
@@ -175,8 +159,7 @@ void tiff_octaves_init(struct tiff_octaves *t, char *filepattern, int megabytes)
 	for (int o = 0; o < MAX_OCTAVES; o++)
 	{
 		snprintf(t->filename[o], FILENAME_MAX, filepattern, o);
-		if (!get_tiff_info_filename_e(t->i + o, t->filename[o]))
-			break;
+		if (!get_tiff_info_filename(t->i + o, t->filename[o])) break;
 		if (t->i[o].bps < 8 || t->i[o].packed)
 			fail("caching of packed samples is not supported");
 		if (o > 0) { // check consistency
@@ -204,7 +187,7 @@ void tiff_octaves_init(struct tiff_octaves *t, char *filepattern, int megabytes)
 	// set up data for old tile deletion
 	if (megabytes) {
 		for (int o = 0; o < t->noctaves; o++)
-			t->a[o] = malloc(t->i[o].ntiles * sizeof*t->a[o]);
+			t->a[o] = xmalloc(t->i[o].ntiles * sizeof*t->a[o]);
 		t->ax = 0;
 		int tilesize = t->i->tw * t->i->th * (t->i->bps/8) * t->i->spp;
 		double mbts = tilesize / (1024.0 * 1024);
