@@ -1622,7 +1622,7 @@ void tiff_octaves_init(struct tiff_octaves *t, char *filepattern, int megabytes)
 		fprintf(stderr, "\n");
 	}
 
-	// set up data for obsolete tile deletion
+	// set up data for old tile deletion
 	if (megabytes) {
 		for (int o = 0; o < t->noctaves; o++)
 			t->a[o] = malloc(t->i[o].ntiles * sizeof*t->a[o]);
@@ -1693,7 +1693,7 @@ static void notify_tile_access_octave(struct tiff_octaves *t, int o, int i)
 	t->a[o][i] = ++t->ax;
 }
 
-void *tiff_octaves_getpixel(struct tiff_octaves *t, int o, int i, int j)
+void *tiff_octaves_gettile(struct tiff_octaves *t, int o, int i, int j)
 {
 	// sanitize input
 	o = bound(0, o, t->noctaves - 1);
@@ -1709,14 +1709,23 @@ void *tiff_octaves_getpixel(struct tiff_octaves *t, int o, int i, int j)
 		if (t->a[0] && t->curtiles == t->maxtiles)
 			free_oldest_tile_octave(t);
 
-		fprintf(stderr, "CACHE: LOADing tile %d of octave %d\n", tidx, o);
+		fprintf(stderr,"CACHE: LOADing tile %d of octave %d\n",tidx,o);
 		struct tiff_tile tmp[1];
 		read_tile_from_file(tmp, t->filename[o], tidx);
 		t->c[o][tidx] = tmp->data;
 
 		t->curtiles += 1;
 	}
-	if (t->a[0]) notify_tile_access_octave(t, o, tidx);
+	if (t->a[0])
+		notify_tile_access_octave(t, o, tidx);
+
+	return t->c[0][tidx];
+}
+
+void *tiff_octaves_getpixel(struct tiff_octaves *t, int o, int i, int j)
+{
+	void *tile = tiff_octaves_gettile(t, o, i, j);
+	if (!tile) return NULL;
 
 	// get pointer to requested pixel
 	struct tiff_info *ti = t->i + o;
@@ -1724,7 +1733,7 @@ void *tiff_octaves_getpixel(struct tiff_octaves *t, int o, int i, int j)
 	int jj = j % ti->th;
 	int pixel_index = jj * ti->tw + ii;
 	int pixel_position = pixel_index * ti->spp * (ti->bps / 8);
-	return pixel_position + (char*)t->c[o][tidx];
+	return pixel_position + (char*)tile;
 }
 
 static int main_octaves(int c, char *v[])
