@@ -252,13 +252,16 @@ int main(int argc, char *argv[])
 
 	int w[2], h[2], pd;
 	float *in = iio_read_image_float_split(filename_in, w, h, &pd);
-	float *mask = iio_read_image_float(filename_mask, w+1, h+1);
-	if (w[0] != w[1] || h[0] != h[1])
-		return fprintf(stderr, "image and mask file size mismatch");
+	float *mask = NULL;
+	if (0 != strcmp(filename_mask, "NAN")) {
+		mask =iio_read_image_float(filename_mask, w+1, h+1);
+		if (w[0] != w[1] || h[0] != h[1])
+			return fprintf(stderr, "image and mask size mismatch");
+	}
 	float *out = xmalloc(*w**h*pd*sizeof*out);
 
 	for (int i = 0; i < *w * *h; i++)
-		if (mask[i] > 0)
+		if (mask && mask[i] > 0)
 			for (int l = 0; l < pd; l++)
 				in[*w**h*l+i] = NAN;
 
