@@ -133,7 +133,9 @@ static void action_print_value_under_cursor(struct FTR *f, int x, int y)
 		struct pan_state *e = f->userdata;
 		double p[2];
 		window_to_image(p, e, x, y);
-		fprintf(stderr, "%g %g, value not implemented yet\n",p[0],p[1]);
+		float v[3];
+		pixel(v, e, p[0], p[1]);
+		fprintf(stderr, "%g %g, value %g\n",p[0],p[1],v[0]);
 		//float c[3];
 		//interpolate_at(c, e->frgb, e->w, e->h, p[0], p[1]);
 		//printf("%g\t%g\t: %g\t%g\t%g\n", p[0], p[1], c[0], c[1], c[2]);

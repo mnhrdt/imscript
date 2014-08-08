@@ -1577,12 +1577,17 @@ struct tiff_octaves {
 	int maxtiles;    // number of tiles allowed to be in memory at once
 };
 
+//#include "smapa.h"
+//SMART_PARAMETER(FIRST_OCTAVE,0)
+
 void tiff_octaves_init(struct tiff_octaves *t, char *filepattern, int megabytes)
 {
+	//fprintf(stderr, "tiff octaves init\n");
 	// create filenames until possible
 	t->noctaves = 0;
 	for (int o = 0; o < MAX_OCTAVES; o++)
 	{
+		//int oo = o + FIRST_OCTAVE();
 		snprintf(t->filename[o], FILENAME_MAX, filepattern, o);
 		if (!get_tiff_info_filename_e(t->i + o, t->filename[o]))
 			break;
@@ -1719,7 +1724,7 @@ void *tiff_octaves_gettile(struct tiff_octaves *t, int o, int i, int j)
 	if (t->a[0])
 		notify_tile_access_octave(t, o, tidx);
 
-	return t->c[0][tidx];
+	return t->c[o][tidx];
 }
 
 void *tiff_octaves_getpixel(struct tiff_octaves *t, int o, int i, int j)

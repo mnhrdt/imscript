@@ -1063,6 +1063,7 @@ struct mandel_state {
 	complex long double from, to;
 	int nsites;
 	struct mandel_site *t;
+	int itoff;
 };
 
 // assumes the table of sites is already allocated
@@ -1092,6 +1093,7 @@ static void mandel_state_start(struct mandel_state *e, int w, int h,
 	e->from = from;
 	e->to = to;
 	e->nsites = w * h;
+	e->itoff = 0;
 }
 
 static void mandelbrot_resize(struct FTR *f, int d1, int d2, int w, int h)
@@ -1188,6 +1190,8 @@ static void mandelbrot_key(struct FTR *f, int k, int m, int x, int y)
 	//if (k == FTR_KEY_DOWN)  action_mandel_translation(f, 0, -f->h/2);
 	//if (k == FTR_KEY_LEFT)  action_mandel_translation(f, -f->w/2, 0);
 	//if (k == FTR_KEY_RIGHT) action_mandel_translation(f, f->w/2, 0);
+	if (k == 'p') { e->itoff += 1; fprintf(stderr,"itoff = %d\n",e->itoff);}
+	if (k == 'm') { e->itoff -= 1; fprintf(stderr,"itoff = %d\n",e->itoff);}
 
 }
 
@@ -1200,7 +1204,7 @@ static void mandel_remove_site(struct FTR *f, struct mandel_state *e, int i)
 	//f->rgb[3*k+0] = g2;
 	//f->rgb[3*k+1] = g2;
 	//f->rgb[3*k+2] = g1;
-	double idx1 = sqrt(s->iter/7.0);//log(1+s->iter/30.0)-1;
+	double idx1 = sqrt((e->itoff+s->iter)/7.0);//log(1+s->iter/30.0)-1;
 	//double idx3 = log(1+s->iter/10.0);
 	f->rgb[3*k+0] = 127-127*cos(idx1-3.1416/3);
 	f->rgb[3*k+2] = 127-127*cos(idx1+3.1416/2);
@@ -1351,11 +1355,33 @@ int main_paint(int c, char *v[])
 	return ftr_loop_run(&f);
 }
 
+// main_mini {{{1
+int main_mini(int c, char *v[])
+{
+	struct FTR f = ftr_new_window(320, 200);
+	//f.rgb[1+3*(f.w*10+10)] = 255;
+	return ftr_loop_run(&f);
+}
+int main_mini0(int c, char *v[])
+{
+	struct FTR f = ftr_new_window(320, 200);
+	return 0;
+}
+int main_mini1(int c, char *v[])
+{
+	struct FTR f = ftr_new_window(320, 200);
+	sleep(3);
+	return 0;
+}
+
 // main {{{1
 
 #define MAIN(x) { #x, main_ ## x }
 
 static const struct { char *n; int(*f)(int,char*[]); } mains[] = {
+	MAIN(mini),
+	MAIN(mini0),
+	MAIN(mini1),
 	MAIN(viewimage),
 	MAIN(viewimage0),
 	MAIN(viewimage0),

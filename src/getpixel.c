@@ -171,12 +171,24 @@ static void setsample_segf(float *x, int w, int h, int pd, int i, int j, int l,
 	x[(i+j*w)*pd + l] = v;
 }
 
-//static float getpixel(float *x, int w, int h, int i, int j)
-//{
-//	if (i < 0 || i >= w || j < 0 || j >= h)
-//		return 0;
-//	return x[i + j*w];
-//}
+typedef float (*getpixel_operator)(float*,int,int,int,int);
+
+static float getpixel_0(float *x, int w, int h, int i, int j)
+{
+	if (i < 0 || i >= w || j < 0 || j >= h)
+		return 0;
+	return x[i + j*w];
+}
+
+static float getpixel_1(float *x, int w, int h, int i, int j)
+{
+	if (i < 0) i = 0;
+	if (j < 0) j = 0;
+	if (i >= w) i = w-1;
+	if (j >= h) j = h-1;
+	return x[i+j*w];
+}
+
 //
 //static void setpixel(float *x, int w, int h, int i, int j, float v)
 //{
