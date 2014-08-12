@@ -1,15 +1,19 @@
 // tiff utils //
-// info   f.tiff            # print misc info
-// ntiles f.tiff            # print the total number of tiles
-// tget   f.tiff n t.tiff   # get the nth tile (sizes must coincide)
-// tput   f.tiff n t.tiff   # an image into the nth tile (sizes must coincide)
-// tzout  a.tiff b.tiff     # zoom out by a factor 2 (keeping tile size)
-// retile in.t tw th out.t
-// tzero  w h tw th spp bps fmt
-//
+// info     f.tiff            # print misc info
+// imprintf format f.tiff     # print printf-like formatted info
+// ntiles   f.tiff            # print the total number of tiles
+// tget     f.tiff n t.tiff   # get the nth tile (sizes must coincide)
+// tput     f.tiff n t.tiff   # an image into the nth tile (sizes must coincide)
+// zoomout  a.tiff b.tiff     # zoom out by a factor 2 (keeping tile size)
+// crop     cx cy r in out    # crop a tiff file
+// tzero    w h ...           # create a huge tiled tiff file
+// getpixel f.tiff < coords   # evaluate pixels specified by input lines
+// manwhole ...               # like tzero, but create a mandelbrot image
 // meta   prog in.tiff ... out.tiff # run "prog" for all the tiles
+// octaves                    # example program for the pyramidal interface
 //
 // TODO: resample, tileize
+// retile   in.t tw th out.t  # retile a file to the new given tile size
 
 
 // includes {{{1
@@ -2131,7 +2135,6 @@ int main(int c, char *v[])
 	if (0 == strcmp(v[1], "imprintf")) return main_imprintf(c-1, v+1);
 	if (0 == strcmp(v[1], "ntiles"))   return main_ntiles  (c-1, v+1);
 	if (0 == strcmp(v[1], "tget"))     return main_tget    (c-1, v+1);
-	if (0 == strcmp(v[1], "whatever")) return main_whatever(c-1, v+1);
 	if (0 == strcmp(v[1], "crop"))     return main_crop    (c-1, v+1);
 	if (0 == strcmp(v[1], "tput"))     return main_tput    (c-1, v+1);
 	if (0 == strcmp(v[1], "tzero"))    return main_tzero   (c-1, v+1);
@@ -2140,6 +2143,7 @@ int main(int c, char *v[])
 	if (0 == strcmp(v[1], "zoomout"))  return main_zoomout (c-1, v+1);
 	if (0 == strcmp(v[1], "manwhole")) return main_manwhole(c-1, v+1);
 	if (0 == strcmp(v[1], "octaves"))  return main_octaves(c-1, v+1);
+	if (0 == strcmp(v[1], "whatever")) return main_whatever(c-1, v+1);
 
 	goto err;
 }
