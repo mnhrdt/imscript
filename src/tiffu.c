@@ -11,6 +11,9 @@
 // manwhole ...               # like tzero, but create a mandelbrot image
 // meta   prog in.tiff ... out.tiff # run "prog" for all the tiles
 // octaves                    # example program for the pyramidal interface
+// dlist    f.tiff            # list images inside this file
+// dget     f.tiff n d.tiff   # get the nth image of a multi-image file
+// dpush    f.tiff d.tiff     # add a new image to a multi-image file
 //
 // TODO: resample, tileize
 // retile   in.t tw th out.t  # retile a file to the new given tile size
@@ -2031,6 +2034,104 @@ static int main_imprintf(int argc, char *argv[])
 	return 0;
 }
 
+// main_dlist {{{1
+static int main_dlist(int c, char *v[])
+{
+	if (c != 2) {
+		fprintf(stderr, "usage:\n\t%s file.tiff\n", *v);
+		return 1;
+	}
+	char *filename = v[1];
+
+	TIFF *tif = TIFFOpen(filename, "r");
+	if (!tif)
+		fail("could not open TIFF file %s\n", filename);
+
+	int dircount = 0;
+	do {
+		struct tiff_info t[1];
+		get_tiff_info(t, tif);
+		printf("%d: %d %d , %d (bps=%d fmt=%d k=%d) ti=%d\n",
+				dircount, t->w, t->h, t->spp,
+				t->bps, t->fmt, t->compressed,
+				t->tiled
+				);
+		dircount += 1;
+	} while (TIFFReadDirectory(tif));
+
+	TIFFClose(tif);
+
+	return 0;
+}
+
+// main_dpush {{{1
+
+static void tiff_append(TIFF *tif, TIFF *tif_new)
+{
+	struct tiff_info t[1];
+	get_tiff_info(t, tif_new);
+
+	TIFFSetField(tif, TIFFTAG_IMAGEWIDTH,      t->w);
+	TIFFSetField(tif, TIFFTAG_IMAGELENGTH,     t->h);
+	TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, t->spp);
+	TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE,   t->bps);
+	TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT,    t->fmt);
+	TIFFSetField(tif, TIFFTAG_PLANARCONFIG,    PLANARCONFIG_CONTIG);
+	if (t->compressed)
+		TIFFSetField(tif, TIFFTAG_COMPRESSION, COMPRESSION_LZW);
+
+	if (t->tiled) {
+		int tile_size = TIFFTileSize(tif_new);
+		TIFFSetField(tif, TIFFTAG_TILEWIDTH, t->tw);
+		TIFFSetField(tif, TIFFTAG_TILELENGTH, t->th);
+		uint8_t *buf = xmalloc(tile_size);
+		memset(buf, 0, tile_size);
+		for (int j = 0; j < t->h; j += t->th)
+		for (int i = 0; i < t->w; i += t->tw) {
+			int r1 = TIFFReadTile(tif_new, buf, i, j, 0, 0);
+			int r2 = TIFFWriteTile(tif, buf, i, j, 0, 0);
+			if (r1 < 0 || r2 < 0)
+				fail("cp error i,j=%d,%d r1=%d r2=%d\n",
+						i, j, r1, r2);
+		}
+	} else { // scanlines
+		int scanline_size = TIFFScanlineSize(tif_new);
+		uint8_t *buf = xmalloc(scanline_size);
+		for (int j = 0; j < t->h; j++) {
+			int r1 = TIFFReadScanline(tif_new, buf, j, 0);
+			int r2 = TIFFWriteScanline(tif, buf, j, 0);
+			if (r1 < 0 || r2 < 0)
+				fail("cp error j=%d r1=%d r2=%d\n", j, r1, r2);
+		}
+	}
+}
+
+static int main_dpush(int c, char *v[])
+{
+	if (c != 3) {
+		fprintf(stderr, "usage:\n\t%s acc.tiff new.tiff\n", *v);
+		return 1;
+	}
+	char *filename_acc = v[1];
+	char *filename_new = v[2];
+
+	TIFF *tifa = TIFFOpen(filename_acc, "a");
+	TIFF *tifn = TIFFOpen(filename_new, "r");
+
+	tiff_append(tifa, tifn);
+
+	TIFFClose(tifa);
+	TIFFClose(tifn);
+
+	return 0;
+}
+
+// main_dget {{{1
+static int main_dget(int c, char *v[])
+{
+	return 0;
+}
+
 // main_manwhole {{{1
 
 static bool small(complex long double z)
@@ -2123,11 +2224,11 @@ void my_tifferror(const char *module, const char *fmt, va_list ap)
 #ifndef TIFFU_OMIT_MAIN
 int main(int c, char *v[])
 {
-	TIFFSetWarningHandler(NULL);//suppress warnings
+	//TIFFSetWarningHandler(NULL);//suppress warnings
 	//TIFFSetErrorHandler(my_tifferror);
 
 	if (c < 2) {
-	err:	fprintf(stderr, "usage:\n\t%s {info|ntiles|tget|tput}\n", *v);
+	err:	fprintf(stderr, "usage:\n\t%s {info|ntiles|tget|...}\n", *v);
 		return 1;
 	}
 
@@ -2142,7 +2243,10 @@ int main(int c, char *v[])
 	if (0 == strcmp(v[1], "getpixel")) return main_getpixel(c-1, v+1);
 	if (0 == strcmp(v[1], "zoomout"))  return main_zoomout (c-1, v+1);
 	if (0 == strcmp(v[1], "manwhole")) return main_manwhole(c-1, v+1);
-	if (0 == strcmp(v[1], "octaves"))  return main_octaves(c-1, v+1);
+	if (0 == strcmp(v[1], "octaves"))  return main_octaves (c-1, v+1);
+	if (0 == strcmp(v[1], "dlist"))    return main_dlist   (c-1, v+1);
+	if (0 == strcmp(v[1], "dpush"))    return main_dpush   (c-1, v+1);
+	if (0 == strcmp(v[1], "dget"))     return main_dget    (c-1, v+1);
 	if (0 == strcmp(v[1], "whatever")) return main_whatever(c-1, v+1);
 
 	goto err;
