@@ -74,20 +74,21 @@ struct tiff_info {
 
 static TIFF *tiffopen_fancy(char *filename, char *mode)
 {
-	char *colon = strrchr(filename, ':');
-	if (0 != strcmp(mode, "r") || !colon)
+	fprintf(stderr, "tiffopen fancy \"%s\",\"%s\"\n", filename, mode);
+	char *comma = strrchr(filename, ',');
+	if (*mode != 'r' || !comma)
 	def:	return TIFFOpen(filename, mode);
 
-	int aftercolon = strlen(colon + 1);
-	int ndigits = strspn(colon + 1, "0123456789");
+	int aftercomma = strlen(comma + 1);
+	int ndigits = strspn(comma + 1, "0123456789");
 
-	if (aftercolon != ndigits) goto def;
+	if (aftercomma != ndigits) goto def;
 
 	char buf[FILENAME_MAX];
 	strncpy(buf, filename, FILENAME_MAX);
-	colon = strrchr(buf, ':');
-	*colon = '\0';
-	int index = atoi(colon + 1);
+	comma = strrchr(buf, ',');
+	*comma = '\0';
+	int index = atoi(comma + 1);
 
 	TIFF *tif = TIFFOpen(buf, mode);
 	if (!tif) return tif;
@@ -322,7 +323,7 @@ static void put_tile_into_file(char *filename, struct tiff_tile *t, int tidx)
 
 	// Note, the mode "r+" is officially undocumented, but its behaviour is
 	// described on file tif_open.c from libtiff.
-	TIFF *tif = TIFFOpen(filename, "r+");
+	TIFF *tif = tiffopen_fancy(filename, "r+");
 	if (!tif) fail("could not open TIFF file \"%s\" for writing", filename);
 
 	int tw = tiff_tilewidth(tif);
@@ -418,7 +419,7 @@ static tsize_t my_readtile(TIFF *tif, tdata_t buf,
 
 static void read_tile_from_file(struct tiff_tile *t, char *filename, int tidx)
 {
-	TIFF *tif = TIFFOpen(filename, "r");
+	TIFF *tif = tiffopen_fancy(filename, "r");
 	if (!tif) fail("could not open TIFF file \"%s\" for reading", filename);
 
 	uint32_t w, h;
@@ -470,7 +471,7 @@ static void insert_tile_into_file(char *filename, struct tiff_tile *t, int idx)
 
 static void tiffu_print_info(char *filename)
 {
-	TIFF *tif = TIFFOpen(filename, "r");
+	TIFF *tif = tiffopen_fancy(filename, "r");
 	if (!tif) fail("could not open TIFF file \"%s\"", filename);
 
 	uint32_t w, h;
@@ -524,7 +525,7 @@ static int tiffu_ntiles(char *filename)
 {
 	int r = 1;
 
-	TIFF *tif = TIFFOpen(filename, "r");
+	TIFF *tif = tiffopen_fancy(filename, "r");
 	if (!tif) fail("could not open TIFF file \"%s\"", filename);
 
 	if (TIFFIsTiled(tif)) {
@@ -546,7 +547,7 @@ static int tiffu_ntiles2(char *filename)
 {
 	int r = 0;
 
-	TIFF *tif = TIFFOpen(filename, "r");
+	TIFF *tif = tiffopen_fancy(filename, "r");
 	if (!tif) fail("could not open TIFF file \"%s\"", filename);
 
 	if (TIFFIsTiled(tif)) {
@@ -562,7 +563,7 @@ static float *tiffu_tget_ll(char *filename_in, int tile_idx,
 		int *out_w, int *out_h, int *out_pd)
 {
 
-	TIFF *tif = TIFFOpen(filename_in, "r");
+	TIFF *tif = tiffopen_fancy(filename_in, "r");
 	if (!tif) fail("could not open TIFF file \"%s\"", filename_in);
 
 	uint32_t w, h;
@@ -805,7 +806,7 @@ static void crop_scanlines(struct tiff_tile *tout, struct tiff_info *tinfo,
 void tcrop(char *fname_out, char *fname_in, int x0, int xf, int y0, int yf)
 {
 	// open input file
-	TIFF *tif = TIFFOpen(fname_in, "r");
+	TIFF *tif = tiffopen_fancy(fname_in, "r");
 	if (!tif) fail("can not open TIFF file \"%s\" for reading", fname_in);
 
 	// read input file info
@@ -888,7 +889,7 @@ static int main_info(int c, char *v[])
 
 static void tiffu_whatever(char *filename)
 {
-	TIFF *tif = TIFFOpen(filename, "r");
+	TIFF *tif = tiffopen_fancy(filename, "r");
 
 	int w = tiff_imagewidth(tif);
 	int h = tiff_imagelength(tif);
@@ -2143,7 +2144,7 @@ static int main_dpush(int c, char *v[])
 	char *filename_new = v[2];
 
 	TIFF *tifa = TIFFOpen(filename_acc, "a");
-	TIFF *tifn = TIFFOpen(filename_new, "r");
+	TIFF *tifn = tiffopen_fancy(filename_new, "r");
 
 	tiff_append(tifa, tifn);
 
