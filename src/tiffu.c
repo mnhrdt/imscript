@@ -17,6 +17,8 @@
 //
 // TODO: resample, tileize
 // retile   in.t tw th out.t  # retile a file to the new given tile size
+//
+// NOTE: images from a multi-image file can be accessed like e.g. "fname.tiff:4"
 
 
 // includes {{{1
@@ -69,6 +71,31 @@ struct tiff_info {
 };
 
 // general utility functions {{{1
+
+static TIFF *tiffopen_fancy(char *filename, char *mode)
+{
+	char *colon = strrchr(filename, ':');
+	if (0 != strcmp(mode, "r") || !colon)
+	def:	return TIFFOpen(filename, mode);
+
+	int aftercolon = strlen(colon + 1);
+	int ndigits = strspn(colon + 1, "0123456789");
+
+	if (aftercolon != ndigits) goto def;
+
+	char buf[FILENAME_MAX];
+	strncpy(buf, filename, FILENAME_MAX);
+	colon = strrchr(buf, ':');
+	*colon = '\0';
+	int index = atoi(colon + 1);
+
+	TIFF *tif = TIFFOpen(buf, mode);
+	if (!tif) return tif;
+	for (int i = 0; i < index; i++)
+		TIFFReadDirectory(tif);
+	
+	return tif;
+}
 
 static int tinfo_pixelsize(struct tiff_info *t)
 {
@@ -146,7 +173,7 @@ static void get_tiff_info(struct tiff_info *t, TIFF *tif)
 
 static void get_tiff_info_filename(struct tiff_info *t, char *fname)
 {
-	TIFF *tif = TIFFOpen(fname, "r");
+	TIFF *tif = tiffopen_fancy(fname, "r");
 	if (!tif)
 		fail("could not open TIFF file \"%s\" for reading", fname);
 	get_tiff_info(t, tif);
