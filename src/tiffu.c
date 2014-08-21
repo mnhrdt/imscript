@@ -183,12 +183,11 @@ static void get_tiff_info_filename(struct tiff_info *t, char *fname)
 
 static bool get_tiff_info_filename_e(struct tiff_info *t, char *fname)
 {
-	FILE *f = fopen(fname, "r");
-	if (!f)
+	TIFF *tif = tiffopen_fancy(fname, "r");
+	if (!tif)
 		return false;
-	fclose(f);
-
-	get_tiff_info_filename(t, fname);
+	get_tiff_info(t, tif);
+	TIFFClose(tif);
 	return true;
 }
 
@@ -1624,10 +1623,9 @@ void tiff_octaves_init(struct tiff_octaves *t, char *filepattern, int megabytes)
 	{
 		//int oo = o + FIRST_OCTAVE();
 		snprintf(t->filename[o], FILENAME_MAX, filepattern, o);
-		fprintf(stderr, "f[%d]=%s\n", o, t->filename[o]);
-		get_tiff_info_filename(t->i + o, t->filename[o]);
-		//if (!get_tiff_info_filename_e(t->i + o, t->filename[o]))
-		//	break;
+		//fprintf(stderr, "f[%d]=%s\n", o, t->filename[o]);
+		if (!get_tiff_info_filename_e(t->i + o, t->filename[o]))
+			break;
 		if (t->i[o].bps < 8 || t->i[o].packed)
 			fail("caching of packed samples is not supported");
 		if (o > 0) { // check consistency
