@@ -19,7 +19,7 @@ The conventions are the following:
 	1.10. The "default" format for samples is "float"
 
 
-2. Coding conventions (basedn on Linux Kernel coding style)
+2. Coding conventions (based on Linux Kernel coding style)
 
 	2.1. Tabs are 8 spaces
 	2.2. Lines have at most 80 columns
@@ -38,13 +38,15 @@ The conventions are the following:
 	2.18. Typedef are allowed for plain C data types
 	2.19. A typedef always ends in "_t"
 	2.20. All functions are declared static except for public API functions
-	2.21. The ideal internal function:
+	2.21. Order of function arguments: (output, input, options)
+	2.22. Exception to 2.21: (state, output, input, options)
+	2.23. The ideal internal function:
 		* is static
 		* has a very long name
 		* has two or three single-letter arguments 
-		* has no local variables
-		* is only used once
-	2.22. The ideal interface function:
+		* has none or very few local variables
+		* is only called once
+	2.24. The ideal interface function:
 		* is the only non-static function in its file
 		* has a very long name
 		* has a few arguments with long names explaining their purpose
@@ -61,3 +63,8 @@ The conventions are the following:
 	3.5. Struct tags have long and descriptive names
 	3.6. Struct fields have short names (preferably single letters)
 	3.7. Global and static variables must have very long and obnoxious names
+	3.8. Typical names for image arguments: x, y, z, in, out
+	3.9. Names for image sizes: w (width), h (height), pd (pixel dimension)
+	3.10. Image sizes as arguments go together with their images
+	3.11. Example of 3.10:
+	     void zoom_out(float *y, int wy, int hy, float *x, int wx, int hx)
