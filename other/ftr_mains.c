@@ -1252,8 +1252,8 @@ static void draw_mandelbrot_idle(struct FTR *f, int k, int m, int x, int y)
 
 int main_mandelbrot(int c, char *v[])
 {
-	int w = 1000;
-	int h = 800;
+	int w = 800;
+	int h = 600;
 	struct FTR f = ftr_new_window(w, h);
 
 	struct mandel_state e[1];

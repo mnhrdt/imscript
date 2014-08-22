@@ -1,4 +1,4 @@
-// icc -std=c99 -Ofast fpantiff.c iio.o -o fpan -lglut -lGL -ltiff -lm
+// icc -std=c99 -Ofast fpantiff.c iio.o -o fpantiff -lglut -lGL -ltiff -lm
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -8,7 +8,7 @@
 #include "tiffu.c"
 
 #ifndef FTR_BACKEND
-#define FTR_BACKEND 'f'
+#define FTR_BACKEND 'x'
 #endif
 #include "ftr.c"
 
@@ -561,8 +561,8 @@ int main_pan(int c, char *v[])
 	struct pan_state e[1];
 	int megabytes = 100;
 	tiff_octaves_init(e->t, pyrpattern, megabytes);
-	e->w = 1200;
-	e->h = 800;
+	e->w = 700;
+	e->h = 500;
 	e->infrared = 4 == e->t->i->spp;
 	e->preview = NULL;
 	e->do_preview = false;
@@ -575,7 +575,7 @@ int main_pan(int c, char *v[])
 	if (e->preview)
 		f = ftr_new_window(e->pw, e->ph);
 	else
-		f = ftr_new_window(BAD_MIN(e->w,1200), BAD_MIN(e->h,800));
+		f = ftr_new_window(BAD_MIN(e->w,700), BAD_MIN(e->h,500));
 	f.userdata = e;
 	action_reset_zoom_and_position(&f);
 	ftr_set_handler(&f, "key"   , pan_key_handler);
