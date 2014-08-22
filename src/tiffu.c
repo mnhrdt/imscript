@@ -1,15 +1,24 @@
 // tiff utils //
-// info   f.tiff            # print misc info
-// ntiles f.tiff            # print the total number of tiles
-// tget   f.tiff n t.tiff   # get the nth tile (sizes must coincide)
-// tput   f.tiff n t.tiff   # an image into the nth tile (sizes must coincide)
-// tzout  a.tiff b.tiff     # zoom out by a factor 2 (keeping tile size)
-// retile in.t tw th out.t
-// tzero  w h tw th spp bps fmt
-//
+// info     f.tiff            # print misc info
+// imprintf format f.tiff     # print printf-like formatted info
+// ntiles   f.tiff            # print the total number of tiles
+// tget     f.tiff n t.tiff   # get the nth tile (sizes must coincide)
+// tput     f.tiff n t.tiff   # an image into the nth tile (sizes must coincide)
+// zoomout  a.tiff b.tiff     # zoom out by a factor 2 (keeping tile size)
+// crop     cx cy r in out    # crop a tiff file
+// tzero    w h ...           # create a huge tiled tiff file
+// getpixel f.tiff < coords   # evaluate pixels specified by input lines
+// manwhole ...               # like tzero, but create a mandelbrot image
 // meta   prog in.tiff ... out.tiff # run "prog" for all the tiles
+// octaves                    # example program for the pyramidal interface
+// dlist    f.tiff            # list images inside this file
+// dget     f.tiff n d.tiff   # get the nth image of a multi-image file
+// dpush    f.tiff d.tiff     # add a new image to a multi-image file
 //
 // TODO: resample, tileize
+// retile   in.t tw th out.t  # retile a file to the new given tile size
+//
+// NOTE: images from a multi-image file can be accessed like e.g. "fname.tiff:4"
 
 
 // includes {{{1
@@ -62,6 +71,32 @@ struct tiff_info {
 };
 
 // general utility functions {{{1
+
+static TIFF *tiffopen_fancy(char *filename, char *mode)
+{
+	fprintf(stderr, "tiffopen fancy \"%s\",\"%s\"\n", filename, mode);
+	char *comma = strrchr(filename, ',');
+	if (*mode != 'r' || !comma)
+	def:	return TIFFOpen(filename, mode);
+
+	int aftercomma = strlen(comma + 1);
+	int ndigits = strspn(comma + 1, "0123456789");
+
+	if (aftercomma != ndigits) goto def;
+
+	char buf[FILENAME_MAX];
+	strncpy(buf, filename, FILENAME_MAX);
+	comma = strrchr(buf, ',');
+	*comma = '\0';
+	int index = atoi(comma + 1);
+
+	TIFF *tif = TIFFOpen(buf, mode);
+	if (!tif) return tif;
+	for (int i = 0; i < index; i++)
+		TIFFReadDirectory(tif);
+	
+	return tif;
+}
 
 static int tinfo_pixelsize(struct tiff_info *t)
 {
@@ -139,7 +174,7 @@ static void get_tiff_info(struct tiff_info *t, TIFF *tif)
 
 static void get_tiff_info_filename(struct tiff_info *t, char *fname)
 {
-	TIFF *tif = TIFFOpen(fname, "r");
+	TIFF *tif = tiffopen_fancy(fname, "r");
 	if (!tif)
 		fail("could not open TIFF file \"%s\" for reading", fname);
 	get_tiff_info(t, tif);
@@ -148,12 +183,11 @@ static void get_tiff_info_filename(struct tiff_info *t, char *fname)
 
 static bool get_tiff_info_filename_e(struct tiff_info *t, char *fname)
 {
-	FILE *f = fopen(fname, "r");
-	if (!f)
+	TIFF *tif = tiffopen_fancy(fname, "r");
+	if (!tif)
 		return false;
-	fclose(f);
-
-	get_tiff_info_filename(t, fname);
+	get_tiff_info(t, tif);
+	TIFFClose(tif);
 	return true;
 }
 
@@ -288,7 +322,7 @@ static void put_tile_into_file(char *filename, struct tiff_tile *t, int tidx)
 
 	// Note, the mode "r+" is officially undocumented, but its behaviour is
 	// described on file tif_open.c from libtiff.
-	TIFF *tif = TIFFOpen(filename, "r+");
+	TIFF *tif = tiffopen_fancy(filename, "r+");
 	if (!tif) fail("could not open TIFF file \"%s\" for writing", filename);
 
 	int tw = tiff_tilewidth(tif);
@@ -384,7 +418,7 @@ static tsize_t my_readtile(TIFF *tif, tdata_t buf,
 
 static void read_tile_from_file(struct tiff_tile *t, char *filename, int tidx)
 {
-	TIFF *tif = TIFFOpen(filename, "r");
+	TIFF *tif = tiffopen_fancy(filename, "r");
 	if (!tif) fail("could not open TIFF file \"%s\" for reading", filename);
 
 	uint32_t w, h;
@@ -436,7 +470,7 @@ static void insert_tile_into_file(char *filename, struct tiff_tile *t, int idx)
 
 static void tiffu_print_info(char *filename)
 {
-	TIFF *tif = TIFFOpen(filename, "r");
+	TIFF *tif = tiffopen_fancy(filename, "r");
 	if (!tif) fail("could not open TIFF file \"%s\"", filename);
 
 	uint32_t w, h;
@@ -490,7 +524,7 @@ static int tiffu_ntiles(char *filename)
 {
 	int r = 1;
 
-	TIFF *tif = TIFFOpen(filename, "r");
+	TIFF *tif = tiffopen_fancy(filename, "r");
 	if (!tif) fail("could not open TIFF file \"%s\"", filename);
 
 	if (TIFFIsTiled(tif)) {
@@ -512,7 +546,7 @@ static int tiffu_ntiles2(char *filename)
 {
 	int r = 0;
 
-	TIFF *tif = TIFFOpen(filename, "r");
+	TIFF *tif = tiffopen_fancy(filename, "r");
 	if (!tif) fail("could not open TIFF file \"%s\"", filename);
 
 	if (TIFFIsTiled(tif)) {
@@ -528,7 +562,7 @@ static float *tiffu_tget_ll(char *filename_in, int tile_idx,
 		int *out_w, int *out_h, int *out_pd)
 {
 
-	TIFF *tif = TIFFOpen(filename_in, "r");
+	TIFF *tif = tiffopen_fancy(filename_in, "r");
 	if (!tif) fail("could not open TIFF file \"%s\"", filename_in);
 
 	uint32_t w, h;
@@ -771,7 +805,7 @@ static void crop_scanlines(struct tiff_tile *tout, struct tiff_info *tinfo,
 void tcrop(char *fname_out, char *fname_in, int x0, int xf, int y0, int yf)
 {
 	// open input file
-	TIFF *tif = TIFFOpen(fname_in, "r");
+	TIFF *tif = tiffopen_fancy(fname_in, "r");
 	if (!tif) fail("can not open TIFF file \"%s\" for reading", fname_in);
 
 	// read input file info
@@ -854,7 +888,7 @@ static int main_info(int c, char *v[])
 
 static void tiffu_whatever(char *filename)
 {
-	TIFF *tif = TIFFOpen(filename, "r");
+	TIFF *tif = tiffopen_fancy(filename, "r");
 
 	int w = tiff_imagewidth(tif);
 	int h = tiff_imagelength(tif);
@@ -1577,13 +1611,19 @@ struct tiff_octaves {
 	int maxtiles;    // number of tiles allowed to be in memory at once
 };
 
+//#include "smapa.h"
+//SMART_PARAMETER(FIRST_OCTAVE,0)
+
 void tiff_octaves_init(struct tiff_octaves *t, char *filepattern, int megabytes)
 {
+	//fprintf(stderr, "tiff octaves init\n");
 	// create filenames until possible
 	t->noctaves = 0;
 	for (int o = 0; o < MAX_OCTAVES; o++)
 	{
+		//int oo = o + FIRST_OCTAVE();
 		snprintf(t->filename[o], FILENAME_MAX, filepattern, o);
+		//fprintf(stderr, "f[%d]=%s\n", o, t->filename[o]);
 		if (!get_tiff_info_filename_e(t->i + o, t->filename[o]))
 			break;
 		if (t->i[o].bps < 8 || t->i[o].packed)
@@ -1600,7 +1640,7 @@ void tiff_octaves_init(struct tiff_octaves *t, char *filepattern, int megabytes)
 
 	}
 	if (t->noctaves < 1)
-		fail("could not get any file with pattern \"%s\"", filepattern);
+		fail("Could not get any file with pattern \"%s\"", filepattern);
 
 	// set up essential data
 	for (int o = 0; o < t->noctaves; o++)
@@ -1719,7 +1759,7 @@ void *tiff_octaves_gettile(struct tiff_octaves *t, int o, int i, int j)
 	if (t->a[0])
 		notify_tile_access_octave(t, o, tidx);
 
-	return t->c[0][tidx];
+	return t->c[o][tidx];
 }
 
 void *tiff_octaves_getpixel(struct tiff_octaves *t, int o, int i, int j)
@@ -2022,6 +2062,106 @@ static int main_imprintf(int argc, char *argv[])
 	return 0;
 }
 
+// main_dlist {{{1
+static int main_dlist(int c, char *v[])
+{
+	if (c != 2) {
+		fprintf(stderr, "usage:\n\t%s file.tiff\n", *v);
+		return 1;
+	}
+	char *filename = v[1];
+
+	TIFF *tif = TIFFOpen(filename, "r");
+	if (!tif)
+		fail("could not open TIFF file %s\n", filename);
+
+	int dircount = 0;
+	do {
+		struct tiff_info t[1];
+		get_tiff_info(t, tif);
+		printf("%d: %d %d , %d (bps=%d fmt=%d k=%d) ti=%d\n",
+				dircount, t->w, t->h, t->spp,
+				t->bps, t->fmt, t->compressed,
+				t->tiled
+				);
+		dircount += 1;
+	} while (TIFFReadDirectory(tif));
+
+	TIFFClose(tif);
+
+	return 0;
+}
+
+// main_dpush {{{1
+
+static void tiff_append(TIFF *tif, TIFF *tif_new)
+{
+	struct tiff_info t[1];
+	get_tiff_info(t, tif_new);
+
+	TIFFSetField(tif, TIFFTAG_IMAGEWIDTH,      t->w);
+	TIFFSetField(tif, TIFFTAG_IMAGELENGTH,     t->h);
+	TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, t->spp);
+	TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE,   t->bps);
+	TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT,    t->fmt);
+	TIFFSetField(tif, TIFFTAG_PLANARCONFIG,    PLANARCONFIG_CONTIG);
+	if (t->compressed)
+		TIFFSetField(tif, TIFFTAG_COMPRESSION, COMPRESSION_LZW);
+
+	if (t->tiled) {
+		// TODO : optimize this by using TIFFReadRawTile
+		// (to avoid decompressing/compressing the entire image)
+		int tile_size = TIFFTileSize(tif_new);
+		TIFFSetField(tif, TIFFTAG_TILEWIDTH, t->tw);
+		TIFFSetField(tif, TIFFTAG_TILELENGTH, t->th);
+		uint8_t *buf = xmalloc(tile_size);
+		memset(buf, 0, tile_size);
+		for (int j = 0; j < t->h; j += t->th)
+		for (int i = 0; i < t->w; i += t->tw) {
+			int r1 = TIFFReadTile(tif_new, buf, i, j, 0, 0);
+			int r2 = TIFFWriteTile(tif, buf, i, j, 0, 0);
+			if (r1 < 0 || r2 < 0)
+				fail("cp error i,j=%d,%d r1=%d r2=%d\n",
+						i, j, r1, r2);
+		}
+	} else { // scanlines
+		int scanline_size = TIFFScanlineSize(tif_new);
+		uint8_t *buf = xmalloc(scanline_size);
+		for (int j = 0; j < t->h; j++) {
+			int r1 = TIFFReadScanline(tif_new, buf, j, 0);
+			int r2 = TIFFWriteScanline(tif, buf, j, 0);
+			if (r1 < 0 || r2 < 0)
+				fail("cp error j=%d r1=%d r2=%d\n", j, r1, r2);
+		}
+	}
+}
+
+static int main_dpush(int c, char *v[])
+{
+	if (c != 3) {
+		fprintf(stderr, "usage:\n\t%s acc.tiff new.tiff\n", *v);
+		return 1;
+	}
+	char *filename_acc = v[1];
+	char *filename_new = v[2];
+
+	TIFF *tifa = TIFFOpen(filename_acc, "a");
+	TIFF *tifn = tiffopen_fancy(filename_new, "r");
+
+	tiff_append(tifa, tifn);
+
+	TIFFClose(tifa);
+	TIFFClose(tifn);
+
+	return 0;
+}
+
+// main_dget {{{1
+static int main_dget(int c, char *v[])
+{
+	return 0;
+}
+
 // main_manwhole {{{1
 
 static bool small(complex long double z)
@@ -2114,11 +2254,11 @@ void my_tifferror(const char *module, const char *fmt, va_list ap)
 #ifndef TIFFU_OMIT_MAIN
 int main(int c, char *v[])
 {
-	TIFFSetWarningHandler(NULL);//suppress warnings
+	//TIFFSetWarningHandler(NULL);//suppress warnings
 	//TIFFSetErrorHandler(my_tifferror);
 
 	if (c < 2) {
-	err:	fprintf(stderr, "usage:\n\t%s {info|ntiles|tget|tput}\n", *v);
+	err:	fprintf(stderr, "usage:\n\t%s {info|ntiles|tget|...}\n", *v);
 		return 1;
 	}
 
@@ -2126,7 +2266,6 @@ int main(int c, char *v[])
 	if (0 == strcmp(v[1], "imprintf")) return main_imprintf(c-1, v+1);
 	if (0 == strcmp(v[1], "ntiles"))   return main_ntiles  (c-1, v+1);
 	if (0 == strcmp(v[1], "tget"))     return main_tget    (c-1, v+1);
-	if (0 == strcmp(v[1], "whatever")) return main_whatever(c-1, v+1);
 	if (0 == strcmp(v[1], "crop"))     return main_crop    (c-1, v+1);
 	if (0 == strcmp(v[1], "tput"))     return main_tput    (c-1, v+1);
 	if (0 == strcmp(v[1], "tzero"))    return main_tzero   (c-1, v+1);
@@ -2134,7 +2273,11 @@ int main(int c, char *v[])
 	if (0 == strcmp(v[1], "getpixel")) return main_getpixel(c-1, v+1);
 	if (0 == strcmp(v[1], "zoomout"))  return main_zoomout (c-1, v+1);
 	if (0 == strcmp(v[1], "manwhole")) return main_manwhole(c-1, v+1);
-	if (0 == strcmp(v[1], "octaves"))  return main_octaves(c-1, v+1);
+	if (0 == strcmp(v[1], "octaves"))  return main_octaves (c-1, v+1);
+	if (0 == strcmp(v[1], "dlist"))    return main_dlist   (c-1, v+1);
+	if (0 == strcmp(v[1], "dpush"))    return main_dpush   (c-1, v+1);
+	if (0 == strcmp(v[1], "dget"))     return main_dget    (c-1, v+1);
+	if (0 == strcmp(v[1], "whatever")) return main_whatever(c-1, v+1);
 
 	goto err;
 }

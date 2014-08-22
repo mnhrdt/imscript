@@ -108,7 +108,7 @@ static float fdiste(float *x, float *y, int n, float e)
 	return n ? hypot(*x - *y, fdiste(x + 1, y + 1, n - 1, e)) : e;
 }
 
-#define WEISZ_NITER 6
+#define WEISZ_NITER 0
 #define WEISZ_EPSILON 1e-5
 
 // y[k] = euclidean median of the vectors x[i][k]
