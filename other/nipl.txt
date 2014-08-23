@@ -61,10 +61,43 @@ The conventions are the following:
 	3.3. Function names are very long and descriptive
 	3.4. Local variables are typically single letters
 	3.5. Struct tags have long and descriptive names
-	3.6. Struct fields have short names (preferably single letters)
+	3.6. Struct fields have short names (often single letters)
 	3.7. Global and static variables must have very long and obnoxious names
 	3.8. Typical names for image arguments: x, y, z, in, out
 	3.9. Names for image sizes: w (width), h (height), pd (pixel dimension)
 	3.10. Image sizes as arguments go together with their images
 	3.11. Example of 3.10:
 	     void zoom_out(float *y, int wy, int hy, float *x, int wx, int hx)
+	3.12. How to set all the pixels of an image (notice the indentation):
+	     for (int j = 0; j < h; j++)
+	     for (int i = 0; i < w; i++)
+	             x[j*w + i] = 0;
+
+
+MOTIVATION
+----------
+
+I often try to convince people that, when programming in C, an "image struct"
+is useless because it creates more problems than it solves.  I contend that it
+is better to use raw C data.  Thus, an image is represented by three variables:
+a pointer to the RGB pixel values, an integer representing the width and an
+integer representing the height.  
+
+The typical reply that I receive is that this data is incomplete to describe an
+image: are the pixels stored by rows or by columns?  are the RGB values
+contiguous or separated into planes?  These problems are solved by creating an
+image "object", that hides them as implementation details and provides a
+well-defined interface.  I agree that this is a good solution, but not the only
+one.  A different solution, as proposed by NIPL, is to fix definite answers to
+these questions.  Thus, users of NIPL are forced to arrange their data in a
+certain order, just as users of other libraries are forced to call the
+interface functions with a certain order of arguments.  The amount of
+information needed to describe an image interface is similar to the amount of
+information needed to describe the NIPL conventions, so there's no net gain
+here.  However, the amount of NIPL code is zero, while the amount of code for
+other libraries is non-zero, giving an infinite advantage.
+
+Besides these philosophical reasons, the most poignant practical justification
+for NIPL is that it produces code which is trivially modular and reusable.  I
+do not care if NIPL code is difficult to write, but I want that algorithms
+implemented in NIPL be very easy to copy-paste into other libraries.
