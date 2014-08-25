@@ -7,7 +7,7 @@
 #include "iio.h"
 
 #ifndef FTR_BACKEND
-#define FTR_BACKEND 'f'
+#define FTR_BACKEND 'x'
 #endif
 #include "ftr.c"
 
@@ -449,7 +449,7 @@ int main_pan(int c, char *v[])
 	create_pyramid(e);
 
 	// open window
-	struct FTR f = ftr_new_window(BAD_MIN(e->w,1200), BAD_MIN(e->h,800));
+	struct FTR f = ftr_new_window(BAD_MIN(e->w,700), BAD_MIN(e->h,500));
 	f.userdata = e;
 	action_reset_zoom_and_position(&f);
 	ftr_set_handler(&f, "expose", pan_exposer);

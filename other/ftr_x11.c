@@ -170,7 +170,7 @@ static int keycode_to_ftr(struct _FTR *f, int keycode, int keystate)
 	//fprintf(stderr, "\tkeycode = %d (%d)\n", keycode, keystate);
 	//int key = XKeycodeToKeysym(f->display, keycode, keystate);
 	int key = XkbKeycodeToKeysym(f->display, keycode, 0, keystate);
-	//fprintf(stderr, "\tkeycode = %d (%d) => %d\n", keycode,keystate,key);
+	fprintf(stderr, "\tkeycode = %d (%d) => %d\n", keycode,keystate,key);
 
 	if (keycode == 9)   return 27;    // ascii ESC
 	if (keycode == 119) return 127;   // ascii DEL

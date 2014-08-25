@@ -9,7 +9,7 @@ WFLAGS=
 CFLAGS = $(WFLAGS)
 CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE -fopenmp
 CFLAGS = $(WFLAGS) -g
-CFLAGS = $(WFLAGS) -Ofast
+CFLAGS = $(WFLAGS) -O3
 
 SRCDIR = src
 BINDIR = bin
