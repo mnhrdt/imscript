@@ -371,25 +371,27 @@ static double produce_homography(double H[9], int w, int h,
 static double produce_affinity(double A[6], int w, int h,
 		char *afftype, double *v)
 {
+	int W = w - 1;
+	int H = h - 1;
 	if (0 == strcmp(afftype, "aff")) { // actual parameters
 		FORI(6) A[i] = v[i];
 	} else if (0 == strcmp(afftype, "aff3p")) {
 		// absolute displacement of the image corners
-		double corner[3][2] = {{0,0}, {w,0}, {0,h}};
+		double corner[3][2] = {{0,0}, {W,0}, {0,H}};
 		double other[3][2] = {
 			{0 + v[0], 0 + v[1]},
-			{w + v[2], 0 + v[3]},
-			{0 + v[4], h + v[5]}
+			{W + v[2], 0 + v[3]},
+			{0 + v[4], H + v[5]}
 		};
 		affinity_from_3corresp(corner[0], corner[1], corner[2],
 					other[0], other[1], other[2], A);
 	} else if (0 == strcmp(afftype, "aff3pr")) {
 		// relative displacement of the image corners
-		double corner[3][2] = {{0,0}, {w,0}, {0,h}};
+		double corner[3][2] = {{0,0}, {W,0}, {0,H}};
 		double other[3][2] = {
-			{0 + w*v[0], 0 + h*v[1]},
-			{w + w*v[2], 0 + h*v[3]},
-			{0 + w*v[4], h + h*v[5]}
+			{0 + W*v[0], 0 + H*v[1]},
+			{W + W*v[2], 0 + H*v[3]},
+			{0 + W*v[4], H + H*v[5]}
 		};
 		affinity_from_3corresp(corner[0], corner[1], corner[2],
 					other[0], other[1], other[2], A);
@@ -397,9 +399,9 @@ static double produce_affinity(double A[6], int w, int h,
 		// percentual relative displacement of the image corners
 		double corner[3][2] = {{0,0}, {w,0}, {0,h}};
 		double other[3][2] = {
-			{0 + w*v[0]/100, 0 + h*v[1]/100},
-			{w + w*v[2]/100, 0 + h*v[3]/100},
-			{0 + w*v[4]/100, h + h*v[5]/100}
+			{0 + W*v[0]/100, 0 + H*v[1]/100},
+			{W + W*v[2]/100, 0 + H*v[3]/100},
+			{0 + W*v[4]/100, H + H*v[5]/100}
 		};
 		affinity_from_3corresp(corner[0], corner[1], corner[2],
 					other[0], other[1], other[2], A);
@@ -411,34 +413,34 @@ static double produce_affinity(double A[6], int w, int h,
 	} else if (0 == strcmp(afftype, "aff12r")) {
 		// relative coordinates of 3 point pairs
 		double a[3][2] = {
-			{w*v[0],h*v[1]},
-			{w*v[2],h*v[3]},
-			{w*v[4],h*v[5]}
+			{W*v[0],H*v[1]},
+			{W*v[2],H*v[3]},
+			{W*v[4],H*v[5]}
 		};
 		double b[3][2] = {
-			{w*v[6], h*v[7]},
-			{w*v[8], h*v[9]},
-			{w*v[10],h*v[11]}
+			{W*v[6], H*v[7]},
+			{W*v[8], H*v[9]},
+			{W*v[10],H*v[11]}
 		};
 		affinity_from_3corresp(a[0], a[1], a[2], b[0], b[1], b[2], A);
 	} else if (0 == strcmp(afftype, "aff12rc")) {
 		// percentual relative coordinates of 3 point pairs
 		double a[3][2] = {
-			{w*v[0]/100,h*v[1]/100},
-			{w*v[2]/100,h*v[3]/100},
-			{w*v[4]/100,h*v[5]/100}
+			{W*v[0]/100,H*v[1]/100},
+			{W*v[2]/100,H*v[3]/100},
+			{W*v[4]/100,H*v[5]/100}
 		};
 		double b[3][2] = {
-			{w*v[6] /100,h*v[7] /100},
-			{w*v[8] /100,h*v[9] /100},
-			{w*v[10]/100,h*v[11]/100}
+			{W*v[6] /100,H*v[7] /100},
+			{W*v[8] /100,H*v[9] /100},
+			{W*v[10]/100,H*v[11]/100}
 		};
 		affinity_from_3corresp(a[0], a[1], a[2], b[0], b[1], b[2], A);
 	} else if (0 == strcmp(afftype, "traslation")) {
 		double R[6] = {1, 0, v[0], 0, 1, v[1]};
 		FORI(6) A[i] = R[i];
 	} else if (0 == strcmp(afftype, "traslation_rc")) {
-		double R[6] = {1, 0, w*v[0]/100, 0, 1, h*v[1]/100};
+		double R[6] = {1, 0, W*v[0]/100, 0, 1, H*v[1]/100};
 		FORI(6) A[i] = R[i];
 	} else if (0 == strcmp(afftype, "euclidean")) {
 		double theta = v[0];
@@ -447,12 +449,12 @@ static double produce_affinity(double A[6], int w, int h,
 		FORI(6) A[i] = R[i];
 	} else if (0 == strcmp(afftype, "euclidean_rc")) {
 		double theta = M_PI*v[0]/180;
-		double c[2] = {w/2.0, h/2.0}, rc[2];
+		double c[2] = {W/2.0, H/2.0}, rc[2];
 		double R[6] = {cos(theta), sin(theta), 0,
 			-sin(theta), cos(theta), 0};
 		affine_map(rc, R, c);
-		R[2] = w*v[1]/100 - rc[0] + c[0];
-		R[5] = h*v[2]/100 - rc[1] + c[1];
+		R[2] = W*v[1]/100 - rc[0] + c[0];
+		R[5] = H*v[2]/100 - rc[1] + c[1];
 		FORI(6) A[i] = R[i];
 	} else if (0 == strcmp(afftype, "similar")) {
 		double theta = v[0];
@@ -463,20 +465,20 @@ static double produce_affinity(double A[6], int w, int h,
 	} else if (0 == strcmp(afftype, "similar_rc")) {
 		double theta = M_PI*v[0]/180;
 		double rho = v[1];
-		double c[2] = {w/2.0, h/2.0}, rc[2];
+		double c[2] = {W/2.0, H/2.0}, rc[2];
 		double R[6] = {rho*cos(theta), rho*sin(theta), 0,
 			-rho*sin(theta), rho*cos(theta), 0};
 		affine_map(rc, R, c);
-		R[2] = w*v[2]/100 - rc[0] + c[0];
-		R[5] = h*v[3]/100 - rc[1] + c[1];
+		R[2] = W*v[2]/100 - rc[0] + c[0];
+		R[5] = H*v[3]/100 - rc[1] + c[1];
 		FORI(6) A[i] = R[i];
 	} else if (0 == strcmp(afftype, "colorwheel")) {
 		double disp = v[0];
 		double scale = 1 + disp/100.0;
 		fprintf(stderr, "scale = %g\n", scale);
 		double R[6] = {
-			scale, 0, (1-scale)*w/2.0,
-			0, scale, (1-scale)*h/2.0
+			scale, 0, (1-scale)*W/2.0,
+			0, scale, (1-scale)*H/2.0
 		};
 		FORI(6) A[i] = R[i];
 	} else error("unrecognized affinity type \"%s\"", afftype);

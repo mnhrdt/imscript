@@ -9,7 +9,7 @@
 //
 // 	./program opt1 opt2 ... optM par1 par2 ... parN
 //
-// where par1 ... parN are floating-point numbers and opt1 ... optN are
+// where par1 ... parN are floating-point numbers and opt1 ... optM are
 // arbitrary strings.
 //
 // Suppose that running this program prints a single floating point
@@ -41,6 +41,7 @@
 
 
 #include "minimize_gsl.c"
+//#include "minimize_ccmath.c"
 
 
 struct program {
@@ -117,6 +118,8 @@ int main(int c, char *v[])
 			run_program_as_of, n, p);
 
 	fprintf(stderr, "minimization returned %d\n", r);
+	for (int i = 0; i < n; i++)
+		printf("%lf%c", result[i], i<n-1?' ':'\n');
 
 	return EXIT_SUCCESS;
 }

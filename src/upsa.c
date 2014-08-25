@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "iio.h"
 #include "marching_squares.c"
@@ -228,8 +229,12 @@ static float *scalar(float *x, int w, int h, int pd, char *level_type)
 
 static float getsample(float *x, int w, int h, int pd, int i, int j, int l)
 {
-	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
-		return 0;
+	if (i < 0) i = 0;
+	if (j < 0) j = 0;
+	if (l < 0) l = 0;
+	if (i >= w) i = w - 1;
+	if (j >= h) j = h - 1;
+	if (l >= pd) l = pd - 1;
 	return x[(i+j*w)*pd + l];
 }
 
@@ -303,9 +308,10 @@ static float interpolate_cell(float a, float b, float c, float d,
 static void interpolate_vec(float *out, float *x, int w, int h, int pd,
 		float p, float q, int m)
 {
-	if (p < 0 || q < 0 || p+1 >= w || q+1 >= h) {
-		FORL(pd) out[l] = 0;
-	} else if (m == 3) {
+	//if (p < 0 || q < 0 || p+1 >= w || q+1 >= h) {
+	//	FORL(pd) out[l] = 0;
+	//} else
+		if (m == 3) {
 		bicubic_interpolation(out, x, w, h, pd, p, q);
 	} else {
 		int ip = floor(p);
@@ -325,8 +331,8 @@ static void interpolate_vec(float *out, float *x, int w, int h, int pd,
 static float *zoom(float *x, int w, int h, int pd, int n, int zt,
 		int *ow, int *oh)
 {
-	int W = n*w - n;
-	int H = n*h - n;
+	int W = n*w;// - n;
+	int H = n*h;// - n;
 	float *y = xmalloc(W*H*pd*sizeof*y), nf = n;
 	FORJ(H) FORI(W) {
 		float tmp[pd];

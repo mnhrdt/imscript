@@ -1,3 +1,6 @@
+// biharmonic solver
+// note: timestep must be negative between -0.08 and -0.099
+
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>

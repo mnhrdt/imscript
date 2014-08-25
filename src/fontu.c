@@ -594,14 +594,27 @@ static void put_pixel(float *x, int w, int h, int pd, int i, int j, float *c)
 			x[(w*j+i)*pd+l] = c[l];
 }
 
+static void put_pixel_rgb(uint8_t *x, int w, int h, int i, int j, uint8_t *c)
+{
+	if (c && i>=0 && j>=0 && i<w && j<h)
+		for (int l = 0; l < 3; l++)
+			x[(w*j+i)*3+l] = c[l];
+}
+
 static void put_string_in_float_image(float *x, int w, int h, int pd,
 		int posx, int posy, float *color, int kerning,
 		struct bitmap_font *font, char *string)
 {
+	int posx0 = posx;
 	while (1)
 	{
 		int c = *string++;
 		if (!c) break;
+		if (c == '\n') {
+			posx = posx0;
+			posy += font->height;
+			continue;
+		}
 		if (c > 0 && c < font->number_of_glyphs)
 		{
 			//fprintf(stderr, "putting glyph \"%d\" '%c'\n", c, c);
@@ -623,6 +636,43 @@ static void put_string_in_float_image(float *x, int w, int h, int pd,
 		posx += font->width + kerning;
 	}
 }
+
+static void put_string_in_rgb_image(uint8_t *x, int w, int h,
+		int posx, int posy, uint8_t *fg, uint8_t *bg, int kerning,
+		struct bitmap_font *font, char *string)
+{
+	int posx0 = posx;
+	while (1)
+	{
+		int c = *string++;
+		if (!c) break;
+		if (c == '\n') {
+			posx = posx0;
+			posy += font->height;
+			continue;
+		}
+		if (c > 0 && c < font->number_of_glyphs)
+		{
+			for (int i = 0; i < font->width; i++)
+			for (int j = 0; j < font->height; j++)
+			{
+				int ii = posx + i;
+				int jj = posy + j;
+				if (get_font_bit(font, c, i, j))
+					put_pixel_rgb(x, w, h, ii, jj, fg);
+				else
+					put_pixel_rgb(x, w, h, ii, jj, bg);
+			}
+		}
+		posx += font->width + kerning;
+	}
+}
+
+#ifndef OMIT_MAIN_FONTU
+#define MAIN_FONTU
+#endif//OMIT_MAIN_FONTU
+
+#ifdef MAIN_FONTU
 
 // fontu cdump name {packed|unpacked|zrle|huffman|lzw|mhuffman} [in.bdf [out.c]]
 // fontu puts [-f bdf] [-c color] "string" [in.png [out.png]]
@@ -758,3 +808,4 @@ int main(int c, char **v)
 	       return 1;
 	}
 }
+#endif//MAIN_FONTU

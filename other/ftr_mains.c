@@ -794,6 +794,42 @@ int main_pclick(int c, char *v[])
 	return 0;
 }
 
+// main_iclicks {{{1
+// print to stdout an image with the given mouse clicks
+int main_iclicks(int c, char *v[])
+{
+	// process input arguments
+	if (c != 2 && c != 1 && c != 3) {
+		fprintf(stderr, "usage:\n\t%s [[in] out]\n", *v);
+		//                          0  1    2
+		return 1;
+	}
+	char *filename_in  = c > 1 ? v[1] : "-";
+	char *filename_out = c > 2 ? v[2] : "-";
+
+	// read input image
+	int w, h;
+	unsigned char *x = read_image_uint8_rgb(filename_in, &w, &h);
+
+	// show image on window
+	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
+
+	// get the first mouse click
+	int pos[2], button = 0;
+	while (button != FTR_BUTTON_RIGHT) {
+		if (button)
+			printf("%d %d\n", pos[0], pos[1]);
+		ftr_wait_for_mouse_click3(&f, pos+0, pos+1, &button);
+	}
+
+	// close the window
+	ftr_close(&f);
+
+	// cleanup and exit (optional)
+	free(x);
+	return 0;
+}
+
 
 // main_random {{{1
 static void draw_random(struct FTR *f, int x, int y, int k, int m)
@@ -1023,6 +1059,63 @@ int main_minifire(int c, char *v[])
 	return 0;
 }
 
+
+// main_tele {{{1
+
+static void draw_tele(struct FTR *f, int x, int y, int k, int m)
+{
+	// build buffer
+	static float *t = NULL;
+	static int w = 0;
+	static int h = 0;
+	if (!f || w != f->w || h != f->h) {
+		w = f->w;
+		h = f->h;
+		if (t) free(t);
+		t = malloc(w * h * sizeof*t);
+		for (int i = 0; i < w*h; i++)
+			t[i] = 104;
+	}
+
+	// draw random values
+	int p = 0;
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++) {
+		t[p] = 255*(rand()/(1.0+RAND_MAX));
+		p++;
+	}
+
+	// render
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		int idx = (unsigned char)t[w*j+i];
+		f->rgb[3*(w*j+i)+0] = idx;
+		f->rgb[3*(w*j+i)+1] = idx;
+		f->rgb[3*(w*j+i)+2] = idx;
+	}
+
+	f->changed = 1;
+}
+
+int main_tele(int c, char *v[])
+{
+	int w = 320;
+	int h = 200;
+	unsigned char *x = malloc(3*w*h);
+
+	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
+	ftr_set_handler(&f, "idle", draw_tele);
+	//ftr_set_handler(&f, "button", ftr_handler_toggle_idle);
+	ftr_set_handler(&f, "resize", fire_resize);
+	ftr_loop_run(&f);
+
+	ftr_close(&f);
+	free(x);
+	return 0;
+}
+
+
 // main_mandelbrot {{{1
 
 // state of the view: crop and palette
@@ -1142,7 +1235,7 @@ static void mandelbrot_key(struct FTR *f, int k, int m, int x, int y)
 		mandel_state_start(e, f->w, f->h, e->from, e->to);
 		memset(f->rgb, 0, 3 * f->w * f->h);
 	}
-	if (k == '+') {
+	if (k == '+' || k == '=') {
 		// ACTION: mandel zoom in
 		mandel_state_start(e, f->w, f->h, (c+e->from)/2, (c+e->to)/2);
 		unsigned char *tmp = malloc(3 * f->w * f->h);
@@ -1318,6 +1411,9 @@ static void print_event_resize(struct FTR *f, int b, int m, int x, int y)
 int main_events(int c, char *v[])
 {
 	struct FTR f = ftr_new_window(320, 200);
+	for (int i = 0; i < 3 * f.w * f.h; i++)
+		f.rgb[i] = 0xa0*!(i%3);
+	f.changed = 1;
 	fprintf(stderr, "i'm here!\n");
 	ftr_set_handler(&f, "key", print_event_key);
 	ftr_set_handler(&f, "button", print_event_button);
@@ -1392,9 +1488,11 @@ static const struct { char *n; int(*f)(int,char*[]); } mains[] = {
 	MAIN(icrop),
 	MAIN(icrop2),
 	MAIN(pclick),
+	MAIN(iclicks),
 	MAIN(random),
 	MAIN(fire),
 	MAIN(minifire),
+	MAIN(tele),
 	MAIN(mandelbrot),
 	MAIN(events),
 	MAIN(paint),

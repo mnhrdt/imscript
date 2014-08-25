@@ -87,6 +87,14 @@ struct sift_keypoint *read_raw_sifts(FILE *f, int *no)
 	return r-n;
 }
 
+struct sift_keypoint *read_raw_sifts_fname(char *fname, int *n)
+{
+	FILE *f = xfopen(fname, "r");
+	struct sift_keypoint *r = read_raw_sifts(f, n);
+	xfclose(f);
+	return r;
+}
+
 void write_raw_siftb(FILE *f, struct sift_keypoint *k)
 {
 	float t[4] = {k->pos[0], k->pos[1], k->scale, k->orientation};
@@ -400,6 +408,54 @@ static int find_closest_keypoint(struct sift_keypoint *q,
 	return bestd < dmax ? besti : -1;
 }
 
+// returns i such that t[idxt[i]] is as close as possible to q
+// if the distance is largest than dmax, return -1
+static int find_closest_keypoint_idxs(struct sift_keypoint *q,
+		struct sift_keypoint *t, int *idxt, int nit,
+		float *od, float dmax, float dx, float dy)
+{
+	int besti = -1;
+	float bestd = dmax;
+	for (int i = 0; i < nit; i++)
+	{
+		int ii = idxt[i];
+		if (fabs(q->pos[0] - t[ii].pos[0]) > dx) continue;
+		if (fabs(q->pos[1] - t[ii].pos[1]) > dy) continue;
+		float nb = sift_distance_topped(q, t+ii, bestd);
+		if (nb < bestd) {
+			bestd = nb;
+			besti = i;
+		}
+	}
+	if (besti < 0) return -1;
+	assert(besti >= 0);
+	*od = bestd;
+	return bestd < dmax ? besti : -1;
+}
+
+// returns i such that t[idxt[i]] is as close as possible to q
+static int fancynearest_idx(struct sift_keypoint *q,
+		struct sift_keypoint *t, int *idxt, int nit,
+		float *od, float *opd, float dmax)
+{
+	int besti = -1;
+	float bestd = INFINITY, bestprev = bestd;
+	for (int i = 0; i < nit; i++)
+	{
+		int ii = idxt[i];
+		float nb = dist_descs(q, t+ii);
+		if (nb < bestd) {
+			bestprev = bestd;
+			bestd = nb;
+			besti = i;
+		}
+	}
+	//assert(besti >= 0);
+	*od = bestd;
+	*opd = bestprev;
+	return besti;
+}
+
 int (*siftlike_getpairs(
 		struct sift_keypoint *ka, int na, 
 		struct sift_keypoint *kb, int nb,
@@ -589,6 +645,7 @@ struct ann_pair *siftlike_get_accpairsrad(
 	return p;
 }
 
+//#define VERBOSE true
 #include "ok_list.c"
 #include "grid.c"
 
@@ -598,10 +655,10 @@ struct ok_grid {
 	int *buf;
 };
 
-static void ok_grid_init(struct ok_grid *o, int nr, int np,
+static void ok_grid_init(struct ok_grid *o, int np,
 		float x0[2], float dx[2], int n[2])
 {
-	assert(nr == n[0] * n[1]);
+	int nr = n[0] * n[1];
 	ok_init(o->l, nr, np);
 	grid_init(o->g, 2, x0, dx, n);
 	o->buf = xmalloc(np*sizeof*o->buf);
@@ -679,8 +736,8 @@ struct ann_pair *compute_sift_matches_locally(int *onp,
 	float dxy[2] = {dx, dy};
 	int n[2] = {1+(w-1)/dx, 1+(h-1)/dy};
 	int nr = n[0] * n[1];
-	//struct ok_grid ga[1]; ok_grid_init(ga, nr, na, x0, dxy, n);
-	struct ok_grid gb[1]; ok_grid_init(gb, nr, nb, x0, dxy, n);
+	//struct ok_grid ga[1]; ok_grid_init(ga, na, x0, dxy, n);
+	struct ok_grid gb[1]; ok_grid_init(gb, nb, x0, dxy, n);
 	//for (int i = 0; i < na; i++) ok_grid_add_point(ga, i, ka[i].pos);
 	for (int i = 0; i < nb; i++) ok_grid_add_point(gb, i, kb[i].pos);
 	//ok_display_tables(gb->l);
@@ -733,6 +790,472 @@ struct ann_pair *compute_sift_matches(int *onp,
 	}
 	sort_annpairs(p, np);
 	*onp = np;
+	return p;
+}
+
+static void get_bbx(double out_min[2], double out_max[2],
+		struct sift_keypoint *p, int np)
+{
+	out_min[0] = out_min[1] = 0;
+	out_max[0] = 3072;
+	out_max[1] = 2048;
+	//out_min[0] = out_min[1] = INFINITY;
+	//out_max[0] = out_max[1] = -INFINITY;
+	//for (int i = 0; i < np; i++)
+	//for (int l = 0; l < 2; l++)
+	//{
+	//	out_min[l] = fmin(out_min[l], p[i].pos[l]);
+	//	out_max[l] = fmax(out_max[l], p[i].pos[l]);
+	//}
+}
+
+//static void matrix_times_vector(double Ax[3], double A[9], double x[3])
+//{
+//	Ax[0] = A[0] * x[0] + A[1] * x[1] + A[2] * x[2];
+//	Ax[1] = A[3] * x[0] + A[4] * x[1] + A[5] * x[2];
+//	Ax[2] = A[6] * x[0] + A[7] * x[1] + A[8] * x[2];
+//}
+
+static void vector_times_matrix(double xA[3], double x[3], double A[9])
+{
+	xA[0] = A[0] * x[0] + A[3] * x[1] + A[6] * x[2];
+	xA[1] = A[1] * x[0] + A[4] * x[1] + A[7] * x[2];
+	xA[2] = A[2] * x[0] + A[5] * x[1] + A[8] * x[2];
+}
+
+// compute the vector product of two vectors
+static void vector_product(double axb[3], double a[3], double b[3])
+{
+	// a0 a1 a2
+	// b0 b1 b2
+	axb[0] = a[1] * b[2] - a[2] * b[1];
+	axb[1] = a[2] * b[0] - a[0] * b[2];
+	axb[2] = a[0] * b[1] - a[1] * b[0];
+}
+
+// compute the scalar product of two vectors
+static double scalar_product(double a[3], double b[3])
+{
+	return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+// cut a line with a segment (returns true if they cut)
+static bool cut_line_with_segment(double out[2], double line[3],
+		double p[2], double q[2])
+{
+	// points in "oriented" projective coordinates
+	double pp[3] = {p[0], p[1], 1};
+	double qq[3] = {q[0], q[1], 1};
+
+	// sign of each point (says on which side of the line each point is)
+	double sp = scalar_product(pp, line);
+	double sq = scalar_product(qq, line);
+
+	// if signs are different, the line crosses the segment
+	if (sp * sq < 0) {
+		// line trough points p and q
+		double pq[3]; vector_product(pq, pp, qq);
+
+		// intersection of "line" and "pq"
+		double ii[3]; vector_product(ii, pq, line);
+
+		// recover affine coordinates
+		out[0] = ii[0] / ii[2];
+		out[1] = ii[1] / ii[2];
+		return true;
+	}
+	return false;
+}
+
+// cut a line with a rectangle (returns true if they cut)
+static bool cut_line_with_rectangle(double out_a[2], double out_b[2],
+		double line[3], double rec_from[2], double rec_to[2])
+{
+	double nnn = hypot(line[0], line[1]);
+	//fprintf(stderr, "clwr (%g %g %g) (%g %g)-(%g %g)...",
+	//		line[0]/nnn, line[1]/nnn, line[2]/nnn,
+	//		rec_from[0], rec_from[1], rec_to[0], rec_to[1]);
+	// four vertices of the rectangle
+	double v[4][2] = {
+		{ rec_from[0], rec_from[1] },
+		{ rec_to[0]  , rec_from[1] },
+		{ rec_to[0]  , rec_to[1]   },
+		{ rec_from[0], rec_to[1]   }
+	};
+
+	// intersections with each of the edges
+	bool xP[4]; // whether it intersects
+	double x[4][2]; // where it intersects
+	for (int i = 0; i < 4; i++)
+		xP[i] = cut_line_with_segment(x[i], line, v[i], v[ (i+1)%4 ] );
+
+	// write output
+	int n_intersections = xP[0] + xP[1] + xP[2] + xP[3];
+	if (n_intersections == 2) { // generic case: 2 intersections
+		int cx = 0;
+		for (int i = 0; i < 4; i++)
+			if (xP[i])
+			{
+				double *out = cx ? out_b : out_a;
+				out[0] = x[i][0];
+				out[1] = x[i][1];
+				cx += 1;
+			}
+		//fprintf(stderr, "cx=%d out=(%g %g)-(%g %g)\n",cx, out_a[0], out_a[1], out_b[0], out_b[1]);
+		return true;
+	}
+	//fprintf(stderr, "nothing\n");
+	return false;
+}
+
+// draw a segment between two points
+void traverse_segment(int px, int py, int qx, int qy,
+		void (*f)(int,int,void*), void *e)
+{
+	if (px == qx && py == qy)
+		f(px, py, e);
+	else if (qx + qy < px + py) // bad quadrants
+		traverse_segment(qx, qy, px, py, f, e);
+	else {
+		if (abs(qx - px) > qy - py) { // horitzontal
+			float slope = (qy - py)/(float)(qx - px);
+			for (int i = 0; i < qx-px; i++)
+				f(i+px, lrint(py + i*slope), e);
+		} else { // vertical
+			float slope = (qx - px)/(float)(qy - py);
+			for (int j = 0; j <= qy-py; j++)
+				f(lrint(px+j*slope), j+py, e);
+		}
+	}
+}
+
+void traverse_segment_thick_precise(
+		double px, double py, double qx, double qy,
+		void (*f)(int,int,void*), void *e)
+{
+	if (qx + qy < px + py) // bad quadrants
+		traverse_segment_thick_precise(qx, qy, px, py, f, e);
+	else {
+		if (fabs(qx - px) > qy - py) { // horitzontal
+			double slope = (qy - py); slope /= (qx - px);
+			assert(px <= qx);
+			assert(fabs(slope) <= 1);
+			for (int i = 0; i <= qx-px; i++) {
+				double exact = py + i*slope;
+				int whole = lrint(exact);
+				//double part = fabs(whole - exact);
+				//int owhole = (whole<exact)?whole+1:whole-1;
+				//assert(part <= 0.5);
+				f(i+px, whole, e);
+				f(i+px, whole+1, e);
+				f(i+px, whole-1, e);
+				f(i+px, whole+2, e);
+				f(i+px, whole-2, e);
+				//f(i+px, whole, 1-part, e);
+				//f(i+px, owhole, part, e);
+			}
+		} else { // vertical
+			double slope = (qx - px); slope /= (qy - py);
+			assert(abs(qy - py) >= abs(qx - px));
+			assert(py <= qy);
+			assert(fabs(slope) <= 1);
+			for (int j = 0; j <= qy-py; j++) {
+				double exact = px + j*slope;
+				int whole = lrint(exact);
+				//double part = fabs(whole - exact);
+				//int owhole = (whole<exact)?whole+1:whole-1;
+				//assert(part <= 0.5);
+				f(whole, j+py, e);
+				f(whole+1, j+py, e);
+				f(whole-1, j+py, e);
+				f(whole+2, j+py, e);
+				f(whole-2, j+py, e);
+				//f(whole, j+py, 1-part, e);
+				//f(owhole, j+py, part, e);
+			}
+		}
+	}
+}
+
+// draw a segment between two points (somewhat anti-aliased)
+void traverse_segment_thick(int px, int py, int qx, int qy,
+		void (*f)(int,int,void*), void *e)
+{
+	if (px == qx && py == qy)
+		f(px, qx, e);
+	else if (qx + qy < px + py) // bad quadrants
+		traverse_segment_thick(qx, qy, px, py, f, e);
+	else {
+		//fprintf(stderr, "tsthick (%d %d)-(%d %d)\n", px, py, qx, qy);
+		if (fabs(qx - px) > qy - py) { // horitzontal
+			float slope = (qy - py); slope /= (qx - px);
+			assert(px <= qx);
+			assert(fabs(slope) <= 1);
+			for (int i = 0; i <= qx-px; i++) {
+				float exact = py + i*slope;
+				int whole = lrint(exact);
+				float part = fabs(whole - exact);
+				int owhole = (whole<exact)?whole+1:whole-1;
+				assert(part <= 0.5);
+				f(i+px, whole, e);
+				f(i+px, whole+1, e);
+				f(i+px, whole-1, e);
+				//f(i+px, whole, 1-part, e);
+				//f(i+px, owhole, part, e);
+			}
+		} else { // vertical
+			float slope = (qx - px); slope /= (qy - py);
+			assert(abs(qy - py) >= abs(qx - px));
+			assert(py <= qy);
+			assert(fabs(slope) <= 1);
+			for (int j = 0; j <= qy-py; j++) {
+				float exact = px + j*slope;
+				int whole = lrint(exact);
+				float part = fabs(whole - exact);
+				int owhole = (whole<exact)?whole+1:whole-1;
+				assert(part <= 0.5);
+				f(whole, j+py, e);
+				f(whole+1, j+py, e);
+				f(whole-1, j+py, e);
+				//f(whole, j+py, 1-part, e);
+				//f(owhole, j+py, part, e);
+			}
+		}
+	}
+}
+
+struct grille_traversal_state {
+	int *buf, nbuf, maxbuf;
+	int grille_width, grille_height;
+	struct ok_grid *o;
+	float eps;
+	float img_line[3];
+	struct sift_keypoint *kb;
+};
+
+float signed_distance_point_to_line(float l[3], float x[2])
+{
+	return (l[0] * x[0] + l[1] * x[1] + l[2]) / hypot(l[0], l[1]);
+}
+
+// add to the buffer the indexes of keypoints found in grille position (i,j)
+void grille_traversal_function(int i, int j, void *ee)
+{
+	struct grille_traversal_state *e = ee;
+	//fprintf(stderr, "GTF CALL\n");fflush(stderr);
+	//fprintf(stderr, "grille pos %d %d (%g)\n", i, j, a);
+
+	//if (i < 0) i = 0;
+	//if (j < 0) j = 0;
+	//if (i >= e->grille_width ) i = e->grille_width  - 1;
+	//if (j >= e->grille_height) j = e->grille_height - 1;
+	if (i < 0 || j < 0) return;
+	if (i >= e->grille_width ) return;
+	if (j >= e->grille_height) return;
+	int ridx = j * e->grille_width + i;
+	int np = ok_which_points(e->o->l, ridx);
+	//fprintf(stderr, "\t%d points here\n", np);
+	if (e->nbuf + np >= e->maxbuf)
+		fail("grille buffer overflow!");
+	for (int k = 0; k < np; k++)
+	{
+		int idx = e->o->l->buf[k];
+		float d = signed_distance_point_to_line(
+				e->img_line, e->kb[idx].pos);
+		if (fabs(d) < e->eps)
+			e->buf[e->nbuf++] = idx;
+		//e->buf[e->nbuf++] = e->o->l->buf[k];
+	}
+}
+
+#include "iio.h"
+
+int insideP(int w, int h, int i, int j)
+{
+	return i>=0 && j>= 0 && i<w && j<h;
+}
+
+struct plot_state {
+	uint8_t *x;
+	int w, h, r, g, b;
+};
+
+void pixel_plotter(int i, int j, void *ee)
+{
+	struct plot_state *e = ee;
+	if (insideP(e->w, e->h, i, j))
+	{
+		e->x[3*(e->w*j+i)+0] = e->r;
+		e->x[3*(e->w*j+i)+1] = e->g;
+		e->x[3*(e->w*j+i)+2] = e->b;
+	}
+}
+
+void overlay_red_thick_line(uint8_t *x, int w, int h, double a[2], double b[2])
+{
+	struct plot_state e[1];
+	e->x = x;
+	e->w = w;
+	e->h = h;
+	e->r = 255;
+	e->g = 0;
+	e->b = 0;
+	traverse_segment_thick(
+			round(a[0]), round(a[1]),
+			round(b[0]), round(b[1]),
+			pixel_plotter, e);
+}
+
+struct ann_pair *sift_fm_pairs(
+		struct sift_keypoint *ka, int na,
+		struct sift_keypoint *kb, int nb,
+		float tau, double fm[9], float eps,
+		int *out_np)
+{
+	if (na == 0 || nb == 0) { *out_np=0; return NULL; }
+	struct ann_pair *p = xmalloc((na*nb) * sizeof * p);
+	int num_pairs = 0;
+
+	// compute bounding box of points on image B
+	double minxy[2], maxxy[2];
+	get_bbx(minxy, maxxy, kb, nb);
+	//fprintf(stderr, "B's bbx = (%g %g)-(%g %g)\n", minxy[0], minxy[1], maxxy[0], maxxy[1]);
+
+	// prepare occupancy list of image B
+	float dxy[2] = {eps, eps};
+	int nxy[2] = {1+(maxxy[0]-minxy[0])/eps, 1+(maxxy[1]-minxy[1])/eps};
+	struct ok_grid gb[1];
+	ok_grid_init(gb, nb,(float[]){minxy[0],minxy[1]}, dxy, nxy);
+	for (int i = 0; i < nb; i++)
+		ok_grid_add_point(gb, i, kb[i].pos);
+
+	// transformation from "quadrille" to "pixel" coordinates
+	int qw = nxy[0];
+	int qh = nxy[1];
+	int q[qh][qw];
+	for (int j = 0; j < qh; j++)
+	for (int i = 0; i < qw; i++)
+		q[j][i] = j * qw + i;
+	//double aff_a[2] = { 1/eps, 1/eps};
+	//double aff_b[2] = { -minxy[0]/eps, -minxy[1]/eps};
+
+	// buffer for point indexes
+	int buf[nb];
+	struct grille_traversal_state e[1];
+	e->buf = buf;
+	e->nbuf = 0;
+	e->maxbuf = nb;
+	e->o = gb;
+	e->grille_width = qw;
+	e->grille_height = qh;
+	e->eps = eps/2;
+	e->kb = kb;
+
+	fprintf(stderr, "quadrille (%d %d) with eps=%g\n", qw, qh, eps);
+
+	// for each A point, etc
+	//assert(aff_a[0] == aff_a[1]);
+	for (int i = 0; i < na; i++)
+	{
+		e->nbuf = 0;
+		double x[3] = { ka[i].pos[0], ka[i].pos[1], 1};
+		//fprintf(stderr, "treating %dth A point (%g %g)\n",i,x[0],x[1]);
+		double epix[3]; // epipolar line in right IMAGE coordinates
+		vector_times_matrix(epix, x, fm);
+		double factor = hypot(epix[0], epix[1]);
+		for (int l = 0; l < 3; l++) epix[l] /= factor;
+		for (int l = 0; l < 3; l++) e->img_line[l] = epix[l];
+		double epiX[3]; // epipolar line in right GRILLE coordinates
+		epiX[0] = epix[0];
+		epiX[1] = epix[1];
+		epiX[2] = (epix[2] + epix[0]*minxy[0] + epix[1]*minxy[1]) / eps;
+		//epiX[2] = (epix[2] + aff_b[0]*epix[0] + aff_b[1]*epix[1]) * aff_a[0];
+		//epiX[2] = (epix[2] + aff_b[0]*epix[0] + aff_b[1]*epix[1]) * aff_a[0];
+		//fprintf(stderr, "epix = %g %g %g\n", epix[0], epix[1], epix[2]);
+		//fprintf(stderr, "epiX = %g %g %g\n", epiX[0], epiX[1], epiX[2]);
+		double gfrom[2] = {0, 0};
+		double gto[2] = {qw, qh};
+		double pa[2], pb[2];
+		cut_line_with_rectangle(pa, pb, epix, minxy, maxxy);
+		if (cut_line_with_rectangle(pa, pb, epiX, gfrom, gto))
+		{
+			//int ipa[2] = {round(pa[0]), round(pa[1])};
+			//int ipb[2] = {round(pb[0]), round(pb[1])};
+			traverse_segment_thick_precise(
+					pa[0], pa[1], pb[0], pb[1],
+					grille_traversal_function, e);
+		}
+		//fprintf(stderr, "enbuf = %d\n", e->nbuf);
+		// now "e->buf" contains the list
+		// of the "e->nbuf" candidate keypoints (from image B)
+		// these keypoints must be compared to the keypoint "ka[i]"
+		// and the best one, if any, added to the list "p"
+		//
+		if (isnan(tau) && i == 0) { // debug mode
+			for (int k = 0; k < e->nbuf; k++)
+			{
+				int j = e->buf[k];
+				assert(j >= 0);
+				assert(j < nb);
+				p[num_pairs].from = i;
+				p[num_pairs].to = j;
+				p[num_pairs].v[0] = 0;
+				p[num_pairs].v[1] = NAN;
+				//fprintf(stderr, "added %dth pair {%d} [%d %d] (d=%g)\n", num_pairs, cidx, i, j, dist);
+				//if (dist_point_line(epix, kb[j].pos[0], kb[j].pos[1]) < eps)
+					num_pairs += 1;
+			}
+			int dbg_w = maxxy[0];
+			int dbg_h = maxxy[1];
+			uint8_t *dbg = xmalloc(3 * dbg_w * dbg_h);
+			for (int k = 0; k < dbg_w * dbg_h * 3; k++)
+				dbg[k] = 0;
+			cut_line_with_rectangle(pa, pb, epix, minxy, maxxy);
+			fprintf(stderr, "pa = %g %g\n", pa[0], pa[1]);
+			fprintf(stderr, "pb = %g %g\n", pb[0], pb[1]);
+			overlay_red_thick_line(dbg, dbg_w, dbg_h, pa, pb);
+			for (int k = 0; k < num_pairs; k++)
+			{
+				int idx = p[k].to;
+				int xp = round(kb[idx].pos[0]);
+				int yp = round(kb[idx].pos[1]);
+				if (insideP(dbg_w, dbg_h, xp, yp))
+					dbg[3*(dbg_w*yp+xp)+1] = 255;
+			}
+			iio_save_image_uint8_vec("/tmp/dbg_sfm.png", dbg, dbg_w, dbg_h, 3);
+			free(dbg);
+			goto acabemaqui;
+		}
+		float dist, dsecond;
+		int cidx;//
+		if (tau < 0 && tau > -1) {
+			cidx = fancynearest_idx(ka + i,
+					kb, e->buf, e->nbuf,
+					&dist, &dsecond, 500);
+			if (dist > 500 || (dist / dsecond > -tau))
+				cidx = -1;
+		}
+		else
+			cidx = find_closest_keypoint_idxs(ka + i,
+				kb, e->buf, e->nbuf,
+				&dist, tau, INFINITY, INFINITY);
+		if (cidx >= 0)
+		{
+			int j = e->buf[cidx];
+			assert(j >= 0);
+			assert(j < nb);
+			p[num_pairs].from = i;
+			p[num_pairs].to = j;
+			p[num_pairs].v[0] = dist;
+			p[num_pairs].v[1] = NAN;
+			//fprintf(stderr, "added %dth pair {%d} [%d %d] (d=%g)\n", num_pairs, cidx, i, j, dist);
+			num_pairs += 1;
+		}
+	}
+
+acabemaqui:
+	sort_annpairs(p, num_pairs);
+	*out_np = num_pairs;
 	return p;
 }
 

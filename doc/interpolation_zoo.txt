@@ -1,0 +1,10 @@
+# create an image with irregularly distributed barbara dots
+raddots 1.5  0 0 0 0 0 0 0 1 500 500 <(downsa v 7 barbara.png) dots.tiff
+
+# visualize the result of different interpolators
+# 1. nearest neighbor
+# 2. nearest neighbor with smooth boundaries
+# 3. amle
+# 4. harmonic
+# 5. biharmonic
+v.py <(nnint dots.tiff) <(plambda dots.tiff "x isnan 0 x if x isnan 0 1 if join"|blur l 1|plambda - "halve /") <(amle_recsep 50 8 dots.tiff <(plambda dots.tiff isnan) -) <(simpois -i dots.tiff) <(simpois -t -0.08 -i dots.tiff)

@@ -2,12 +2,14 @@
 #include <stdlib.h>
 #include "iio.h"
 
+#include "smapa.h"
 #include "xmalloc.c"
 #include "getpixel.c"
 #include "pickopt.c"
 
 #define BAD_MAX(a,b) (a)<(b)?(b):(a);
 
+SMART_PARAMETER(BACKGROUND,0)
 
 int main(int c, char *v[])
 {
@@ -29,7 +31,7 @@ int main(int c, char *v[])
 
 	float *z = xmalloc(w[2] * h[2] * pd[2] * sizeof*y);
 	for (int i = 0; i < w[2] * h[2] * pd[2]; i++)
-		z[i] = 0;
+		z[i] = BACKGROUND();
 
 	for (int j = 0; j < h[0]; j++)
 	for (int i = 0; i < w[0]; i++)

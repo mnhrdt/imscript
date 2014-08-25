@@ -1,33 +1,33 @@
 // PLAMBDA(1)                  imscript                  PLAMBDA(1)        {{{1
 //
 // NAME                                                                    {{{2
-// 	plambda - a RPN calculator for image pixels
+//	plambda - a RPN calculator for image pixels
 //
 // SYNOPSIS                                                                {{{2
-// 	plambda a.pnb b.png c.png ... "lambda expression" > output
-// 	plambda a.pnb b.png c.png ... "lambda expression" -o output.png
-// 	plambda -c num1 num2 ... "lambda expression"
+//	plambda a.pnb b.png c.png ... "lambda expression" > output
+//	plambda a.pnb b.png c.png ... "lambda expression" -o output.png
+//	plambda -c num1 num2 ... "lambda expression"
 //
 // DESCRIPTION                                                             {{{2
-// 	Plambda applies an expression to all the pixels of a collection of
-// 	images, and produces a single output image.  Each input image
-// 	corresponds to one of the variables of the expression (in alphabetical
-// 	order).  There are modifiers to the variables that allow access to the
-// 	values of neighboring pixels, or to particular components of a pixel.
+//	Plambda applies an expression to all the pixels of a collection of
+//	images, and produces a single output image.  Each input image
+//	corresponds to one of the variables of the expression (in alphabetical
+//	order).  There are modifiers to the variables that allow access to the
+//	values of neighboring pixels, or to particular components of a pixel.
 //
 // LANGUAGE                                                                {{{2
-// 	A "plambda" program is a sequence of tokens.  Tokens may be constants,
-// 	variables, or operators.  Constants and variables get their value
-// 	computed and pushed to the stack.  Operators pop values from the stack,
-// 	apply a function to them, and push back the results.
+//	A "plambda" program is a sequence of tokens.  Tokens may be constants,
+//	variables, or operators.  Constants and variables get their value
+//	computed and pushed to the stack.  Operators pop values from the stack,
+//	apply a function to them, and push back the results.
 //
-// 	CONSTANTS: numeric constants written in scientific notation, and "pi"
-// 	OPERATORS: +, -, *, ^, /, and all the functions from math.h
-// 	VARIABLES: anything not recognized as a constant or operator.  There
-// 	must be as many variables as input images, and they are assigned to
-// 	images in alphabetical order.
+//	CONSTANTS: numeric constants written in scientific notation, and "pi"
+//	OPERATORS: +, -, *, ^, /, and all the functions from math.h
+//	VARIABLES: anything not recognized as a constant or operator.  There
+//	must be as many variables as input images, and they are assigned to
+//	images in alphabetical order.
 //
-// 	All operators (unary, binary and ternary) are vectorializable.
+//	All operators (unary, binary and ternary) are vectorializable.
 //
 //	Some "sugar" is added to the language:
 //
@@ -130,12 +130,12 @@
 //
 //
 // OPTIONS                                                                 {{{2
-//      -o file     save output to named file
-//      -c          act as a symbolic calculator
-//      -h          print short help message
-//      --help      print longer help message
-//      --man       print manpage (requires help2man)
-//      --version   print program version
+//	-o file		save output to named file
+//	-c		act as a symbolic calculator
+//	-h		print short help message
+//	--help		print longer help message
+//	--man		print manpage (requires help2man)
+//	--version	print program version
 //
 // EXAMPLES                                                                {{{2
 // 	Sum two images:
@@ -198,25 +198,25 @@
 //		plambda zero:WxH "randn randn randn randn  4 njoin $GRAINSIZE * pi sqrt * 2 *"|blur g $GRAINSIZE|plambda - "x[0] x[1] * x[2] x[3] * - 2 sqrt /"
 //
 //	Periodic component of an image
-//		  cat image|fftper|fft|plambda - "x :I :I * :J :J * + *"|ifft|crop 0 0 `imprintf "%w %h" image`|fft|plambda - "x :I :I * :J :J * + / 4 /"|ifft >pcomponent
+//		  cat image|fftsym|fft|plambda - "x :I :I * :J :J * + *"|ifft|crop 0 0 `imprintf "%w %h" image`|fft|plambda - "x :I :I * :J :J * + / 4 /"|ifft >pcomponent
 //
 //
 //
 // AUTHOR                                                                  {{{2
 //
-//      Written by Enric Meinhardt-Llopis
+//	Written by Enric Meinhardt-Llopis
 //
 //
 // REPORTING BUGS                                                          {{{2
 //
-//      Download last version from https://github.com/mnhrdt
-//      Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>
+//	Download last version from https://github.com/mnhrdt
+//	Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>
 //
 // TODO LIST                                                               {{{2
 //
-//      * implement shunting-yard algorithm to admit infix notation
-//      * handle 3D and nD images
-//      * merge colonvars and magicvars (the only difficulty lies in naming)
+//	* implement shunting-yard algorithm to admit infix notation
+//	* handle 3D and nD images
+//	* merge colonvars and magicvars (the only difficulty lies in naming)
 
 
 // #includes {{{1
@@ -407,6 +407,8 @@ static int matrix_product(float *ab, float *a, float *b, int na, int nb)
 		a_nrows = a_ncols = b_nrows = b_ncols = 2;
 	} else if (na == 9 && nb == 9) {
 		a_nrows = a_ncols = b_nrows = b_ncols = 3;
+	} else if (na == 16 && nb == 16) {
+		a_nrows = a_ncols = b_nrows = b_ncols = 4;
 	} else if (na == 9 && nb == 3) {
 		a_nrows = a_ncols = b_nrows = 3;
 		b_ncols = 1;
@@ -855,6 +857,7 @@ struct plambda_program {
 struct image_stats {
 	bool init_simple, init_vsimple, init_ordered, init_vordered;
 	float scalar_min, scalar_max, scalar_avg, scalar_med, scalar_sum;
+	float scalar_std;
 	//float vector_cmin[PLAMBDA_MAX_PIXELDIM];  // component-wise min
 	float vector_n1min[PLAMBDA_MAX_PIXELDIM]; // exemplar with min L1
 	float vector_n2min[PLAMBDA_MAX_PIXELDIM]; // exemplar with min L2
@@ -872,11 +875,12 @@ struct image_stats {
 	float component_avg[PLAMBDA_MAX_PIXELDIM];
 	float component_med[PLAMBDA_MAX_PIXELDIM];
 	float component_sum[PLAMBDA_MAX_PIXELDIM];
+	float component_std[PLAMBDA_MAX_PIXELDIM];
 	float *sorted_samples, *sorted_components[PLAMBDA_MAX_PIXELDIM];
 };
 
 struct linear_statistics {
-	float min, max, avg, avgnz, sum;
+	float min, max, avg, avgnz, sum, std;
 	int n, rns, rnz, nnan, ninf;
 };
 
@@ -885,7 +889,7 @@ static void compute_linstats(struct linear_statistics *s,
 {
 	int rns = 0, rnz = 0, nnan = 0, ninf = 0;
 	float min = INFINITY, max = -INFINITY;
-	long double avg = 0, avgnz = 0;
+	long double avg = 0, avgnz = 0, sumsq = 0;
 	for (int i = 0; i < n; i++) {
 		float y = x[i*stride + offset];
 		if (isnan(y)) {
@@ -904,6 +908,12 @@ static void compute_linstats(struct linear_statistics *s,
 	}
 	s->sum = avg;
 	avg /= rns; avgnz /= rnz;
+	for (int i = 0; i < n; i++) {
+		float y = x[i*stride + offset];
+		if (!isnan(y))
+			sumsq += (y - avg) * (y - avg);
+	}
+	s->std = sqrt(sumsq / rns);
 	s->min=min; s->max=max; s->avg=avg; s->avgnz=avgnz;
 	s->n=n; s->rns=rns; s->rnz=rnz; s->nnan=nnan; s->ninf=ninf;
 }
@@ -919,6 +929,7 @@ static void compute_simple_sample_stats(struct image_stats *s,
 	s->scalar_max = ls->max;
 	s->scalar_avg = ls->avg;
 	s->scalar_sum = ls->sum;
+	s->scalar_std = ls->std;
 }
 
 static void compute_simple_component_stats(struct image_stats *s,
@@ -933,6 +944,7 @@ static void compute_simple_component_stats(struct image_stats *s,
 		s->component_min[l] = ls->min;
 		s->component_max[l] = ls->max;
 		s->component_avg[l] = ls->avg;
+		s->component_std[l] = ls->std;
 	}
 }
 
@@ -1064,7 +1076,7 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 
 	struct image_stats *ti = t + img_index;
 
-	if (magic=='i' || magic=='a' || magic=='v' || magic=='s') {
+	if(magic=='i' || magic=='a' || magic=='v' || magic=='s' || magic=='r') {
 		if (comp < 0) { // use all samples
 			compute_simple_sample_stats(ti, x, w, h, pd);
 			switch(magic) {
@@ -1072,6 +1084,7 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 				case 'a': *out = ti->scalar_max; break;
 				case 'v': *out = ti->scalar_avg; break;
 				case 's': *out = ti->scalar_sum; break;
+				case 'r': *out = ti->scalar_std; break;
 				default: fail("this can not happen");
 			}
 			return 1;
@@ -1082,6 +1095,7 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 				case 'a': *out = ti->component_max[comp]; break;
 				case 'v': *out = ti->component_avg[comp]; break;
 				case 's': *out = ti->component_sum[comp]; break;
+				case 'r': *out = ti->component_std[comp]; break;
 				default: fail("this can not happen");
 			}
 			return 1;
@@ -1096,11 +1110,12 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 		default: fail("this can not happen");
 		}
 		return pd;
-	} else if (magic=='Y' || magic=='E') {
+	} else if (magic=='Y' || magic=='E' || magic=='R') {
 		compute_simple_component_stats(ti, x, w, h, pd);
 		switch(magic) {
 		case 'Y': FORI(pd) out[i] = ti->component_min[i]; break;
 		case 'E': FORI(pd) out[i] = ti->component_max[i]; break;
+		case 'R': FORI(pd) out[i] = ti->component_std[i]; break;
 		default: fail("this can not happen");
 		}
 		return pd;
@@ -1141,7 +1156,7 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 	} else if (magic == 'W') {
 		compute_ordered_component_stats(ti, x, w, h, pd);
 		FORI(pd) {
-			int qposi = round(qq*w*h/1000000.0);
+			int qposi = round(qq*(w*h/1000000.0));
 			qposi = bound(0, qposi, w*h-1);
 			out[i] = ti->sorted_components[i][qposi];
 		}
@@ -1163,7 +1178,7 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 		}
 		return pd;
 	} else
-		fail("magic of kind '%c' is not yed implemented", magic);
+		fail("magic of kind '%c' is not yet implemented", magic);
 
 	return 0;
 }
@@ -1369,6 +1384,7 @@ static void parse_imageop(const char *s, int *op, int *scheme)
 	else if (hassuffix(s, "b")) *scheme = SCHEME_BACKWARD;
 	else if (hassuffix(s, "c")) *scheme = SCHEME_CENTERED;
 	else if (hassuffix(s, "s")) *scheme = SCHEME_SOBEL;
+	else if (hassuffix(s, "p")) *scheme = SCHEME_PREWITT;
 }
 
 static void collection_of_varnames_init(struct collection_of_varnames *x)
@@ -1784,8 +1800,7 @@ static void vstack_apply_function(struct value_vstack *s,
 	float r[PLAMBDA_MAX_PIXELDIM];
 	FORI(f->nargs)
 		d[i] = vstack_pop_vector(v[i], s);
-	// the d[i] which are larger than one must be equal
-	FORI(f->nargs)
+	FORI(f->nargs) // the d[i] which are larger than one must be equal
 		if (d[i] > 1) {
 			if (rd > 1 && d[i] != rd)
 				fail("can not vectorize (%d %d)", rd, d[i]);
@@ -2004,6 +2019,8 @@ static float stencil_3x3_dy_backward[9] = {0,-1,0, 0,1,0,  0,0,0};
 static float stencil_3x3_dy_centered[9] = {0,-H,0, 0,0,0,  0,H,0};
 static float stencil_3x3_dy_sobel[9] = {-O,-2*O,-O,  0,0,0, O,2*O,O};
 static float stencil_3x3_dx_sobel[9] = {-O,0,O,  -2*O,0,2*O, -O,0,O};
+static float stencil_3x3_dx_prewitt[9] =  {0,0,0,  0,-H,H, 0,-H,H};
+static float stencil_3x3_dy_prewitt[9] =  {0,0,0,  0,-H,-H, 0,H,H};
 static float stencil_3x3_laplace[9] =  {0,1,0,  1,-4,1, 0,1,0};
 static float stencil_3x3_dxx[9] =  {0,0,0,  1,-2,1, 0,0,0};
 static float stencil_3x3_dyy[9] =  {0,1,0,  0,-2,0, 0,1,0};
@@ -2030,6 +2047,7 @@ static float *get_stencil_3x3(int operator, int scheme)
 			case SCHEME_BACKWARD: return stencil_3x3_dx_backward;
 			case SCHEME_CENTERED: return stencil_3x3_dx_centered;
 			case SCHEME_SOBEL: return stencil_3x3_dx_sobel;
+			case SCHEME_PREWITT: return stencil_3x3_dx_prewitt;
 			default: fail("unrecognized stencil,x scheme %d");
 			}
 		}
@@ -2038,6 +2056,7 @@ static float *get_stencil_3x3(int operator, int scheme)
 			case SCHEME_BACKWARD: return stencil_3x3_dy_backward;
 			case SCHEME_CENTERED: return stencil_3x3_dy_centered;
 			case SCHEME_SOBEL: return stencil_3x3_dy_sobel;
+			case SCHEME_PREWITT: return stencil_3x3_dy_prewitt;
 			default: fail("unrecognized stencil,y scheme %d");
 			}
 		}
@@ -2086,6 +2105,10 @@ static float imageop_scalar(float *img, int w, int h, int pd,
 	return 0;
 }
 
+SMART_PARAMETER_SILENT(SHADOWX,1)
+SMART_PARAMETER_SILENT(SHADOWY,1)
+SMART_PARAMETER_SILENT(SHADOWZ,1)
+
 static int imageop_vector(float *out, float *img, int w, int h, int pd,
 		int ai, int aj, struct plambda_token *t)
 {
@@ -2115,13 +2138,15 @@ static int imageop_vector(float *out, float *img, int w, int h, int pd,
 			out[l] = ax + by;
 		}
 		return pd/2;
-	case IMAGEOP_SHADOW:
+	case IMAGEOP_SHADOW: {
 		if (pd != 1) fail("can not yet compute shadow of a vector");
 		float vdx[3]={1,0,apply_3x3_stencil(img, w,h,pd, ai,aj,0, sx)};
 		float vdy[3]={0,1,apply_3x3_stencil(img, w,h,pd, ai,aj,0, sy)};
-		float sun[3] = {-1, -1, 1}, nor[3];
+		//float sun[3] = {-1, -1, 1}, nor[3];
+		float sun[3] = {-SHADOWX(), -SHADOWY(), SHADOWZ()}, nor[3];
 		vector_product(nor, vdx, vdy, 3, 3);
 		return scalar_product(out, nor, sun, 3, 3);
+		}
 	default: fail("unrecognized imageop %d\n", t->imageop_operator);
 	}
 }
@@ -2324,6 +2349,7 @@ int main_calc(int c, char **v)
 		fprintf(stderr, "calculator correspondence \"%s\" = \"%s\"\n",
 				p->var->t[i], v[i+1]);
 
+	xsrand(SRAND());
 
 	float out[pdmax];
 	int od = run_program_vectorially_at(out, p, x, NULL, NULL, pd, 0, 0);
@@ -2607,6 +2633,6 @@ int main(int c, char **v)
 		c -= 1;
 	}
 	return f(c,v);
-}
+}   
 
 // vim:set foldmethod=marker:

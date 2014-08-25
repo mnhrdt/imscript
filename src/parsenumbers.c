@@ -146,4 +146,31 @@ static double *alloc_parse_doubles(int nmax, const char *ss, int *n)
 	return r;
 }
 
+// Obtain n numbers from string.
+// The string contains a list of ascii numbers
+// or the name of a file containing a list of ascii numbers.
+// In case of failure, unread numbers are set to zero.
+// Returns the number of read numbers.
+static int read_n_doubles_from_string(double *out, char *string, int n)
+{
+	for (int i = 0; i < n; i++)
+		out[i] = 0;
+
+	int no;
+	double *buf = NULL;
+	FILE *f = fopen(string, "r");
+	if (f) {
+		buf = read_ascii_doubles(f, &no);
+		fclose(f);
+	} else {
+		buf = alloc_parse_doubles(n, string, &no);
+	}
+
+	if (no > n) no = n;
+	for (int i = 0; i < no; i++)
+		out[i] = buf[i];
+	free(buf);
+	return no;
+}
+
 #endif//_PARSENUMBERS_C

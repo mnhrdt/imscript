@@ -3,18 +3,19 @@
 ENABLE_GSL = yes
 WFLAGS=
 WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wstrict-prototypes
-WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wstrict-prototypes -Wno-unused -Wno-parentheses
+WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wstrict-prototypes -Wno-unused -Wno-parentheses -Wno-sign-compare -Werror -Wno-error=format -Wno-error=overflow
 WFLAGS=
 
 CFLAGS = $(WFLAGS)
 CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE -fopenmp
-CFLAGS = $(WFLAGS) -g
 CFLAGS = $(WFLAGS) -O3
+CFLAGS = $(WFLAGS) -g
+CFLAGS = $(WFLAGS) -O3 -DNDEBUG
 
 SRCDIR = src
 BINDIR = bin
 
-SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat tbcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad frakes_monaco_smith fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco vecov vecov_lm flowinv ghisto shuntingyard rpc overpoints periodize rpcflow ransac genk cgi zeropad siftu pview homfilt rpchfilt rpc_errfilt uncrop maptp rpcparcheck rpc_errsingle rpc_errpair cline rpc_angpair rpc_curvpair chisto fftper srmatch croparound zoombil flowh harris lgblur rpc_eval cutrecombine cdeint imgerr amle elap imspread replicate disp_to_corr printmask colormesh colormeshh elap3 sphereheights fmsrA elap_rec amle_rec palette radphar aronsson43 scheme_plap flowjac elap_recsep aronsson11 fill_bill fill_rect rpc_epicyl starfield morsi gharrows ipol_watermark fontu fontu2 cglap flownop pairsinp pairhom poisson_rec cgpois cgpois_rec isoricci lapbediag lapcolo simplest_inpainting lapbediag_sep cldmask plyflatten metatiler tiffu hview dither ditheru histeq8 thinpa_recsep really_simplest_inpainting bmms perms
+SRCIIO = fftshift sterint plambda viewflow imprintf ntiply backflow unalpha imdim downsa flowarrows flowdiv fnorm imgstats qauto qeasy lrcat tbcat lk hs rgbcube iminfo setdim synflow vecstack ofc component faxpb faxpby iion flowgrad fillcorners colorflow lic deframe crosses crop angleplot closeup hrezoom upsa veco vecov vecov_lm flowinv ghisto shuntingyard rpc overpoints periodize rpcflow ransac genk cgi zeropad siftu pview homfilt rpchfilt rpc_errfilt uncrop maptp rpcparcheck rpc_errsingle rpc_errpair cline rpc_angpair rpc_curvpair chisto fftper srmatch croparound zoombil flowh harris lgblur rpc_eval cutrecombine cdeint imgerr amle elap imspread replicate disp_to_corr printmask colormesh colormeshh ijmesh elap3 sphereheights fmsrA elap_rec amle_rec palette radphar aronsson43 scheme_plap flowjac elap_recsep aronsson11 fill_bill fill_rect rpc_epicyl starfield morsi gharrows ipol_watermark fontu fontu2 cglap flownop pairsinp pairhom poisson_rec cgpois cgpois_rec isoricci lapbediag lapcolo simplest_inpainting lapbediag_sep cldmask plyflatten metatiler tiffu hview dither ditheru histeq8 thinpa_recsep really_simplest_inpainting bmms perms censust satproj mnehs mnehs_ms rpc_warpab rpc_warpabt rpc_mnehs rpc_pm rpc_pmn aff3d amle_recsep elevate_matches elevate_matcheshh pmba pmba2 frustumize ghough ghough2 tdip ihough2 alphadots posmax ppsboundary homdots awgn strt remove_small_cc distance tregistration tvint shadowcast raddots simpois nnint bdint contihist graysing unshadow sfblur overflow
 SRCFFT = gblur fft dct blur lgblur2 lure lgblur3 testgblur lures
 ifeq ($(ENABLE_GSL), yes)
 	SRCGSL = paraflow minimize
@@ -60,7 +61,7 @@ endif
 
 
 SRC = $(SRCIIO) $(SRCFFT) $(SRCGSL)
-PROGRAMS = $(addprefix $(BINDIR)/,$(SRC) flow_ms rgfield rgfields rgfieldst elap2)
+PROGRAMS = $(addprefix $(BINDIR)/,$(SRC) flow_ms rgfield rgfields rgfieldst elap2 flambda fancy_zoomout fancy_downsa)
 
 
 .PHONY: default
@@ -96,6 +97,9 @@ $(SRCDIR)/flow_ms.o: $(SRCDIR)/flow_ms.c
 $(SRCDIR)/flowarrows.o: $(SRCDIR)/flowarrows.c
 	$(CC) $(CFLAGS) $(OFLAGS) -DOMIT_MAIN -c $< -o $@
 
+#ifndef OMIT_BLUR_MAIN
+#define MAIN_BLUR
+#endif
 $(SRCDIR)/distance.o: $(SRCDIR)/distance.c
 	$(CC) $(CFLAGS) $(OFLAGS) -DOMIT_DISTANCE_MAIN -c $< -o $@
 
@@ -112,6 +116,15 @@ $(BINDIR)/rgfieldst: $(addprefix $(SRCDIR)/,rgfieldst.c gblur.o iio.o)
 	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS) $(FFTFLAGS)
 
 $(BINDIR)/elap2: $(addprefix $(SRCDIR)/,elap2.c distance.o iio.o)
+	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS)
+
+$(BINDIR)/flambda: $(addprefix $(SRCDIR)/,flambda.c fancy_image.o iio.o)
+	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS)
+
+$(BINDIR)/fancy_zoomout: $(addprefix $(SRCDIR)/,fancy_zoomout.c fancy_image.o iio.o)
+	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS)
+
+$(BINDIR)/fancy_downsa: $(addprefix $(SRCDIR)/,fancy_downsa.c fancy_image.o iio.o)
 	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS)
 
 .PHONY: clean

@@ -194,6 +194,9 @@ static void get_palette_color(uint8_t *rgb, struct palette *p, float x)
 	rgb[2] = p->t[3*ix+2];
 }
 
+#include "smapa.h"
+SMART_PARAMETER(PALMAXEPS,0)
+
 static void get_min_max(float *min, float *max, float *x, int n)
 {
 	float m = INFINITY, M = -m;
@@ -204,7 +207,7 @@ static void get_min_max(float *min, float *max, float *x, int n)
 			M = fmax(M, x[i]);
 		}
 	if (min) *min = m;
-	if (max) *max = M;
+	if (max) *max = M+PALMAXEPS();
 }
 
 void apply_palette(uint8_t *y, float *x, int n, char *s, float m, float M)

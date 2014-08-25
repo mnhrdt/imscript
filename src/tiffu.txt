@@ -1,0 +1,57 @@
+DATA STRUCTURES FOR LARGE IMAGES
+--------------------------------
+
+
+Abstract
+
+We describe the simplest data structure that allows fast access to
+images of size comparable to a whole hard disk, e.g. of terapixel
+size.  Thanks to this data structure, portions of the image at any
+position and resolution can be extracted instantaneously, allowing
+continuous navigation of the scale space.  The data structure is very
+simple: each octave of the scale space pyramid is stored as a
+collection of small tiles that can be accessed individually.
+
+
+1. INTRODUCTION
+
+Modern computer systems such as servers, laptops, and smartphones,
+store information in two levels:
+
+	TYPE A: RAM memory, with a limited amount of space but very fast to read
+
+	TYPE B: Block storage devices, that can contain a huge amount of data,
+	but are slow to access
+
+In reality, the situation is more complicated due to disk and CPU
+caches, but we will stick to this simplified model.  According to
+this context, we can distinguish three size ranges of image data:
+
+	SMALL: Images that fit comfortably in RAM memory.
+	This includes most single-captor images, even very high resolution
+	images taken with the largest modern sensors UHDTV and OMNIMAX.
+
+	LARGE: Images that do not fit in RAM memory but fit in disk.
+	This includes for example moderately-sized image mosaics and
+	push-broom satellite images.
+
+	ARBITRARILY LARGE IMAGES: that do not fit on a single disk.
+	This includes databases of multiple images of the same object
+	at very different resolutions.
+
+These are sociotechnical distinctions, whose precise definition
+depends on the context and the device used.  The goal of this article
+is to describe how to deal efficiently with large images, that fit on
+disk but do not fit on RAM memory.
+
+
+
+2. DATA STRUCTURE
+
+3. ALGORITHMS
+
+4. IMPLEMENTATION USING LIBTIFF
+
+
+
+# vim:set tw=69 filetype=text spell spelllang=en:

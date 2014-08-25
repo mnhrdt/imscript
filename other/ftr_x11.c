@@ -1,17 +1,13 @@
 #define _POSIX_SOURCE
-//#include <math.h>
-#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <X11/Xlib.h>
-//#include <X11/Xutil.h> // only for XDestroyImage, that can be easily removed
-#include <X11/XKBlib.h> // only for XkbKeycodeToKeysym
-#include <X11/extensions/XShm.h> // only for XkbKeycodeToKeysym
-#include <unistd.h> // only for "fork"
-
 #include <sys/types.h>
 #include <signal.h>
+#include <X11/Xlib.h>
+//#include <X11/Xutil.h> // only for XDestroyImage, that can be easily removed
+#include <unistd.h> // only for "fork"
+
 
 #include "ftr.h"
 
@@ -165,12 +161,19 @@ void ftr_close(struct FTR *ff)
 	XCloseDisplay(f->display);
 }
 
+// replacement for XKeycodeToKeysym, which is deprecated
+static int x_keycode_to_keysym(struct _FTR *f, int keycode)
+{
+	int nothing;
+	KeySym *t = XGetKeyboardMapping(f->display, keycode, 1, &nothing);
+	int r = t[0];
+	XFree(t);
+	return r;
+}
+
 static int keycode_to_ftr(struct _FTR *f, int keycode, int keystate)
 {
-	//fprintf(stderr, "\tkeycode = %d (%d)\n", keycode, keystate);
-	//int key = XKeycodeToKeysym(f->display, keycode, keystate);
-	int key = XkbKeycodeToKeysym(f->display, keycode, 0, keystate);
-	fprintf(stderr, "\tkeycode = %d (%d) => %d\n", keycode,keystate,key);
+	int key = x_keycode_to_keysym(f, keycode);
 
 	if (keycode == 9)   return 27;    // ascii ESC
 	if (keycode == 119) return 127;   // ascii DEL
@@ -194,28 +197,6 @@ static int do_bound(int a, int b, int x)
 	return x;
 }
 
-//static int do_snap(int a, int b, int x)
-//{
-//	if (b < a) return do_snap(b, a, x);
-//	if (2*x > a+b) return b;
-//	return a;
-//}
-//
-//static void do_doublesnap(int *ox, int *oy, int w, int h, int x, int y)
-//{
-//	if (x < 0) x = 0;
-//	if (y < 0) y = 0;
-//	if (x >= w) x = w-1;
-//	if (y >= h) y = h-1;
-//	int dhor = fmin(x, w - x);
-//	int dver = fmin(y, h - y);
-//	if (dhor < 100 && dver > 100) { x = x<100 ? 0 : w-1; }
-//	if (dver < 100 && dhor > 100) { y = y<100 ? 0 : h-1; }
-//	*ox = x;
-//	*oy = y;
-//}
-
-
 static void ugly_hack_disable_enter_events(struct _FTR *f)
 {
 	int mask = 0
@@ -235,8 +216,8 @@ static void process_next_event(struct FTR *ff)
 
 	XEvent event = { .type = GenericEvent } ;
 	if (!f->changed)
-		XNextEvent(f->display, &event);
-	//fprintf(stderr,"ev %d\t\"%s\"\n",event.type,event_names[event.type]);
+		XNextEvent(f->display, &event); // blocks and waits!
+	//fprintf(stderr,"ev(%p,%p) %d\t\"%s\"\n",(void*)f->display,(void*)f->window,event.type,event_names[event.type]);
 
 	if (event.type == Expose || f->changed) {
 		if (f->handle_expose)
@@ -383,6 +364,54 @@ int ftr_loop_run(struct FTR *ff)
 
 	int r = f->stop_loop;
 	f->stop_loop = 0;
+	return r;
+}
+
+int ftr_loop_run2(struct FTR *ff, struct FTR *gg)
+{
+	struct _FTR *f = (void*)ff;
+	struct _FTR *g = (void*)gg;
+
+	char *dn_f = XDisplayString(f->display);
+	char *dn_g = XDisplayString(g->display);
+	if (0 != strcmp(dn_f, dn_g))
+		exit(fprintf(stderr, "FTR error: two displays bad bad bad (%p,%p)(\"%s\",\"%s\")\n", (void*)f->display, (void*)g->display, dn_f, dn_g));
+
+	fprintf(stderr, "dn_f = %p \"%s\"\n", (void*)f->display, dn_f);
+	fprintf(stderr, "dn_g = %p \"%s\"\n", (void*)g->display, dn_g);
+
+	while (!f->stop_loop && !g->stop_loop)
+	{
+		int pending_f = XPending(f->display);
+		int pending_g = XPending(g->display);
+
+		fprintf(stderr, "pending fg = %d %d\n", pending_f, pending_g);
+
+		// treat g
+		if (!g->handle_idle || g->changed || pending_g > 0)
+			process_next_event(gg);
+		else if (g->handle_idle) {
+			g->handle_idle(gg, 0, 0, 0, 0);
+			XEvent ev;
+			ev.type = Expose;
+			XSendEvent(g->display, g->window, 0, NoEventMask, &ev);
+			XFlush(g->display);
+		}
+
+		// treat f
+		if (!f->handle_idle || f->changed || pending_f > 0)
+			process_next_event(ff);
+		else if (f->handle_idle) {
+			f->handle_idle(ff, 0, 0, 0, 0);
+			XEvent ev;
+			ev.type = Expose;
+			XSendEvent(f->display, f->window, 0, NoEventMask, &ev);
+			XFlush(f->display);
+		}
+	}
+
+	int r = f->stop_loop + g->stop_loop;
+	f->stop_loop = g->stop_loop = 0;
 	return r;
 }
 

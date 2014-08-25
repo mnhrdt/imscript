@@ -189,6 +189,23 @@ static void compute_stuff_nothing(struct printable_data *p,
 	setnumber(p, "dimension", 2);
 }
 
+// sum all the finite numbers on an array
+// (kahane algorithm)
+static float sum(float *x, int n)
+{
+	float r = 0;
+	float c = 0;
+	for (int i = 0; i < n; i++)
+		if (isfinite(x[i]))
+		{
+			float y = x[i] - c;
+			float t = r + y;
+			c = (t - r) - y;
+			r = t;
+		}
+	return r;
+}
+
 static void compute_stuff_basic(struct printable_data *p,
 		float *x, int w, int h, int pd)
 {
@@ -197,7 +214,8 @@ static void compute_stuff_basic(struct printable_data *p,
 	float minsample = INFINITY, maxsample = -INFINITY;
 	long double avgsample = 0;
 	long double avgnzsample = 0;
-	long double sumsamples = 0;
+	//long double sumsamples = 0;
+	float sumsamples = 0;
 	for (int i = 0; i < ns; i++)
 	{
 		float y = x[i];
@@ -223,6 +241,8 @@ static void compute_stuff_basic(struct printable_data *p,
 	setnumber(p, "avgsample", avgsample);
 	setnumber(p, "avgnzsample", avgnzsample);
 	setnumber(p, "sumsamples", sumsamples);
+	float ks = sum(x, ns);
+	setnumber(p, "kahsamples", ks);
 	setnumber(p, "nnan", nnan);
 	setnumber(p, "ninf", ninf);
 
@@ -653,6 +673,7 @@ static char *preprocess_arrobas(char *fmt)
 "infinite samples (\\%y):       %y\n"
 "nan samples (\\%Y):            %Y\n"
 "sum of samples (\\%s):         %s\n"
+"Sum of samples (\\%+):         %+\n"
 "sum of pixels (\\%S):          %S\n";
 	default: return fmt;
 	}
@@ -691,6 +712,7 @@ static void imprintf_2d(FILE *f, char *fmt, float *x, int w, int h, int pd)
 			{"ninf",       "y", REQ_BASIC,   1, {0}, 0, {0}, false},
 			{"nnan",       "Y", REQ_BASIC,   1, {0}, 0, {0}, false},
 			{"sumsamples", "s", REQ_BASIC,   1, {0}, 0, {0}, false},
+			{"kahsamples", "+", REQ_BASIC,   1, {0}, 0, {0}, false},
 			{"sumpixels",  "S", REQ_BASIC,   1, {0}, 0, {0}, false},
 //			{"l1norm",     "1", REQ_SQUARES, 1, {0}, 0, {0}, false},
 //			{"l2norm",     "2", REQ_SQUARES, 1, {0}, 0, {0}, false},

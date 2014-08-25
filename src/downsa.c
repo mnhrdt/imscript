@@ -125,13 +125,16 @@ static void downsa2d(float *oy, float *ox, int w, int h, int pd, int n, int ty)
 		float g;
 		switch (ty)
 		{
-		case 'i': g = s.min;      break;
-		case 'e': g = s.median;   break;
-		case 'a': g = s.max;      break;
-		case 'v': g = s.average;  break;
-		case 'V': g = s.laverage; break;
-		case 'r': g = s.sample;   break;
-		case 'f': g = vv[0];      break;
+		case 'i': g = s.min;          break;
+		case 'e': g = s.median;       break;
+		case 'a': g = s.max;          break;
+		case 'v': g = s.average;      break;
+		case 'V': g = s.laverage;     break;
+		case 's': g = s.variance;     break;
+		case 'r': g = s.sample;       break;
+		case 'f': g = vv[0];          break;
+		case 'l': g = vv[nv-1];       break;
+		case 'c': g = vv[(nv-1)/2];   break;
 		default:  error("downsa type %c not implemented", ty);
 		}
 		y[j][i][l] = g;

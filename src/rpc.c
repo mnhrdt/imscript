@@ -254,6 +254,7 @@ void eval_rpc(double *result,
 	result[1] = tmp[1] * p->iscale[1] + p->ioffset[1];
 }
 
+
 // evaluate the inverse rpc model
 void eval_rpci(double *result,
 		struct rpc *p, double x, double y, double z)
@@ -266,6 +267,19 @@ void eval_rpci(double *result,
 	result[0] = tmp[0] * p->scale[0] + p->offset[0];
 	result[1] = tmp[1] * p->scale[1] + p->offset[1];
 }
+
+void rpc_projection(double out_pq[2], struct rpc *r,
+		double lon, double lat, double h)
+{
+	eval_rpci(out_pq, r, lon, lat, h);
+}
+
+void rpc_localization(double out_latlon[2],
+		struct rpc *r, double p, double q, double h)
+{
+	eval_rpc(out_latlon, r, p, q, h);
+}
+
 
 // evaluate a correspondence between to images given their rpc
 void eval_rpc_pair(double xprime[2],

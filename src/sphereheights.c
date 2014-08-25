@@ -43,12 +43,18 @@ static void sphere_count_neighbors(float *out_count, float *x, int w, int h,
 	}
 }
 
-
-
 #include "iio.h"
 
 #include "fail.c"
 #include "xmalloc.c"
+
+static void sphere_count_neighbors_3d(float *out_count, float *xyz,
+		int w, int h, float sphere_radius, float *in_mask)
+{
+	fail("3d case to be implemented!");
+}
+
+
 
 int main(int c, char *v[])
 {
@@ -64,8 +70,8 @@ int main(int c, char *v[])
 	char *filename_out = v[4];
 	char *filename_mask = v[5];
 
-	int w, h;
-	float *x = iio_read_image_float(filename_in, &w, &h);
+	int w, h, pd;
+	float *x = iio_read_image_float_vec(filename_in, &w, &h, &pd);
 	float *m = NULL;
 	if (filename_mask) {
 		int ww, hh;
@@ -73,9 +79,17 @@ int main(int c, char *v[])
 		if (w != ww || h != hh)
 			fail("input image and mask size mismatch");
 	}
+	if (pd != 1 && pd != 3)
+		fail("input must be either HEIGTH or XYZ (got pd=%d)\n", pd);
 	float *o = xmalloc(w*h*sizeof*o);
 
-	sphere_count_neighbors(o, x, w, h, rad, vex, m);
+	if (pd == 1)
+		sphere_count_neighbors(o, x, w, h, rad, vex, m);
+	if (pd == 3) {
+		if (vex != 1)
+			fprintf(stderr, "WARNING: vex=%g ignored in 3d\n", vex);
+		sphere_count_neighbors_3d(o, x, w, h, rad, m);
+	}
 
 	iio_save_image_float(filename_out, o, w, h);
 

@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 
 static float index_to_scale(int n, float s0, float sf, int i)

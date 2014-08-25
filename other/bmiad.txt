@@ -1,0 +1,167 @@
+
+Block Matching In The Altitude Domain
+
+
+Dear Gabriele, Carlo, Javier,
+
+I did some experiments on block matching in the altitude domain that I want
+to share with you.  The goal of these experiments is not to have a satellite
+stereo method in itself, but to visualize some numerical instabilities that
+I have found in the "optical flow in the altitude domain" method that I
+explained on last GTTI.  Yet there are some beautiful observations.
+
+
+CONTEXT
+
+An "orthophoto" is an ideal photo taken from a zenith camera pointing
+downwards.  The camera is oriented such that the pixels of the image are
+indexed by longitude and latitude.  A "digital elevation map" is a
+topographic map using the same coordinate grid as an ortophoto.  In a typical
+satellite acquisition, three images of the same site are taken from slightly
+off-zenith position, thus no ortophoto is available.
+
+Notations:
+
+	X ( i, j )         : a satellite image
+	L_X ( i, j, h)     : localization function of image X
+	P_X ( lon, lat, h) : projection function of image X
+	h ( lon, lat )     : a topographic map
+
+From a single satellite image (with its RPC functions), and a known
+topographic map, an ortophoto can be produced by composing the topographic
+map with the projection function and the image:
+
+	Ortho_X  :=  X  .  P_X  .  h 
+
+	Ortho_X (lon, lat) := X (P_X (lon, lat, h(lon, lat))
+
+In practice, this is impossible because the topographic map is unknown at the
+required resolution.  However, an approximate ortophoto can be created by
+using a lower-resolution topographic map such as the SRTM4.  An approximate
+ortophoto will have the small hills and the buildings flattened sideways, on
+a direction that depends on the position of the satellite.
+
+
+TWO IMAGES
+
+When we have two images "A" and "B", we can make the hypothesis that the
+ortophotos corresponding to each are identical:
+
+	Ortho_A = Ortho_B
+
+This identity gives a single equation for each point in the grid (lon,lat).
+Since there is a single unknown h(lon,lat) at this point, we can solve this
+system.  However, this solution is very noisy because the images are not
+exactly the same due to noise and non-lambertian objects.  Thus, some
+regularity is sought for.  There are three different ways to impose this
+regularity:
+
+	1. VARIATIONAL: minimize a functional E(h) that contains the identity
+	"Ortho_A = Ortho_B" as a data term, and a regularizer term that
+	depends only on h.
+
+	2. IMAGE BLOCK MATCHING: instead of comparing the colors at a single
+	point, compare a small patch around the corresponding points on each
+	image.
+
+	3. ORTHO BLOCK MATCHING: compare small patches on the ortophoto, not
+	on the original images
+
+I have tried "1.", but there are numerical instabilities difficult to
+understand (for me).  I have implemented "2." using patchmatch, where the
+behavior is easier to understand.  It seems to me that the best solution may
+be "3", specially to combine information from the color images in a
+transparent way.
+
+
+ORTHO PATCHMATCH ALGORITHM
+
+Input:  * A pair of images A and B, with their RPC functions
+	* The coorinate grid {(lon,lat)} of the desired topographic map "h"
+	* An initial estimate "h_0" for "h" (may be 0)
+	* An search interval "min,max" around "h_0".
+
+Parameters:
+	* WINDOW_SIZE (5x5)
+	* PATCH_COMPARISON_FUNCTION (SSD)
+	* N_TRIALS (1)
+	* N_ITERATIONS (1)
+
+Output: * Topographic map "h(lon,lat)"
+
+Algorithm:
+	1. RANDOM SEARCH.  For each (lon,lat) pick N_TRIALS numbers uniformly
+	in the interval, and select the h that minimizes the comparison cost.
+
+	2. FORWARD PROPAGATION.  For each (lon,lat), try the "h" values of
+	its 4 neighbors in the grid, and if some of these "h" gives a smaller
+	cost, copy it.
+
+	3. BACKWARD PROPAGATION. Like 2, but traverse the grid in the
+	opposite direction.
+
+	4. ITERATE.  Repeat steps 1,2,3 for N_ITERATIONS
+
+This algorithm extends naturally to more than three images.  Notice that,
+the amount of images only changes the cost function, not the algorithm.  To
+evaluate a candidate "h(lon,lat)" we have to compare patches of more images,
+but the candidate is always a single number with the same interpretation.  In
+the case of pleiades images, we can even match windows on between the color
+and the gray images at the same time, to evaluate a cost for a candidate
+height.  (Observation: compare color-color and gray-gray, never color-gray).
+
+This algorithm produces an interesting byproduct: ortophotos!.  In the case
+of 3 images, a clean ortophoto can be obtained by computing the median of the
+ortophotos coming from each image.
+
+
+EXPERIMENTS
+
+The variational method is implemented on file "mnehs.c" on imscript.  The
+patchmatch method is implemented on file "rpc_pmn.c".  I have run the
+patchmatch algorithm on a small part of the "calanques" images, both in color
+and in gray.
+
+	# go to data directory
+	$ cd calanques/FCGC600038656
+
+	# set parameters of the algorithm
+	$ export PM_MIN=-10
+	$ export PM_MAX=180
+	$ export PM_WINRADIUS=2
+	$ export PM_TRIALS=1
+	$ export PM_NITER=1
+
+	# select site by manual inspection of the image
+	$ X=1064
+	$ Y=8687
+	$ H0=constant:50:600x600
+
+	# run algorithm
+	$ rpc_pmn *MS*{4,5,6}/{*TIF,RPC*} $X $Y $H0 color_topographic_map.tif
+
+The output file "color_topographic_map" looks reasonable: the water is a
+random texture (as expected by block matching), and the mountains are
+correctly recovered with the expected adherence problems.  There are some
+spots of outliers scattered through mostly correct height data.
+
+Some byproduct files are included: "color_rect_*.png" are the images
+rectified at a height of "50" (the height of the sea at this site).  The
+images "color_ortho_*png" are the orthophotos computed.  They should be
+identical, except for slight color changes.
+
+My observation of the experiment for the color triplet is positive.  For the
+gray triplet, I am forced to use much larger windows, which result in a
+reduced resolution.  Otherwise, there are too many bad spots with spurious
+data everywhere (even with three images, which surprises me.  I suspect that
+the source of the problem is the bad calibration of the RPC, since the
+orthophotos show a displacement of about two pixels perpendicular to the
+epipolar direction.
+
+See the corresponding "gray" files for some examples.  In particular, see how
+the orthophotos are not globally correctly registered.  This must come from a
+defect in the calibration, I guess...
+
+
+regards,
+enric

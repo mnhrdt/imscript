@@ -11,7 +11,7 @@ struct FTR {
 	void *userdata; // ignored by the library
 
 	// hidden implementation details
-	char pad[100];
+	char pad[200];
 };
 
 // type of a handler function
@@ -26,6 +26,7 @@ void ftr_close(struct FTR *f);
 
 // blocking calls
 void ftr_wait_for_mouse_click(struct FTR *f, int *x, int *y);
+void ftr_wait_for_mouse_click3(struct FTR *f, int *x, int *y, int *b);
 void ftr_wait_for_key_depress(struct FTR *f, int *x, int *y, int *k, int *m);
 
 // default and example handlers
