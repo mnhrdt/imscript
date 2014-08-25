@@ -51,7 +51,7 @@
 #  define I_CAN_HAS_FMEMOPEN 1
 #endif
 
-#if _POSIX_C_SOURCE >= 200112L
+#if _POSIX_C_SOURCE >= 200112L || __OpenBSD__
 #  define I_CAN_HAS_MKSTEMP 1
 #endif
 

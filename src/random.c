@@ -21,7 +21,9 @@ static void xsrand(unsigned int seed)
 #ifdef RNG_SPECIFIC_WELL1024
 	well1024_seed(seed);
 #else
+#  ifndef __OpenBSD__
 	srand(seed);
+#  endif
 #endif
 }
 
@@ -35,7 +37,11 @@ static int xrand(void)
 	r = RAND_MAX * well1024();
 	return r;
 #else
+#ifdef __OpenBSD__
+	return arc4random();
+#else
 	return rand();
+#endif
 #endif
 }
 
@@ -54,7 +60,11 @@ static double random_uniform(void)
 	r = well1024();
 	return r;
 #else
+#ifdef __OpenBSD__
+	return arc4random_uniform(RAND_MAX)/(0.0+RAND_MAX);
+#else
 	return rand()/(1.0+RAND_MAX);
+#endif
 #endif
 }
 
@@ -82,7 +92,11 @@ int randombounds(int a, int b)
 		return randombounds(b, a);
 	if (b == a)
 		return b;
+#ifdef __OpenBSD__
+	return a + arc4random_uniform(b - a + 1);
+#else
 	return a + rand()%(b - a + 1);
+#endif
 }
 
 static double random_laplace(void)
