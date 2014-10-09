@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 
 #include "xmalloc.c"
@@ -108,7 +109,7 @@ static float fdiste(float *x, float *y, int n, float e)
 	return n ? hypot(*x - *y, fdiste(x + 1, y + 1, n - 1, e)) : e;
 }
 
-#define WEISZ_NITER 0
+#define WEISZ_NITER 1
 #define WEISZ_EPSILON 1e-5
 
 // y[k] = euclidean median of the vectors x[i][k]
@@ -174,6 +175,8 @@ static float squared_euclidean_distance(float *x, float *y, int n)
 	return r;
 }
 
+typedef float (*cost_function_t)(float*,float*,int,int,int,int,int,int,float*);
+
 static float eval_displacement_by_bm(float *a, float *b, int w, int h, int pd,
 		int wrad, int i, int j, float d[2])
 {
@@ -194,20 +197,43 @@ static float eval_displacement_by_bm(float *a, float *b, int w, int h, int pd,
 	return squared_euclidean_distance(va, vb, wside*wside*pd);
 }
 
+static float eval_displacement_by_census(float *a, float *b,
+		int w, int h, int pd,
+		int wrad, int i, int j, float d[2])
+{
+	assert(!wrad);
+	int count_bits[256] = {
+#               define B2(n) n,     n+1,     n+1,     n+2
+#               define B4(n) B2(n), B2(n+1), B2(n+1), B2(n+2)
+#               define B6(n) B4(n), B4(n+1), B4(n+1), B4(n+2)
+                B6(0), B6(1), B6(1), B6(2)
+	}, r = 0;
+	for (int l = 0; l < pd; l++)
+	{
+		uint8_t p = getsample_0(a, w, h, pd, i       , j       , l);
+		uint8_t q = getsample_0(b, w, h, pd, i + d[0], j + d[1], l);
+		r += count_bits[p ^ q];
+	}
+	return r;
+}
+
 static void refine_displacement_at(float d[2], float *a, float *b,
-		int w, int h, int pd, int wrad, int i, int j)
+		int w, int h, int pd, int wrad, int i, int j,
+	       	cost_function_t e)
 {
 	int best_index = -1;
-	int neig[13][2] = { {0,0}, {-1,-1},{-1,0},{-1,1},
-		{0,-1},{0,1}, {1,-1},{1,0},{1,1}, 
-		{2,0},{-2,0},{0,2},{0,-2},
+	int neig[17][2] = { {0,0}, //1
+		{-1,0}, {0,-1}, {0,1}, {1,0},//5
+		{-1,-1}, {-1,1}, {1,-1}, {1,1}, //9
+		{2,0},{-2,0},{0,2},{0,-2},//13
+		{3,0},{-3,0},{0,3},{0,-3},//17
 	};
 	float best_energy = INFINITY;
 
-	for (int n = 0; n < 13; n++)
+	for (int n = 0; n < 17; n++)
 	{
 		float D[2] = {d[0] + neig[n][0], d[1] + neig[n][1]};
-		float r = eval_displacement_by_bm(a,b, w,h,pd, wrad, i,j, D);
+		float r = e(a,b, w,h,pd, wrad, i,j, D);
 		if (r < best_energy) {
 			best_energy = r;
 			best_index = n;
@@ -220,18 +246,20 @@ static void refine_displacement_at(float d[2], float *a, float *b,
 }
 
 static void refine_displacement(float *d, float *a, float *b,
-		int w, int h, int pd, int wrad)
+		int w, int h, int pd, int wrad, cost_function_t e)
 {
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 	{
 		int idx = j*w + i;
-		refine_displacement_at(d + 2*idx, a, b, w, h, pd, wrad, i, j);
+		float *di = d + 2 * idx;
+		refine_displacement_at(di, a, b, w, h, pd, wrad, i, j, e);
 	}
 }
 
 void bmms_rec(float *out, float *a, float *b,
-		int w, int h, int pd, int wrad, int mrad, int scale)
+		int w, int h, int pd, int wrad, int mrad, int scale,
+		cost_function_t e)
 {
 	fprintf(stderr, "scal(%d) %d %d\n", scale, w, h);
 	// find an initial rhough displacement
@@ -243,7 +271,7 @@ void bmms_rec(float *out, float *a, float *b,
 		float *Os = malloc(ws * hs * 2  * sizeof*Os);
 		zoom_out_by_factor_two(As, ws, hs, a, w, h, pd);
 		zoom_out_by_factor_two(Bs, ws, hs, b, w, h, pd);
-		bmms_rec(Os, As, Bs, ws, hs, pd, wrad, mrad, scale - 1);
+		bmms_rec(Os, As, Bs, ws, hs, pd, wrad, mrad, scale - 1, e);
 		zoom_in_by_factor_two(out, w, h, Os, ws, hs, 2);
 		if (mrad > 0)
 			vector_median_filter_inline(out, w, h, 2, mrad);
@@ -259,7 +287,7 @@ void bmms_rec(float *out, float *a, float *b,
 	}
 
 	// refine the rhough displacement by local optimization
-	refine_displacement(out, a, b, w, h, pd, wrad);
+	refine_displacement(out, a, b, w, h, pd, wrad, e);
 }
 
 
@@ -288,7 +316,9 @@ int main(int argc, char *argv[])
 	float *b = iio_read_image_float_vec(filename_b, w+1, h+1, pd+1);
 	float *f = xmalloc(*w * *h * 2 * sizeof*f);
 
-	bmms_rec(f, a, b, *w, *h, *pd, winradius, mfradius, nscales);
+	cost_function_t e = eval_displacement_by_bm;
+	//cost_function_t e = eval_displacement_by_census;
+	bmms_rec(f, a, b, *w, *h, *pd, winradius, mfradius, nscales, e);
 
 	iio_save_image_float_vec(filename_out, f, *w, *h, 2);
 
