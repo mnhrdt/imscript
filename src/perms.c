@@ -2,36 +2,31 @@
 
 static void swap(char *t[], int i, int j)
 {
-	if (i != j)
-	{
-		char *tmp = t[i];
-		t[i] = t[j];
-		t[j] = tmp;
-	}
+	char *tmp = t[i];
+	t[i] = t[j];
+	t[j] = tmp;
 }
 
-static void emit(char *t[], int n)
+static void print_array(char *t[], int n)
 {
 	for (int i = 0; i < n; i++)
 		printf("%s%c", t[i], i == n-1 ? '\n' : ' ');
 }
 
-static void emit_perms(char *t[], int s, int n)
+static void perm(char *t[], int s, int n)
 {
-	if (n > 0) {
-		for (int i = 0; i < n; i++)
-		{
-			swap(t, s, s + i);
-			emit_perms(t, s + 1, n - 1);
-			swap(t, s, s + i);
-		}
-	} else
-		emit(t, s);
+	for (int i = 0; i < n; i++)
+	{
+		swap(t, s    , s + i);
+		perm(t, s + 1, n - 1);
+		swap(t, s    , s + i);
+	}
+	if (n == 0)
+		print_array(t, s);
 }
 
 int main(int c, char *v[])
 {
-	int n = c - 1;
-	emit_perms(v + 1, 0, n);
+	perm(v + 1, 0, c - 1);
 	return 0;
 }

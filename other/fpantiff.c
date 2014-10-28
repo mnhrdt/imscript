@@ -384,9 +384,11 @@ static unsigned char float_to_byte(float x)
 	if (x > 255) return 255;
 	// set gamma=2
 	//float r = x * x / 255;
-	float n = x / 255;
-	float r = (n*n)*n;
-	return r*255;
+	//
+	//float n = x / 255;
+	//float r = (n*n)*n;
+	//return r*255;
+	return x;
 }
 
 // dump the image acording to the state of the viewport
