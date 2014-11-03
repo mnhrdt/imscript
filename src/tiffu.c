@@ -74,7 +74,7 @@ struct tiff_info {
 
 static TIFF *tiffopen_fancy(char *filename, char *mode)
 {
-	fprintf(stderr, "tiffopen fancy \"%s\",\"%s\"\n", filename, mode);
+	//fprintf(stderr, "tiffopen fancy \"%s\",\"%s\"\n", filename, mode);
 	char *comma = strrchr(filename, ',');
 	if (*mode != 'r' || !comma)
 	def:	return TIFFOpen(filename, mode);
@@ -2004,6 +2004,45 @@ static int main_crop(int c, char *v[])
 	return 0;
 }
 
+// main_tileize {{{1
+static int main_tileize(int c, char *v[])
+{
+	// process input arguments
+	if (c != 4) {
+		fprintf(stderr, "usage:\n\t%s tw th in.tiff out.tiff\n", *v);
+		//                            0  1  2       3
+		return 1;
+	}
+	//int tw = atoi(v[1]);
+	//int th = atoi(v[2]);
+	//char *filename_in = v[2];
+	//char *filename_out = v[3];
+
+	//// read info of input image
+	//TIFF *tif_a = TIFFOpen(filename_in, "r");
+	//if (!tif_a)
+	//	fail("could not open TIFF file \"%s\"", filename_in);
+	//struct tiff_info ta[1];
+	//get_tiff_info(ta, tif_a);
+	//if (ta->tiled) fail("please, use retile");
+
+	//// create output image
+	//double GiB = 1024.0 * 1024.0 * 1024.0;
+	//double gigabytes = (ta->spp/8.0) * ta->w * ta->h * ta->bps / GiB;
+	//TIFF *tif_b = TIFFOpen(filename_out, gigabytes > 1 ? "w8" : "w");
+	//TIFFSetField(tif_b, TIFFTAG_IMAGEWIDTH, ta->w);
+	//TIFFSetField(tif_b, TIFFTAG_IMAGEWIDTH, ta->w);
+	//TIFFSetField(tif_b, TIFFTAG_SAMPLESPERPIXEL, ta->spp);
+	//TIFFSetField(tif_b, TIFFTAG_BITSPERSAMPLE, ta->bps);
+	//TIFFSetField(tif_b, TIFFTAG_SAMPLEFORMAT, ta->fmt);
+	//TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+	//TIFFSetField(tif, TIFFTAG_TILEWIDTH, tw);
+	//TIFFSetField(tif, TIFFTAG_TILELENGTH, th);
+
+
+	return 0;
+}
+
 // main_imprintf {{{1
 static void my_putchar(FILE *f, int c)
 {
@@ -2282,6 +2321,7 @@ int main(int c, char *v[])
 	if (0 == strcmp(v[1], "dpush"))    return main_dpush   (c-1, v+1);
 	if (0 == strcmp(v[1], "dget"))     return main_dget    (c-1, v+1);
 	if (0 == strcmp(v[1], "whatever")) return main_whatever(c-1, v+1);
+	if (0 == strcmp(v[1], "tileize"))  return main_tileize (c-1, v+1);
 
 	goto err;
 }

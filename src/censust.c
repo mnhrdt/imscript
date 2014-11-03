@@ -39,7 +39,7 @@ static void census_at(unsigned char *out, float *x, int w, int h, int pd,
 		float a = getsample_nan(x, w, h, pd, p    , q    , l);
 		float b = getsample_nan(x, w, h, pd, p + i, q + j, l);
 		if (i || j)
-			bits[cx++] = a > b;
+			bits[cx++] = a < b;
 	}
 	assert(cx == nbits);
 
@@ -79,6 +79,7 @@ int main(int c, char *v[])
 	int side = 2 * winradius + 1;
 	int nbits = pd * (side * side - 1);
 	int nbytes = ceil(nbits / 8.0);
+	fprintf(stderr, "output nbits=%d nbytes=%d\n", nbits, nbytes);
 
 	// allocate output image
 	unsigned char *y = malloc(w * h * nbytes);
