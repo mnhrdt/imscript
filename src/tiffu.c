@@ -712,6 +712,9 @@ static void tiffu_tput_hl(char *fname_whole, int tile_idx, char *fname_part)
 //	free(tout->data);
 //}
 
+// crop functions {{{1
+
+// crop a tiled tiff
 static void crop_tiles(struct tiff_tile *tout, struct tiff_info *tinfo,
 		TIFF *tif, int x0, int xf, int y0, int yf)
 {
@@ -766,6 +769,7 @@ static void crop_tiles(struct tiff_tile *tout, struct tiff_info *tinfo,
 	free(buf);
 }
 
+// crop a non-tiled tiff
 static void crop_scanlines(struct tiff_tile *tout, struct tiff_info *tinfo,
 		TIFF *tif, int x0, int xf, int y0, int yf)
 {
@@ -802,6 +806,7 @@ static void crop_scanlines(struct tiff_tile *tout, struct tiff_info *tinfo,
 	free(buf);
 }
 
+// crop a tiff file, given by its name
 void tcrop(char *fname_out, char *fname_in, int x0, int xf, int y0, int yf)
 {
 	// open input file

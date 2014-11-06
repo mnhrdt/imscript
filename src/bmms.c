@@ -197,6 +197,31 @@ static float eval_displacement_by_bm(float *a, float *b, int w, int h, int pd,
 	return squared_euclidean_distance(va, vb, wside*wside*pd);
 }
 
+static float eval_displacement_by_sc(float *a, float *b, int w, int h, int pd,
+		int wrad, int i, int j, float d[2])
+{
+	getsample_operator p = getsample_nan;
+
+	int wside = 2 * wrad + 1;
+	float r = 0;
+	int cx = 0;
+	for (int l = 0; l < pd; l++)
+	{
+		float va = getsample_nan(a, w, h, pd, i, j, l);
+		float vb = getsample_nan(b, w, h, pd, i, j, l);
+		for (int dy = -wrad; dy <= wrad; dy++)
+		for (int dx = -wrad; dx <= wrad; dx++)
+		{
+			int ii = i + dx;
+			int jj = j + dy;
+			float vai = p(a, w, h, pd, ii       , jj       , l);
+			float vbi = p(b, w, h, pd, ii + d[0], jj + d[1], l);
+			r += (vai > va) != (vbi > vb);
+		}
+	}
+	return r;
+}
+
 static float eval_displacement_by_census(float *a, float *b,
 		int w, int h, int pd,
 		int wrad, int i, int j, float d[2])
@@ -295,14 +320,15 @@ void bmms_rec(float *out, float *a, float *b,
 
 #ifdef MAIN_BMMS
 #include "iio.h"
-
+#include "pickopt.c"
 int main(int argc, char *argv[])
 {
+	char *cost_id = pick_option(&argc, &argv, "t", "CENSUS");
 	if (argc != 7) {
 		fprintf(stderr, "usage:\n\t"
 		"%s WINRADIUS NSCALES MFRADIUS a.png b.png out.flo\n", *argv);
 		//0 1         2       3        4     5     6
-		return 1;
+		return argc;
 	}
 	int winradius = atoi(argv[1]);
 	int nscales = atoi(argv[2]);
@@ -316,8 +342,10 @@ int main(int argc, char *argv[])
 	float *b = iio_read_image_float_vec(filename_b, w+1, h+1, pd+1);
 	float *f = xmalloc(*w * *h * 2 * sizeof*f);
 
-	cost_function_t e = eval_displacement_by_bm;
-	//cost_function_t e = eval_displacement_by_census;
+	cost_function_t e = NULL;
+	if (0 == strcmp(cost_id, "SSD"    )) e = eval_displacement_by_bm;
+	if (0 == strcmp(cost_id, "CENSUS" )) e = eval_displacement_by_sc;
+	if (0 == strcmp(cost_id, "CENSUST")) e = eval_displacement_by_census;
 	bmms_rec(f, a, b, *w, *h, *pd, winradius, mfradius, nscales, e);
 
 	iio_save_image_float_vec(filename_out, f, *w, *h, 2);
