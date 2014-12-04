@@ -794,6 +794,42 @@ int main_pclick(int c, char *v[])
 	return 0;
 }
 
+// main_iclicks {{{1
+// print to stdout an image with the given mouse clicks
+int main_iclicks(int c, char *v[])
+{
+	// process input arguments
+	if (c != 2 && c != 1 && c != 3) {
+		fprintf(stderr, "usage:\n\t%s [[in] out]\n", *v);
+		//                          0  1    2
+		return 1;
+	}
+	char *filename_in  = c > 1 ? v[1] : "-";
+	char *filename_out = c > 2 ? v[2] : "-";
+
+	// read input image
+	int w, h;
+	unsigned char *x = read_image_uint8_rgb(filename_in, &w, &h);
+
+	// show image on window
+	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
+
+	// get the first mouse click
+	int pos[2], button = 0;
+	while (button != FTR_BUTTON_RIGHT) {
+		if (button)
+			printf("%d %d\n", pos[0], pos[1]);
+		ftr_wait_for_mouse_click3(&f, pos+0, pos+1, &button);
+	}
+
+	// close the window
+	ftr_close(&f);
+
+	// cleanup and exit (optional)
+	free(x);
+	return 0;
+}
+
 
 // main_random {{{1
 static void draw_random(struct FTR *f, int x, int y, int k, int m)
@@ -1392,6 +1428,7 @@ static const struct { char *n; int(*f)(int,char*[]); } mains[] = {
 	MAIN(icrop),
 	MAIN(icrop2),
 	MAIN(pclick),
+	MAIN(iclicks),
 	MAIN(random),
 	MAIN(fire),
 	MAIN(minifire),
