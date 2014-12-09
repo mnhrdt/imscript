@@ -1,5 +1,7 @@
 #!/usr/bin/octave -qf
 
+format loose
+
 if nargin != 3
 	fprintf(stderr, "usage:\n\tbasify p q r > P.txt\n");
 	exit(1);
@@ -18,7 +20,7 @@ p /= norm(p);
 
 % prevent gimbal lock around the vertical direction (ad-hoc)
 if norm(p - e3) < 1e-5
-	d = -e1;
+	d = e1;
 else
 	d = e3;
 endif
@@ -28,17 +30,18 @@ q = cross(p, d);
 q /= norm(q);
 r = cross(p, q);
 
+
 % project the canonical basis
-pe1 = e1 - dot(p, e1)*p
-pe2 = e2 - dot(p, e2)*p
-pe3 = e3 - dot(p, e3)*p
+pe1 = e1 - dot(p, e1)*p;
+pe2 = e2 - dot(p, e2)*p;
+pe3 = e3 - dot(p, e3)*p;
 
 % build matrices with the two bases
-mpei = [pe1 ; pe2 ; pe3]
-mpqr = [p ; r ; q]
+mpei = [pe1 ; pe2 ; pe3];
+mpqr = [p ; q ; r];
 
 % compute the coefficients of the projection with this pair of basis
-P = mpqr * mpei'
+P = mpqr * mpei';
 
 % remove the first row
 P = P(2:3,:);
