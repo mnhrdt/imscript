@@ -280,6 +280,7 @@ int main(int c, char *v[])
 {
 	// input arguments
 	bool do_center = pick_option(&c, &v, "c", NULL);
+	bool do_not = pick_option(&c, &v, "n", NULL);
 	if (c != 7) {
 		fprintf(stderr, "usage:\n\t"
 			"%s heights.tiff colors.png P.txt ow oh out.png\n", *v);
@@ -311,6 +312,11 @@ int main(int c, char *v[])
 	// perform centering, if necessary
 	if (do_center)
 		center_projection(P, *w/2, *h/2);
+	if (do_not) {
+		for (int i = 0; i < 8; i++)
+			printf("%g%c", P[i], i==7?'\n':' ');
+		return 0;
+	}
 
 	// run simulator
 	satproj(out, out_w, out_h, P, heights, colors, *w, *h, pd);
