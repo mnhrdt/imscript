@@ -81,10 +81,30 @@ static void handle_click_wait(struct FTR *f, int b, int m, int x, int y)
 		ftr_notify_the_desire_to_stop_this_loop(f, 10000*y + x);
 }
 
+static void handle_click_wait3(struct FTR *f, int b, int m, int x, int y)
+{
+	if (b == FTR_BUTTON_LEFT || b == FTR_BUTTON_RIGHT)
+	{
+		int bit = b == FTR_BUTTON_LEFT;
+		ftr_notify_the_desire_to_stop_this_loop(f, 2*(10000*y + x)+bit);
+	}
+}
+
 void ftr_wait_for_mouse_click(struct FTR *f, int *x, int *y)
 {
 	ftr_set_handler(f, "button", handle_click_wait);
 	int r = ftr_loop_run(f);
 	if (x) *x = r % 10000;
 	if (y) *y = r / 10000;
+}
+
+void ftr_wait_for_mouse_click3(struct FTR *f, int *x, int *y, int *b)
+{
+	ftr_set_handler(f, "button", handle_click_wait3);
+	int r = ftr_loop_run(f);
+	int bit = r % 2;
+	r /= 2;
+	if (x) *x = r % 10000;
+	if (y) *y = r / 10000;
+	if (b) *b = bit ? FTR_BUTTON_LEFT : FTR_BUTTON_RIGHT;
 }

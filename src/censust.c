@@ -61,7 +61,7 @@ int main(int c, char *v[])
 {
 	// process command line arguments
 	char *radius_opt = pick_option(&c, &v, "r", "1");
-	if (c != 1 && c != 2 && c != 3)
+	if ((c == 2 && 0 == strcmp("-h", v[1])) || (c != 1 && c != 2 && c != 3))
 	{
 		fprintf(stderr, "usage:\n\t%s [-r radius] [in [out]]\n", *v);
 		//                          0              1   2
