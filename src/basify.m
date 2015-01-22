@@ -30,7 +30,6 @@ q = cross(p, d);
 q /= norm(q);
 r = cross(p, q);
 
-
 % project the canonical basis
 pe1 = e1 - dot(p, e1)*p;
 pe2 = e2 - dot(p, e2)*p;

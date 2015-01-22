@@ -149,21 +149,23 @@ int main_forks(int c, char *v[])
 	}
 	my_notify_change(f);
 	my_notify_change(g);
-	sleep(1);
+	sleep(10);
 	for (int i = 0; i < f->w * f->h; i++) {
 		f->rgb[3*i+0] = 255; f->rgb[3*i+1] = 0; f->rgb[3*i+2] = 0;
 		g->rgb[3*i+0] = 255; g->rgb[3*i+1] = 0; g->rgb[3*i+2] = 127;
 	}
 	my_notify_change(f);
+	sleep(5);
 	my_notify_change(g);
-	sleep(1);
+	sleep(5);
 	for (int i = 0; i < f->w * f->h; i++) {
 		f->rgb[3*i+0] = 0; f->rgb[3*i+1] = 0; f->rgb[3*i+2] = 255;
 		g->rgb[3*i+0] = 0; g->rgb[3*i+1] = 0; g->rgb[3*i+2] = 127;
 	}
 	my_notify_change(f);
+	sleep(5);
 	my_notify_change(g);
-	sleep(1);
+	sleep(5);
 	for (int i = 0; i < f->w * f->h; i++) {
 		f->rgb[3*i+0] = 255; f->rgb[3*i+1] = 255; f->rgb[3*i+2] = 255;
 		g->rgb[3*i+0] = 255; g->rgb[3*i+1] = 255; g->rgb[3*i+2] = 127;

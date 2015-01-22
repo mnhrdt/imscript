@@ -130,6 +130,7 @@ static void downsa2d(float *oy, float *ox, int w, int h, int pd, int n, int ty)
 		case 'a': g = s.max;          break;
 		case 'v': g = s.average;      break;
 		case 'V': g = s.laverage;     break;
+		case 's': g = s.variance;     break;
 		case 'r': g = s.sample;       break;
 		case 'f': g = vv[0];          break;
 		case 'l': g = vv[nv-1];       break;

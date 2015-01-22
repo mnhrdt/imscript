@@ -18,7 +18,7 @@ static void apply_projection(double y[3], double P[8], double x[3])
 
 float eval_using_k33(float *x, int w, int h, int i, int j, float k[9])
 {
-	getsample_operator p = getsample_1;
+	getsample_operator p = getsample_2;
 	int cx = 0;
 	float r = 0;
 	for (int jj = j-1; jj <= j+1; jj++)
@@ -31,7 +31,7 @@ static void fill_gradient(float *g, float *x, int w, int h)
 {
 	float kdx[9] = {-1, 0, 1, -2, 0, 2, -1, 0, 1};
 	float kdy[9] = {-1, -2, -1, 0, 0, 0, 1, 2, 1};
-	float f = 0.25;
+	float f = 0.125;
 	//float kdx[9] = {0, 0, 0,  0, -1, 1,  0, 0, 0};
 	//float kdy[9] = {0, 0, 0,  0, -1, 0,  0, 1, 0};
 	//float f = 1;
@@ -73,6 +73,7 @@ void mnehs_affine_warp(float *warp,
 SMART_PARAMETER(TAU,0.25)
 SMART_PARAMETER(ALPHA,1)
 SMART_PARAMETER(NITER,1)
+SMART_PARAMETER(NWARPS,1)
 
 static float laplacian_at(float *x, int w, int h, int i, int j)
 {
@@ -83,6 +84,23 @@ static float laplacian_at(float *x, int w, int h, int i, int j)
 		     + p(x, w, h, i  , j+1)
 		     + p(x, w, h, i-1, j  )
 		     + p(x, w, h, i  , j-1);
+
+	return r;
+}
+
+static float laplacian8_at(float *x, int w, int h, int i, int j)
+{
+	getpixel_operator p = getpixel_0;
+
+	float r = -8 * p(x, w, h, i  , j  )
+		     + p(x, w, h, i+1, j  )
+		     + p(x, w, h, i  , j+1)
+		     + p(x, w, h, i-1, j  )
+		     + p(x, w, h, i  , j-1)
+		     + p(x, w, h, i+1, j+1)
+		     + p(x, w, h, i+1, j-1)
+		     + p(x, w, h, i-1, j-1)
+		     + p(x, w, h, i-1, j+1);
 
 	return r;
 }
@@ -127,8 +145,8 @@ void mnehs_affine(float *out_h, float *init_h, int ow, int oh,
 		apply_projection(paijh, PA, ijh);
 		apply_projection(pbijh, PB, ijh);
 		float va, vb, vga[2], vgb[2];
-		bicubic_interpolation(&va, a, wa, ha, 1, paijh[0], paijh[1]);
-		bicubic_interpolation(&vb, b, wb, hb, 1, pbijh[0], pbijh[1]);
+		bicubic_interpolation_nans(&va, a, wa, ha, 1, paijh[0], paijh[1]);
+		bicubic_interpolation_nans(&vb, b, wb, hb, 1, pbijh[0], pbijh[1]);
 		bicubic_interpolation(vga, ga, wa, ha, 2, paijh[0], paijh[1]);
 		bicubic_interpolation(vgb, gb, wb, hb, 2, pbijh[0], pbijh[1]);
 		float gapa = vga[0] * PA[2] + vga[1] * PA[6];
@@ -151,18 +169,11 @@ void mnehs_affine(float *out_h, float *init_h, int ow, int oh,
 		for (int i = 0; i < ow; i++)
 		{
 			int ij = j * ow + i;
-
-			//float hbar = hbar_at(h, ow, oh, i, j);
-			//float ax = (-hbar * Q[ij] - amb[ij]) * Q[ij];
-			//ax /= alpha2 + Q[ij] * Q[ij];
-			//h[ij] = hbar + ax;
-			//float ax = 0;
+			if (!isfinite(amb[ij])) continue;
 
 			float ax = laplacian_at(h, ow, oh, i, j);
-			////ax += laplacian_at(init_h, ow, oh, i, j);
 			ax -= Q[ij] * (Q[ij] * h[ij] + amb[ij]) / alpha2;
-			////ax -= ( amb[idx]) / alpha2;
-			h[ij] += TAU() * tanh(ax);
+			h[ij] += TAU() * ax;
 		}
 	}
 	iio_save_image_float_vec("h.tiff", h, ow, oh, 1);
@@ -207,12 +218,24 @@ static void read_n_doubles_from_string(double *out, char *string, int n)
 	free(buf);
 }
 
+static void center_projection(double P[8], double cx, double cy)
+{
+	// point "c" must be fixed at h = 0
+	P[3] = cx - P[0]*cx - P[1]*cy;
+	P[7] = cy - P[4]*cx - P[5]*cy;
+}
+
+#include <stdbool.h>
+#include "pickopt.c"
+
+
 int main_warp(int c, char *v[])
 {
 	// input arguments
+	bool do_center = pick_option(&c, &v, "c", NULL);
 	if (c != 7) {
 		fprintf(stderr, "usage:\n\t"
-			"%s a.png b.png Pa.txt Pb.txt in.tiff out.tiff\n", *v);
+			"%s a.png b.png Pa.txt Pb.txt in.tiff amb.png\n", *v);
 		//        0  1     2     3      4     5       6
 		return 1;
 	}
@@ -234,6 +257,13 @@ int main_warp(int c, char *v[])
 	if (pd != pdb)
 		fail("input pair has different color depth");
 
+	// perform centering, if necessary
+	if (do_center) {
+		fprintf(stderr, "centering projection matrices\n");
+		center_projection(PA, wa/2, ha/2);
+		center_projection(PB, wb/2, hb/2);
+	}
+
 	// allocate space for output image
 	float *out = xmalloc(wi * hi * pd * sizeof*out);
 
@@ -254,6 +284,9 @@ int main_warp(int c, char *v[])
 int main_compute(int c, char *v[])
 {
 	// input arguments
+	bool do_only_warp = pick_option(&c, &v, "w", NULL);
+	if (do_only_warp) return main_warp(c, v);
+	bool do_center = pick_option(&c, &v, "c", NULL);
 	if (c != 7) {
 		fprintf(stderr, "usage:\n\t"
 			"%s a.png b.png Pa.txt Pb.txt in.tiff out.tiff\n", *v);
@@ -276,13 +309,24 @@ int main_compute(int c, char *v[])
 	read_n_doubles_from_string(PA, matrix_pa, 8);
 	read_n_doubles_from_string(PB, matrix_pb, 8);
 
+	// perform centering, if necessary
+	if (do_center) {
+		center_projection(PA, wa/2, ha/2);
+		center_projection(PB, wb/2, hb/2);
+	}
+
 	// allocate space for output image
 	float *out = xmalloc(wi * hi * sizeof*out);
 
 	// run the algorithm
 	float alpha2 = ALPHA()*ALPHA();
 	int niter = NITER();
-	mnehs_affine(out, h0, wi,hi, a,wa,ha, b,wb,hb, PA, PB, alpha2, niter);
+	int nwarps = NWARPS();
+	for (int i = 0; i < nwarps; i++)
+	{
+		mnehs_affine(out, h0, wi,hi, a,wa,ha, b,wb,hb, PA, PB, alpha2, niter);
+		memcpy(h0, out, wi * hi * sizeof*h0);
+	}
 
 	// save the output image
 	iio_save_image_float(filename_out, out, wi, hi);
