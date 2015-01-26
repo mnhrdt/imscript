@@ -250,10 +250,10 @@ static void change_view_scale(struct FTR *f, int x, int y, double fac)
 {
 	struct viewer_state *e = f->userdata;
 	double center[2], X[2] = {x, y};
-	//map_window_to_view(f, center, X);
+	map_window_to_view(f, center, X);
 	e->scale *= fac;
-	//for (int p = 0; p < 2; p++)
-	//	e->offset[p] = center[p] - (X[p]) * e->scale;
+	for (int p = 0; p < 2; p++)
+		e->offset[p] = -center[p]*e->scale + X[p];
 	fprintf(stderr, "\t zoom changed %g (o=%g %g)\n", e->scale, e->offset[0], e->offset[1]);
 	paint_state(f);
 }
@@ -358,8 +358,8 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		paint_state(f);
 	}
 
-	if (k == FTR_BUTTON_UP) change_view_scale(f, x, y, 1.2);
-	if (k == FTR_BUTTON_DOWN) change_view_scale(f, x, y, 1/1.2);
+	if (k == FTR_BUTTON_DOWN) change_view_scale(f, x, y, 1.2);
+	if (k == FTR_BUTTON_UP) change_view_scale(f, x, y, 1/1.2);
 }
 
 static void event_motion(struct FTR *f, int b, int m, int x, int y)
