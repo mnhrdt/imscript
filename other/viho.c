@@ -1,9 +1,9 @@
-// This program is a homography viewer.
+// Homography viewer.
 //
-// It loads a color image and allows the user to drag the four corners of the
-// image around the window.  An homography is determined by the position of
-// these four points, and this homography is used to warp the image into the
-// window.
+// This program loads a color image and allows the user to drag the four
+// corners of the image around the window.  An homography is determined by the
+// position of these four points, and this homography is used to map the image
+// into the window.
 // 
 //
 // Usage: viho image.png
@@ -270,33 +270,36 @@ static double float_to_byte(double x)
 }
 
 // change from view coordinates to window coordinates
-static void map_view_to_window(struct FTR *f, double y[2], double x[2])
+static void map_view_to_window(struct viewer_state *e, double y[2], double x[2])
 {
-	struct viewer_state *e = f->userdata;
 	for (int k = 0; k < 2; k++)
 		y[k] = e->offset[k] + e->scale * x[k];
 }
 
 // change from window coordinates to view coordinates
-static void map_window_to_view(struct FTR *f, double y[2], double x[2])
+static void map_window_to_view(struct viewer_state *e, double y[2], double x[2])
 {
-	struct viewer_state *e = f->userdata;
 	for (int k = 0; k < 2; k++)
 		y[k] = ( x[k] - e->offset[k] ) / e->scale;
 }
 
-// change from window coordinates to image coordinates
-static void map_window_to_image(struct FTR *f, double y[2], double x[2])
+// obtain the direct homography from the current configuration
+static void obtain_current_homography(double H[3][3], struct viewer_state *e)
 {
-	struct viewer_state *e = f->userdata;
-
-	double H[3][3], C[4][2];
+	double C[4][2];
 	for (int p = 0; p < 4; p++)
-		map_view_to_window(f, C[p], e->c[p]);
+		map_view_to_window(e, C[p], e->c[p]);
 	homography_from_eight_points(H,
 			C[0], C[1], C[2], C[3],
 			e->p[0], e->p[1], e->p[2], e->p[3]
 			);
+}
+
+// change from window coordinates to image coordinates
+static void map_window_to_image(struct viewer_state *e, double *y, double *x)
+{
+	double H[3][3], C[4][2];
+	obtain_current_homography(H, e);
 	apply_homography(y, H, x);
 }
 
@@ -463,53 +466,48 @@ static interpolator_t obtain_interpolator(struct viewer_state *e)
 	return nearest_neighbor_at;
 }
 
+
+//
+///////////////////////////////
+///  MAIN WARPING FUNCTION  ///
+///////////////////////////////
+//
 // draw the image warped by the current homography
 static void draw_warped_image(struct FTR *f)
 {
 	struct viewer_state *e = f->userdata;
 
-	getsample_operator_t    pix = obtain_sample_operator(e);
-	interpolator_t       interp = obtain_interpolator(e);
 	double H[3][3];
-	double C[4][2];
-	for (int p = 0; p < 4; p++)
-		map_view_to_window(f, C[p], e->c[p]);
-	homography_from_eight_points(H,
-			C[0], C[1], C[2], C[3],
-			e->p[0], e->p[1], e->p[2], e->p[3]
-			);
+	obtain_current_homography(H, e);
+	getsample_operator_t    bound = obtain_sample_operator(e);
+	interpolator_t    interpolate = obtain_interpolator(e);
+	
 	for (int j = 0; j < f->h; j++)
 	for (int i = 0; i < f->w; i++)
 	{
 		double p[2] = {i, j};
 		apply_homography(p, H, p);
-		double ipx[2] = {
-			(p[0] - 0.5) * e->iw / (e->iw - 1.0),
-			(p[1] - 0.5) * e->ih / (e->ih - 1.0)
-		};
-		float v[3];
-		interp(v, e->img, e->iw, e->ih, 3, ipx[0], ipx[1], pix);
+		p[0] = (p[0] - 0.5) * e->iw / (e->iw - 1.0);
+		p[1] = (p[1] - 0.5) * e->ih / (e->ih - 1.0);
+		float colour[3];
+		interpolate(colour, e->img, e->iw, e->ih, 3, p[0], p[1], bound);
 		for (int l = 0; l < 3; l++)
 		{
 			int idx = l + 3 * (f->w * j + i);
-			f->rgb[idx] = float_to_byte(v[l]);
+			f->rgb[idx] = float_to_byte(colour[l]);
 		}
 	}
 }
+
 
 // draw the positions of the image samples
 static void draw_unwarped_grid(struct FTR *f)
 {
 	struct viewer_state *e = f->userdata;
 
-	double H[3][3];
-	double C[4][2];
-	for (int p = 0; p < 4; p++)
-		map_view_to_window(f, C[p], e->c[p]);
-	homography_from_eight_points(H,
-			e->p[0], e->p[1], e->p[2], e->p[3],
-			C[0], C[1], C[2], C[3]
-			);
+	double H[3][3], iH[3][3];
+	obtain_current_homography(iH, e);
+	invert_homography(H, iH);
 	for (int i = 0 ; i < f->w * f->h * 3; i++)
 		f->rgb[i] = 255*(i%3);
 	for (int j = 0; j < e->ih; j++)
@@ -536,8 +534,8 @@ static void draw_four_red_segments(struct FTR *f)
 	for (int p = 0; p < 4; p++)
 	{
 		double x0[2], xf[2];
-		map_view_to_window(f, x0, e->c[p]);
-		map_view_to_window(f, xf, e->c[(p+1)%4]);
+		map_view_to_window(e, x0, e->c[p]);
+		map_view_to_window(e, xf, e->c[(p+1)%4]);
 		plot_segment_red(f, x0[0], x0[1], xf[0], xf[1]);
 	}
 }
@@ -551,7 +549,7 @@ static void draw_four_control_points(struct FTR *f)
 	for (int p = 0; p < 4; p++)
 	{
 		double P[2];
-		map_view_to_window(f, P, e->c[p]);
+		map_view_to_window(e, P, e->c[p]);
 
 		// grey circle
 		int side = DISK_RADIUS;
@@ -608,7 +606,7 @@ static void change_view_scale(struct FTR *f, int x, int y, double fac)
 {
 	struct viewer_state *e = f->userdata;
 	double center[2], X[2] = {x, y};
-	map_window_to_view(f, center, X);
+	map_window_to_view(e, center, X);
 	e->scale *= fac;
 	for (int p = 0; p < 2; p++)
 		e->offset[p] = -center[p]*e->scale + X[p];
@@ -616,14 +614,13 @@ static void change_view_scale(struct FTR *f, int x, int y, double fac)
 }
 
 
-// test whether (x,y) is inside one of the four control points
-static int hit_point(struct FTR *f, double x, double y)
+// test whether (x,y) is inside one of the four control disks
+static int hit_point(struct viewer_state *e, double x, double y)
 {
-	struct viewer_state *e = f->userdata;
 	for (int p = 0; p < 4; p++)
 	{
 		double P[2];
-		map_view_to_window(f, P, e->c[p]);
+		map_view_to_window(e, P, e->c[p]);
 		if (hypot(P[0] - x, P[1] - y) < 2+DISK_RADIUS)
 			return p;
 	}
@@ -683,7 +680,7 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	// begin dragging a control point in the WINDOW DOMAIN
 	if (k == FTR_BUTTON_LEFT)
 	{
-		int p = hit_point(f, x, y);
+		int p = hit_point(e, x, y);
 		if (p >= 0)
 		{
 			e->dragging_point = true;
@@ -697,13 +694,13 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		int p = e->dragged_point;
 		e->dragging_point = false;
 		double X[2] = {x, y};
-		map_window_to_view(f, e->c[p], X);
+		map_window_to_view(e, e->c[p], X);
 	}
 
 	// begin dragging a control point in the IMAGE DOMAIN
 	if (k == FTR_BUTTON_RIGHT)
 	{
-		int p = hit_point(f, x, y);
+		int p = hit_point(e, x, y);
 		if (p >= 0)
 		{
 			e->dragging_ipoint = true;
@@ -717,10 +714,10 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		int p = e->dragged_point;
 		e->dragging_ipoint = false;
 		double P[2], Q[2] = {x, y};
-		map_window_to_image(f, P, Q);
+		map_window_to_image(e, P, Q);
 		e->p[p][0] = P[0];
 		e->p[p][1] = P[1];
-		map_window_to_view(f, e->c[p], Q);
+		map_window_to_view(e, e->c[p], Q);
 	}
 
 	// zoom in/out
@@ -740,7 +737,7 @@ static void event_motion(struct FTR *f, int b, int m, int x, int y)
 	{
 		int p = e->dragged_point;
 		double X[2] = {x, y};
-		map_window_to_view(f, e->c[p], X);
+		map_window_to_view(e, e->c[p], X);
 		paint_state(f);
 	}
 
@@ -749,10 +746,10 @@ static void event_motion(struct FTR *f, int b, int m, int x, int y)
 	{
 		int p = e->dragged_point;
 		double P[2], Q[2] = {x, y};
-		map_window_to_image(f, P, Q);
+		map_window_to_image(e, P, Q);
 		e->p[p][0] = P[0];
 		e->p[p][1] = P[1];
-		map_window_to_view(f, e->c[p], Q);
+		map_window_to_view(e, e->c[p], Q);
 		paint_state(f);
 	}
 }
