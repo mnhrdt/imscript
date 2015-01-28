@@ -867,7 +867,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "usage:\n\t%s image.png\n", *argv);
 		return 1;
 	}
-	char *filename_in = v[2];
+	char *filename_in = argv[2];
 
 	struct FTR f = ftr_new_window(512,512);
 	struct viewer_state e[1];
