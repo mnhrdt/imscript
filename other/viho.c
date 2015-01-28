@@ -6,7 +6,10 @@
 // into the window.
 //
 //
-// Usage: viho image.png
+// Usage:
+//
+// 	viho image.png
+//
 //
 // Controls:
 //
@@ -18,11 +21,12 @@
 //
 //	3. Mouse wheel for zoom-in and zoom-out
 //
+//
 // Keys:
 //
 //	q	exit the viewer
 //	c	reset viewer and center image
-// 	p	toggle periodic image
+// 	p	toggle periodic extrapolation
 // 	w	toggle horizon
 // 	+	zoom-in
 // 	-	zoom-out
@@ -35,7 +39,8 @@
 //
 //
 // Compilation:
-// clang -O3 viho.c iio.c ftr.c -lX11 -lpng -ljpeg -ltiff -o viho 
+//
+//	cc -O3 viho.c iio.c ftr.c -lX11 -lpng -ljpeg -ltiff -o viho 
 
 
 // SECTION 1. Libraries and data structures                                 {{{1
@@ -80,8 +85,10 @@ struct viewer_state {
 	int interpolation_order; // 0=nearest, 1=linear, 2=bilinear, 3=bicubic
 	bool tile_plane;
 	bool show_horizon;
+	bool show_grid_points;
 };
 
+
 // function to reset and center the viewer
 static void center_view(struct FTR *f)
 {
@@ -121,10 +128,11 @@ static void center_view(struct FTR *f)
 	e->interpolation_order = 0;
 	e->tile_plane = false;
 	e->show_horizon = false;
+	e->show_grid_points = false;
 }
 
 
-// funtion to test wether a point is inside the window
+// funtion to test whether a point is inside the window
 static bool insideP(struct FTR *f, int x, int y)
 {
 	return x >= 0 && y >= 0 && x < f->w && y < f->h;
@@ -173,7 +181,7 @@ static void compose_homographies(double C[3][3], double A[3][3], double B[3][3])
 			C[i][j] += A[i][k] * B[k][j];
 	}
 }
-
+
 // Find the homography that changes the canonical projective basis
 // into the given four points (x, y, z, w)
 static void homography_from_four_points(double H[3][3],
@@ -315,15 +323,6 @@ static float getsample_per(float *x, int w, int h, int pd, int i, int j, int l)
 	return x[(i+j*w)*pd + l];
 }
 
-//static float getsample_perh(float *x, int w, int h, int pd, int i, int j, int l)
-//{
-//	bool in=(0<=i&&0<=j&&i<w&&j<h);
-//	i = good_modulus(i, w);
-//	j = good_modulus(j, h);
-//	float r = x[(i+j*w)*pd + l];
-//	return in ? r : 255*pow(r/255,0.2);
-//}
-
 // instance of "getsample_operator_t", extrapolate by a constant value
 static float getsample_cons(float *x, int w, int h, int pd, int i, int j, int l)
 {
@@ -357,12 +356,10 @@ typedef void (*interpolator_t)(float*,float*,int,int,int,float,float,
 static float evaluate_bilinear_cell(float a, float b, float c, float d,
 							float x, float y)
 {
-	float r = 0;
-	r += a * (1-x) * (1-y);
-	r += b * ( x ) * (1-y);
-	r += c * (1-x) * ( y );
-	r += d * ( x ) * ( y );
-	return r;
+	return a * (1-x) * (1-y)
+	     + b * ( x ) * (1-y)
+	     + c * (1-x) * ( y )
+	     + d * ( x ) * ( y );
 }
 
 // instance of "interpolator_t", for bilinear interpolation
@@ -495,7 +492,7 @@ static void draw_warped_image(struct FTR *f)
 
 
 
-// SECTION 7. Drawing                                                      {{{1
+// SECTION 7. Drawing                                                       {{{1
 
 // Subsection 7.1. Drawing segments                                         {{{2
 
@@ -559,14 +556,13 @@ static void plot_segment_green(struct FTR *f,
 }
 
 
-
+
 // Subsection 7.2. Drawing user-interface elements                          {{{2
 
 // draw the positions of the image samples
 static void draw_unwarped_grid(struct FTR *f)
 {
 	struct viewer_state *e = f->userdata;
-
 	double H[3][3], iH[3][3];
 	obtain_current_homography(iH, e);
 	invert_homography(H, iH);
@@ -602,7 +598,6 @@ static void draw_four_red_segments(struct FTR *f)
 	}
 }
 
-
 // draw disks around the control points
 static void draw_four_control_points(struct FTR *f)
 {
@@ -634,6 +629,7 @@ static void draw_four_control_points(struct FTR *f)
 	}
 }
 
+// plot the horizon in green
 static void draw_horizon(struct FTR *f)
 {
 	struct viewer_state *e = f->userdata;
@@ -674,18 +670,17 @@ static void draw_horizon(struct FTR *f)
 }
 
 // Paint the whole scene
-// This function is called whenver the window needs to be redisplayed.
+// This function is called whenever the window needs to be redisplayed.
 static void paint_state(struct FTR *f)
 {
 	struct viewer_state *e = f->userdata;
 
-	// fill-in cyan background
 	for (int i = 0 ; i < f->w * f->h * 3; i++)
-		f->rgb[i] = 255*(i%3);
+		f->rgb[i] = 255*(i%3); // cyan
 
-	if (e->interpolation_order != -1)
+	if (!e->show_grid_points)
 		draw_warped_image(f);
-	if (e->interpolation_order == -1)
+	else
 		draw_unwarped_grid(f);
 	draw_four_red_segments(f);
 	draw_four_control_points(f);
@@ -736,8 +731,7 @@ static int hit_point(struct viewer_state *e, double x, double y)
 // key handler
 static void event_key(struct FTR *f, int k, int m, int x, int y)
 {
-	if (k == 'q')
-	{
+	if (k == 'q') {
 		ftr_notify_the_desire_to_stop_this_loop(f, 0);
 		return;
 	}
@@ -759,12 +753,10 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if (k == FTR_KEY_LEFT) change_view_offset(f, 100, 0);
 	if (k == '+') change_view_scale(f, f->w/2, f->h/2, ZOOM_FACTOR);
 	if (k == '-') change_view_scale(f, f->w/2, f->h/2, 1.0/ZOOM_FACTOR);
-
 	if (k == 'p') e->tile_plane = !e->tile_plane;
 	if (k == 'w') e->show_horizon = !e->show_horizon;
 	if (k >= '0' && k <= '9') e->interpolation_order = k - '0';
 	if (k == '.') e->interpolation_order = -1;
-
 	if (k == 'z') {
 		e->dragging_point = false;
 		e->dragging_ipoint = false;
@@ -833,7 +825,7 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 
 	paint_state(f);
 }
-
+
 // mouse motion handler
 static void event_motion(struct FTR *f, int b, int m, int x, int y)
 {
@@ -863,25 +855,23 @@ static void event_motion(struct FTR *f, int b, int m, int x, int y)
 
 
 
-// SECTION 9. Main Program                                                 {{{1
+// SECTION 9. Main Program                                                  {{{1
 
 // library for image input-output
 #include "iio.h"
 
 // main function
-int main(int c, char *v[])
+int main(int argc, char *argv[])
 {
-	//if (c != 2) {
-	//	fprintf(stderr, "usage:\n\t%s image.png\n", *v);
-	//	return 1;
-	//}
-	//char *filename_in = v[1];//c == 2 ? v[1] : "/tmp/lenak.png";
-	char *filename_in = c == 2 ? v[1] : "/tmp/lenak.png";
+	if (argc != 2) {
+		fprintf(stderr, "usage:\n\t%s image.png\n", *argv);
+		return 1;
+	}
+	char *filename_in = v[2];
 
 	struct FTR f = ftr_new_window(512,512);
 	struct viewer_state e[1];
 	f.userdata = e;
-
 
 	int pd;
 	e->img = iio_read_image_float_vec(filename_in, &e->iw, &e->ih, &pd);
