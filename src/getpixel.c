@@ -78,9 +78,9 @@ static int good_modulus(int nn, int p)
 		if (r == p)
 			r = 0;
 	}
-	assert(r >= 0);
+	//assert(r >= 0);
 	if (!(r<p)) fprintf(stderr, "bad modulus nn=%d r=%d p=%d\n", nn, r, p);
-	assert(r < p);
+	//assert(r < p);
 	return r;
 }
 

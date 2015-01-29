@@ -109,6 +109,7 @@ static double random_normal(void)
 }
 
 #include <math.h>
+#include <stdbool.h>
 
 static void hsv_to_rgb_doubles(double *out, double *in)
 {

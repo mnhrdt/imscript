@@ -13,10 +13,10 @@
 //
 // Controls:
 //
-// 	1. Drag the control points with the left button to change their
+// 	1. Drag the control points with the left mouse button to change their
 // 	position in the window
 //
-//	2. Drag the control points with the right button to change their
+//	2. Drag the control points with the right mouse button to change their
 //	position in the image
 //
 //	3. Mouse wheel for zoom-in and zoom-out
@@ -26,16 +26,19 @@
 //
 //	q	exit the viewer
 //	c	reset viewer and center image
-// 	p	toggle periodic extrapolation
-// 	w	toggle horizon
+//
 // 	+	zoom-in
 // 	-	zoom-out
 // 	ARROWS	move the view
-// 	0	nearest-neighbor interpolation
-// 	1	linear interpolation
-// 	2	bilinear interpolation
-// 	3	bicubic interpolation
-// 	.	show grid points
+//
+// 	0	use nearest-neighbor interpolation
+// 	1	use linear interpolation
+// 	2	use bilinear interpolation
+// 	3	use bicubic interpolation
+//
+// 	p	toggle periodic extrapolation
+// 	w	toggle horizon
+// 	.	toggle grid points
 //
 //
 // Compilation:
@@ -46,13 +49,9 @@
 // SECTION 1. Libraries and data structures                                 {{{1
 
 // standard libraries
-#include <assert.h>
-#include <ctype.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 // user interface library
 #include "ftr.h"
@@ -67,9 +66,9 @@
 
 // data structure to store the state of the viewer
 struct viewer_state {
-	// RGB image data
+	// image data
 	float *img;
-	int iw, ih;
+	int iw, ih, pd;
 
 	// geometry
 	double c[4][2]; // control points in window coordinates
@@ -133,7 +132,7 @@ static void center_view(struct FTR *f)
 
 
 // funtion to test whether a point is inside the window
-static bool insideP(struct FTR *f, int x, int y)
+static int insideP(struct FTR *f, int x, int y)
 {
 	return x >= 0 && y >= 0 && x < f->w && y < f->h;
 }
@@ -155,6 +154,9 @@ static void apply_homography(double y[2], double H[3][3], double x[2])
 // compute the inverse homography (inverse of a 3x3 matrix)
 static double invert_homography(double invH[3][3], double H[3][3])
 {
+	// 0 1 2
+	// 3 4 5
+	// 6 7 8
 	double *a = H[0], *r = invH[0];
 	double det = a[0]*a[4]*a[8] + a[2]*a[3]*a[7] + a[1]*a[5]*a[6]
 		   - a[2]*a[4]*a[6] - a[1]*a[3]*a[8] - a[0]*a[5]*a[7];
@@ -234,6 +236,8 @@ static void homography_from_eight_points(double H[3][3],
 /// compute the vector product of two vectors
 static void vector_product(double axb[3], double a[3], double b[3])
 {
+	// a0 a1 a2
+	// b0 b1 b2
 	axb[0] = a[1] * b[2] - a[2] * b[1];
 	axb[1] = a[2] * b[0] - a[0] * b[2];
 	axb[2] = a[0] * b[1] - a[1] * b[0];
@@ -244,14 +248,11 @@ static void vector_product(double axb[3], double a[3], double b[3])
 
 // SECTION 3. Coordinate Conversions                                        {{{1
 
-// Convert a floating-point color into a byte in the range [0,255]
-// (Colors outisde of this range are saturated.)
-static double float_to_byte(double x)
-{
-	if (x < 0) return 0;
-	if (x < 255) return x;
-	return 255;
-}
+// This program deals with three systems of coordinates
+//
+// "image"  : coordinates in the rectangular domain of the input image
+// "view"   : coordinates of the infinite plane where the image is mapped
+// "window" : coordinates of the window, which is a rectangluar piece of "view"
 
 // change from view coordinates to window coordinates
 static void map_view_to_window(struct viewer_state *e, double y[2], double x[2])
@@ -287,9 +288,17 @@ static void map_window_to_image(struct viewer_state *e, double *y, double *x)
 	apply_homography(y, H, x);
 }
 
+// Convert a floating-point color into a byte in the range [0,255]
+// (Colors outisde of this range are saturated.)
+static double float_to_byte(double x)
+{
+	if (x < 0) return 0;
+	if (x < 255) return x;
+	return 255;
+}
 
 
-// SECTION 4. Boundary Conditions                                           {{{1
+// SECTION 4. Extrapolation                                                 {{{1
 
 // type of the "getsample" functions
 typedef float (*getsample_operator_t)(float*,int,int,int,int,int,int);
@@ -309,9 +318,6 @@ static int good_modulus(int nn, int p)
 		if (r == p)
 			r = 0;
 	}
-	assert(r >= 0);
-	if (!(r<p)) fprintf(stderr, "bad modulus nn=%d r=%d p=%d\n", nn, r, p);
-	assert(r < p);
 	return r;
 }
 
@@ -320,6 +326,8 @@ static float getsample_per(float *x, int w, int h, int pd, int i, int j, int l)
 {
 	i = good_modulus(i, w);
 	j = good_modulus(j, h);
+	if (l >= pd)
+		l = pd - 1;
 	return x[(i+j*w)*pd + l];
 }
 
@@ -329,8 +337,10 @@ static float getsample_cons(float *x, int w, int h, int pd, int i, int j, int l)
 	static float value = 0;
 	if (w == 0 && h == 0)
 		value = *x;
-	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
+	if (i < 0 || i >= w || j < 0 || j >= h)
 		return value;
+	if (l >= pd)
+		l = pd - 1;
 	return x[(i+j*w)*pd + l];
 }
 
@@ -349,7 +359,7 @@ static getsample_operator_t obtain_sample_operator(struct viewer_state *e)
 // SECTION 5. Local Interpolation                                           {{{1
 
 // type of the "interpolation" functions
-typedef void (*interpolator_t)(float*,float*,int,int,int,float,float,
+typedef float (*interpolator_t)(float*,int,int,int,float,float,int,
 		getsample_operator_t);
 
 // auxiliary function for bilinear interpolation
@@ -363,51 +373,41 @@ static float evaluate_bilinear_cell(float a, float b, float c, float d,
 }
 
 // instance of "interpolator_t", for bilinear interpolation
-static void bilinear_interpolation_at(float *result,
-		float *x, int w, int h, int pd,
-		float p, float q, getsample_operator_t pix)
+static float bilinear_interpolation_at(float *x, int w, int h, int pd,
+		float p, float q, int l, getsample_operator_t pix)
 {
 	int ip = floor(p);
 	int iq = floor(q);
-	for (int l = 0; l < pd; l++) {
-		float a = pix(x, w, h, pd, ip  , iq  , l);
-		float b = pix(x, w, h, pd, ip+1, iq  , l);
-		float c = pix(x, w, h, pd, ip  , iq+1, l);
-		float d = pix(x, w, h, pd, ip+1, iq+1, l);
-		float r = evaluate_bilinear_cell(a, b, c, d, p-ip, q-iq);
-		result[l] = r;
-	}
+	float a = pix(x, w, h, pd, ip  , iq  , l);
+	float b = pix(x, w, h, pd, ip+1, iq  , l);
+	float c = pix(x, w, h, pd, ip  , iq+1, l);
+	float d = pix(x, w, h, pd, ip+1, iq+1, l);
+	return evaluate_bilinear_cell(a, b, c, d, p-ip, q-iq);
 }
 
 // auxiliary code for "linear" interpolation
 #include "marching_interpolation.c"
 
 // instance of "interpolator_t", for linear (marching) interpolation
-static void linear_interpolation_at(float *result,
-		float *x, int w, int h, int pd,
-		float p, float q, getsample_operator_t pix)
+static float linear_interpolation_at(float *x, int w, int h, int pd,
+		float p, float q, int l, getsample_operator_t pix)
 {
 	int ip = floor(p);
 	int iq = floor(q);
-	for (int l = 0; l < pd; l++) {
-		float a = pix(x, w, h, pd, ip  , iq  , l);
-		float b = pix(x, w, h, pd, ip+1, iq  , l);
-		float c = pix(x, w, h, pd, ip  , iq+1, l);
-		float d = pix(x, w, h, pd, ip+1, iq+1, l);
-		float r = marchi(a, c, b, d, p-ip, q-iq);
-		result[l] = r;
-	}
+	float a = pix(x, w, h, pd, ip  , iq  , l);
+	float b = pix(x, w, h, pd, ip+1, iq  , l);
+	float c = pix(x, w, h, pd, ip  , iq+1, l);
+	float d = pix(x, w, h, pd, ip+1, iq+1, l);
+	return marchi(a, c, b, d, p-ip, q-iq);
 }
 
 // instance of "interpolator_t" for nearest neighbor interpolation
-static void nearest_neighbor_at(float *result,
-		float *x, int w, int h, int pd,
-		float p, float q, getsample_operator_t pix)
+static float nearest_neighbor_at(float *x, int w, int h, int pd,
+		float p, float q, int l, getsample_operator_t pix)
 {
 	int ip = round(p);
 	int iq = round(q);
-	for (int l = 0; l < pd; l++)
-		result[l] = pix(x, w, h, pd, ip, iq, l);
+	return pix(x, w, h, pd, ip, iq, l);
 }
 
 // one-dimensional cubic interpolation of four data points ("Keys")
@@ -430,23 +430,19 @@ static float bicubic_interpolation_cell(float p[4][4], float x, float y)
 }
 
 // instance of "interpolator_t" for bicubic interpolation
-static void bicubic_interpolation_at(float *result,
-		float *img, int w, int h, int pd, float x, float y,
-		getsample_operator_t p)
+static float bicubic_interpolation_at(float *img, int w, int h, int pd,
+		float x, float y, int l, getsample_operator_t p)
 {
 	x -= 1;
 	y -= 1;
 
 	int ix = floor(x);
 	int iy = floor(y);
-	for (int l = 0; l < pd; l++) {
-		float c[4][4];
-		for (int j = 0; j < 4; j++)
-			for (int i = 0; i < 4; i++)
-				c[i][j] = p(img, w, h, pd, ix + i, iy + j, l);
-		float r = bicubic_interpolation_cell(c, x - ix, y - iy);
-		result[l] = r;
-	}
+	float c[4][4];
+	for (int j = 0; j < 4; j++)
+		for (int i = 0; i < 4; i++)
+			c[i][j] = p(img, w, h, pd, ix + i, iy + j, l);
+	return bicubic_interpolation_cell(c, x - ix, y - iy);
 }
 
 // obtain an interpolation operator from the current configuration
@@ -468,10 +464,9 @@ static void draw_warped_image(struct FTR *f)
 {
 	struct viewer_state *e = f->userdata;
 
-	double H[3][3];
-	obtain_current_homography(H, e);
-	getsample_operator_t    bound = obtain_sample_operator(e);
-	interpolator_t    interpolate = obtain_interpolator(e);
+	double H[3][3];           obtain_current_homography(H, e);
+	getsample_operator_t ex = obtain_sample_operator(e);
+	interpolator_t     eval = obtain_interpolator(e);
 
 	for (int j = 0; j < f->h; j++)
 	for (int i = 0; i < f->w; i++)
@@ -480,12 +475,12 @@ static void draw_warped_image(struct FTR *f)
 		apply_homography(p, H, p);
 		p[0] = (p[0] - 0.5) * e->iw / (e->iw - 1.0);
 		p[1] = (p[1] - 0.5) * e->ih / (e->ih - 1.0);
-		float colour[3];
-		interpolate(colour, e->img, e->iw, e->ih, 3, p[0], p[1], bound);
 		for (int l = 0; l < 3; l++)
 		{
 			int idx = l + 3 * (f->w * j + i);
-			f->rgb[idx] = float_to_byte(colour[l]);
+			float v = eval(e->img, e->iw, e->ih, e->pd,
+					p[0], p[1], l, ex);
+			f->rgb[idx] = float_to_byte(v);
 		}
 	}
 }
@@ -505,7 +500,8 @@ void traverse_segment(int px, int py, int qx, int qy,
 	else if (qx + qy < px + py) // bad quadrants
 		traverse_segment(qx, qy, px, py, f, e);
 	else {
-		if (abs(qx - px) > qy - py) { // horitzontal
+		//if (abs(qx - px) > qy - py) { // horitzontal
+		if (qx - px > qy - py || px - qx > qy - py) {
 			float slope = (qy - py)/(float)(qx - px);
 			for (int i = 0; i < qx-px; i++)
 				f(i+px, lrint(py + i*slope), e);
@@ -560,14 +556,14 @@ static void plot_segment_green(struct FTR *f,
 // Subsection 7.2. Drawing user-interface elements                          {{{2
 
 // draw the positions of the image samples
-static void draw_unwarped_grid(struct FTR *f)
+static void draw_grid_points(struct FTR *f)
 {
 	struct viewer_state *e = f->userdata;
 	double H[3][3], iH[3][3];
 	obtain_current_homography(iH, e);
 	invert_homography(H, iH);
 	for (int i = 0 ; i < f->w * f->h * 3; i++)
-		f->rgb[i] = 255*(i%3);
+		f->rgb[i] = 0;//255*(i%3);
 	for (int j = 0; j < e->ih; j++)
 	for (int i = 0; i < e->iw; i++)
 	{
@@ -579,7 +575,7 @@ static void draw_unwarped_grid(struct FTR *f)
 		{
 			int idx_win = l + 3 * (f->w * ip[1] + ip[0]);
 			int idx_img = l + 3 * (e->iw * j + i);
-			f->rgb[idx_win] = e->img[idx_img];
+			f->rgb[idx_win] = 127+e->img[idx_img]/2;
 		}
 	}
 }
@@ -678,10 +674,10 @@ static void paint_state(struct FTR *f)
 	for (int i = 0 ; i < f->w * f->h * 3; i++)
 		f->rgb[i] = 255*(i%3); // cyan
 
-	if (!e->show_grid_points)
-		draw_warped_image(f);
+	if (e->show_grid_points)
+		draw_grid_points(f);
 	else
-		draw_unwarped_grid(f);
+		draw_warped_image(f);
 	draw_four_red_segments(f);
 	draw_four_control_points(f);
 	if (e->show_horizon)
@@ -756,7 +752,7 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'p') e->tile_plane = !e->tile_plane;
 	if (k == 'w') e->show_horizon = !e->show_horizon;
 	if (k >= '0' && k <= '9') e->interpolation_order = k - '0';
-	if (k == '.') e->interpolation_order = -1;
+	if (k == '.') e->show_grid_points = !e->show_grid_points;
 	if (k == 'z') {
 		e->dragging_point = false;
 		e->dragging_ipoint = false;
@@ -863,19 +859,17 @@ static void event_motion(struct FTR *f, int b, int m, int x, int y)
 // main function
 int main(int argc, char *argv[])
 {
-	if (argc != 2) {
-		fprintf(stderr, "usage:\n\t%s image.png\n", *argv);
+	if (argc != 2 && argc != 1) {
+		fprintf(stderr, "usage:\n\t%s [image.png]\n", *argv);
 		return 1;
 	}
-	char *filename_in = argv[1];
+	char *filename_in = argc == 2 ? argv[1] : "/tmp/lenak.png";
 
 	struct FTR f = ftr_new_window(512,512);
 	struct viewer_state e[1];
 	f.userdata = e;
 
-	int pd;
-	e->img = iio_read_image_float_vec(filename_in, &e->iw, &e->ih, &pd);
-	assert(pd == 3);
+	e->img = iio_read_image_float_vec(filename_in, &e->iw, &e->ih, &e->pd);
 
 	center_view(&f);
 	paint_state(&f);
@@ -885,7 +879,10 @@ int main(int argc, char *argv[])
 	ftr_set_handler(&f, "motion", event_motion);
 	ftr_set_handler(&f, "resize", event_resize);
 
-	return ftr_loop_run(&f);
+	int r = ftr_loop_run(&f);
+	ftr_close(&f);
+	//free(e->img);
+	return r;
 }
 
 // vim:set foldmethod=marker:

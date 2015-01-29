@@ -165,18 +165,18 @@ float march_singular_raw(float a, float b, float c, float d, float x, float y)
 	//return 0;
 }
 
-#include <stdlib.h>
+//#include <stdlib.h>
 // read an environment variable to switch singularity treatment
 static int MARCH_SADDLES(void)
 {
 	static int reat = 0;
 	static int value = 3;
-	if (!reat) {
-		reat = 1;
-		char *s = getenv("MARCH_SADDLES");
-		if (s)
-			value = atoi(s);
-	}
+	//if (!reat) {
+	//	reat = 1;
+	//	char *s = getenv("MARCH_SADDLES");
+	//	if (s)
+	//		value = atoi(s);
+	//}
 	return value;
 }
 

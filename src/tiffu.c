@@ -1167,7 +1167,7 @@ static void fill_subs_cmdline(char *cmdline, char *cmd, char *fprefix,
 			add_item_to_cmdline(cmdline, bn(fns_out[idx]), fprefix);
 		} else
 			add_item_to_cmdline(cmdline, tok, NULL);
-	} while (tok = strtok(NULL, " "));
+	} while ((tok = strtok(NULL, " ")));
 }
 
 static void extract_tile(char *tpd, char *filename, int idx)
