@@ -1,9 +1,8 @@
 // Homography viewer.
 //
 // This program loads a color image and allows the user to drag the four
-// corners of the image around the window.  An homography is determined by the
-// position of these four points, and this homography is used to map the image
-// into the window.
+// corners of the image around the window, thus deforming the image by an
+// homography.
 //
 //
 // Usage:
@@ -11,7 +10,7 @@
 // 	viho image.png
 //
 //
-// Controls:
+// Mouse controls:
 //
 // 	1. Drag the control points with the left mouse button to change their
 // 	position in the window
@@ -85,6 +84,7 @@ struct viewer_state {
 	bool tile_plane;
 	bool show_horizon;
 	bool show_grid_points;
+	bool restrict_to_affine;
 };
 
 
@@ -128,6 +128,7 @@ static void center_view(struct FTR *f)
 	e->tile_plane = false;
 	e->show_horizon = false;
 	e->show_grid_points = false;
+	e->restrict_to_affine = false;
 }
 
 
@@ -251,8 +252,9 @@ static void vector_product(double axb[3], double a[3], double b[3])
 // This program deals with three systems of coordinates
 //
 // "image"  : coordinates in the rectangular domain of the input image
-// "view"   : coordinates of the infinite plane where the image is mapped
-// "window" : coordinates of the window, which is a rectangluar piece of "view"
+// "view"   : coordinates in the infinite plane where the image is mapped
+// "window" : coordinates in the window, which is a rectangluar piece of "view"
+//
 
 // change from view coordinates to window coordinates
 static void map_view_to_window(struct viewer_state *e, double y[2], double x[2])
@@ -297,11 +299,21 @@ static double float_to_byte(double x)
 	return 255;
 }
 
+static void adjust_affine_corner(struct viewer_state *e)
+{
+	for (int i = 0; i < 2; i++)
+		e->c[2][i] = e->c[1][i] + ( e->c[3][i] - e->c[0][i] );
+}
+
 
 // SECTION 4. Extrapolation                                                 {{{1
 
-// type of the "getsample" functions
-typedef float (*getsample_operator_t)(float*,int,int,int,int,int,int);
+// A "extrapolator" evaluates an image at an arbitrary integral position.
+// When the position is outside the image domain, the value is extrapolated
+// (by periodization, or by a constant value).
+
+// type of the "extrapolator" functions
+typedef float (*extrapolator_t)(float*,int,int,int,int,int,int);
 
 // auxiliary function: compute n%p correctly, even for huge and negative numbers
 static int good_modulus(int nn, int p)
@@ -321,7 +333,7 @@ static int good_modulus(int nn, int p)
 	return r;
 }
 
-// instance of "getsample_operator_t", extrapolate by periodicity
+// instance of "extrapolator_t", extrapolate by periodicity
 static float getsample_per(float *x, int w, int h, int pd, int i, int j, int l)
 {
 	i = good_modulus(i, w);
@@ -331,7 +343,7 @@ static float getsample_per(float *x, int w, int h, int pd, int i, int j, int l)
 	return x[(i+j*w)*pd + l];
 }
 
-// instance of "getsample_operator_t", extrapolate by a constant value
+// instance of "extrapolator_t", extrapolate by a constant value
 static float getsample_cons(float *x, int w, int h, int pd, int i, int j, int l)
 {
 	static float value = 0;
@@ -344,8 +356,8 @@ static float getsample_cons(float *x, int w, int h, int pd, int i, int j, int l)
 	return x[(i+j*w)*pd + l];
 }
 
-// obtain a sample operator from the current configuration
-static getsample_operator_t obtain_sample_operator(struct viewer_state *e)
+// obtain an extrapolator function from the current configuration
+static extrapolator_t obtain_extrapolator(struct viewer_state *e)
 {
 	if (e->tile_plane)
 		return getsample_per;
@@ -357,10 +369,15 @@ static getsample_operator_t obtain_sample_operator(struct viewer_state *e)
 
 
 // SECTION 5. Local Interpolation                                           {{{1
+//
+// An "interpolator" evaluates an image at an arbitrary floating-point
+// position.  When the position is not integral, the value is a combination of
+// neighboring values.  Notice that when the position is outside the image
+// domain, an extrapolator is also needed.
 
-// type of the "interpolation" functions
+// type of the "interpolator" functions
 typedef float (*interpolator_t)(float*,int,int,int,float,float,int,
-		getsample_operator_t);
+		extrapolator_t);
 
 // auxiliary function for bilinear interpolation
 static float evaluate_bilinear_cell(float a, float b, float c, float d,
@@ -374,7 +391,7 @@ static float evaluate_bilinear_cell(float a, float b, float c, float d,
 
 // instance of "interpolator_t", for bilinear interpolation
 static float bilinear_interpolation_at(float *x, int w, int h, int pd,
-		float p, float q, int l, getsample_operator_t pix)
+		float p, float q, int l, extrapolator_t pix)
 {
 	int ip = floor(p);
 	int iq = floor(q);
@@ -390,7 +407,7 @@ static float bilinear_interpolation_at(float *x, int w, int h, int pd,
 
 // instance of "interpolator_t", for linear (marching) interpolation
 static float linear_interpolation_at(float *x, int w, int h, int pd,
-		float p, float q, int l, getsample_operator_t pix)
+		float p, float q, int l, extrapolator_t pix)
 {
 	int ip = floor(p);
 	int iq = floor(q);
@@ -403,13 +420,14 @@ static float linear_interpolation_at(float *x, int w, int h, int pd,
 
 // instance of "interpolator_t" for nearest neighbor interpolation
 static float nearest_neighbor_at(float *x, int w, int h, int pd,
-		float p, float q, int l, getsample_operator_t pix)
+		float p, float q, int l, extrapolator_t pix)
 {
 	int ip = round(p);
 	int iq = round(q);
 	return pix(x, w, h, pd, ip, iq, l);
 }
 
+
 // one-dimensional cubic interpolation of four data points ("Keys")
 static float cubic_interpolation(float v[4], float x)
 {
@@ -431,7 +449,7 @@ static float bicubic_interpolation_cell(float p[4][4], float x, float y)
 
 // instance of "interpolator_t" for bicubic interpolation
 static float bicubic_interpolation_at(float *img, int w, int h, int pd,
-		float x, float y, int l, getsample_operator_t p)
+		float x, float y, int l, extrapolator_t p)
 {
 	x -= 1;
 	y -= 1;
@@ -464,22 +482,24 @@ static void draw_warped_image(struct FTR *f)
 {
 	struct viewer_state *e = f->userdata;
 
-	double H[3][3];           obtain_current_homography(H, e);
-	getsample_operator_t ex = obtain_sample_operator(e);
-	interpolator_t     eval = obtain_interpolator(e);
+	int w = e->iw;
+	int h = e->ih;
+
+	double         H[3][3];   obtain_current_homography(H, e);
+	extrapolator_t OUT      = obtain_extrapolator(e);
+	interpolator_t EVAL     = obtain_interpolator(e);
 
 	for (int j = 0; j < f->h; j++)
 	for (int i = 0; i < f->w; i++)
 	{
 		double p[2] = {i, j};
 		apply_homography(p, H, p);
-		p[0] = (p[0] - 0.5) * e->iw / (e->iw - 1.0);
-		p[1] = (p[1] - 0.5) * e->ih / (e->ih - 1.0);
+		p[0] = (p[0] - 0.5) * w / (w - 1.0);
+		p[1] = (p[1] - 0.5) * h / (h - 1.0);
 		for (int l = 0; l < 3; l++)
 		{
 			int idx = l + 3 * (f->w * j + i);
-			float v = eval(e->img, e->iw, e->ih, e->pd,
-					p[0], p[1], l, ex);
+			float v = EVAL(e->img, w, h, e->pd, p[0], p[1], l, OUT);
 			f->rgb[idx] = float_to_byte(v);
 		}
 	}
@@ -500,8 +520,7 @@ void traverse_segment(int px, int py, int qx, int qy,
 	else if (qx + qy < px + py) // bad quadrants
 		traverse_segment(qx, qy, px, py, f, e);
 	else {
-		//if (abs(qx - px) > qy - py) { // horitzontal
-		if (qx - px > qy - py || px - qx > qy - py) {
+		if (qx - px > qy - py || px - qx > qy - py) { // horizontal
 			float slope = (qy - py)/(float)(qx - px);
 			for (int i = 0; i < qx-px; i++)
 				f(i+px, lrint(py + i*slope), e);
@@ -563,7 +582,7 @@ static void draw_grid_points(struct FTR *f)
 	obtain_current_homography(iH, e);
 	invert_homography(H, iH);
 	for (int i = 0 ; i < f->w * f->h * 3; i++)
-		f->rgb[i] = 0;//255*(i%3);
+		f->rgb[i] = 0; // black
 	for (int j = 0; j < e->ih; j++)
 	for (int i = 0; i < e->iw; i++)
 	{
@@ -574,8 +593,9 @@ static void draw_grid_points(struct FTR *f)
 		for (int l = 0; l < 3; l++)
 		{
 			int idx_win = l + 3 * (f->w * ip[1] + ip[0]);
-			int idx_img = l + 3 * (e->iw * j + i);
-			f->rgb[idx_win] = 127+e->img[idx_img]/2;
+			float val = getsample_cons(e->img, e->iw, e->ih,
+					e->pd, i, j, l);
+			f->rgb[idx_win] = 127+val/2;
 		}
 	}
 }
@@ -601,6 +621,7 @@ static void draw_four_control_points(struct FTR *f)
 
 	for (int p = 0; p < 4; p++)
 	{
+		if (p == 2 && e->restrict_to_affine) continue;
 		double P[2];
 		map_view_to_window(e, P, e->c[p]);
 
@@ -691,17 +712,15 @@ static void paint_state(struct FTR *f)
 // SECTION 8. User-Interface Actions and Events                             {{{1
 
 // action: viewport translation
-static void change_view_offset(struct FTR *f, double dx, double dy)
+static void change_view_offset(struct viewer_state *e, double dx, double dy)
 {
-	struct viewer_state *e = f->userdata;
 	e->offset[0] += dx;
 	e->offset[1] += dy;
 }
 
 // action: viewport zoom
-static void change_view_scale(struct FTR *f, int x, int y, double fac)
+static void change_view_scale(struct viewer_state *e, int x, int y, double fac)
 {
-	struct viewer_state *e = f->userdata;
 	double center[2], X[2] = {x, y};
 	map_window_to_view(e, center, X);
 	e->scale *= fac;
@@ -716,6 +735,7 @@ static int hit_point(struct viewer_state *e, double x, double y)
 {
 	for (int p = 0; p < 4; p++)
 	{
+		if (p == 2 && e->restrict_to_affine) continue;
 		double P[2];
 		map_view_to_window(e, P, e->c[p]);
 		if (hypot(P[0] - x, P[1] - y) < 2+DISK_RADIUS)
@@ -735,20 +755,20 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	struct viewer_state *e = f->userdata;
 
 	if (k == 'c') center_view(f);
-	if (k == 'J') change_view_offset(f, 0, -1);
-	if (k == 'K') change_view_offset(f, 0, 1);
-	if (k == 'H') change_view_offset(f, 1, 0);
-	if (k == 'L') change_view_offset(f, -1, 0);
-	if (k == 'j') change_view_offset(f, 0, -10);
-	if (k == 'k') change_view_offset(f, 0, 10);
-	if (k == 'h') change_view_offset(f, 10, 0);
-	if (k == 'l') change_view_offset(f, -10, 0);
-	if (k == FTR_KEY_DOWN ) change_view_offset(f, 0, -100);
-	if (k == FTR_KEY_UP   ) change_view_offset(f, 0, 100);
-	if (k == FTR_KEY_RIGHT) change_view_offset(f, -100, 0);
-	if (k == FTR_KEY_LEFT) change_view_offset(f, 100, 0);
-	if (k == '+') change_view_scale(f, f->w/2, f->h/2, ZOOM_FACTOR);
-	if (k == '-') change_view_scale(f, f->w/2, f->h/2, 1.0/ZOOM_FACTOR);
+	if (k == 'J') change_view_offset(e, 0, -1);
+	if (k == 'K') change_view_offset(e, 0, 1);
+	if (k == 'H') change_view_offset(e, 1, 0);
+	if (k == 'L') change_view_offset(e, -1, 0);
+	if (k == 'j') change_view_offset(e, 0, -10);
+	if (k == 'k') change_view_offset(e, 0, 10);
+	if (k == 'h') change_view_offset(e, 10, 0);
+	if (k == 'l') change_view_offset(e, -10, 0);
+	if (k == FTR_KEY_DOWN ) change_view_offset(e, 0, -100);
+	if (k == FTR_KEY_UP   ) change_view_offset(e, 0, 100);
+	if (k == FTR_KEY_RIGHT) change_view_offset(e, -100, 0);
+	if (k == FTR_KEY_LEFT)  change_view_offset(e, 100, 0);
+	if (k == '+') change_view_scale(e, f->w/2, f->h/2, ZOOM_FACTOR);
+	if (k == '-') change_view_scale(e, f->w/2, f->h/2, 1.0/ZOOM_FACTOR);
 	if (k == 'p') e->tile_plane = !e->tile_plane;
 	if (k == 'w') e->show_horizon = !e->show_horizon;
 	if (k >= '0' && k <= '9') e->interpolation_order = k - '0';
@@ -757,6 +777,7 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 		e->dragging_point = false;
 		e->dragging_ipoint = false;
 	}
+	if (k == 'a') e->restrict_to_affine = !e->restrict_to_affine;
 
 	paint_state(f);
 }
@@ -790,6 +811,8 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		e->dragging_point = false;
 		double X[2] = {x, y};
 		map_window_to_view(e, e->c[p], X);
+		if (e->restrict_to_affine)
+			adjust_affine_corner(e);
 	}
 
 	// begin dragging a control point in the IMAGE DOMAIN
@@ -816,8 +839,8 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	}
 
 	// zoom in/out
-	if (k == FTR_BUTTON_DOWN) change_view_scale(f, x, y, ZOOM_FACTOR);
-	if (k == FTR_BUTTON_UP) change_view_scale(f, x, y, 1.0/ZOOM_FACTOR);
+	if (k == FTR_BUTTON_DOWN) change_view_scale(e, x, y, ZOOM_FACTOR);
+	if (k == FTR_BUTTON_UP) change_view_scale(e, x, y, 1.0/ZOOM_FACTOR);
 
 	paint_state(f);
 }
@@ -828,16 +851,18 @@ static void event_motion(struct FTR *f, int b, int m, int x, int y)
 	struct viewer_state *e = f->userdata;
 
 	// drag WINDOW DOMAIN control point (realtime feedback)
-	if (e->dragging_point && m == FTR_BUTTON_LEFT)
+	if (e->dragging_point && m | FTR_BUTTON_LEFT)
 	{
 		int p = e->dragged_point;
 		double X[2] = {x, y};
 		map_window_to_view(e, e->c[p], X);
+		if (e->restrict_to_affine)
+			adjust_affine_corner(e);
 		paint_state(f);
 	}
 
 	// drag IMAGE DOMAIN control point (realtime feedback)
-	if (e->dragging_ipoint && m == FTR_BUTTON_RIGHT)
+	if (e->dragging_ipoint && m | FTR_BUTTON_RIGHT)
 	{
 		int p = e->dragged_point;
 		double P[2], Q[2] = {x, y};
@@ -879,10 +904,7 @@ int main(int argc, char *argv[])
 	ftr_set_handler(&f, "motion", event_motion);
 	ftr_set_handler(&f, "resize", event_resize);
 
-	int r = ftr_loop_run(&f);
-	ftr_close(&f);
-	//free(e->img);
-	return r;
+	return ftr_loop_run(&f);
 }
 
 // vim:set foldmethod=marker:
