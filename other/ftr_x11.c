@@ -1,6 +1,4 @@
 #define _POSIX_SOURCE
-//#include <math.h>
-//#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -163,6 +161,7 @@ void ftr_close(struct FTR *ff)
 	XCloseDisplay(f->display);
 }
 
+// replacement for XKeycodeToKeysym, which is deprecated
 static int x_keycode_to_keysym(struct _FTR *f, int keycode)
 {
 	int nothing;
@@ -174,10 +173,7 @@ static int x_keycode_to_keysym(struct _FTR *f, int keycode)
 
 static int keycode_to_ftr(struct _FTR *f, int keycode, int keystate)
 {
-	//fprintf(stderr, "\tkeycode = %d (%d)\n", keycode, keystate);
-	//int key = XKeycodeToKeysym(f->display, keycode, keystate);
 	int key = x_keycode_to_keysym(f, keycode);
-	//fprintf(stderr, "\t\tkey = %d\n", key);
 
 	if (keycode == 9)   return 27;    // ascii ESC
 	if (keycode == 119) return 127;   // ascii DEL
@@ -200,28 +196,6 @@ static int do_bound(int a, int b, int x)
 	if (x > b) return b;
 	return x;
 }
-
-//static int do_snap(int a, int b, int x)
-//{
-//	if (b < a) return do_snap(b, a, x);
-//	if (2*x > a+b) return b;
-//	return a;
-//}
-//
-//static void do_doublesnap(int *ox, int *oy, int w, int h, int x, int y)
-//{
-//	if (x < 0) x = 0;
-//	if (y < 0) y = 0;
-//	if (x >= w) x = w-1;
-//	if (y >= h) y = h-1;
-//	int dhor = fmin(x, w - x);
-//	int dver = fmin(y, h - y);
-//	if (dhor < 100 && dver > 100) { x = x<100 ? 0 : w-1; }
-//	if (dver < 100 && dhor > 100) { y = y<100 ? 0 : h-1; }
-//	*ox = x;
-//	*oy = y;
-//}
-
 
 static void ugly_hack_disable_enter_events(struct _FTR *f)
 {

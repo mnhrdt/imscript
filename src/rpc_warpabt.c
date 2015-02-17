@@ -55,7 +55,7 @@ static int tiff_cache_interpolate_float(float *result,
 }
 
 
-void rpc_warpabt(float *outa, float *outb, int w, int h, int pd,
+void rpc_warpabt(float *outa, float *outb, float *h0, int w, int h, int pd,
 		struct tiff_tile_cache *ta, struct rpc *rpca,
 		struct tiff_tile_cache *tb, struct rpc *rpcb,
 		double axyh[3])
@@ -68,39 +68,42 @@ void rpc_warpabt(float *outa, float *outb, int w, int h, int pd,
 
 	// center in geographic coordinates
 	double c[3];
-	eval_rpc(c, rpca, axyh[0], axyh[1], axyh[2]);
-	fprintf(stderr, "(%g %g %g) => %g %g\n",
-			axyh[0], axyh[1], axyh[2], c[0], c[1]);
+	eval_rpc(c, rpca, axyh[0], axyh[1], *h0);
 
 	// TODO: compute the stem more inteligently here
 	// step = nominal resolution
 	double csouth[3];
-	eval_rpc(csouth, rpca, axyh[0], axyh[1] + 1, axyh[2]);
-	fprintf(stderr, "(%g %g %g) => %g %g\n",
-			axyh[0], axyh[1]+1, axyh[2], csouth[0], csouth[1]);
-	double ceast[3];
-	eval_rpc(ceast, rpca, axyh[0] + 1, axyh[1], axyh[2]);
-	fprintf(stderr, "(%g %g %g) => %g %g\n",
-			axyh[0]+1, axyh[1], axyh[2], ceast[0], ceast[1]);
+	eval_rpc(csouth, rpca, axyh[0], axyh[1] + 1, *h0);
 
-	double lon_step = ceast[0] - c[0]; // in degrees
+
+
+	fprintf(stderr, "(%g %g %g) => %.8lf %.8lf\n",
+			axyh[0], axyh[1], axyh[2], c[0], c[1]);
+	fprintf(stderr, "(%g %g %g) => %.8lf %.8lf\n",
+			axyh[0], axyh[1]+1, axyh[2], csouth[0], csouth[1]);
+	//double ceast[3];
+	//eval_rpc(ceast, rpca, axyh[0] + 1, axyh[1], axyh[2]);
+	//fprintf(stderr, "(%g %g %g) => %g %g\n",
+	//		axyh[0]+1, axyh[1], axyh[2], ceast[0], ceast[1]);
+
+	//double lon_step = ceast[0] - c[0]; // in degrees
 	double lat_step = csouth[1] - c[1]; // in degrees
 
 	double latitude = c[1] * (M_PI/180); // in radians
 	double lonfactor = cos(latitude);
 
-	double lon_step_m = lon_step * (M_PI/180) * EARTH_RADIUS / lonfactor;
-	double lat_step_m = lat_step * (M_PI/180) * EARTH_RADIUS;
 
+	// actually apply the factor
+	double lon_step = - lat_step / lonfactor;
+
+	double lon_step_m = (lon_step*lonfactor) * (M_PI/180) * EARTH_RADIUS;
+	double lat_step_m = lat_step * (M_PI/180) * EARTH_RADIUS;
 	fprintf(stderr, "lon_step = %g (%g meters)\n", lon_step, lon_step_m);
 	fprintf(stderr, "lat_step = %g (%g meters)\n", lat_step, lat_step_m);
 
-	// actually apply the factor
-	lon_step /= lonfactor;
-
 	if (1) { // some consistency tests
 		double pc[3];
-		eval_rpci(pc, rpca, c[0], c[1], axyh[2]);
+		eval_rpci(pc, rpca, c[0], c[1], *h0);
 		fprintf(stderr, "(%g %g %g) => %g %g\n",
 				c[0], c[1], axyh[2], pc[0], pc[1]);
 	}
@@ -113,8 +116,9 @@ void rpc_warpabt(float *outa, float *outb, int w, int h, int pd,
 	{
 		double lon = c[0] + i * lon_step;
 		double lat = c[1] + j * lat_step;
-		double paij[3]; eval_rpci(paij, rpca, lon, lat, axyh[2]);
-		double pbij[3]; eval_rpci(pbij, rpcb, lon, lat, axyh[2]);
+		float h0ij = h0[j*w+i];
+		double paij[3]; eval_rpci(paij, rpca, lon, lat, h0ij);
+		double pbij[3]; eval_rpci(pbij, rpcb, lon, lat, h0ij);
 		float *oaij = outa + (j*w + i) * pd;
 		float *obij = outb + (j*w + i) * pd;
 		tiff_cache_interpolate_float(oaij, ta, paij[0], paij[1]);
@@ -135,21 +139,20 @@ int main_rpc_warpabt(int c, char *v[])
 	TIFFSetWarningHandler(NULL);//suppress warnings
 
 	// input arguments
-	if (c != 12) {
+	if (c != 10) {
 		fprintf(stderr, "usage:\n\t"
-		"%s a.{tiff,rpc} b.{tiff,rpc} ax ay h0 w h o{a,b}.tiff\n", *v);
-		//0 1       2    3       4    5  6  7  8 9 10  11
+		"%s a.{tiff,rpc} b.{tiff,rpc} ax ay h0.tif o{a,b}.tiff\n", *v);
+		//0 1       2    3       4    5  6  7      8   9
 		return 1;
 	}
 	char *filename_a    = v[1];
 	char *filename_rpca = v[2];
 	char *filename_b    = v[3];
 	char *filename_rpcb = v[4];
-	double axyh[3] ={atof(v[5]), atof(v[6]), atof(v[7])};
-	int  w =         atoi(v[8]);
-	int  h =         atoi(v[9]);
-	char *filename_outa = v[10];
-	char *filename_outb = v[11];
+	double axyh[3] ={atof(v[5]), atof(v[6]), 0};
+	char *filename_h0   = v[7];
+	char *filename_outa = v[8];
+	char *filename_outb = v[9];
 
 	// read input images and rpcs
 	//int wa, wb, ha, hb, pd, pdb;
@@ -168,13 +171,16 @@ int main_rpc_warpabt(int c, char *v[])
 	read_rpc_file_xml(rpca, filename_rpca);
 	read_rpc_file_xml(rpcb, filename_rpcb);
 
+	int w, h;
+	float *h0 = iio_read_image_float(filename_h0, &w, &h);
+
 
 	// allocate space for output images
 	float *outa = xmalloc(w * h * pd * sizeof*outa);
 	float *outb = xmalloc(w * h * pd * sizeof*outb);
 
 	// run the algorithm
-	rpc_warpabt(outa, outb, w,h,pd, ta,rpca, tb,rpcb, axyh);
+	rpc_warpabt(outa, outb, h0, w,h,pd, ta,rpca, tb,rpcb, axyh);
 
 	// save the output images
 	iio_save_image_float_vec(filename_outa, outa, w, h, pd);

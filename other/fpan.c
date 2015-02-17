@@ -11,6 +11,8 @@
 #endif
 #include "ftr.c"
 
+#include "xmalloc.c"
+
 #define WHEEL_FACTOR 1.4
 #define MAX_PYRAMID_LEVELS 30
 
@@ -20,7 +22,7 @@ static float *read_image_float_rgb(char *fname, int *w, int *h)
 	int pd;
 	float *x = iio_read_image_float_vec(fname, w, h, &pd);
 	if (pd == 3) return x;
-	float *y = malloc(3**w**h*sizeof*y);
+	float *y = xmalloc(3**w**h*sizeof*y);
 	for (int i = 0; i < *w**h; i++) {
 		switch(pd) {
 		case 1:
@@ -417,7 +419,7 @@ static void create_pyramid(struct pan_state *e)
 		float   *lrgb = s ? e->pyr_rgb[s-1] : e->frgb;
 		int      sw   = ceil(lw / 2.0);
 		int      sh   = ceil(lh / 2.0);
-		float   *srgb = malloc(3 * sw * sh * sizeof*srgb);
+		float   *srgb = xmalloc(3 * sw * sh * sizeof*srgb);
 		z(srgb, sw, sh, lrgb, lw, lh);
 		e->pyr_w[s]   = sw;
 		e->pyr_h[s]   = sh;

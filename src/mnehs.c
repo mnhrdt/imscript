@@ -9,6 +9,9 @@
 #include "getpixel.c"
 #include "bicubic.c"
 
+#define DONT_USE_TEST_MAIN
+#include "rpc.c"
+
 static void apply_projection(double y[3], double P[8], double x[3])
 {
 	y[0] = P[0] * x[0] + P[1] * x[1] + P[2] * x[2] + P[3];
@@ -61,6 +64,31 @@ void mnehs_affine_warp(float *warp,
 		double paijh[3], pbijh[3];
 		apply_projection(paijh, PA, ijh);
 		apply_projection(pbijh, PB, ijh);
+		float va[pd], vb[pd];
+		bicubic_interpolation(va, a, wa, ha, pd, paijh[0], paijh[1]);
+		bicubic_interpolation(vb, b, wb, hb, pd, pbijh[0], pbijh[1]);
+		for (int l = 0; l < pd; l++)
+			warp[pd*(j*wh+i)+l] = va[l] - vb[l];
+	}
+}
+
+void mnehs_rpc_warp(float *warp,
+		float *h, int wh, int hh, int pd,
+		float *a, int wa, int ha,
+		float *b, int wb, int hb,
+		struct rpc *ra, struct rpc *rb)
+{
+	for (int j = 0; j < hh; j++)
+	for (int i = 0; i < wh; i++)
+	{
+		float vh = getsample_nan(h, wh, hh, 1, i, j, 0);
+		double ijh[3] = {i, j, vh};
+		double paijh[3], pbijh[3];
+
+		eval_rpci(paijh, ra, i, j, vh);
+		eval_rpci(pbijh, rb, i, j, vh);
+		fprintf(stderr, "(%d %d %g) => (%g %g)\n", i, j, vh, paijh[0], paijh[1]);
+
 		float va[pd], vb[pd];
 		bicubic_interpolation(va, a, wa, ha, pd, paijh[0], paijh[1]);
 		bicubic_interpolation(vb, b, wb, hb, pd, pbijh[0], pbijh[1]);
@@ -258,6 +286,11 @@ int main_warp(int c, char *v[])
 	if (pd != pdb)
 		fail("input pair has different color depth");
 
+	fprintf(stderr, "pa = %g %g %g %g %g %g %g %g\n",
+		PA[0], PA[1], PA[2], PA[3], PA[4], PA[5], PA[6], PA[7]);
+	fprintf(stderr, "pb = %g %g %g %g %g %g %g %g\n",
+		PB[0], PB[1], PB[2], PB[3], PB[4], PB[5], PB[6], PB[7]);
+
 	// perform centering, if necessary
 	if (do_center) {
 		fprintf(stderr, "centering projection matrices\n");
@@ -270,6 +303,58 @@ int main_warp(int c, char *v[])
 
 	// run the algorithm
 	mnehs_affine_warp(out, h0, wi,hi,pd, a,wa,ha, b,wb,hb, PA, PB);
+
+	// save the output image
+	iio_save_image_float_vec(filename_out, out, wi, hi, pd);
+
+	// cleanup and exit
+	free(out);
+	free(h0);
+	free(a);
+	free(b);
+	return 0;
+}
+
+int main_warprpc(int c, char *v[])
+{
+	// input arguments
+	bool do_center = pick_option(&c, &v, "c", NULL);
+	if (c != 7) {
+		fprintf(stderr, "usage:\n\t"
+			"%s a.png b.png Pa.rpc Pb.rpc in.tiff amb.png\n", *v);
+		//        0  1     2     3      4     5       6
+		return 1;
+	}
+	char *filename_a   = v[1];
+	char *filename_b   = v[2];
+	char *matrix_pa    = v[3];
+	char *matrix_pb    = v[4];
+	char *filename_in  = v[5];
+	char *filename_out = v[6];
+
+	// read input images and matrices
+	int wa, wb, wi, ha, hb, hi, pd, pdb;
+	float *a  = iio_read_image_float_vec(filename_a, &wa, &ha, &pd);
+	float *b  = iio_read_image_float_vec(filename_b, &wb, &hb, &pdb);
+	float *h0 = iio_read_image_float(filename_in, &wi, &hi);
+
+	//double PA[8], PB[8];
+	//read_n_doubles_from_string(PA, matrix_pa, 8);
+	//read_n_doubles_from_string(PB, matrix_pb, 8);
+	struct rpc rpca[1];
+	struct rpc rpcb[1];
+	read_rpc_file_xml(rpca, matrix_pa);
+	read_rpc_file_xml(rpcb, matrix_pb);
+
+	if (pd != pdb)
+		fail("input pair has different color depth");
+
+
+	// allocate space for output image
+	float *out = xmalloc(wi * hi * pd * sizeof*out);
+
+	// run the algorithm
+	mnehs_rpc_warp(out, h0, wi,hi,pd, a,wa,ha, b,wb,hb, rpca, rpcb);
 
 	// save the output image
 	iio_save_image_float_vec(filename_out, out, wi, hi, pd);
@@ -339,5 +424,5 @@ int main_compute(int c, char *v[])
 	free(b);
 	return 0;
 }
-int main(int c,char*v[]){return main_compute(c,v);}
+int main(int c,char*v[]){return main_warp(c,v);}
 #endif//MAIN_MNEHS

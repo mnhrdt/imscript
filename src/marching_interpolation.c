@@ -38,7 +38,7 @@ float march_regular(float a, float b, float c, float d, float x, float y)
 	assert(x0 >= 0); assert(x0 <= 1); assert(x0 <= x);
 	assert(x1 >= 0); assert(x1 <= 1); assert(x1 >= x);
 	float ix = ((x - x0)*c + (x1 - x)*b)/(x1 - x0);
-	assert(ix >= a); assert(ix <= c);
+	//assert(ix >= a); assert(ix <= c);
 
 	return 1*ix;
 }

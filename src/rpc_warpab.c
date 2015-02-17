@@ -29,6 +29,7 @@ void rpc_warpab(float *outa, float *outb, int w, int h, int pd,
 	// LA = rpca direct
 	// PB = rpcb inverse
 	// LB = rpcb direct
+	// FALSE! it is actually the opposite (?)
 
 	// center in geographic coordinates
 	double c[3];
@@ -77,9 +78,8 @@ void rpc_warpab(float *outa, float *outb, int w, int h, int pd,
 		double lat = c[1] + j * lat_step;
 		double paij[3]; eval_rpci(paij, rpca, lon, lat, axyh[2]);
 		double pbij[3]; eval_rpci(pbij, rpcb, lon, lat, axyh[2]);
-		int oidx = (j*w + i) * pd;
-		float *oaij = outa + oidx;
-		float *obij = outb + oidx;
+		float *oaij = outa + (j*w + i) * pd;
+		float *obij = outb + (j*w + i) * pd;
 		bicubic_interpolation(oaij, a, wa, ha, pd, paij[0], paij[1]);
 		bicubic_interpolation(obij, b, wb, hb, pd, pbij[0], pbij[1]);
 	}

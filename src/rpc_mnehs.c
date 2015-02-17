@@ -204,6 +204,7 @@ static void vertical_direction(double result[2],
 	project(ph, P, ijhp);
 	result[0] = ph[0] - p0[0];
 	result[1] = ph[1] - p0[1];
+	//fprintf(stderr, "vertical %p (%g %g %g | %g) = (%g %g)\n", P, ijh[0], ijh[1], ijh[2],ijhp[2], result[0], result[1]);
 }
 
 static float laplacian_at(float *x, int w, int h, int i, int j)
@@ -237,12 +238,10 @@ void mnehs_rpc(float *out_h, float *init_h, int ow, int oh,
 
 	// allocate temporary images
 	float *h   = xmalloc(ow * oh * sizeof*h);     // h-increment
-	float *Q   = xmalloc(ow * oh * sizeof*Q);      // Q
-	float *amb = xmalloc(ow * oh * sizeof*amb);    // A-B (warped)
-	float *iga = xmalloc(ow * oh * 2 * sizeof*Q);      // Q
-	float *igb = xmalloc(ow * oh * 2 * sizeof*Q);      // Q
-	//float *ga  = xmalloc(2 * wa * ha * sizeof*ga); // grad(A)
-	//float *gb  = xmalloc(2 * wb * hb * sizeof*gb); // grad(B)
+	float *Q   = xmalloc(ow * oh * sizeof*Q);     // Q
+	float *amb = xmalloc(ow * oh * sizeof*amb);   // A-B (warped)
+	float *iga = xmalloc(ow * oh * 2 * sizeof*Q); // grad(A) (warped)
+	float *igb = xmalloc(ow * oh * 2 * sizeof*Q); // grad(B) (warped)
 	
 	// fill images q and amb (a minus b)
 	for (int j = 0; j < oh; j++)
@@ -255,8 +254,6 @@ void mnehs_rpc(float *out_h, float *init_h, int ow, int oh,
 		float va[pd], vb[pd], vga[2*pd], vgb[2*pd];
 		tiff_cache_interpolate_float(va, ta, paijh[0], paijh[1]);
 		tiff_cache_interpolate_float(vb, tb, pbijh[0], pbijh[1]);
-		//fprintf(stderr, "%d %d %g => (%g %g)[%g] (%g %g)[%g]\n",
-		//		i, j, h0, paijh[0], paijh[1], va, pbijh[0], pbijh[1], vb);
 		tiff_cache_gradient_float(vga, ta, paijh[0], paijh[1]);
 		tiff_cache_gradient_float(vgb, tb, pbijh[0], pbijh[1]);
 		double PAp[2]; vertical_direction(PAp, PA, paijh);
@@ -271,10 +268,24 @@ void mnehs_rpc(float *out_h, float *init_h, int ow, int oh,
 		igb[(j*ow+i)*2+1] = vgb[1];
 	}
 
-	iio_save_image_float_vec("amb.tiff", amb, ow, oh, 1);
-	iio_save_image_float_vec("Q.tiff", Q, ow, oh, 1);
-	iio_save_image_float_vec("iga.tiff", iga, ow, oh, 2);
-	iio_save_image_float_vec("igb.tiff", igb, ow, oh, 2);
+	iio_save_image_float_vec("/tmp/mnehs_amb.tiff", amb, ow, oh, 1);
+	iio_save_image_float_vec("/tmp/mnehs_Q.tiff", Q, ow, oh, 1);
+	iio_save_image_float_vec("/tmp/mnehs_iga.tiff", iga, ow, oh, 2);
+	iio_save_image_float_vec("/tmp/mnehs_igb.tiff", igb, ow, oh, 2);
+
+	// save raster grid
+	float *raster_grid = xmalloc(2 * ow * oh * sizeof(float));
+	for (int j = 0; j < oh; j++)
+	for (int i = 0; i < ow; i++)
+	{
+		double x = PA->lon_0 + i * PA->lon_d;
+		double y = PA->lat_0 + j * PA->lat_d;
+		raster_grid[(j*ow+i)*2+0] = x;
+		raster_grid[(j*ow+i)*2+1] = y;
+
+	}
+	iio_save_image_float_vec("/tmp/mnehs_raster.tiff",raster_grid,ow,oh,2);
+	free(raster_grid);
 
 	// initialize h
 	for (int i = 0; i < ow * oh; i++)
@@ -292,11 +303,11 @@ void mnehs_rpc(float *out_h, float *init_h, int ow, int oh,
 			float ax = laplacian_at(h, ow, oh, i, j);
 			ax -= Q[ij] * (Q[ij] * h[ij] + amb[ij]) / alpha2;
 			h[ij] += TAU() * ax;
-			if (fabs(Q[ij]) > 10) // there is boundary
+			if (fabs(Q[ij]) > 200) // there is boundary
 				h[ij] = -amb[ij]/Q[ij];
 		}
 	}
-	iio_save_image_float_vec("h.tiff", h, ow, oh, 1);
+	iio_save_image_float_vec("/tmp/mnehs_h.tiff", h, ow, oh, 1);
 
 	// update result
 	for (int i = 0; i < ow * oh; i++)
@@ -360,7 +371,12 @@ int main_rpc_warpabt(int c, char *v[])
 	// run the algorithm
 	float alpha2 = ALPHA()*ALPHA();
 	int niter = NITER();
-	mnehs_rpc(out_h, in_h0, w, h, ta,rpca, tb,rpcb, axyh, alpha2, niter);
+	int nwarps = NWARPS();
+	for (int i = 0; i < nwarps; i++)
+	{
+		mnehs_rpc(out_h, in_h0, w,h,ta,rpca,tb,rpcb,axyh, alpha2,niter);
+		memcpy(in_h0, out_h, w*h*sizeof*in_h0);
+	}
 
 	// save the output raster
 	iio_save_image_float(filename_out, out_h, w, h);

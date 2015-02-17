@@ -42,7 +42,7 @@
 //
 // Compilation:
 //
-//	cc -O3 viho.c iio.c ftr.c -lX11 -lpng -ljpeg -ltiff -o viho 
+//	cc -O3 -DNDEBUG viho.c iio.c ftr.c -lX11 -lpng -ljpeg -ltiff -o viho 
 
 
 // SECTION 1. Libraries and data structures                                 {{{1
@@ -52,7 +52,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-// user interface library
+//// user interface library
 #include "ftr.h"
 
 
@@ -75,9 +75,11 @@ struct viewer_state {
 	double offset[2], scale; // window viewport
 
 	// dragging state
-	bool dragging_point;
-	bool dragging_ipoint;
+	bool dragging_window_point;
+	bool dragging_image_point;
+	bool dragging_background;
 	int dragged_point;
+	int drag_handle[2];
 
 	// display options
 	int interpolation_order; // 0=nearest, 1=linear, 2=bilinear, 3=bicubic
@@ -115,8 +117,10 @@ static void center_view(struct FTR *f)
 	e->p[3][1] = e->ih - 1;
 
 	// drag state
-	e->dragging_point = false;
-	e->dragging_ipoint = false;
+	e->dragging_window_point = false;
+	e->dragging_image_point = false;
+	e->dragged_point = -1;
+	e->dragging_background = false;
 
 	// viewport
 	e->offset[0] = 0;
@@ -129,6 +133,8 @@ static void center_view(struct FTR *f)
 	e->show_horizon = false;
 	e->show_grid_points = false;
 	e->restrict_to_affine = false;
+
+	f->changed = 1;
 }
 
 
@@ -161,15 +167,15 @@ static double invert_homography(double invH[3][3], double H[3][3])
 	double *a = H[0], *r = invH[0];
 	double det = a[0]*a[4]*a[8] + a[2]*a[3]*a[7] + a[1]*a[5]*a[6]
 		   - a[2]*a[4]*a[6] - a[1]*a[3]*a[8] - a[0]*a[5]*a[7];
-	r[0] = (a[4]*a[8]-a[5]*a[7])/det;
-	r[1] = (a[2]*a[7]-a[1]*a[8])/det;
-	r[2] = (a[1]*a[5]-a[2]*a[4])/det;
-	r[3] = (a[5]*a[6]-a[3]*a[8])/det;
-	r[4] = (a[0]*a[8]-a[2]*a[6])/det;
-	r[5] = (a[2]*a[3]-a[0]*a[5])/det;
-	r[6] = (a[3]*a[7]-a[4]*a[6])/det;
-	r[7] = (a[1]*a[6]-a[0]*a[7])/det;
-	r[8] = (a[0]*a[4]-a[1]*a[3])/det;
+	r[0] = ( a[4] * a[8] - a[5] * a[7] ) / det;
+	r[1] = ( a[2] * a[7] - a[1] * a[8] ) / det;
+	r[2] = ( a[1] * a[5] - a[2] * a[4] ) / det;
+	r[3] = ( a[5] * a[6] - a[3] * a[8] ) / det;
+	r[4] = ( a[0] * a[8] - a[2] * a[6] ) / det;
+	r[5] = ( a[2] * a[3] - a[0] * a[5] ) / det;
+	r[6] = ( a[3] * a[7] - a[4] * a[6] ) / det;
+	r[7] = ( a[1] * a[6] - a[0] * a[7] ) / det;
+	r[8] = ( a[0] * a[4] - a[1] * a[3] ) / det;
 	return det;
 }
 
@@ -207,8 +213,6 @@ static void homography_from_four_points(double H[3][3],
 	double DET = A * D - B * C;
 	double r = (D * P - B * Q) / DET;
 	double s = (A * Q - C * P) / DET;
-	if (!isnormal(DET))
-		fprintf(stderr, "denormal! DET = %g\n", DET);
 
 	// solve the rest of the diagonal system
 	double a = w[0] * ( 1 + r ) - p;
@@ -243,7 +247,6 @@ static void vector_product(double axb[3], double a[3], double b[3])
 	axb[1] = a[2] * b[0] - a[0] * b[2];
 	axb[2] = a[0] * b[1] - a[1] * b[0];
 }
-
 
 
 
@@ -361,7 +364,7 @@ static extrapolator_t obtain_extrapolator(struct viewer_state *e)
 {
 	if (e->tile_plane)
 		return getsample_per;
-	float top = 255;
+	float top = 255; // white
 	getsample_cons(&top, 0, 0, 0, 0, 0, 0);
 	return getsample_cons;
 }
@@ -466,7 +469,8 @@ static float bicubic_interpolation_at(float *img, int w, int h, int pd,
 // obtain an interpolation operator from the current configuration
 static interpolator_t obtain_interpolator(struct viewer_state *e)
 {
-	if (e->dragging_point || e->dragging_ipoint) return nearest_neighbor_at;
+	if (e->dragged_point >= 0 || e->dragging_background)
+		return nearest_neighbor_at;
 	if (e->interpolation_order == 1) return linear_interpolation_at;
 	if (e->interpolation_order == 2) return bilinear_interpolation_at;
 	if (e->interpolation_order == 3) return bicubic_interpolation_at;
@@ -494,8 +498,8 @@ static void draw_warped_image(struct FTR *f)
 	{
 		double p[2] = {i, j};
 		apply_homography(p, H, p);
-		p[0] = (p[0] - 0.5) * w / (w - 1.0);
-		p[1] = (p[1] - 0.5) * h / (h - 1.0);
+		p[0] = p[0] * w / (w - 1.0) - 0.5;
+		p[1] = p[1] * h / (h - 1.0) - 0.5;
 		for (int l = 0; l < 3; l++)
 		{
 			int idx = l + 3 * (f->w * j + i);
@@ -527,7 +531,7 @@ void traverse_segment(int px, int py, int qx, int qy,
 		} else { // vertical
 			float slope = (qx - px)/(float)(qy - py);
 			for (int j = 0; j <= qy-py; j++)
-				f(lrint(px+j*slope), j+py, e);
+				f(lrint(px + j*slope), j+py, e);
 		}
 	}
 }
@@ -658,14 +662,14 @@ static void draw_horizon(struct FTR *f)
 	double d[3] = {e->c[3][0], e->c[3][1], 1};
 
 	// lines though the control points
-	double lab[3]; vector_product(lab, a, b);
-	double lcd[3]; vector_product(lcd, c, d);
-	double lad[3]; vector_product(lad, a, d);
-	double lbc[3]; vector_product(lbc, b, c);
+	double ab[3]; vector_product(ab, a, b);
+	double cd[3]; vector_product(cd, c, d);
+	double ad[3]; vector_product(ad, a, d);
+	double bc[3]; vector_product(bc, b, c);
 
 	// intersections of opposite sides (vanishing points)
-	double p[3]; vector_product(p, lab, lcd);
-	double q[3]; vector_product(q, lad, lbc);
+	double p[3]; vector_product(p, ab, cd);
+	double q[3]; vector_product(q, ad, bc);
 
 	// horizon := line through two vanishing points
 	double horizon[3]; vector_product(horizon, p, q);
@@ -675,7 +679,6 @@ static void draw_horizon(struct FTR *f)
 		p[k] /= p[2];
 		q[k] /= q[2];
 	}
-	p[2] = q[2] = 1;
 
 	// plot the horizon
 	double v[2][2];
@@ -692,9 +695,6 @@ static void paint_state(struct FTR *f)
 {
 	struct viewer_state *e = f->userdata;
 
-	for (int i = 0 ; i < f->w * f->h * 3; i++)
-		f->rgb[i] = 255*(i%3); // cyan
-
 	if (e->show_grid_points)
 		draw_grid_points(f);
 	else
@@ -703,8 +703,6 @@ static void paint_state(struct FTR *f)
 	draw_four_control_points(f);
 	if (e->show_horizon)
 		draw_horizon(f);
-
-	f->changed = 1;
 }
 
 
@@ -729,6 +727,26 @@ static void change_view_scale(struct viewer_state *e, int x, int y, double fac)
 	fprintf(stderr, "zoom changed %g\n", e->scale);
 }
 
+// action: drag a point in the window domain
+static void drag_point_in_window_domain(struct viewer_state *e, int x, int y)
+{
+	int p = e->dragged_point;
+	double X[2] = {x, y};
+	map_window_to_view(e, e->c[p], X);
+	if (e->restrict_to_affine)
+		adjust_affine_corner(e);
+}
+
+// action: drag a point in the image domain
+static void drag_point_in_image_domain(struct viewer_state *e, int x, int y)
+{
+	int p = e->dragged_point;
+	double P[2], Q[2] = {x, y};
+	map_window_to_image(e, P, Q);
+	e->p[p][0] = P[0];
+	e->p[p][1] = P[1];
+	map_window_to_view(e, e->c[p], Q);
+}
 
 // test whether (x,y) is inside one of the four control disks
 static int hit_point(struct viewer_state *e, double x, double y)
@@ -738,7 +756,7 @@ static int hit_point(struct viewer_state *e, double x, double y)
 		if (p == 2 && e->restrict_to_affine) continue;
 		double P[2];
 		map_view_to_window(e, P, e->c[p]);
-		if (hypot(P[0] - x, P[1] - y) < 2+DISK_RADIUS)
+		if (hypot(P[0] - x, P[1] - y) < 2 + DISK_RADIUS)
 			return p;
 	}
 	return -1;
@@ -755,10 +773,6 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	struct viewer_state *e = f->userdata;
 
 	if (k == 'c') center_view(f);
-	if (k == 'J') change_view_offset(e, 0, -1);
-	if (k == 'K') change_view_offset(e, 0, 1);
-	if (k == 'H') change_view_offset(e, 1, 0);
-	if (k == 'L') change_view_offset(e, -1, 0);
 	if (k == 'j') change_view_offset(e, 0, -10);
 	if (k == 'k') change_view_offset(e, 0, 10);
 	if (k == 'h') change_view_offset(e, 10, 0);
@@ -773,19 +787,16 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'w') e->show_horizon = !e->show_horizon;
 	if (k >= '0' && k <= '9') e->interpolation_order = k - '0';
 	if (k == '.') e->show_grid_points = !e->show_grid_points;
-	if (k == 'z') {
-		e->dragging_point = false;
-		e->dragging_ipoint = false;
-	}
 	if (k == 'a') e->restrict_to_affine = !e->restrict_to_affine;
 
-	paint_state(f);
+	e->dragging_window_point = e->dragging_image_point = false;
+	f->changed = 1;
 }
 
 // resize handler
 static void event_resize(struct FTR *f, int k, int m, int x, int y)
 {
-	paint_state(f);
+	f->changed = 1;
 }
 
 // mouse button handler
@@ -793,56 +804,60 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 {
 	struct viewer_state *e = f->userdata;
 
+	int p = hit_point(e, x, y);
+
 	// begin dragging a control point in the WINDOW DOMAIN
-	if (k == FTR_BUTTON_LEFT)
+	if (k == FTR_BUTTON_LEFT && p >= 0)
 	{
-		int p = hit_point(e, x, y);
-		if (p >= 0)
-		{
-			e->dragging_point = true;
-			e->dragged_point = p;
-		}
+		e->dragged_point = p;
+		e->dragging_window_point = true;
 	}
 
 	// end dragging a control point in the WINDOW DOMAIN
-	if (e->dragging_point && k == -FTR_BUTTON_LEFT)
+	if (e->dragging_window_point && k == -FTR_BUTTON_LEFT)
 	{
-		int p = e->dragged_point;
-		e->dragging_point = false;
-		double X[2] = {x, y};
-		map_window_to_view(e, e->c[p], X);
-		if (e->restrict_to_affine)
-			adjust_affine_corner(e);
+		drag_point_in_window_domain(e, x, y);
+		e->dragging_window_point = false;
+		e->dragged_point = -1;
 	}
 
 	// begin dragging a control point in the IMAGE DOMAIN
-	if (k == FTR_BUTTON_RIGHT)
+	if (k == FTR_BUTTON_RIGHT && p >= 0)
 	{
-		int p = hit_point(e, x, y);
-		if (p >= 0)
-		{
-			e->dragging_ipoint = true;
-			e->dragged_point = p;
-		}
+		e->dragged_point = p;
+		e->dragging_image_point = true;
 	}
 
 	// end dragging a control point in the IMAGE DOMAIN
-	if (e->dragging_ipoint && k == -FTR_BUTTON_RIGHT)
+	if (e->dragging_image_point && k == -FTR_BUTTON_RIGHT)
 	{
-		int p = e->dragged_point;
-		e->dragging_ipoint = false;
-		double P[2], Q[2] = {x, y};
-		map_window_to_image(e, P, Q);
-		e->p[p][0] = P[0];
-		e->p[p][1] = P[1];
-		map_window_to_view(e, e->c[p], Q);
+		drag_point_in_image_domain(e, x, y);
+		e->dragging_image_point = false;
+		e->dragged_point = -1;
+	}
+
+	// begin dragging a the WINDOW BACKGROUND
+	if (k == FTR_BUTTON_LEFT && hit_point(e, x, y) < 0)
+	{
+		e->drag_handle[0] = x;
+		e->drag_handle[1] = y;
+		e->dragging_background = true;
+	}
+
+	// end dragging the WINDOW BACLGROUND
+	if (e->dragging_background && k == -FTR_BUTTON_LEFT)
+	{
+		int dx = x - e->drag_handle[0];
+		int dy = y - e->drag_handle[1];
+		change_view_offset(e, dx, dy);
+		e->dragging_background = false;
 	}
 
 	// zoom in/out
 	if (k == FTR_BUTTON_DOWN) change_view_scale(e, x, y, ZOOM_FACTOR);
 	if (k == FTR_BUTTON_UP) change_view_scale(e, x, y, 1.0/ZOOM_FACTOR);
 
-	paint_state(f);
+	f->changed = 1;
 }
 
 // mouse motion handler
@@ -851,32 +866,83 @@ static void event_motion(struct FTR *f, int b, int m, int x, int y)
 	struct viewer_state *e = f->userdata;
 
 	// drag WINDOW DOMAIN control point (realtime feedback)
-	if (e->dragging_point && m | FTR_BUTTON_LEFT)
+	if (e->dragging_window_point && m & FTR_BUTTON_LEFT)
 	{
-		int p = e->dragged_point;
-		double X[2] = {x, y};
-		map_window_to_view(e, e->c[p], X);
-		if (e->restrict_to_affine)
-			adjust_affine_corner(e);
-		paint_state(f);
+		drag_point_in_window_domain(e, x, y);
+		f->changed = 1;
 	}
 
 	// drag IMAGE DOMAIN control point (realtime feedback)
-	if (e->dragging_ipoint && m | FTR_BUTTON_RIGHT)
+	if (e->dragging_image_point && m & FTR_BUTTON_RIGHT)
 	{
-		int p = e->dragged_point;
-		double P[2], Q[2] = {x, y};
-		map_window_to_image(e, P, Q);
-		e->p[p][0] = P[0];
-		e->p[p][1] = P[1];
-		map_window_to_view(e, e->c[p], Q);
-		paint_state(f);
+		drag_point_in_image_domain(e, x, y);
+		f->changed = 1;
+	}
+
+	// drag WINDOW DOMAIN background (realtime feedback)
+	if (e->dragging_background && m & FTR_BUTTON_LEFT)
+	{
+		int dx = x - e->drag_handle[0];
+		int dy = y - e->drag_handle[1];
+		change_view_offset(e, dx, dy);
+		e->drag_handle[0] = x;
+		e->drag_handle[1] = y;
+		f->changed = 1;
 	}
 }
 
+// expose handler
+static void event_expose(struct FTR *f, int b, int m, int x, int y)
+{
+	if (f->changed)
+		paint_state(f);
+}
 
 
-// SECTION 9. Main Program                                                  {{{1
+// SECTION 9. Image processing
+
+//#include "xmalloc.c"
+//
+//#define PYRAMID_LEVELS 20
+//
+//struct image_pyramid {
+//	float *x[PYRAMID_LEVELS];
+//	int w[PYRAMID_LEVELS];
+//	int h[PYRAMID_LEVELS];
+//	int pd;
+//};
+//
+//static void do_pyramid(struct image_pyramid *p, float *x, int w, int h, int pd)
+//{
+//	fprintf(stderr, "building a multiscale pyramid %d x %d x %d\n",
+//			w, h, pd);
+//
+//	int nw = 1 + ceil(log2(w+1));
+//	int nh = 1 + ceil(log2(h+1));
+//	p->n = (nw + nh + abs(nw - nh))/2;
+//	p->x = xmalloc(n * sizeof*p->x);
+//	p->w = xmalloc(n * sizeof*p->w);
+//	p->h = xmalloc(n * sizeof*p->h);
+//
+//	p->w[0] = w;
+//	p->h[0] = h;
+//	for (int i = 1; i < p->n; i++)
+//
+//
+//	fprintf(stderr, "\t%d x %d\n", nw, nh);
+//}
+//
+//static void free_pyramid(struct image_pyramid *p)
+//{
+//	for (int i = 0; i < pyra i++)
+//		free(p->x[i]);
+//	free(p->x);
+//	free(
+//}
+
+
+
+// SECTION 10. Main Program                                                 {{{1
 
 // library for image input-output
 #include "iio.h"
@@ -896,13 +962,16 @@ int main(int argc, char *argv[])
 
 	e->img = iio_read_image_float_vec(filename_in, &e->iw, &e->ih, &e->pd);
 
-	center_view(&f);
-	paint_state(&f);
+	//struct image_pyramid p[1];
+	//do_pyramid(p, e->img, e->iw, e->ih, e->pd);
 
-	ftr_set_handler(&f, "key", event_key);
+	center_view(&f);
+
+	ftr_set_handler(&f, "expose", event_expose);
+	ftr_set_handler(&f, "resize", event_resize);
 	ftr_set_handler(&f, "button", event_button);
 	ftr_set_handler(&f, "motion", event_motion);
-	ftr_set_handler(&f, "resize", event_resize);
+	ftr_set_handler(&f, "key", event_key);
 
 	return ftr_loop_run(&f);
 }

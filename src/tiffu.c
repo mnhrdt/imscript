@@ -779,6 +779,11 @@ static void crop_scanlines(struct tiff_tile *tout, struct tiff_info *tinfo,
 
 	// allocate space for a temporal buffer
 	int scanline_size = TIFFScanlineSize(tif);
+	if (scanline_size != tinfo->w * pixel_size) {
+		fprintf(stderr, "\tBAD scanline_size = %d\n", scanline_size);
+		fprintf(stderr, "\tBAD tinfo->w = %d\n", tinfo->w);
+		fprintf(stderr, "\tBAD pixel_size = %d\n", pixel_size);
+	}
 	assert(scanline_size == tinfo->w * pixel_size);
 	uint8_t *buf = xmalloc(scanline_size);
 
@@ -1540,7 +1545,8 @@ static void convert_pixel_to_float(float *out, struct tiff_info *t, void *in)
 {
 	for (int i = 0; i < t->spp; i++)
 	{
-		float r;
+		float r = 0;
+		if (in)
 		switch(t->fmt) {
 		case SAMPLEFORMAT_UINT:
 			if (t->bps == 8)  r = ((uint8_t*) in)[i];
@@ -2009,38 +2015,95 @@ static int main_crop(int c, char *v[])
 static int main_tileize(int c, char *v[])
 {
 	// process input arguments
-	if (c != 4) {
+	if (c != 5) {
 		fprintf(stderr, "usage:\n\t%s tw th in.tiff out.tiff\n", *v);
-		//                            0  1  2       3
+		//                         0  1  2  3       4
 		return 1;
 	}
-	//int tw = atoi(v[1]);
-	//int th = atoi(v[2]);
-	//char *filename_in = v[2];
-	//char *filename_out = v[3];
+	int tw = atoi(v[1]);
+	int th = atoi(v[2]);
+	char *filename_in = v[3];
+	char *filename_out = v[4];
 
-	//// read info of input image
-	//TIFF *tif_a = TIFFOpen(filename_in, "r");
-	//if (!tif_a)
-	//	fail("could not open TIFF file \"%s\"", filename_in);
-	//struct tiff_info ta[1];
-	//get_tiff_info(ta, tif_a);
-	//if (ta->tiled) fail("please, use retile");
+	// read info of input image
+	TIFF *tif_a = TIFFOpen(filename_in, "r");
+	if (!tif_a)
+		fail("could not open TIFF file \"%s\" (r)", filename_in);
+	struct tiff_info ta[1];
+	get_tiff_info(ta, tif_a);
+	if (ta->tiled)
+		fail("file is already tiled! please, use retile");
 
-	//// create output image
-	//double GiB = 1024.0 * 1024.0 * 1024.0;
-	//double gigabytes = (ta->spp/8.0) * ta->w * ta->h * ta->bps / GiB;
-	//TIFF *tif_b = TIFFOpen(filename_out, gigabytes > 1 ? "w8" : "w");
-	//TIFFSetField(tif_b, TIFFTAG_IMAGEWIDTH, ta->w);
-	//TIFFSetField(tif_b, TIFFTAG_IMAGEWIDTH, ta->w);
-	//TIFFSetField(tif_b, TIFFTAG_SAMPLESPERPIXEL, ta->spp);
-	//TIFFSetField(tif_b, TIFFTAG_BITSPERSAMPLE, ta->bps);
-	//TIFFSetField(tif_b, TIFFTAG_SAMPLEFORMAT, ta->fmt);
-	//TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
-	//TIFFSetField(tif, TIFFTAG_TILEWIDTH, tw);
-	//TIFFSetField(tif, TIFFTAG_TILELENGTH, th);
+	// create output tiff info
+	struct tiff_info tb[1];
+	*tb = *ta; // copy most of the data fields, except the following:
+	tb->tiled = true;
+	tb->tw = tw;
+	tb->th = th;
+	tb->ta = how_many(tb->w, tb->w);
+	tb->td = how_many(tb->h, tb->h);
+	tb->ntiles = tb->ta * tb->td;
+
+	// create output image (better use an auxiliary function that uses "tb")
+	double GiB = 1024.0 * 1024.0 * 1024.0;
+	double gigabytes = (ta->spp/8.0) * ta->w * ta->h * ta->bps / GiB;
+	TIFF *tif_b = TIFFOpen(filename_out, gigabytes > 1 ? "w8" : "w");
+	if (!tif_b)
+		fail("could not open TIFF file \"%s\" (r)", filename_out);
+	TIFFSetField(tif_b, TIFFTAG_IMAGEWIDTH, ta->w);
+	TIFFSetField(tif_b, TIFFTAG_IMAGEWIDTH, ta->w);
+	TIFFSetField(tif_b, TIFFTAG_SAMPLESPERPIXEL, ta->spp);
+	TIFFSetField(tif_b, TIFFTAG_BITSPERSAMPLE, ta->bps);
+	TIFFSetField(tif_b, TIFFTAG_SAMPLEFORMAT, ta->fmt);
+	TIFFSetField(tif_b, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+	TIFFSetField(tif_b, TIFFTAG_TILEWIDTH, tw);
+	TIFFSetField(tif_b, TIFFTAG_TILELENGTH, th);
+
+	// alloc buffer for one row of tiles
+	int bufsize = tinfo_tilesize(tb) * tb->ta;
+	uint8_t *buf = xmalloc(bufsize); // this is the malloc that may fail
+	uint8_t *tbuf = xmalloc(tinfo_tilesize(tb)); // small, just for a tile
+
+	// for each row of tiles
+	for (int tj = 0; tj < tb->td; tj++)
+	{
+		memset(buf, 127, bufsize);
+
+		// load the required scanlines from "tif_a" into the buffer
+		int scanline_size = TIFFScanlineSize(tif_a);
+		for (int j = 0; j < th; j++)
+		{
+			uint8_t *lin = buf + j * scanline_size;
+			int jj = tj * th + j;
+			int r = TIFFReadScanline(tif_a, lin, jj, 0);
+			if (r < 0) fail("could not read scanline %d", jj);
+		}
+
+		// dump the buffer into the required output tiles of "tif_b"
+		for (int ti = 0; ti < tb->ta; ti++)
+		{
+			memset(tbuf, 200, tinfo_tilesize(tb));
+			for (int j = 0; j < th; j++)
+			{
+				fail("write the body of this loop!");
+				int ps = tinfo_pixelsize(tb);
+				int tlin = ps * tw;
+				int off_out = 0;
+				int off_in;
+				memcpy(tbuf + off_out, buf + off_in, tlin);
+			}
+			int tcorner_i = 0;
+			int tcorner_j = 0;
+			TIFFWriteTile(tif_b, tbuf, tcorner_i, tcorner_j, 0, 0);
+		}
+	}
 
 
+	// close the files (closing the outpuf file is necessary, because
+	// it writes part of the header).
+	TIFFClose(tif_b);
+	TIFFClose(tif_a);
+	free(buf);
 	return 0;
 }
 
