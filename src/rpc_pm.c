@@ -303,7 +303,7 @@ void pm_rpc(float *out_h, float *init_h, int ow, int oh,
 #include "xmalloc.c"
 
 
-int main_rpc_warpabt(int c, char *v[])
+int main_rpc_pm(int c, char *v[])
 {
 	TIFFSetWarningHandler(NULL);//suppress warnings
 
@@ -356,5 +356,5 @@ int main_rpc_warpabt(int c, char *v[])
 	tiff_tile_cache_free(tb);
 	return 0;
 }
-int main(int c,char*v[]){return main_rpc_warpabt(c,v);}
+int main(int c,char*v[]){return main_rpc_pm(c,v);}
 #endif//MAIN_MNEHS

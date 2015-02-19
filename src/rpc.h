@@ -1,10 +1,6 @@
 // rational polynomial coefficient stuff
 
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <math.h>
+
 
 
 // rational polynomial coefficients (and those of the inverse model)
@@ -29,7 +25,7 @@ struct rpc {
 // read an XML file specifying an RPC model
 void read_rpc_file_xml(struct rpc *p, char *filename);
 
-void print_rpc(FILE *f, struct rpc *p, char *n);
+//void print_rpc(FILE *f, struct rpc *p, char *n);
 
 // evaluate the direct rpc model
 void eval_rpc(double *result,
