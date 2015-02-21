@@ -109,6 +109,13 @@ static double randu(double a, double b)
 	return a + random_uniform() * (b - a);
 }
 
+static void huge_tiff_getpixel_float(float *out,
+		struct tiff_tile_cache *t, int i, int j)
+{
+	void *p = tiff_tile_cache_getpixel(t, i, j);
+	convert_pixel_to_float(out, t->i, p);
+}
+
 #include "smapa.h"
 SMART_PARAMETER(PM_WINRADIUS,1)
 SMART_PARAMETER(PM_TRIALS,5)
@@ -208,7 +215,7 @@ static void backward_propagation(float *cost, float *height,
 			if (!insideP(w, h, ii, jj)) continue;
 			float hh = height[jj*w+ii];
 			float new_cost = eval_cost(PA, PB, ta, tb, ii, jj, hh);
-			if (new_cost < 1.2 * cost[idx])
+			if (new_cost < cost[idx])
 			{
 				cost[idx] = new_cost;
 				height[idx] = hh;
@@ -236,7 +243,7 @@ static void backward_propagation2(float *cost, float *height,
 			if (!insideP(w, h, ii, jj)) continue;
 			float hh = height[jj*w+ii];
 			float new_cost = eval_cost(PA, PB, ta, tb, ii, jj, hh);
-			if (new_cost < 1.2 * cost[idx])
+			if (new_cost < cost[idx])
 			{
 				cost[idx] = new_cost;
 				height[idx] = hh;
@@ -270,6 +277,47 @@ static void backward_propagation_h(float *cost, float *height,
 	}
 }
 
+static void dump_warps(float *init_h, int w, int h,
+		struct tiff_tile_cache *ta, struct tiff_tile_cache *tb,
+		struct projection_state *PA, struct projection_state *PB)
+{
+	int pd = ta->i->spp;
+
+	float *wa0 = xmalloc(w * h * pd * sizeof(float));
+	float *wb0 = xmalloc(w * h * pd * sizeof(float));
+	float *wah = xmalloc(w * h * pd * sizeof(float));
+	float *wbh = xmalloc(w * h * pd * sizeof(float));
+
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		int idx = j*w + i;
+		double ij0[3] = {i, j, 0};
+		double ijh[3] = {i, j, init_h[idx]};
+		double pa0[3], pb0[3], pah[3], pbh[3];
+		project(pa0, PA, ij0);
+		project(pb0, PB, ij0);
+		project(pah, PA, ijh);
+		project(pbh, PB, ijh);
+		int ipa0[2] = {lrint(pa0[0]), lrint(pa0[1])};
+		int ipb0[2] = {lrint(pb0[0]), lrint(pb0[1])};
+		int ipah[2] = {lrint(pah[0]), lrint(pah[1])};
+		int ipbh[2] = {lrint(pbh[0]), lrint(pbh[1])};
+		huge_tiff_getpixel_float(wa0 + pd*idx, ta, ipa0[0], ipa0[1]);
+		huge_tiff_getpixel_float(wb0 + pd*idx, tb, ipb0[0], ipb0[1]);
+		huge_tiff_getpixel_float(wah + pd*idx, ta, ipah[0], ipah[1]);
+		huge_tiff_getpixel_float(wbh + pd*idx, tb, ipbh[0], ipbh[1]);
+	}
+
+	iio_save_image_float_vec("/tmp/pm_wa0.tiff", wa0, w, h, pd);
+	iio_save_image_float_vec("/tmp/pm_wb0.tiff", wb0, w, h, pd);
+	iio_save_image_float_vec("/tmp/pm_wah.tiff", wah, w, h, pd);
+	iio_save_image_float_vec("/tmp/pm_wbh.tiff", wbh, w, h, pd);
+
+	free(wa0); free(wb0);
+	free(wah); free(wbh);
+}
+
 // RPC Patch Match
 void pm_rpc(float *out_h, float *init_h, int ow, int oh,
 		struct tiff_tile_cache *ta, struct rpc *ra,
@@ -278,6 +326,8 @@ void pm_rpc(float *out_h, float *init_h, int ow, int oh,
 {
 	struct projection_state PA[1], PB[1];
 	build_projection_states(PA, PB, ra, rb, axyh, ow, oh);
+
+	dump_warps(init_h, ow, oh, ta, tb, PA, PB);
 
 	float *cost = xmalloc(ow * oh * sizeof*cost);
 	for (int i = 0; i < ow * oh; i++)
@@ -289,6 +339,7 @@ void pm_rpc(float *out_h, float *init_h, int ow, int oh,
 		fprintf(stderr, "iteration %d/%d\n", iter+1, niter);
 		random_search(cost, out_h, init_h, ow, oh, PA, PB, ta, tb);
 		backward_propagation(cost, out_h, ow, oh, PA, PB, ta, tb);
+		backward_propagation2(cost, out_h, ow, oh, PA, PB, ta, tb);
 	}
 
 	free(cost);

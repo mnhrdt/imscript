@@ -1520,7 +1520,10 @@ static void free_oldest_tile(struct tiff_tile_cache *t)
 void *tiff_tile_cache_getpixel(struct tiff_tile_cache *t, int i, int j)
 {
 	int tidx = my_computetile(t->i, i, j);
-	if (tidx < 0) {/*fprintf(stderr, "LOST %d %d\n",i,j);*/return NULL;}
+	if (tidx < 0 || tidx > t->i->ntiles) {
+		//fprintf(stderr, "LOST %d %d\n",i,j);
+		return NULL;
+	}
 	if (!t->c[tidx]) {
 		if (t->a && t->curtiles == t->maxtiles)
 			free_oldest_tile(t);

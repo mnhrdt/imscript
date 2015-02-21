@@ -39,6 +39,8 @@ static void project(double out[3], struct ortho_view *p, double in[3])
 {
 	double x = p->lon_0 + in[0] * p->lon_d;
 	double y = p->lat_0 + in[1] * p->lat_d;
+	assert(p->r);
+	assert(out);
 	eval_rpci(out, p->r, x, y, in[2]);
 }
 
@@ -72,16 +74,24 @@ static void build_projection_states(
 	fprintf(stderr, "lat_step = %g (%g meters)\n", lat_step, lat_step_m);
 
 	// fill-in the fields
-	for (int i = 0; i < n; i++, o++)
+	for (int i = 0; i < n; i++)
 	{
-		o->t = t + i;
-		o->r = r + i;
-		o->w = w;
-		o->h = h;
-		o->lon_0 = center[0];
-		o->lat_0 = center[1];
-		o->lon_d = lon_step;
-		o->lat_d = lat_step;
+		o[i].t = t + i;
+		o[i].r = r + i;
+		o[i].w = w;
+		o[i].h = h;
+		o[i].lon_0 = center[0];
+		o[i].lat_0 = center[1];
+		o[i].lon_d = lon_step;
+		o[i].lat_d = lat_step;
+		//o->t = t + i;
+		//o->r = r + i;
+		//o->w = w;
+		//o->h = h;
+		//o->lon_0 = center[0];
+		//o->lat_0 = center[1];
+		//o->lon_d = lon_step;
+		//o->lat_d = lat_step;
 	}
 }
 
@@ -97,6 +107,13 @@ SMART_PARAMETER(PM_NITER,3)
 SMART_PARAMETER(PM_MIN,-100)
 SMART_PARAMETER(PM_MAX,500)
 
+static void huge_tiff_getpixel_float(float *out,
+		struct tiff_tile_cache *t, int i, int j)
+{
+	void *p = tiff_tile_cache_getpixel(t, i, j);
+	convert_pixel_to_float(out, t->i, p);
+}
+
 static float eval_cost_pair(
 		struct tiff_tile_cache *ta, int ai, int aj,
 		struct tiff_tile_cache *tb, int bi, int bj
@@ -109,10 +126,8 @@ static float eval_cost_pair(
 	for (int j = -rad; j <= rad; j++)
 	for (int i = -rad; i <= rad; i++)
 	{
-		void *pa = tiff_tile_cache_getpixel(ta, ai + i, aj + j);
-		void *pb = tiff_tile_cache_getpixel(tb, bi + i, bj + j);
-		float fa[pd]; convert_pixel_to_float(fa, ta->i, pa);
-		float fb[pd]; convert_pixel_to_float(fb, tb->i, pb);
+		float fa[pd]; huge_tiff_getpixel_float(fa, ta, ai + i, aj + j);
+		float fb[pd]; huge_tiff_getpixel_float(fb, tb, bi + i, bj + j);
 		for (int l = 0; l < pd; l++)
 			r = hypot(r, fa[l] - fb[l]);
 	}
@@ -123,10 +138,9 @@ static float eval_cost(struct ortho_view *o, int n, int i, int j, int h)
 {
 	int cx = 0;
 	float r = 0;
-	for (int a = 0  ; a < n; a++)
-	for (int b = a+1; b < n; b ++)
+	for (int a = 0; a < n; a++)
+	for (int b = 0; b < a; b++)
 	{
-
 		double ijh[3] = {i, j, h}, paijh[3], pbijh[3];
 		project(paijh, o + a, ijh);
 		project(pbijh, o + b, ijh);
@@ -144,8 +158,12 @@ static float eval_cost(struct ortho_view *o, int n, int i, int j, int h)
 static void random_search(float *cost, float *out_h, float *init_h,
 		struct ortho_view *t, int n)
 {
+	for (int k = 0; k < n; k++)
+		fprintf(stderr, "rs_%d %p %p %d\n", k, t+k, t[k].r, t[k].w);
+
 	float min_off = PM_MIN();
 	float max_off = PM_MAX();
+#pragma omp parallel for
 	for (int j = 0; j < t->h; j++)
 	for (int i = 0; i < t->w; i++)
 	{
@@ -171,19 +189,23 @@ static int insideP(int w, int h, int i, int j)
 static void backward_propagation(float *cost, float *height,
 		struct ortho_view *t, int n)
 {
+	for (int k = 0; k < n; k++)
+		fprintf(stderr, "bp_%d %p %p %d\n", k, t+k, t[k].r, t[k].w);
+
 	int neigs[4][2] = { {1,0}, {0,1}, {-1,0}, {0,-1}};
+#pragma omp parallel for
 	for (int j = 0; j < t->h; j++)
 	for (int i = 0; i < t->w; i++)
 	{
 		int idx = j * t->w + i;
-		for (int n = 0; n < 4; n++)
+		for (int k = 0; k < 4; k++)
 		{
-			int ii = i + neigs[n][0];
-			int jj = j + neigs[n][1];
+			int ii = i + neigs[k][0];
+			int jj = j + neigs[k][1];
 			if (!insideP(t->w, t->h, ii, jj)) continue;
 			float hh = height[jj*t->w+ii];
 			float new_cost = eval_cost(t, n, ii, jj, hh);
-			if (new_cost < 1.2 * cost[idx])
+			if (new_cost < cost[idx])
 			{
 				cost[idx] = new_cost;
 				height[idx] = hh;
@@ -192,59 +214,72 @@ static void backward_propagation(float *cost, float *height,
 	}
 }
 
-//
-//static void backward_propagation2(float *cost, float *height,
-//		int w, int h,
-//		struct projection_state *PA,
-//		struct projection_state *PB,
-//		struct tiff_tile_cache *ta,
-//		struct tiff_tile_cache *tb)
-//{
-//	int neigs[4][2] = { {1,0}, {0,1}, {-1,0}, {0,-1}};
-//	for (int i = w-1; i >= 0; i--)
-//	for (int j = h-1; j >= 0; j--)
-//	{
-//		int idx = j * w + i;
-//		for (int n = 0; n < 4; n++)
-//		{
-//			int ii = i + neigs[n][0];
-//			int jj = j + neigs[n][1];
-//			if (!insideP(w, h, ii, jj)) continue;
-//			float hh = height[jj*w+ii];
-//			float new_cost = eval_cost(PA, PB, ta, tb, ii, jj, hh);
-//			if (new_cost < 1.2 * cost[idx])
-//			{
-//				cost[idx] = new_cost;
-//				height[idx] = hh;
-//			}
-//		}
-//	}
-//}
-//
-//static void backward_propagation_h(float *cost, float *height,
-//		int w, int h,
-//		struct projection_state *PA,
-//		struct projection_state *PB,
-//		struct tiff_tile_cache *ta,
-//		struct tiff_tile_cache *tb)
-//{
-//	float hdiff[4] = { -4, -1, 1, 4};
-//	for (int j = 0; j < h; j++)
-//	for (int i = 0; i < w; i++)
-//	{
-//		int idx = j * w + i;
-//		for (int n = 0; n < 4; n++)
-//		{
-//			float hh = height[idx] + hdiff[n];
-//			float new_cost = eval_cost(PA, PB, ta, tb, i, j, hh);
-//			if (new_cost < cost[idx])
-//			{
-//				cost[idx] = new_cost;
-//				height[idx] = hh;
-//			}
-//		}
-//	}
-//}
+static void backward_propagation2(float *cost, float *height,
+		struct ortho_view *t, int n)
+{
+	for (int k = 0; k < n; k++)
+		fprintf(stderr, "bp2_%d %p %p %d\n", k, t+k, t[k].r, t[k].w);
+
+	int neigs[4][2] = { {1,0}, {0,1}, {-1,0}, {0,-1}};
+#pragma omp parallel for
+	for (int i = t->w-1; i >= 0; i--)
+	for (int j = t->h-1; j >= 0; j--)
+	{
+		int idx = j * t->w + i;
+		for (int k = 0; k < 4; k++)
+		{
+			int ii = i + neigs[k][0];
+			int jj = j + neigs[k][1];
+			if (!insideP(t->w, t->h, ii, jj)) continue;
+			float hh = height[jj*t->w+ii];
+			float new_cost = eval_cost(t, n, ii, jj, hh);
+			if (new_cost < cost[idx])
+			{
+				cost[idx] = new_cost;
+				height[idx] = hh;
+			}
+		}
+	}
+}
+
+
+#include "iio.h"
+static void dump_warps(float *init_h, int w, int h,
+		struct ortho_view *o, int n, char *ident)
+{
+	int pd = o->t->i->spp;
+
+	for (int k = 0; k < n; k++)
+	{
+		struct ortho_view *ok = o + k;
+		float *w0 = xmalloc(w * h * pd * sizeof(float));
+		float *wh = xmalloc(w * h * pd * sizeof(float));
+
+		for (int j = 0; j < h; j++)
+		for (int i = 0; i < w; i++)
+		{
+			int idx = j*w + i;
+			double ij0[3] = {i, j, 0};
+			double ijh[3] = {i, j, init_h[idx]};
+			double p0[3], ph[3];
+			project(p0, ok, ij0);
+			project(ph, ok, ijh);
+			int ip0[2] = {lrint(p0[0]), lrint(p0[1])};
+			int iph[2] = {lrint(ph[0]), lrint(ph[1])};
+			huge_tiff_getpixel_float(w0+pd*idx,ok->t,ip0[0],ip0[1]);
+			huge_tiff_getpixel_float(wh+pd*idx,ok->t,iph[0],iph[1]);
+		}
+
+		char buf[FILENAME_MAX];
+		snprintf(buf, FILENAME_MAX, "/tmp/pm_%s_%d_w0.tiff", ident, k);
+		iio_save_image_float_vec(buf, w0, w, h, pd);
+		snprintf(buf, FILENAME_MAX, "/tmp/pm_%s_%d_wh.tiff", ident, k);
+		iio_save_image_float_vec(buf, wh, w, h, pd);
+
+		free(w0);
+		free(wh);
+	}
+}
 
 // RPC Patch Match
 void pm_rpcn(float *out_h, float *init_h, int w, int h,
@@ -253,6 +288,8 @@ void pm_rpcn(float *out_h, float *init_h, int w, int h,
 {
 	struct ortho_view o[n];
 	build_projection_states(o, t, r, n, axyh, w, h);
+
+	dump_warps(init_h, w, h, o, n, "X");
 
 	float *cost = xmalloc(w * h * sizeof*cost);
 	for (int i = 0; i < w * h; i++)
@@ -264,7 +301,10 @@ void pm_rpcn(float *out_h, float *init_h, int w, int h,
 		fprintf(stderr, "iteration %d/%d\n", iter+1, niter);
 		random_search(cost, out_h, init_h, o, n);
 		backward_propagation(cost, out_h , o, n);
+		backward_propagation2(cost, out_h , o, n);
 	}
+
+	dump_warps(out_h, w, h, o, n, "Y");
 
 	free(cost);
 }
@@ -300,6 +340,12 @@ int main_rpc_pm(int c, char *v[])
 	}
 
 	fprintf(stderr, "patch matching from %d views\n", n);
+	for (int i = 0; i < n; i++)
+	{
+		fprintf(stderr, "view %d/%d:\n", i+1, n);
+		fprintf(stderr, "\tIMG = %s\n", filename_img[i]);
+		fprintf(stderr, "\tRPC = %s\n", filename_rpc[i]);
+	}
 
 	// read input images
 	int megabytes = 800/n;
