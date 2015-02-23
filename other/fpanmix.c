@@ -1,4 +1,4 @@
-// icc -std=c99 -Ofast fpanmix.c iio.o -o fpantiff -lglut -lGL -ltiff -lm
+// icc -std=c99 -Ofast fpanmix.c iio.o -o fpanmix -lglut -lGL -ltiff -lm
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
