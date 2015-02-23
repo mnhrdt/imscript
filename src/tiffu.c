@@ -2092,7 +2092,7 @@ static int main_tileize(int c, char *v[])
 				int ps = tinfo_pixelsize(tb);
 				int tlin = ps * tw;
 				int off_out = 0;
-				int off_in;
+				int off_in = 0;
 				memcpy(tbuf + off_out, buf + off_in, tlin);
 			}
 			int tcorner_i = 0;
