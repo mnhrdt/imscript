@@ -1379,7 +1379,7 @@ static bool hassuffix(const char *s, const char *suf)
 	return 0 == strcmp(suf, s + (len_s - len_suf));
 }
 
-#define LENGTH(t) sizeof((t))/sizeof((t)[0])
+#define LENGTH(t) ((int)(sizeof((t))/sizeof((t)[0])))
 
 static bool filename_is_tiff(char *s)
 {
@@ -1597,8 +1597,8 @@ static int main_getpixel(int c, char *v[])
 
 		// print samples to stdout
 		printf("%d\t%d", i, j);
-		for (int i = 0; i < t->i->spp; i++)
-			printf("\t%g", x[i]);
+		for (int k = 0; k < t->i->spp; k++)
+			printf("\t%g", x[k]);
 		printf("\n");
 	}
 
@@ -1779,6 +1779,42 @@ void *tiff_octaves_gettile(struct tiff_octaves *t, int o, int i, int j)
 void *tiff_octaves_getpixel(struct tiff_octaves *t, int o, int i, int j)
 {
 	void *tile = tiff_octaves_gettile(t, o, i, j);
+	if (!tile) return NULL;
+
+	// get pointer to requested pixel
+	struct tiff_info *ti = t->i + o;
+	int ii = i % ti->tw;
+	int jj = j % ti->th;
+	int pixel_index = jj * ti->tw + ii;
+	int pixel_position = pixel_index * ti->spp * (ti->bps / 8);
+	return pixel_position + (char*)tile;
+}
+
+// shy versions of the previous two functions
+// (the shy functions avoid reading the disk)
+void *tiff_octaves_gettile_shy(struct tiff_octaves *t, int o, int i, int j)
+{
+	// sanitize input
+	o = bound(0, o, t->noctaves - 1);
+	i = bound(0, i, t->i[o].w - 1);
+	j = bound(0, j, t->i[o].h - 1);
+
+	// get valid tile index
+	int tidx = my_computetile(t->i + o, i, j);
+	if (tidx < 0) return NULL;
+
+	// if tile does not exist, return NULL
+	if (!t->c[o][tidx]) return NULL;
+
+	if (t->a[0])
+		notify_tile_access_octave(t, o, tidx);
+
+	return t->c[o][tidx];
+}
+
+void *tiff_octaves_getpixel_shy(struct tiff_octaves *t, int o, int i, int j)
+{
+	void *tile = tiff_octaves_gettile_shy(t, o, i, j);
 	if (!tile) return NULL;
 
 	// get pointer to requested pixel

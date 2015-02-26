@@ -260,6 +260,47 @@ static void pixel_m4(float *out, struct pan_state *e, double p, double q)
 	out[2] = c[2] * g / nc;
 }
 
+static float rgb_getsamplec(void *vx, int w, int h, int i, int j, int l)
+{
+	int pd = 3;
+	if (i < 0) i = 0;
+	if (j < 0) j = 0;
+	if (l < 0) l = 0;
+	if (i >= w) i = w-1;
+	if (j >= h) j = h-1;
+	if (l >= pd) l = pd-1;
+	unsigned char (*x)[w][pd] = vx;
+	return x[j][i][l];
+}
+
+static float evaluate_bilinear_cell(float a, float b, float c, float d,
+							float x, float y)
+{
+	float r = 0;
+	r += a * (1-x) * (1-y);
+	r += b * ( x ) * (1-y);
+	r += c * (1-x) * ( y );
+	r += d * ( x ) * ( y );
+	return r;
+}
+
+static void preview_at(float *result, struct pan_state *e, double p, double q)
+{
+	int ip = p;
+	int iq = q;
+	int w = e->pw;
+	int h = e->ph;
+	unsigned char *x = e->preview;
+	for (int l = 0; l < 3; l++) {
+		float a = rgb_getsamplec(x, w, h, ip  , iq  , l);
+		float b = rgb_getsamplec(x, w, h, ip+1, iq  , l);
+		float c = rgb_getsamplec(x, w, h, ip  , iq+1, l);
+		float d = rgb_getsamplec(x, w, h, ip+1, iq+1, l);
+		float r = evaluate_bilinear_cell(a, b, c, d, p-ip, q-iq);
+		result[l] = r;
+	}
+}
+
 static void pixel_m5(float *out, struct pan_state *e, double p, double q)
 {
 	if (!out) return;
@@ -288,10 +329,13 @@ static void pixel_m5(float *out, struct pan_state *e, double p, double q)
 		} else {
 			int ip = p * e->pw / e->tg->i->w;
 			int iq = q * e->ph / e->tg->i->h;
+			float fp = p * e->pw / e->tg->i->w;
+			float fq = q * e->ph / e->tg->i->h;
 			if (insideP(e->pw, e->ph, ip, iq)) {
-				out[0] = 5*e->preview[(iq*e->pw+ip)*3+0];
-				out[1] = 5*e->preview[(iq*e->pw+ip)*3+1];
-				out[2] = 5*e->preview[(iq*e->pw+ip)*3+2];
+				preview_at(out, e, fp, fq);
+				out[0] *= 6;
+				out[1] *= 7;
+				out[2] *= 6;
 			} else {
 				out[0] = 2000;
 				out[1] = 50;
@@ -333,10 +377,13 @@ static void pixel_m4b(float *out, struct pan_state *e, double p, double q)
 		} else {
 			int ip = p * e->pw / e->tg->i->w;
 			int iq = q * e->ph / e->tg->i->h;
+			float fp = p * e->pw / e->tg->i->w;
+			float fq = q * e->ph / e->tg->i->h;
 			if (insideP(e->pw, e->ph, ip, iq)) {
-				out[0] = 4*e->preview[(iq*e->pw+ip)*3+0];
-				out[1] = 4*e->preview[(iq*e->pw+ip)*3+1];
-				out[2] = 4*e->preview[(iq*e->pw+ip)*3+2];
+				preview_at(out, e, fp, fq);
+				out[0] *= 6;
+				out[1] *= 7;
+				out[2] *= 6;
 			} else {
 				out[0] = 2000;
 				out[1] = 50;
@@ -685,8 +732,8 @@ void foveate_caches(struct FTR *f)
 	int w = f->w;
 	int h = f->h;
 
-	for (int i = w/3; i < 2*w/3; i += 50) 
-	for (int j = h/3; j < 2*h/3; j += 50) 
+	for (int i = w/4; i < 3*w/4; i += 50) 
+	for (int j = h/4; j < 3*h/4; j += 50) 
 	{
 		double p[2];
 		window_to_image(p, e, i, j);
