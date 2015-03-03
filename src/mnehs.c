@@ -226,26 +226,6 @@ void mnehs_affine(float *out_h, float *init_h, int ow, int oh,
 #include "xmalloc.c"
 #include "parsenumbers.c"
 
-static void read_n_doubles_from_string(double *out, char *string, int n)
-{
-	for (int i = 0; i < n; i++)
-		out[i] = 0;
-
-	int no;
-	double *buf = NULL;
-	FILE *f = fopen(string, "r");
-	if (f) {
-		buf = read_ascii_doubles(f, &no);
-		fclose(f);
-	} else {
-		buf = alloc_parse_doubles(n, string, &no);
-	}
-
-	if (no > n) no = n;
-	for (int i = 0; i < no; i++)
-		out[i] = buf[i];
-	free(buf);
-}
 
 static void center_projection(double P[8], double cx, double cy)
 {
