@@ -58,7 +58,7 @@ static void my_displayfunc(void)
 
 	struct _FTR *f = ftr_freeglut_global_state;
 
-	if (f->handle_expose)
+	if (f->handle_expose && f->changed)
 		f->handle_expose((void*)f, 0, 0, 0, 0);
 
 	if (f->handle_idle)
@@ -170,9 +170,9 @@ static void my_passivemotionfunc(int x, int y)
 	f->handle_mute = 1;
 	if (f->handle_motion) {
 		int m = modifiers_from_glut_to_ftr(glutGetModifiers());
-		f->handle_motion((void*)f, 0, m|f->glut_button_mask, x, y);
 		if (f->changed)
 			glutPostRedisplay();
+		f->handle_motion((void*)f, 0, m|f->glut_button_mask, x, y);
 	}
 	f->handle_mute = 0;
 }
@@ -201,8 +201,8 @@ static void my_idle(void)
 // setup_glut_environment {{{2
 static void setup_glut_environment(struct _FTR *f)
 {
-	int argc = 1;
-	char *argv[]={"dummy"};
+	int argc = 2;
+	char *argv[]={"dummy", "-gldebug", NULL};
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGB|GLUT_DEPTH);
 	glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE,

@@ -41,7 +41,7 @@ static void fill_subs_cmdline(char *cmdline, char *cmd, char *fileprefix,
 			add_item_to_cmdline(cmdline, fns_out[idx], fileprefix);
 		} else
 			add_item_to_cmdline(cmdline, tok, NULL);
-	} while (tok = strtok(NULL, " "));
+	} while ((tok = strtok(NULL, " ")));
 	fprintf(stderr, "CMDLINE = \"%s\"\n", cmdline);
 }
 
@@ -74,7 +74,7 @@ void metatiler(char *command, char **filenames_in, int n_in,
 		char **filenames_out, int n_out)
 {
 	// build command line (will be the same at each run)
-	char cmdline[CMDLINE_MAX];
+	char cmdline[CMDLINE_MAX+1];
 	char *tpd = create_temporary_directory();
 	fill_subs_cmdline(cmdline, command, tpd,
 			filenames_in, n_in, filenames_out, n_out);

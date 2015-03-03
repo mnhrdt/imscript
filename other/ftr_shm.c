@@ -36,6 +36,7 @@ static void *alloc_shareable_memory(size_t n)
 
 static struct _FTR *global_variable_for_the_child;
 
+// wait until the hild finishes
 static void my_wait(struct FTR *ff)
 {
 	struct _FTR *f = (void*)ff;
@@ -124,6 +125,42 @@ struct FTR *my_fork_window(int w, int h)
 	}
 }
 
+struct FTR *my_fork_window_clean(int w, int h)
+{
+	struct FTR *f = alloc_shareable_memory(sizeof*f);
+
+	// place to store the framebuffer for both processes
+	void *data = alloc_shareable_memory(3*w*h);
+
+	pid_t p = fork();
+	if (p) // I'm the parent
+	{
+		int pstatus;
+		waitpid(p, &pstatus, WUNTRACED);
+		kill(p, SIGCONT);
+
+		((struct _FTR*)f)->child_pid = p;
+		return f;
+	}
+	else // I'm the child
+	{
+		*f = ftr_new_window_with_image_uint8_rgb(NULL, w, h);
+		free(f->rgb);
+		f->rgb = data;
+
+		struct sigaction a;
+		sigemptyset(&a.sa_mask);
+		a.sa_flags = 0;
+		a.sa_handler = my_sigusr1_handler;
+		sigaction(SIGUSR1, &a, NULL);
+		global_variable_for_the_child = (struct _FTR*)f;
+
+		kill(getpid(), SIGSTOP);
+		exit(ftr_loop_run(f));
+	}
+}
+
+// notify a change to the child
 void my_notify_change(struct FTR *ff)
 {
 	struct _FTR *f = (void*)ff;
@@ -139,6 +176,18 @@ void my_notify_change(struct FTR *ff)
 //	XFlush(f->display);
 }
 
+
+static void event_button_control(struct FTR *f, int k, int m, int x, int y)
+{
+	fprintf(stderr, "CONTROL pid = %d\n", (int)getpid());
+	fprintf(stderr, "control hit %d %d %d %d\n", k, m, x, y);
+}
+static void event_button_game(struct FTR *f, int k, int m, int x, int y)
+{
+	fprintf(stderr, "GAME pid = %d\n", (int)getpid());
+	fprintf(stderr, "game hit %d %d %d %d\n", k, m, x, y);
+}
+
 int main_forks(int c, char *v[])
 {
 	struct FTR *f = my_fork_window(320,200);
@@ -149,27 +198,30 @@ int main_forks(int c, char *v[])
 	}
 	my_notify_change(f);
 	my_notify_change(g);
-	sleep(1);
+	sleep(10);
 	for (int i = 0; i < f->w * f->h; i++) {
 		f->rgb[3*i+0] = 255; f->rgb[3*i+1] = 0; f->rgb[3*i+2] = 0;
 		g->rgb[3*i+0] = 255; g->rgb[3*i+1] = 0; g->rgb[3*i+2] = 127;
 	}
 	my_notify_change(f);
+	sleep(5);
 	my_notify_change(g);
-	sleep(1);
+	sleep(5);
 	for (int i = 0; i < f->w * f->h; i++) {
 		f->rgb[3*i+0] = 0; f->rgb[3*i+1] = 0; f->rgb[3*i+2] = 255;
 		g->rgb[3*i+0] = 0; g->rgb[3*i+1] = 0; g->rgb[3*i+2] = 127;
 	}
 	my_notify_change(f);
+	sleep(5);
 	my_notify_change(g);
-	sleep(1);
+	sleep(5);
 	for (int i = 0; i < f->w * f->h; i++) {
 		f->rgb[3*i+0] = 255; f->rgb[3*i+1] = 255; f->rgb[3*i+2] = 255;
 		g->rgb[3*i+0] = 255; g->rgb[3*i+1] = 255; g->rgb[3*i+2] = 127;
 	}
 	my_notify_change(f);
 	my_notify_change(g);
+
 	my_wait_all();
 	my_wait(f);
 	my_wait(g);
@@ -177,4 +229,35 @@ int main_forks(int c, char *v[])
 	return 0;
 }
 
-int main(int c, char *v[]) { return main_forks(c, v); }
+int main_forks2(int c, char *v[])
+{
+	fprintf(stderr, "MAIN pid = %d\n", (int)getpid());
+	struct FTR *f = my_fork_window(320,200); // control window
+	struct FTR *g = my_fork_window(512,512); // game window
+	for (int i = 0; i < f->w * f->h; i++) {
+		f->rgb[3*i+0] = 200;
+		f->rgb[3*i+1] = 200;
+		f->rgb[3*i+2] = 200;
+	}
+	for (int i = 0; i < g->w * g->h; i++) {
+		g->rgb[3*i+0] = 100;
+		g->rgb[3*i+1] = 100;
+		g->rgb[3*i+2] = 100;
+	}
+
+	ftr_set_handler(f, "button", event_button_control);
+	ftr_set_handler(g, "button", event_button_game);
+
+	my_notify_change(f);
+	my_notify_change(g);
+
+	fprintf(stderr, "seems to be running\n");
+
+
+	my_wait(f);
+	my_wait(g);
+	fprintf(stderr, "correct exit\n");
+	return 0;
+}
+
+int main(int c, char *v[]) { return main_forks2(c, v); }

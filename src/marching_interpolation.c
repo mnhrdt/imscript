@@ -38,7 +38,7 @@ float march_regular(float a, float b, float c, float d, float x, float y)
 	assert(x0 >= 0); assert(x0 <= 1); assert(x0 <= x);
 	assert(x1 >= 0); assert(x1 <= 1); assert(x1 >= x);
 	float ix = ((x - x0)*c + (x1 - x)*b)/(x1 - x0);
-	assert(ix >= a); assert(ix <= c);
+	//assert(ix >= a); assert(ix <= c);
 
 	return 1*ix;
 }
@@ -165,18 +165,18 @@ float march_singular_raw(float a, float b, float c, float d, float x, float y)
 	//return 0;
 }
 
-#include <stdlib.h>
+//#include <stdlib.h>
 // read an environment variable to switch singularity treatment
 static int MARCH_SADDLES(void)
 {
 	static int reat = 0;
 	static int value = 3;
-	if (!reat) {
-		reat = 1;
-		char *s = getenv("MARCH_SADDLES");
-		if (s)
-			value = atoi(s);
-	}
+	//if (!reat) {
+	//	reat = 1;
+	//	char *s = getenv("MARCH_SADDLES");
+	//	if (s)
+	//		value = atoi(s);
+	//}
 	return value;
 }
 

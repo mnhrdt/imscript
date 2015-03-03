@@ -64,20 +64,22 @@ static float getsample_exit(float *x, int w, int h, int pd, int i, int j, int l)
 	return x[(i+j*w)*pd + l];
 }
 
-static int good_modulus(int n, int p)
+static int good_modulus(int nn, int p)
 {
 	if (!p) return 0;
-	if (p < 1) return good_modulus(n, -p);
+	if (p < 1) return good_modulus(nn, -p);
 
-	int r;
-	if (n >= 0)
-		r = n % p;
+	unsigned int r;
+	if (nn >= 0)
+		r = nn % p;
 	else {
+		unsigned int n = nn;
 		r = p - (-n) % p;
 		if (r == p)
 			r = 0;
 	}
 	//assert(r >= 0);
+	if (!(r<p)) fprintf(stderr, "bad modulus nn=%d r=%d p=%d\n", nn, r, p);
 	//assert(r < p);
 	return r;
 }
@@ -108,7 +110,7 @@ inline
 static float getsample_per(float *x, int w, int h, int pd, int i, int j, int l)
 {
 	i = good_modulus(i, w);
-	j = good_modulus(j, w);
+	j = good_modulus(j, h);
 	return getsample_abort(x, w, h, pd, i, j, l);
 }
 

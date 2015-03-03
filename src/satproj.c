@@ -17,7 +17,7 @@
 static void invert_projection(double iA[8], double A[8])
 {
 	// 
-	//  / i \     / a  b \     / l \     / r \         / p \
+	//  / i \     / a  b \     / l \     / r \         / p |
 	// |     | = |        | * |     | + |     | * h + |     |
 	//  \ j /     \ c  d /     \ t /     \ s /         \ q /
 	//
@@ -176,21 +176,14 @@ static void raytrace(double out[3],
 	double intersection[3] = {ij[0], ij[1], hh};
 	apply_projection(out, L, intersection);
 
-
+	// debug
 	if (ij[0] == 250 && ij[1] == 250) {
 		fprintf(stderr, "raytrace check\n");
 		fprintf(stderr, "\tij = %g %g\n", ij[0], ij[1]);
 		fprintf(stderr, "\tbase = %g %g\n", base[0], base[1]);
-		fprintf(stderr, "\tintersection = %g %g %g\n", intersection[0], intersection[1], intersection[2]);
+		fprintf(stderr, "\tintersection = %g %g %g\n",
+			intersection[0], intersection[1], intersection[2]);
 		fprintf(stderr, "\tout = %g %g %g\n", out[0], out[1], out[2]);
-
-	//	double h0 = objective_height_side(0, e);
-	//	double h1 = objective_height_side(out[2], e);
-	//	fprintf(stderr, "\th0,h1 = %g %g\n", h0, h1);
-	//	//double hh = bisection_1d(objective_height_side, 0, out[2], e);
-	//	double vhh = objective_height_side(hh, e);
-	//	fprintf(stderr, "\thh, vhh = %g %g\n", hh, vhh);
-	//	out[2] = hh;
 	}
 }
 
@@ -204,6 +197,7 @@ void satproj(float *out, int ow, int oh,
 	double L[8];
 	invert_projection(L, P);
 
+	// debug messages
 	fprintf(stderr, "satproj %d %d => %d %d (%d)\n", w, h, ow, oh, pd);
 	fprintf(stderr, "projection P = %g %g %g %g  %g %g %g %g\n",
 			P[0], P[1], P[2], P[3], P[4], P[5], P[6], P[7]);
@@ -223,19 +217,6 @@ void satproj(float *out, int ow, int oh,
 
 
 
-//double fun(double x, void *e)
-//{
-//	double r = x*x-2;
-//	fprintf(stderr, "f(%.30f)=%g\n", x, r);
-//	return r;
-//}
-//int main()
-//{
-//	double x = bisection_1d(fun, 0, 2, NULL);
-//	printf("%lf\n", x);
-//	return 0;
-//}
-
 static void center_projection(double P[8], double cx, double cy)
 {
 	// point "c" must be fixed at h = 0
@@ -251,27 +232,6 @@ static void center_projection(double P[8], double cx, double cy)
 #include "xmalloc.c"
 #include "parsenumbers.c"
 
-
-static void read_n_doubles_from_string(double *out, char *string, int n)
-{
-	for (int i = 0; i < n; i++)
-		out[i] = 0;
-
-	int no;
-	double *buf = NULL;
-	FILE *f = fopen(string, "r");
-	if (f) {
-		buf = read_ascii_doubles(f, &no);
-		fclose(f);
-	} else {
-		buf = alloc_parse_doubles(n, string, &no);
-	}
-
-	if (no > n) no = n;
-	for (int i = 0; i < no; i++)
-		out[i] = buf[i];
-	free(buf);
-}
 
 #include <stdbool.h>
 #include "pickopt.c"

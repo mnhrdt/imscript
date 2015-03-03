@@ -43,6 +43,27 @@ void bicubic_interpolation(float *result,
 	}
 }
 
+void bicubic_interpolation_nans(float *result,
+		float *img, int w, int h, int pd, float x, float y)
+{
+	x -= 1;
+	y -= 1;
+
+	getsample_operator p = getsample_nan;
+
+	int ix = floor(x);
+	int iy = floor(y);
+	for (int l = 0; l < pd; l++) {
+		float c[4][4];
+		for (int j = 0; j < 4; j++)
+			for (int i = 0; i < 4; i++)
+				c[i][j] = p(img, w, h, pd, ix + i, iy + j, l);
+		float r = bicubic_interpolation_cell(c, x - ix, y - iy);
+		result[l] = r;
+	}
+}
+
+
 void bicubic_interpolation_boundary(float *result,
 		float *img, int w, int h, int pd, float x, float y,
 		int boundary)
@@ -59,6 +80,25 @@ void bicubic_interpolation_boundary(float *result,
 	case 2: p = getsample_2; break;
 	case -1: p = getsample_error; break;
 	}
+
+	int ix = floor(x);
+	int iy = floor(y);
+	for (int l = 0; l < pd; l++) {
+		float c[4][4];
+		for (int j = 0; j < 4; j++)
+			for (int i = 0; i < 4; i++)
+				c[i][j] = p(img, w, h, pd, ix + i, iy + j, l);
+		float r = bicubic_interpolation_cell(c, x - ix, y - iy);
+		result[l] = r;
+	}
+}
+
+void bicubic_interpolation_boundary2(float *result,
+		float *img, int w, int h, int pd, float x, float y,
+		getsample_operator p)
+{
+	x -= 1;
+	y -= 1;
 
 	int ix = floor(x);
 	int iy = floor(y);

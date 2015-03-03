@@ -1059,6 +1059,63 @@ int main_minifire(int c, char *v[])
 	return 0;
 }
 
+
+// main_tele {{{1
+
+static void draw_tele(struct FTR *f, int x, int y, int k, int m)
+{
+	// build buffer
+	static float *t = NULL;
+	static int w = 0;
+	static int h = 0;
+	if (!f || w != f->w || h != f->h) {
+		w = f->w;
+		h = f->h;
+		if (t) free(t);
+		t = malloc(w * h * sizeof*t);
+		for (int i = 0; i < w*h; i++)
+			t[i] = 104;
+	}
+
+	// draw random values
+	int p = 0;
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++) {
+		t[p] = 255*(rand()/(1.0+RAND_MAX));
+		p++;
+	}
+
+	// render
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		int idx = (unsigned char)t[w*j+i];
+		f->rgb[3*(w*j+i)+0] = idx;
+		f->rgb[3*(w*j+i)+1] = idx;
+		f->rgb[3*(w*j+i)+2] = idx;
+	}
+
+	f->changed = 1;
+}
+
+int main_tele(int c, char *v[])
+{
+	int w = 320;
+	int h = 200;
+	unsigned char *x = malloc(3*w*h);
+
+	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, w, h);
+	ftr_set_handler(&f, "idle", draw_tele);
+	//ftr_set_handler(&f, "button", ftr_handler_toggle_idle);
+	ftr_set_handler(&f, "resize", fire_resize);
+	ftr_loop_run(&f);
+
+	ftr_close(&f);
+	free(x);
+	return 0;
+}
+
+
 // main_mandelbrot {{{1
 
 // state of the view: crop and palette
@@ -1178,7 +1235,7 @@ static void mandelbrot_key(struct FTR *f, int k, int m, int x, int y)
 		mandel_state_start(e, f->w, f->h, e->from, e->to);
 		memset(f->rgb, 0, 3 * f->w * f->h);
 	}
-	if (k == '+') {
+	if (k == '+' || k == '=') {
 		// ACTION: mandel zoom in
 		mandel_state_start(e, f->w, f->h, (c+e->from)/2, (c+e->to)/2);
 		unsigned char *tmp = malloc(3 * f->w * f->h);
@@ -1432,6 +1489,7 @@ static const struct { char *n; int(*f)(int,char*[]); } mains[] = {
 	MAIN(random),
 	MAIN(fire),
 	MAIN(minifire),
+	MAIN(tele),
 	MAIN(mandelbrot),
 	MAIN(events),
 	MAIN(paint),

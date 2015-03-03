@@ -1,3 +1,7 @@
+// code to read .gml cloud masks and plot them into images
+
+
+
 //////////////////
 /// INTERFACE ////
 //////////////////
@@ -11,12 +15,12 @@ struct cloud_polygon {
 struct cloud_mask {
 	int n;                   // number of polygons
 	struct cloud_polygon *t; // array of polygons
-	double low[2], up[2];    // "rectangle"
+	double low[2], up[2];    // rectangular bounding box
 };
 
 int read_cloud_mask_from_gml_file(struct cloud_mask *m, char *filename);
 
-void clouds_mask_fill(int *img, int w, int h, struct cloud_mask *m);
+void clouds_mask_fill(int *out_img, int w, int h, struct cloud_mask *in_mask);
 
 
 
@@ -88,6 +92,21 @@ void free_cloud(struct cloud_mask *m)
 	free(m->t);
 }
 
+// A .gml file describes a list of clouds inside a rectangular bounding box.
+// Each cloud is described by the polygon at its boundary.
+// There is some XML metadata that is not relevant for this program.
+//
+// Example of a typical .gml file:
+//
+//         ...XML cruft...
+//         <gml:lowerCorner>1 1</gml:lowerCorner>
+//         <gml:upperCorner>38345 34532</gml:upperCorner>
+//         ...XML cruft...
+//         <gml:posList>273.385334 9214.094585 ...</gml:posList>
+//         ...XML cruft...
+//         <gml:posList>4532.908842 7330.118945 4532.92079 ...</gml:posList>
+//         ...XML cruft...
+//
 int read_cloud_mask_from_gml_file(struct cloud_mask *m, char *filename)
 {
 	m->n = 0;
@@ -146,6 +165,7 @@ static void plot_segment_gray(int *img, int w, int h,
 	traverse_segment(p[0], p[1], q[0], q[1], plot_pixel, &d);
 }
 
+// dsf = "disjoint set forest"
 static int dsf_find(int *t, int a)
 {
 	if (a != t[a])
@@ -196,8 +216,8 @@ static void positive_connected_component_filter(int *rep, int w, int h)
 			rep[i] = dsf_find(rep, i);
 }
 
-// area of triangle ABC
-static double triangle_area(double *A, double *B, double *C)
+// signed area of triangle ABC
+static double triangle_area(double A[2], double B[2], double C[2])
 {
 	double X[2] = {B[0] - A[0], B[1] - A[1]};
 	double Y[2] = {C[0] - A[0], C[1] - A[1]};
@@ -205,7 +225,7 @@ static double triangle_area(double *A, double *B, double *C)
 }
 
 // test wether point X is inside triangle ABC
-static int winding_triangle(double *A, double *B, double *C, double *X)
+static int winding_triangle(double A[2], double B[2], double C[2], double X[2])
 {
 	double v1 = triangle_area(A, B, X);
 	double v2 = triangle_area(B, C, X);

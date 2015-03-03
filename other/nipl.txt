@@ -14,12 +14,12 @@ The conventions are the following:
 	1.5. All the pixels on an image have the same number of samples
 	1.6. This number of samples is arbitrary, it can be 1, 3, or 10 or 1000
 	1.7. The samples are numbers, not intensities
-	1.8. Pixels are contiguous, never broken (identical to 1.3)
+	1.8. Pixels are contiguous, never broken (synonymous to 1.3)
 	1.9. Broken pixels (color planes) are represented as arrays of images
 	1.10. The "default" format for samples is "float"
 
 
-2. Coding conventions (based on Linux Kernel coding style)
+2. Coding conventions (based on Linux Kernel Coding Style)
 
 	2.1. Tabs are 8 spaces
 	2.2. Lines have at most 80 columns

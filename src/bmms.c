@@ -255,7 +255,7 @@ static void refine_displacement_at(float d[2], float *a, float *b,
 	};
 	float best_energy = INFINITY;
 
-	for (int n = 0; n < 9; n++)
+	for (int n = 0; n < 5; n++)
 	{
 		float D[2] = {d[0] + neig[n][0], d[1] + neig[n][1]};
 		float r = e(a,b, w,h,pd, wrad, i,j, D);
