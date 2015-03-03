@@ -1235,7 +1235,7 @@ static void mandelbrot_key(struct FTR *f, int k, int m, int x, int y)
 		mandel_state_start(e, f->w, f->h, e->from, e->to);
 		memset(f->rgb, 0, 3 * f->w * f->h);
 	}
-	if (k == '+') {
+	if (k == '+' || k == '=') {
 		// ACTION: mandel zoom in
 		mandel_state_start(e, f->w, f->h, (c+e->from)/2, (c+e->to)/2);
 		unsigned char *tmp = malloc(3 * f->w * f->h);
