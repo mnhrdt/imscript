@@ -26,6 +26,18 @@
 
 #include "xmalloc.c"
 
+// TODO:
+//
+// 1. mouse scroll (with fast panning skipping the pixel-wise rpc)
+// 2. transparent detection of the 12 significant bits on the 16 bit smaples
+// 3. automatic contrast adjust à la qauto
+// 4. local interpolation
+// 5. setup base_h automatically using the SRTM4
+// 6. draw epipolar curves
+// 7. load an arbitrary DEM
+// 8. view the DEM (and the SRTM4)
+//
+
 
 
 
@@ -78,13 +90,56 @@ struct pan_state {
 	int force_exact;
 };
 
+static uint8_t float_to_uint8(float x)
+{
+	if (x < 1) return 0;
+	if (x > 254) return 255;
+	return x;
+}
+
+static uint8_t *load_nice_preview(char *fg, char *fc, int *w, int *h)
+{
+	int wg, hg, wc, hc;
+	uint8_t *g = (void*)iio_read_image_uint8_rgb(fg, &wg, &hg);
+	uint8_t *c = (void*)iio_read_image_uint8_rgb(fc, &wc, &hc);
+	uint8_t *r = xmalloc(3 * wg * hg);
+	memset(r, 0, 3 * wg * hg);
+
+	for (int j = 0; j < hg; j++)
+	for (int i = 0; i < wg; i++)
+	if (i < wc && j < hc)
+	{
+		int cidx = j*wc + i;
+		int gidx = j*wg + i;
+		float R = c[3*cidx + 0];
+		float G = c[3*cidx + 1];
+		float B = c[3*cidx + 2];
+		float nc = hypot( R, hypot(G, B));
+		float P = g[3*gidx];
+		r[3*gidx + 0] = float_to_uint8(3 * P * R / nc);
+		r[3*gidx + 1] = float_to_uint8(3 * P * G / nc);
+		r[3*gidx + 2] = float_to_uint8(3 * P * B / nc);
+	}
+
+	//iio_save_image_uint8_vec("/tmp/prev_g.png", g, wg, hg, 3);
+	//iio_save_image_uint8_vec("/tmp/prev_c.png", c, wc, hc, 3);
+	//iio_save_image_uint8_vec("/tmp/prev_r.png", r, wg, hg, 3);
+
+	free(g);
+	free(c);
+	*w = wg;
+	*h = hg;
+	return r;
+}
+
 static void init_view(struct pan_view *v,
 		char *fgtif, char *fgpre, char *fgrpc, char *fctif, char *fcpre)
 {
 	// build preview (use only color, by now)
-	v->preview = (void*)iio_read_image_uint8_rgb(fgpre, &v->pw, &v->ph);
-	fprintf(stderr, "loaded preview image from file \"%s\" (%d %d)\n",
-			fcpre, v->pw, v->ph);
+	//v->preview = (void*)iio_read_image_uint8_rgb(fgpre, &v->pw, &v->ph);
+	//fprintf(stderr, "loaded preview image from file \"%s\" (%d %d)\n",
+	//		fcpre, v->pw, v->ph);
+	v->preview = load_nice_preview(fgpre, fcpre, &v->pw, &v->ph);
 
 	// load P and MS
 	int megabytes = 400;
@@ -325,89 +380,124 @@ static double getgreen(double c[4])
 	return c[1] * 0.6 + c[3] * 0.2;
 }
 
+static void pixel_from_preview(float *r, struct pan_view *v, double p, double q)
+{
+	int ip = p * v->pw / v->w;
+	int iq = q * v->ph / v->h;
+	float fp = 1 * p * v->pw / v->tg->i->w;
+	float fq = 1 * q * v->ph / v->tg->i->h;
+	if (insideP(v->pw, v->ph, ip, iq)) {
+		preview_at(r, v, fp, fq);
+	} else {
+		r[0] = 200;
+		r[1] = 50;
+		r[2] = 100;
+	}
+}
+
+static void bilinear_ms(float *result, struct pan_view *v, double p, double q)
+{
+	int ip = p;
+	int iq = q;
+	int w = v->pw;
+	int h = v->ph;
+	unsigned char *x = v->preview;
+	for (int l = 0; l < 3; l++) {
+		float a = rgb_getsamplec(x, w, h, ip  , iq  , l);
+		float b = rgb_getsamplec(x, w, h, ip+1, iq  , l);
+		float c = rgb_getsamplec(x, w, h, ip  , iq+1, l);
+		float d = rgb_getsamplec(x, w, h, ip+1, iq+1, l);
+		float r = evaluate_bilinear_cell(a, b, c, d, p-ip, q-iq);
+		result[l] = r;
+	}
+}
+
+static void pixel_from_ms(float *out, struct pan_view *v, double p, double q)
+{
+	int fmt = v->tg->i->fmt;
+	int bps = v->tg->i->bps;
+	int spp = v->tg->i->spp;
+	int ss = bps / 8;
+	int ipc = (p + v->rgbiox) / 4; //(p + e->rgbiox) / factor;
+	int iqc = (q + v->rgbioy) / 4; //(q + e->rgbioy) / factor;
+	char *pix_rgbi = tiff_octaves_getpixel(v->tc, 0, ipc, iqc);
+
+	double c[4];
+	c[0] = from_sample_to_double(pix_rgbi + 0*ss, fmt, bps);
+	c[1] = from_sample_to_double(pix_rgbi + 1*ss, fmt, bps);
+	c[2] = from_sample_to_double(pix_rgbi + 2*ss, fmt, bps);
+	c[3] = from_sample_to_double(pix_rgbi + 3*ss, fmt, bps);
+	c[1] = getgreen(c);
+
+	double g = (c[0] + c[1] + c[2] + c[3]) / 4;
+
+	double nc = 4*hypot(c[0], hypot(c[1], c[2]));
+	out[0] = c[0] * g / nc;
+	out[1] = c[1] * g / nc;
+	out[2] = c[2] * g / nc;
+}
+
+static void pixel_from_pms(float *out, struct pan_view *v, double p, double q)
+{
+	int fmt = v->tg->i->fmt;
+	int bps = v->tg->i->bps;
+	int spp = v->tg->i->spp;
+	int ss = bps / 8;
+	int ipg = p;
+	int iqg = q;
+	int ipc = (p + v->rgbiox) / 4;
+	int iqc = (q + v->rgbioy) / 4;
+	//char *pix_gray = tiff_octaves_getpixel_shy(v->tg, 0, ipg, iqg);
+	char *pix_gray = tiff_octaves_getpixel(v->tg, 0, ipg, iqg);
+	char *pix_rgbi = tiff_octaves_getpixel(v->tc, 0, ipc, iqc);
+
+	double c[4];
+	c[0] = from_sample_to_double(pix_rgbi + 0*ss, fmt, bps);
+	c[1] = from_sample_to_double(pix_rgbi + 1*ss, fmt, bps);
+	c[2] = from_sample_to_double(pix_rgbi + 2*ss, fmt, bps);
+	c[3] = from_sample_to_double(pix_rgbi + 3*ss, fmt, bps);
+	c[1] = getgreen(c);
+	double g;
+	if (pix_gray)
+		g = from_sample_to_double(pix_gray, fmt, bps);
+	else
+		g = (c[0] + c[1] + c[2] + c[3]) / 4;
+	double nc = 4*hypot(c[0], hypot(c[1], c[2]));
+	out[0] = c[0] * g / nc;
+	out[1] = c[1] * g / nc;
+	out[2] = c[2] * g / nc;
+}
+
+static void pixel_from_p(float *out, struct pan_view *v, double p, double q)
+{
+	pixel_from_p(out, v, p, q);
+	int fmt = v->tg->i->fmt;
+	int bps = v->tg->i->bps;
+	int spp = v->tg->i->spp;
+	int ss = bps / 8;
+	int ipc = p;
+	int iqc = q;
+	char *pix_gray = tiff_octaves_getpixel(v->tg, 0, ipc, iqc);
+
+	double g = from_sample_to_double(pix_gray, fmt, bps)/4;
+	out[0] = g;
+	out[1] = g;
+	out[2] = g;
+}
+
 // evaluate the value a position (p,q) in image coordinates
 static void pixel(float *out, struct pan_view *v, double p, double q, int o)
 {
-	if (o == 0) { // preview
-		int ip = p * v->pw / v->w;
-		int iq = q * v->ph / v->h;
-		//float fp = 1 * p * v->pw / v->tg->i->w;
-		//float fq = 1 * q * v->ph / v->tg->i->h;
-		if (insideP(v->pw, v->ph, ip, iq)) {
-			preview_at(out, v, ip, iq);
-		} else {
-			out[0] = 200;
-			out[1] = 50;
-			out[2] = 100;
-		}
-	} else if (o == 1) { // MS
-		int fmt = v->tg->i->fmt;
-		int bps = v->tg->i->bps;
-		int spp = v->tg->i->spp;
-		int ss = bps / 8;
-		int ipc = (p + v->rgbiox) / 4; //(p + e->rgbiox) / factor;
-		int iqc = (q + v->rgbioy) / 4; //(q + e->rgbioy) / factor;
-		char *pix_rgbi = tiff_octaves_getpixel(v->tc, 0, ipc, iqc);
-
-		double c[4];
-		c[0] = from_sample_to_double(pix_rgbi + 0*ss, fmt, bps);
-		c[1] = from_sample_to_double(pix_rgbi + 1*ss, fmt, bps);
-		c[2] = from_sample_to_double(pix_rgbi + 2*ss, fmt, bps);
-		c[3] = from_sample_to_double(pix_rgbi + 3*ss, fmt, bps);
-		c[1] = getgreen(c);
-
-		double g = (c[0] + c[1] + c[2] + c[3]) / 4;
-
-		double nc = 4*hypot(c[0], hypot(c[1], c[2]));
-		out[0] = c[0] * g / nc;
-		out[1] = c[1] * g / nc;
-		out[2] = c[2] * g / nc;
-	} else if (o == 2) { // P + MS
-		int fmt = v->tg->i->fmt;
-		int bps = v->tg->i->bps;
-		int spp = v->tg->i->spp;
-		int ss = bps / 8;
-		int ipg = p;
-		int iqg = q;
-		int ipc = (p + v->rgbiox) / 4;
-		int iqc = (q + v->rgbioy) / 4;
-		//char *pix_gray = tiff_octaves_getpixel_shy(v->tg, 0, ipg, iqg);
-		char *pix_gray = tiff_octaves_getpixel(v->tg, 0, ipg, iqg);
-		char *pix_rgbi = tiff_octaves_getpixel(v->tc, 0, ipc, iqc);
-
-		double c[4];
-		c[0] = from_sample_to_double(pix_rgbi + 0*ss, fmt, bps);
-		c[1] = from_sample_to_double(pix_rgbi + 1*ss, fmt, bps);
-		c[2] = from_sample_to_double(pix_rgbi + 2*ss, fmt, bps);
-		c[3] = from_sample_to_double(pix_rgbi + 3*ss, fmt, bps);
-		c[1] = getgreen(c);
-		double g;
-		if (pix_gray)
-			g = from_sample_to_double(pix_gray, fmt, bps);
-		else
-			g = (c[0] + c[1] + c[2] + c[3]) / 4;
-		double nc = 4*hypot(c[0], hypot(c[1], c[2]));
-		out[0] = c[0] * g / nc;
-		out[1] = c[1] * g / nc;
-		out[2] = c[2] * g / nc;
-	} else if (o == 3) { // P
-		int fmt = v->tg->i->fmt;
-		int bps = v->tg->i->bps;
-		int spp = v->tg->i->spp;
-		int ss = bps / 8;
-		int ipc = p;
-		int iqc = q;
-		char *pix_gray = tiff_octaves_getpixel(v->tg, 0, ipc, iqc);
-
-		double g = from_sample_to_double(pix_gray, fmt, bps)/4;
-		out[0] = g;
-		out[1] = g;
-		out[2] = g;
-	} else {
-		out[0] = 200;
-		out[2] = 50;
-		out[1] = 100;
+	if (p < 0 || q < 0 || p >= v->w || q >= v->w) {
+		out[0] = 0;
+		out[1] = 255;
+		out[2] = 0;
 	}
+	if      (o == 0) pixel_from_preview (out, v, p, q);
+	else if (o == 1) pixel_from_ms      (out, v, p, q);
+	else if (o == 2) pixel_from_pms     (out, v, p, q);
+	else if (o == 3) pixel_from_p       (out, v, p, q);
+	else exit(fprintf(stderr,"ERROR: bad octave %d\n", o));
 }
 
 static void action_offset_viewport(struct FTR *f, int dx, int dy)
@@ -595,6 +685,22 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 	//if (b == FTR_BUTTON_RIGHT)  action_reset_zoom_and_position(f);
 }
 
+// update offset variables by dragging
+static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+
+	static double ox = 0, oy = 0;
+
+	if (m == FTR_BUTTON_LEFT)   action_offset_viewport(f, x - ox, y - oy);
+	//if (m == FTR_BUTTON_MIDDLE) action_print_value_under_cursor(f, x, y);
+	//if (m == FTR_MASK_SHIFT)    action_center_contrast_at_point(f, x, y);
+	//if (m == FTR_MASK_CONTROL)  action_base_contrast_at_point(f, x, y);
+
+	ox = x;
+	oy = y;
+}
+
 //void key_handler_print(struct FTR *f, int k, int m, int x, int y)
 //{
 //	fprintf(stderr, "key pressed %d '%c' (%d) at %d %d\n",
@@ -670,34 +776,6 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 
 #define BAD_MIN(a,b) a<b?a:b
 
-// image file input/output (wrapper around iio) {{{1
-static float *read_image_float_rgb(char *fname, int *w, int *h)
-{
-	int pd;
-	float *x = iio_read_image_float_vec(fname, w, h, &pd);
-	if (pd == 3) return x;
-	float *y = xmalloc(3**w**h*sizeof*y);
-	for (int i = 0; i < *w**h; i++) {
-		switch(pd) {
-		case 1:
-			y[3*i+0] = y[3*i+1] = y[3*i+2] = x[i];
-			break;
-		case 2:
-			y[3*i+0] = x[2*i+0];
-			y[3*i+1] = y[3*i+2] = x[2*i+1];
-			break;
-		default:
-			assert(pd > 3);
-			for (int l = 0; l < 3; l++)
-				y[3*i+l] = x[pd*i+l];
-			break;
-		}
-	}
-	free(x);
-	return y;
-}
-
-
 int main_pan(int c, char *v[])
 {
 	TIFFSetWarningHandler(NULL);//suppress warnings
@@ -743,12 +821,12 @@ int main_pan(int c, char *v[])
 			n);
 
 	// open window
-	struct FTR f = ftr_new_window(80, 80);
+	struct FTR f = ftr_new_window(320, 320);
 	f.userdata = e;
 	f.changed = 1;
 	ftr_set_handler(&f, "key"   , pan_key_handler);
 	ftr_set_handler(&f, "button", pan_button_handler);
-//	ftr_set_handler(&f, "motion", pan_motion_handler);
+	ftr_set_handler(&f, "motion", pan_motion_handler);
 	ftr_set_handler(&f, "expose", pan_exposer);
 	int r = ftr_loop_run(&f);
 
