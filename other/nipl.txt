@@ -36,7 +36,7 @@ The conventions are the following:
 	2.16. Pointer typedefs are forbidden
 	2.17. Typedefs are allowed for complicated function types
 	2.18. Typedefs are allowed for plain C data types
-	2.19. A typedef always ends in "_t"
+	2.19. A typedef always ends in "_t" (e.g., "sample_t")
 	2.20. All functions are declared static except for public API functions
 	2.21. Order of function arguments: (output, input, options)
 	2.22. Exception to 2.21: (state, output, input, options)
