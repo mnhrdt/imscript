@@ -46,7 +46,7 @@
 
 #define EARTH_RADIUS 6378000.0
 
-#define WHEEL_FACTOR 1.4
+#define WHEEL_FACTOR 1.259921049894873164767210607
 
 
 // data for a single view
@@ -664,18 +664,18 @@ static void action_toggle_exact_rpc(struct FTR *f)
 	f->changed = 1;
 }
 
-static void action_toggle_ignore_rpc(struct FTR *f)
+static void action_toggle_ignore_rpc(struct FTR *f, int x, int y)
 {
 	struct pan_state *e = f->userdata;
 
 	// assure that the center of the window is not moved
 	if (e->ignore_rpc) {
-		double c[2] = {f->w/2.0, f->h/2.0}, p[2], q[2];
+		double c[2] = {x, y}, p[2], q[2];
 		window_to_image_raw(p, e, c[0], c[1]);
 		image_to_window_ex(q, e, p[0], p[1]);
 		action_offset_viewport(f, c[0] - q[0], c[1] - q[1]);
 	} else {
-		double c[2] = {f->w/2.0, f->h/2.0}, p[2], q[2];
+		double c[2] = {x, y}, p[2], q[2];
 		window_to_image_ex(p, e, c[0], c[1]);
 		image_to_window_raw(q, e, p[0], p[1]);
 		action_offset_viewport(f, c[0] - q[0], c[1] - q[1]);
@@ -689,14 +689,15 @@ static void action_toggle_ignore_rpc(struct FTR *f)
 // we ignore the RPCs, we still want to be able to flip the images while
 // keeping the center of the image at the correct offset; to compute this
 // offset we need the RPC functions.
-static void hack_ignored_rpc_offsets(struct FTR *f, int a, int b)
+static void hack_ignored_rpc_offsets(struct FTR *f, int a, int b, int x, int y)
 {
+	if (x < 0 || y < 0 || x >= f->w || y >= f->h) { x = f->w/2; y = f->h/2;}
 	struct pan_state *e = f->userdata;
 	int save_view = e->current_view;
 	struct pan_view *va = e->view + a;
 	struct pan_view *vb = e->view + b;
 
-	double c[2] = {f->w / 2.0, f->h / 2.0}, p[2], q[2], no_c[2], lonlat[2];
+	double c[2] = {x, y}, p[2], q[2], no_c[2], lonlat[2];
 	e->current_view = a;
 	window_to_image_raw(p, e, c[0], c[1]);
 	eval_rpc(lonlat, va->r, p[0], p[1], e->base_h);
@@ -716,14 +717,14 @@ static void hack_ignored_rpc_offsets(struct FTR *f, int a, int b)
 	e->current_view = save_view;
 }
 
-static void action_select_view(struct FTR *f, int i)
+static void action_select_view(struct FTR *f, int i, int x, int y)
 {
 	struct pan_state *e = f->userdata;
 	if (i >= 0 && i < e->nviews)
 	{
 		fprintf(stderr, "selecting view %d\n", i);
 		if (e->ignore_rpc)
-			hack_ignored_rpc_offsets(f, e->current_view, i);
+			hack_ignored_rpc_offsets(f, e->current_view, i, x, y);
 		e->current_view = i;
 		f->changed = 1;
 	}
@@ -770,11 +771,11 @@ static int good_modulus(int nn, int p)
 	return r;
 }
 
-static void action_cycle_view(struct FTR *f, int d)
+static void action_cycle_view(struct FTR *f, int d, int x, int y)
 {
 	struct pan_state *e = f->userdata;
 	int new = good_modulus(e->current_view + d, e->nviews);
-	action_select_view(f, new);
+	action_select_view(f, new, x, y);
 	f->changed = 1;
 }
 
@@ -831,9 +832,9 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 	//	action_offset_base_h(f, -10); return; }
 
 	if (b == FTR_BUTTON_UP && m & FTR_MASK_CONTROL) {
-		action_cycle_view(f, +1); return; }
+		action_cycle_view(f, +1, x, y); return; }
 	if (b == FTR_BUTTON_DOWN && m & FTR_MASK_CONTROL) {
-		action_cycle_view(f, -1); return; }
+		action_cycle_view(f, -1, x, y); return; }
 
 	if (b == FTR_BUTTON_DOWN)   action_increase_zoom(f, x, y);
 	if (b == FTR_BUTTON_UP  )   action_decrease_zoom(f, x, y);
@@ -893,15 +894,15 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'd') action_offset_base_h(f, -10);
 
 	if (k == 'e') action_toggle_exact_rpc(f);
-	if (k == 'i') action_toggle_ignore_rpc(f);
+	if (k == 'i') action_toggle_ignore_rpc(f, f->w/2, f->h/2);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
 		ftr_notify_the_desire_to_stop_this_loop(f, 1);
 
 	// image flip operations
-	if (k == ' ') action_cycle_view(f, 1);
-	if (k == '\b') action_cycle_view(f, -1);
+	if (k == ' ') action_cycle_view(f, 1, x, y);
+	if (k == '\b') action_cycle_view(f, -1, x, y);
 
 	if (isdigit(k)) action_select_octave(f, (k-'0')?(k-'0'-1):10);
 
