@@ -1,16 +1,17 @@
 NIPL is Not an Image Processing Library
 ---------------------------------------
 
-NIPL is a set of conventions for doing image processing in standard C.
+NIPL is a set of conventions for doing image processing in C.
 
 The conventions are the following:
+
 
 1. Conventions for image data:
 
 	1.1. An image is an array of pixels
 	1.2. The pixels are ordered from left to right, and from top to bottom
 	1.3. A pixel is an array of samples
-	1.4. A sample is a numeric C type (typically char or float).
+	1.4. A sample is a numeric C type (typically char or float)
 	1.5. All the pixels on an image have the same number of samples
 	1.6. This number of samples is arbitrary, it can be 1, 3, or 10 or 1000
 	1.7. The samples are numbers, not intensities
@@ -36,7 +37,7 @@ The conventions are the following:
 	2.16. Pointer typedefs are forbidden
 	2.17. Typedefs are allowed for complicated function types
 	2.18. Typedefs are allowed for plain C data types
-	2.19. A typedef always ends in "_t" (e.g., "sample_t")
+	2.19. A typedef always ends in "_t" (e.g., "sample_t, getpixel_t")
 	2.20. All functions are declared static except for public API functions
 	2.21. Order of function arguments: (output, input, options)
 	2.22. Exception to 2.21: (state, output, input, options)
@@ -106,7 +107,6 @@ justification for NIPL is that it produces code which is trivially
 modular and reusable.  I do not care if NIPL code is difficult to
 write, but I want that algorithms implemented in NIPL be very easy to
 copy-paste into other, non-NIPL libraries.
-
 
 
 # vim:set tw=69 filetype=text spell spelllang=en:
