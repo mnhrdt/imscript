@@ -28,14 +28,13 @@
 
 // TODO:
 //
-// 1. mouse scroll (with fast panning skipping the pixel-wise rpc)
-// 2. transparent detection of the 12 significant bits on the 16 bit smaples
-// 3. automatic contrast adjust à la qauto
-// 4. local interpolation
-// 5. setup base_h automatically using the SRTM4
-// 6. draw epipolar curves
-// 7. load an arbitrary DEM
-// 8. view the DEM (and the SRTM4)
+// 1. transparent detection of the 12 significant bits on the 16 bit smaples
+// 2. automatic contrast adjust à la qauto
+// 3. local interpolation
+// 4. setup base_h automatically using the SRTM4
+// 5. draw epipolar curves
+// 6. load an arbitrary DEM
+// 7. view the DEM (and the SRTM4)
 //
 
 
@@ -88,6 +87,7 @@ struct pan_state {
 	// 4. visualization options
 	int fix_viewports;
 	int force_exact;
+	int ignore_rpc;
 };
 
 static uint8_t float_to_uint8(float x)
@@ -131,6 +131,43 @@ static uint8_t *load_nice_preview(char *fg, char *fc, int *w, int *h)
 	*h = hg;
 	return r;
 }
+
+//static uint8_t *load_normalized_preview(char *fg, char *fc, int *w, int *h)
+//{
+//TODO: normalize the color by simplest color balance so that the thing looks
+//nicer
+//	int wg, hg, wc, hc, pdg, pdc;
+//	float *g = iio_read_image_float_vec(fg, &wg, &hg, &pdg);
+//	float *c = iio_read_image_float_vec(fc, &wc, &hc, &pdc);
+//	uint8_t *r = xmalloc(3 * wg * hg);
+//	memset(r, 0, 3 * wg * hg);
+//
+//	for (int j = 0; j < hg; j++)
+//	for (int i = 0; i < wg; i++)
+//	if (i < wc && j < hc)
+//	{
+//		int cidx = j*wc + i;
+//		int gidx = j*wg + i;
+//		float R = c[3*cidx + 0];
+//		float G = c[3*cidx + 1];
+//		float B = c[3*cidx + 2];
+//		float nc = hypot( R, hypot(G, B));
+//		float P = g[3*gidx];
+//		r[3*gidx + 0] = float_to_uint8(3 * P * R / nc);
+//		r[3*gidx + 1] = float_to_uint8(3 * P * G / nc);
+//		r[3*gidx + 2] = float_to_uint8(3 * P * B / nc);
+//	}
+//
+//	//iio_save_image_uint8_vec("/tmp/prev_g.png", g, wg, hg, 3);
+//	//iio_save_image_uint8_vec("/tmp/prev_c.png", c, wc, hc, 3);
+//	//iio_save_image_uint8_vec("/tmp/prev_r.png", r, wg, hg, 3);
+//
+//	free(g);
+//	free(c);
+//	*w = wg;
+//	*h = hg;
+//	return r;
+//}
 
 static void init_view(struct pan_view *v,
 		char *fgtif, char *fgpre, char *fgrpc, char *fctif, char *fcpre)
@@ -213,6 +250,7 @@ static void init_state(struct pan_state *e,
 	// set options
 	e->fix_viewports = 1;
 	e->force_exact = 0;
+	e->ignore_rpc = 0;
 	e->octave = 0;
 }
 
@@ -285,24 +323,59 @@ static void apply_projection(double out[3], double P[8], double x[3])
 	out[2] = x[2];
 }
 
-static void window_to_raster(double xy[2], struct pan_state *e, int i, int j)
+// There are four (!) coordinate systems used in this program.
+// (I believe that this is the simplest solution, however the code could be
+// shortened by identifying the "raster" and the "window" coordinates.)
+//
+// 1. IMAGE coordinates (p,q), integers in the range 0--40.000 representing the
+// position of a pixel in the "P" image.
+//
+// 2. GEO coordinates (lon,lat), floating point numbers in degrees, e.g., in an
+// interval such as [ -137.4782 , -137.4779 ].  These coordinates are the
+// geographic position around the site of interest.
+//
+// 3. RASTER coordinates (x,y), floating point numbers in the range 0--40.000
+// representing an isotropic grid over the geographic site, at the nominal
+// pixel resolution.
+
+static
+void window_to_raster(double xy[2], struct pan_state *e, double i, double j)
 {
 	xy[0] = e->offset_x + i / e->zoom_factor;
 	xy[1] = e->offset_y + j / e->zoom_factor;
 }
 
-static void window_to_geo(double lonlat[2], struct pan_state *e, int i, int j)
+static
+void raster_to_window(double ij[2], struct pan_state *e, double x, double y)
 {
-	//fprintf(stderr, "\twindow_to_geo(%d %d)\n", i, j);
-	double x = e->offset_x + i / e->zoom_factor;
-	double y = e->offset_y + j / e->zoom_factor;
-	//fprintf(stderr, "\twindow_to_geo xy = (%g %g)\n", x, y);
-	lonlat[0] = e->lon_0 + x * e->lon_d;
-	lonlat[1] = e->lat_0 + y * e->lat_d;
-	//fprintf(stderr, "\twindow_to_geo lonlat = (%g %g)\n", lonlat[0], lonlat[1]);
+	ij[0] = ( x - e->offset_x ) * e->zoom_factor;
+	ij[1] = ( y - e->offset_y ) * e->zoom_factor;
 }
 
-static void window_to_image_ap(double out[2], struct pan_state *e, int i, int j)
+static
+void raster_to_geo(double ll[2], struct pan_state *e, double x, double y)
+{
+	ll[0] = e->lon_0 + x * e->lon_d;
+	ll[1] = e->lat_0 + y * e->lat_d;
+}
+
+static
+void geo_to_raster(double xy[2], struct pan_state *e, double lon, double lat)
+{
+	xy[0] = ( lon - e->lon_0 ) / e->lon_d;
+	xy[1] = ( lat - e->lat_0 ) / e->lat_d;
+}
+
+static
+void window_to_geo(double lonlat[2], struct pan_state *e, double i, double j)
+{
+	double xy[2];
+	window_to_raster(xy, e, i, j);
+	raster_to_geo(lonlat, e, xy[0], xy[1]);
+}
+
+static
+void window_to_image_ap(double out[2], struct pan_state *e, double i, double j)
 {
 	double lonlath[3];
 	window_to_geo(lonlath, e, i, j);
@@ -315,7 +388,8 @@ static void window_to_image_ap(double out[2], struct pan_state *e, int i, int j)
 	out[1] = p[1];
 }
 
-static void window_to_image_ex(double out[2], struct pan_state *e, int i, int j)
+static
+void window_to_image_ex(double out[2], struct pan_state *e, double i, double j)
 {
 	double lonlath[3];
 	window_to_geo(lonlath, e, i, j);
@@ -327,6 +401,32 @@ static void window_to_image_ex(double out[2], struct pan_state *e, int i, int j)
 
 	out[0] = p[0];
 	out[1] = p[1];
+}
+
+static
+void image_to_window_ex(double ij[2], struct pan_state *e, double p, double q)
+{
+	struct pan_view *v = obtain_view(e);
+	double lonlat[3], xy[2];
+	eval_rpc(lonlat, v->r, p, q, e->base_h);
+	geo_to_raster(xy, e, lonlat[0], lonlat[1]);
+	raster_to_window(ij, e, xy[0], xy[1]);
+}
+
+static
+void window_to_image_raw(double p[2], struct pan_state *e, double i, double j)
+{
+	window_to_raster(p, e, i, j);
+	struct pan_view *v = obtain_view(e);
+	p[0] += v->w / 2.0;
+	p[1] += v->h / 2.0;
+}
+
+static
+void image_to_window_raw(double ij[2], struct pan_state *e, double p, double q)
+{
+	struct pan_view *v = obtain_view(e);
+	raster_to_window(ij, e, p - v->w / 2.0, q - v->h / 2.0);
 }
 
 static float rgb_getsamplec(void *vx, int w, int h, int i, int j, int l)
@@ -500,7 +600,7 @@ static void pixel(float *out, struct pan_view *v, double p, double q, int o)
 	else exit(fprintf(stderr,"ERROR: bad octave %d\n", o));
 }
 
-static void action_offset_viewport(struct FTR *f, int dx, int dy)
+static void action_offset_viewport(struct FTR *f, double dx, double dy)
 {
 	struct pan_state *e = f->userdata;
 	e->offset_x -= dx/e->zoom_factor;
@@ -564,12 +664,66 @@ static void action_toggle_exact_rpc(struct FTR *f)
 	f->changed = 1;
 }
 
+static void action_toggle_ignore_rpc(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+
+	// assure that the center of the window is not moved
+	if (e->ignore_rpc) {
+		double c[2] = {f->w/2.0, f->h/2.0}, p[2], q[2];
+		window_to_image_raw(p, e, c[0], c[1]);
+		image_to_window_ex(q, e, p[0], p[1]);
+		action_offset_viewport(f, c[0] - q[0], c[1] - q[1]);
+	} else {
+		double c[2] = {f->w/2.0, f->h/2.0}, p[2], q[2];
+		window_to_image_ex(p, e, c[0], c[1]);
+		image_to_window_raw(q, e, p[0], p[1]);
+		action_offset_viewport(f, c[0] - q[0], c[1] - q[1]);
+	}
+
+	e->ignore_rpc = !e->ignore_rpc;
+	f->changed = 1;
+}
+
+// This function is only called when "ignoring" the RPC functions.  Even when
+// we ignore the RPCs, we still want to be able to flip the images while
+// keeping the center of the image at the correct offset; to compute this
+// offset we need the RPC functions.
+static void hack_ignored_rpc_offsets(struct FTR *f, int a, int b)
+{
+	struct pan_state *e = f->userdata;
+	int save_view = e->current_view;
+	struct pan_view *va = e->view + a;
+	struct pan_view *vb = e->view + b;
+
+	double c[2] = {f->w / 2.0, f->h / 2.0}, p[2], q[2], no_c[2], lonlat[2];
+	e->current_view = a;
+	window_to_image_raw(p, e, c[0], c[1]);
+	eval_rpc(lonlat, va->r, p[0], p[1], e->base_h);
+	eval_rpci(q, vb->r, lonlat[0], lonlat[1], e->base_h);
+	e->current_view = b;
+	image_to_window_raw(no_c, e, q[0], q[1]);
+
+	//fprintf(stderr, "hack ignored rpc offsets:\n");
+	//fprintf(stderr, "\tc = %g %g\n", c[0], c[1]);
+	//fprintf(stderr, "\tp = %g %g\n", p[0], p[1]);
+	//fprintf(stderr, "\tlonlath = %g %g %g\n",lonlat[0],lonlat[1],e->base_h);
+	//fprintf(stderr, "\tq = %g %g\n", q[0], q[1]);
+	//fprintf(stderr, "\tno_c = %g %g\n", no_c[0], no_c[1]);
+
+	action_offset_viewport(f, - no_c[0] + c[0], - no_c[1] + c[1]);
+
+	e->current_view = save_view;
+}
+
 static void action_select_view(struct FTR *f, int i)
 {
 	struct pan_state *e = f->userdata;
 	if (i >= 0 && i < e->nviews)
 	{
 		fprintf(stderr, "selecting view %d\n", i);
+		if (e->ignore_rpc)
+			hack_ignored_rpc_offsets(f, e->current_view, i);
 		e->current_view = i;
 		f->changed = 1;
 	}
@@ -619,7 +773,8 @@ static int good_modulus(int nn, int p)
 static void action_cycle_view(struct FTR *f, int d)
 {
 	struct pan_state *e = f->userdata;
-	e->current_view = good_modulus(e->current_view + d, e->nviews);
+	int new = good_modulus(e->current_view + d, e->nviews);
+	action_select_view(f, new);
 	f->changed = 1;
 }
 
@@ -629,9 +784,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	struct pan_state *e = f->userdata;
 	struct pan_view *v = obtain_view(e);
 
-	fprintf(stderr, "pan exposer\n");
-
-	// compute 
+	// compute the RPC approximation at the center of the window
 	double ll[3];
 	window_to_geo(ll, e, f->w/2, f->h/2);
 	approximate_projection(v->P, v->r, ll[0], ll[1], e->base_h);
@@ -642,7 +795,9 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	for (int i = 0; i < f->w; i++)
 	{
 		double p[2];
-		if (e->force_exact)
+		if (e->ignore_rpc)
+			window_to_image_raw(p, e, i, j);
+		else if (e->force_exact)
 			window_to_image_ex(p, e, i, j);
 		else
 			window_to_image_ap(p, e, i, j);
@@ -709,8 +864,8 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 
 void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
-	fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
-			k, isalnum(k)?k:' ', m, x, y);
+	//fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
+	//		k, isalnum(k)?k:' ', m, x, y);
 
 	if (k == '+' || k == '=') action_increase_zoom(f, f->w/2, f->h/2);
 	if (k == '-') action_decrease_zoom(f, f->w/2, f->h/2);
@@ -738,6 +893,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'd') action_offset_base_h(f, -10);
 
 	if (k == 'e') action_toggle_exact_rpc(f);
+	if (k == 'i') action_toggle_ignore_rpc(f);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
