@@ -404,5 +404,5 @@ int main_compute(int c, char *v[])
 	free(b);
 	return 0;
 }
-int main(int c,char*v[]){return main_warp(c,v);}
+int main(int c,char*v[]){return main_compute(c,v);}
 #endif//MAIN_MNEHS
