@@ -1,17 +1,24 @@
-// RPCFLIP
 //
 // A "Nadir" viewer for pleiades images, based on vflip by Gabriele Facciolo
 //
 // c99 -O3 rpcflip.c iio.o -o rpcflip -lX11 -ltiff -lm
 //
+// TODO:
+//
+// 1. transparent detection of the 12 significant bits on the 16 bit smaples
+// 2. automatic contrast adjust à la qauto
+// 3. setup base_h automatically using the SRTM4
+// 4. draw epipolar curves
+// 5. load an arbitrary DEM
+// 6. view the DEM (and the SRTM4)
+//
+
 #include <assert.h>
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-
-#include "iio.h"
 
 #define TIFFU_OMIT_MAIN
 #include "tiffu.c"
@@ -24,17 +31,8 @@
 #endif
 #include "ftr.c"
 
+#include "iio.h"
 #include "xmalloc.c"
-
-// TODO:
-//
-// 1. transparent detection of the 12 significant bits on the 16 bit smaples
-// 2. automatic contrast adjust à la qauto
-// 3. setup base_h automatically using the SRTM4
-// 4. draw epipolar curves
-// 5. load an arbitrary DEM
-// 6. view the DEM (and the SRTM4)
-//
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -50,7 +48,7 @@ struct pan_view {
 	struct tiff_octaves tg[1]; // P
 	struct tiff_octaves tc[1]; // MS
 
-	// RGB preview
+	// RGB preview of the whole image
 	uint8_t *preview;
 	int pw, ph;
 
@@ -58,8 +56,12 @@ struct pan_view {
 	struct rpc r[1]; 
 	double P[8]; // affine approximation to the RPC
 	double rgbiox, rgbioy; // offset between P and MS (in P pixel units)
-};
 
+	// current display of this view
+	uint8_t *display;
+	int dw, dh;
+	int repaint;
+};
 
 #define MAX_VIEWS 30
 struct pan_state {
@@ -138,6 +140,10 @@ static void init_view(struct pan_view *v,
 
 	// load P's RPC
 	read_rpc_file_xml(v->r, fgrpc);
+
+	// setup display cache
+	v->display = NULL;
+	v->repaint = 1;
 }
 
 static void setup_nominal_pixels_according_to_first_view(struct pan_state *e)
@@ -181,7 +187,6 @@ static void init_state(struct pan_state *e,
 	e->base_h = 0;
 	e->lon_0 = e->lat_0 = e->lon_d = e->lat_d = NAN;
 	setup_nominal_pixels_according_to_first_view(e);
-
 
 	// set viewport
 	e->a = 1;
@@ -429,14 +434,11 @@ static void preview_at_bic(float *out, struct pan_view *v, double x, double y)
 {
 	x -= 1.5;
 	y -= 1.5;
-
 	int ix = floor(x);
 	int iy = floor(y);
-
 	int w = v->pw;
 	int h = v->ph;
 	unsigned char *img = v->preview;
-
 	for (int l = 0; l < 3; l++) {
 		float c[4][4];
 		for (int j = 0; j < 4; j++)
@@ -464,10 +466,8 @@ void pixel_from_preview(float *r, struct pan_view *v, double p, double q, int i)
 	float fp = 1 * p * v->pw / v->tg->i->w;
 	float fq = 1 * q * v->ph / v->tg->i->h;
 	if (insideP(v->pw, v->ph, ip, iq)) {
-		if (i == 2)
-			preview_at_bil(r, v, fp, fq);
-		else if (i == 3)
-			preview_at_bic(r, v, fp, fq);
+		if (i == 2)      preview_at_bil(r, v, fp, fq);
+		else if (i == 3) preview_at_bic(r, v, fp, fq);
 		else for (int l = 0; l < 3; l++)
 			r[l] = rgb_getsamplec(v->preview, v->pw, v->ph,
 					ip, iq, l);
@@ -521,7 +521,6 @@ static int tiffo_getpixel_float_bicubic(float *r, struct tiff_octaves *t,
 {
 	x -= 1.5;
 	y -= 1.5;
-
 	int ix = floor(x);
 	int iy = floor(y);
 	int pd = t->i->spp;
@@ -567,7 +566,6 @@ static void pixel_from_pms(float *out, struct pan_view *v, double p, double q,
 	else             tiffo_getpixel_float_1(&g, v->tg, 0, p, q);
 	tiffo_getpixel_float_bilinear(c,  v->tc, 0, pc, qc);
 	c[1] = getgreenf(c);
-
 	float nc = 4*hypot(c[0], hypot(c[1], c[2]));
 	out[0] = c[0] * g / nc;
 	out[1] = c[1] * g / nc;
@@ -589,159 +587,11 @@ void pixel(float *out, struct pan_view *v, double p, double q, int o, int i)
 	else exit(fprintf(stderr,"ERROR: bad octave %d\n", o));
 }
 
-static void action_offset_viewport(struct FTR *f, double dx, double dy)
-{
-	struct pan_state *e = f->userdata;
-	e->offset_x -= dx/e->zoom_factor;
-	e->offset_y -= dy/e->zoom_factor;
-
-	f->changed = 1;
-}
-
-static void action_change_zoom_by_factor(struct FTR *f, int x, int y, double F)
-{
-	struct pan_state *e = f->userdata;
-
-	double c[2];
-	window_to_raster(c, e, x, y);
-
-	e->zoom_factor *= F;
-	e->offset_x = c[0] - x/e->zoom_factor;
-	e->offset_y = c[1] - y/e->zoom_factor;
-	fprintf(stderr, "\t zoom changed to %g\n", e->zoom_factor);
-
-	f->changed = 1;
-}
-
-static void action_multiply_contrast(struct FTR *f, double fac)
-{
-	struct pan_state *e = f->userdata;
-	e->a *= fac;
-	fprintf(stderr, "\t constrast factor changed to %g\n", e->a);
-	f->changed = 1;
-}
-
-static void action_offset_base_h(struct FTR *f, double d)
-{
-	struct pan_state *e = f->userdata;
-	e->base_h += d;
-	fprintf(stderr, "base_h = %g\n", e->base_h);
-	f->changed = 1;
-}
-
-static void action_increase_zoom(struct FTR *f, int x, int y)
-{
-	action_change_zoom_by_factor(f, x, y, WHEEL_FACTOR);
-}
-
-static void action_decrease_zoom(struct FTR *f, int x, int y)
-{
-	action_change_zoom_by_factor(f, x, y, 1.0/WHEEL_FACTOR);
-}
-
-static void action_toggle_exact_rpc(struct FTR *f)
-{
-	struct pan_state *e = f->userdata;
-	e->force_exact = !e->force_exact;
-	if (e->force_exact)
-		fprintf(stderr, "use EXACT calibration\n");
-	else
-		fprintf(stderr, "use APPROXIMATE calibration\n");
-	f->changed = 1;
-}
-
-static void action_toggle_diff_mode(struct FTR *f)
-{
-	struct pan_state *e = f->userdata;
-	e->diff_mode = !e->diff_mode;
-	f->changed = 1;
-}
-
-static void action_toggle_ignore_rpc(struct FTR *f, int x, int y)
-{
-	struct pan_state *e = f->userdata;
-
-	// assure that the center of the window is not moved
-	if (e->ignore_rpc) {
-		double c[2] = {x, y}, p[2], q[2];
-		window_to_image_raw(p, e, c[0], c[1]);
-		image_to_window_ex(q, e, p[0], p[1]);
-		action_offset_viewport(f, c[0] - q[0], c[1] - q[1]);
-	} else {
-		double c[2] = {x, y}, p[2], q[2];
-		window_to_image_ex(p, e, c[0], c[1]);
-		image_to_window_raw(q, e, p[0], p[1]);
-		action_offset_viewport(f, c[0] - q[0], c[1] - q[1]);
-	}
-
-	e->ignore_rpc = !e->ignore_rpc;
-	f->changed = 1;
-}
-
-// This function is only called when "ignoring" the RPC functions.  Even when
-// we ignore the RPCs, we still want to be able to flip the images while
-// keeping the center of the image at the correct offset; to compute this
-// offset we need the RPC functions.
-static void hack_ignored_rpc_offsets(struct FTR *f, int a, int b, int x, int y)
-{
-	if (x < 0 || y < 0 || x >= f->w || y >= f->h) { x = f->w/2; y = f->h/2;}
-	struct pan_state *e = f->userdata;
-	int save_view = e->current_view;
-	struct pan_view *va = e->view + a;
-	struct pan_view *vb = e->view + b;
-
-	double c[2] = {x, y}, p[2], q[2], no_c[2], lonlat[2];
-	e->current_view = a;
-	window_to_image_raw(p, e, c[0], c[1]);
-	eval_rpc(lonlat, va->r, p[0], p[1], e->base_h);
-	eval_rpci(q, vb->r, lonlat[0], lonlat[1], e->base_h);
-	e->current_view = b;
-	image_to_window_raw(no_c, e, q[0], q[1]);
-
-	action_offset_viewport(f, - no_c[0] + c[0], - no_c[1] + c[1]);
-
-	e->current_view = save_view;
-}
-
-static void action_select_view(struct FTR *f, int i, int x, int y)
-{
-	struct pan_state *e = f->userdata;
-	if (i >= 0 && i < e->nviews)
-	{
-		fprintf(stderr, "selecting view %d\n", i);
-		if (e->ignore_rpc && !e->diff_mode)
-			hack_ignored_rpc_offsets(f, e->current_view, i, x, y);
-		e->current_view = i;
-		f->changed = 1;
-	}
-}
-
-static void action_select_interpolator(struct FTR *f, int k)
-{
-	struct pan_state *e = f->userdata;
-	if (k >= 0 || k < 3 || k == 4)
-	       	e->interpolation_order = k;
-	f->changed = 1;
-}
-
-
-static void action_offset_rgbi(struct FTR *f, double dx, double dy)
-{
-	struct pan_state *e = f->userdata;
-	struct pan_view *v = obtain_view(e);
-	v->rgbiox += dx;
-	v->rgbioy += dy;
-	fprintf(stderr, "rgbi offset chanted to %g %g\n", v->rgbiox, v->rgbioy);
-	f->changed = 1;
-}
-
-
 // auxiliary function: compute n%p correctly, even for huge and negative numbers
 static int good_modulus(int nn, int p)
 {
 	if (!p) return 0;
 	if (p < 1) return good_modulus(nn, -p);
-
 	unsigned int r;
 	if (nn >= 0)
 		r = nn % p;
@@ -755,19 +605,23 @@ static int good_modulus(int nn, int p)
 	return r;
 }
 
-static void action_cycle_view(struct FTR *f, int d, int x, int y)
-{
-	struct pan_state *e = f->userdata;
-	int new = good_modulus(e->current_view + d, e->nviews);
-	action_select_view(f, new, x, y);
-	f->changed = 1;
-}
-
 // dump the image acording to the state of the viewport
-static void pan_paint(struct FTR *f)
+static void pan_repaint(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
 	struct pan_view *v = obtain_view(e);
+
+	// setup the display buffer
+	if (!v->display || v->dw != f->w || v->dh != f->h) {
+		if (v->display)
+			free(v->display);
+		v->display = xmalloc(f->w * f->h * 3);
+		v->dw = f->w;
+		v->dh = f->h;
+		v->repaint = 1;
+	}
+	if (!v->repaint) return;
+	v->repaint = 0;
 
 	// compute the RPC approximation at the center of the window
 	double ll[3];
@@ -790,57 +644,208 @@ static void pan_paint(struct FTR *f)
 				window_to_image_ap(p, e, i, j);
 			float c[3];
 			pixel(c, v, p[0], p[1], o, interp);
-			unsigned char *cc = f->rgb + 3 * (j * f->w + i);
+			unsigned char *cc = v->display + 3 * (j * f->w + i);
 			for (int l = 0; l < 3; l++)
-			{
-				float g = e->a * c[l] + e->b;
-				if      (g < 0)   cc[l] = 0  ;
-				else if (g > 255) cc[l] = 255;
-				else              cc[l] = g  ;
-			}
+				cc[l] = float_to_uint8(e->a * c[l] + e->b);
 		} else { // diff mode
 			int va = e->current_view;
 			int vb = good_modulus(e->current_view+1,e->nviews);
 			double p[2], q[2];
-			if (e->ignore_rpc) {
-				e->current_view = va;
-				window_to_image_raw(p, e, i, j);
-				e->current_view = vb;
-				window_to_image_raw(q, e, i, j);
-			} else if (e->force_exact) {
-				e->current_view = va;
-				window_to_image_ex(p, e, i, j);
-				e->current_view = vb;
-				window_to_image_ex(q, e, i, j);
-			} else {
-				e->current_view = va;
-				window_to_image_ap(p, e, i, j);
-				e->current_view = vb;
-				window_to_image_ap(q, e, i, j);
-			}
+			static void (*www)(double p[2],struct pan_state*,double,double) = window_to_image_ap;
+			if (e->ignore_rpc)       www = window_to_image_raw;
+			else if (e->force_exact) www = window_to_image_ex;
+			e->current_view = va; www(p, e, i, j);
+			e->current_view = vb; www(q, e, i, j);
 			float ca[3], cb[3];
 			pixel(ca, e->view + va, p[0], p[1], o, interp);
 			pixel(cb, e->view + vb, q[0], q[1], o, interp);
-			unsigned char *cc = f->rgb + 3 * (j * f->w + i);
-			for (int l = 0; l < 3; l++)
-			{
+			unsigned char *cc = v->display + 3 * (j * f->w + i);
+			for (int l = 0; l < 3; l++) {
 				float g = 2*e->a * (ca[l] - cb[l]) + 127;
-				if      (g < 0)   cc[l] = 0  ;
-				else if (g > 255) cc[l] = 255;
-				else              cc[l] = g  ;
+				cc[l] = float_to_uint8(g);
 			}
 			e->current_view = va;
 		}
 	}
-	f->changed = 1;
 }
 
 static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
-	if (f->changed)
-	{
-		pan_paint(f);
+	struct pan_state *e = f->userdata;
+	struct pan_view *v = obtain_view(e);
+
+	pan_repaint(f);
+
+	int idx = v - e->view;
+	fprintf(stderr, "pan exposer idx = %d (%d %d)\n", idx, v->repaint, f->changed);
+
+	assert(f->w == v->dw);
+	assert(f->h == v->dh);
+	memcpy(f->rgb, v->display, v->dw * v->dh * 3);
+}
+
+static void request_repaints(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	for (int i = 0; i < e->nviews; i++)
+		e->view[i].repaint = 1;
+	f->changed = 1;
+}
+
+
+static void action_offset_viewport(struct FTR *f, double dx, double dy)
+{
+	struct pan_state *e = f->userdata;
+	e->offset_x -= dx/e->zoom_factor;
+	e->offset_y -= dy/e->zoom_factor;
+
+	request_repaints(f);
+}
+
+static void action_change_zoom_by_factor(struct FTR *f, int x, int y, double F)
+{
+	struct pan_state *e = f->userdata;
+
+	double c[2];
+	window_to_raster(c, e, x, y);
+
+	e->zoom_factor *= F;
+	e->offset_x = c[0] - x/e->zoom_factor;
+	e->offset_y = c[1] - y/e->zoom_factor;
+	fprintf(stderr, "\t zoom changed to %g\n", e->zoom_factor);
+
+	request_repaints(f);
+}
+
+static void action_multiply_contrast(struct FTR *f, double fac)
+{
+	struct pan_state *e = f->userdata;
+	e->a *= fac;
+	fprintf(stderr, "\t constrast factor changed to %g\n", e->a);
+
+	request_repaints(f);
+}
+
+static void action_offset_base_h(struct FTR *f, double d)
+{
+	struct pan_state *e = f->userdata;
+	e->base_h += d;
+	fprintf(stderr, "base_h = %g\n", e->base_h);
+
+	request_repaints(f);
+}
+
+static void action_increase_zoom(struct FTR *f, int x, int y)
+{
+	action_change_zoom_by_factor(f, x, y, WHEEL_FACTOR);
+}
+
+static void action_decrease_zoom(struct FTR *f, int x, int y)
+{
+	action_change_zoom_by_factor(f, x, y, 1.0/WHEEL_FACTOR);
+}
+
+static void action_toggle_exact_rpc(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->force_exact = !e->force_exact;
+	if (e->force_exact)
+		fprintf(stderr, "use EXACT calibration\n");
+	else
+		fprintf(stderr, "use APPROXIMATE calibration\n");
+
+	request_repaints(f);
+}
+
+static void action_toggle_diff_mode(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->diff_mode = !e->diff_mode;
+
+	request_repaints(f);
+}
+
+static void action_toggle_ignore_rpc(struct FTR *f, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+
+	// assure that the center of the window is not moved
+	if (e->ignore_rpc) {
+		double c[2] = {x, y}, p[2], q[2];
+		window_to_image_raw(p, e, c[0], c[1]);
+		image_to_window_ex(q, e, p[0], p[1]);
+		action_offset_viewport(f, c[0] - q[0], c[1] - q[1]);
+	} else {
+		double c[2] = {x, y}, p[2], q[2];
+		window_to_image_ex(p, e, c[0], c[1]);
+		image_to_window_raw(q, e, p[0], p[1]);
+		action_offset_viewport(f, c[0] - q[0], c[1] - q[1]);
 	}
+
+	e->ignore_rpc = !e->ignore_rpc;
+
+	request_repaints(f);
+}
+
+// This function is only called when "ignoring" the RPC functions.  Even when
+// we ignore the RPCs, we still want to be able to flip the images while
+// keeping the center of the image at the correct offset; to compute this
+// offset we need the RPC functions.
+static void hack_ignored_rpc_offsets(struct FTR *f, int a, int b, int x, int y)
+{
+	// TODO: remove this hack and deal properly with unrectified images
+	if (x < 0 || y < 0 || x >= f->w || y >= f->h) { x = f->w/2; y = f->h/2;}
+	struct pan_state *e = f->userdata;
+	int save_view = e->current_view;
+	struct pan_view *va = e->view + a;
+	struct pan_view *vb = e->view + b;
+	double c[2] = {x, y}, p[2], q[2], no_c[2], lonlat[2];
+	e->current_view = a;
+	window_to_image_raw(p, e, c[0], c[1]);
+	eval_rpc(lonlat, va->r, p[0], p[1], e->base_h);
+	eval_rpci(q, vb->r, lonlat[0], lonlat[1], e->base_h);
+	e->current_view = b;
+	image_to_window_raw(no_c, e, q[0], q[1]);
+	action_offset_viewport(f, - no_c[0] + c[0], - no_c[1] + c[1]);
+	e->current_view = save_view;
+}
+
+static void action_select_view(struct FTR *f, int i, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+	if (i >= 0 && i < e->nviews)
+	{
+		fprintf(stderr, "selecting view %d\n", i);
+		if (e->ignore_rpc && !e->diff_mode)
+			hack_ignored_rpc_offsets(f, e->current_view, i, x, y);
+		e->current_view = i;
+		f->changed = 1;
+	}
+}
+
+static void action_select_interpolator(struct FTR *f, int k)
+{
+	struct pan_state *e = f->userdata;
+	if (k >= 0 || k < 3 || k == 4)
+	       	e->interpolation_order = k;
+	request_repaints(f);
+}
+
+static void action_offset_rgbi(struct FTR *f, double dx, double dy)
+{
+	struct pan_state *e = f->userdata;
+	struct pan_view *v = obtain_view(e);
+	v->rgbiox += dx;
+	v->rgbioy += dy;
+	fprintf(stderr, "rgbi offset chanted to %g %g\n", v->rgbiox, v->rgbioy);
+	request_repaints(f);
+}
+
+static void action_cycle_view(struct FTR *f, int d, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+	int new = good_modulus(e->current_view + d, e->nviews);
+	action_select_view(f, new, x, y);
 }
 
 static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
@@ -849,7 +854,6 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 		action_cycle_view(f, +1, x, y); return; }
 	if (b == FTR_BUTTON_DOWN && m & FTR_MASK_CONTROL) {
 		action_cycle_view(f, -1, x, y); return; }
-
 	if (b == FTR_BUTTON_DOWN)   action_increase_zoom(f, x, y);
 	if (b == FTR_BUTTON_UP  )   action_decrease_zoom(f, x, y);
 }
@@ -858,15 +862,13 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 {
 	struct pan_state *e = f->userdata;
-
 	static double ox = 0, oy = 0;
-
-	if (m == FTR_BUTTON_LEFT)   action_offset_viewport(f, x - ox, y - oy);
-
+	if (m == FTR_BUTTON_LEFT) action_offset_viewport(f, x - ox, y - oy);
 	ox = x;
 	oy = y;
 }
 
+// keyboard handler
 void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
 	if (k == '+' || k == '=') action_increase_zoom(f, f->w/2, f->h/2);
@@ -918,6 +920,12 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 		action_select_interpolator(f, k-'0');
 }
 
+// resize handler
+static void pan_resize(struct FTR *f, int k, int m, int x, int y)
+{
+	request_repaints(f);
+}
+
 int main_pan(int c, char *v[])
 {
 	TIFFSetWarningHandler(NULL);//suppress warnings
@@ -930,7 +938,7 @@ int main_pan(int c, char *v[])
 		//                0  1     2     3     4      5
 		return c;
 	}
-	int n = (c - 1)/5;
+	int n = BAD_MIN((c - 1)/5,MAX_VIEWS);
 	fprintf(stderr, "we have %d views\n", n);
 	char *filename_gtif[n];
 	char *filename_gpre[n];
@@ -970,6 +978,7 @@ int main_pan(int c, char *v[])
 	ftr_set_handler(&f, "button", pan_button_handler);
 	ftr_set_handler(&f, "motion", pan_motion_handler);
 	ftr_set_handler(&f, "expose", pan_exposer);
+	ftr_set_handler(&f, "resize", pan_resize);
 	int r = ftr_loop_run(&f);
 
 	// cleanup and exit (optional)
