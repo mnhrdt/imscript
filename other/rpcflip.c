@@ -54,7 +54,7 @@ struct pan_view {
 
 	// calibration
 	struct rpc r[1]; 
-	double P[8]; // affine approximation to the RPC
+	double P[8]; // local affine approximation of "raster to image"
 	double rgbiox, rgbioy; // offset between P and MS (in P pixel units)
 
 	// current display of this view
@@ -81,7 +81,7 @@ struct pan_state {
 
 	// 4. visualization options
 	int force_exact;
-	int ignore_rpc;
+	int image_space;
 	int diff_mode;
 	int interpolation_order;
 };
@@ -93,7 +93,8 @@ static uint8_t float_to_uint8(float x)
 	return x;
 }
 
-static uint8_t *load_nice_preview(char *fg, char *fc, int *w, int *h)
+//static
+uint8_t *load_nice_preview(char *fg, char *fc, int *w, int *h)
 {
 	int wg, hg, wc, hc;
 	uint8_t *g = (void*)iio_read_image_uint8_rgb(fg, &wg, &hg);
@@ -114,8 +115,7 @@ static uint8_t *load_nice_preview(char *fg, char *fc, int *w, int *h)
 		float P = g[3*gidx];
 		r[3*gidx + 0] = float_to_uint8(3 * P * R / nc);
 		r[3*gidx + 1] = float_to_uint8(3 * P * G / nc);
-		r[3*gidx + 2] = float_to_uint8(3 * P * B / nc);
-	}
+		r[3*gidx + 2] = float_to_uint8(3 * P * B / nc); }
 
 	free(g);
 	free(c);
@@ -196,7 +196,7 @@ static void init_state(struct pan_state *e,
 
 	// set options
 	e->force_exact = 0;
-	e->ignore_rpc = 0;
+	e->image_space = 0;
 	e->diff_mode = 0;
 	e->interpolation_order = 0;
 }
@@ -224,29 +224,40 @@ static int obtain_octave(struct pan_state *e)
 	return 1;
 }
 
-// compute an affine approximation of the RPC function
-static void approximate_projection(double P[8], struct rpc *R,
-		double x, double y, double h)
+static void window_to_image_exh(double*,struct pan_state*,double,double,double);
+
+static void raster_to_image_exh(double out[2], struct pan_state *e,
+		double x, double y, double h);
+
+typedef void raster_to_image_t(double out[2], struct pan_state *e,
+		double x, double y, double h);
+
+// compute an affine approximation of a generic raster_to_image function
+static void approximate_projection_gen(double P[8],
+		struct pan_state *e,
+		double x, double y, double h,
+		raster_to_image_t *rtoi)
 {
+	//fprintf(stderr, "gen approximate projection rxyh=%g %g %g\n", x,y,h);
 	// finite difference steps
-	double eps_L = 0.000001; // (in geographic DEGREES)
-	double eps_H = 1; // (in meters)
+	double eps_R = 0.5; // (in raster steps)
+	double eps_H = 1.0; // (in meters)
 
 	// eval the function at a coordinate tetrahedron
 	double v0[3], vx[3], vy[3], vh[3];
-	eval_rpci(v0, R, x         , y         , h        );
-	eval_rpci(vx, R, x + eps_L , y         , h        );
-	eval_rpci(vy, R, x         , y + eps_L , h        );
-	eval_rpci(vh, R, x         , y         , h + eps_H);
+	rtoi(v0, e, x         , y        , h        );
+	rtoi(vx, e, x + eps_R , y        , h        );
+	rtoi(vy, e, x         , y + eps_R, h        );
+	rtoi(vh, e, x         , y        , h + eps_H);
 
 	// compute forward differences
 	double pp = v0[0];
 	double qq = v0[1];
-	double px = ( vx[0] - v0[0] ) / eps_L;
-	double py = ( vy[0] - v0[0] ) / eps_L;
+	double px = ( vx[0] - v0[0] ) / eps_R;
+	double py = ( vy[0] - v0[0] ) / eps_R;
 	double ph = ( vh[0] - v0[0] ) / eps_H;
-	double qx = ( vx[1] - v0[1] ) / eps_L;
-	double qy = ( vy[1] - v0[1] ) / eps_L;
+	double qx = ( vx[1] - v0[1] ) / eps_R;
+	double qy = ( vy[1] - v0[1] ) / eps_R;
 	double qh = ( vh[1] - v0[1] ) / eps_H;
 
 	// fill-in the coefficients of the affine approximation
@@ -255,6 +266,8 @@ static void approximate_projection(double P[8], struct rpc *R,
 	P[3] = pp - px * x - py * y - ph * h;
 	P[7] = qq - qx * x - qy * y - qh * h;
 }
+
+
 
 static void apply_projection(double out[3], double P[8], double x[3])
 {
@@ -307,40 +320,112 @@ void geo_to_raster(double xy[2], struct pan_state *e, double lon, double lat)
 }
 
 static
-void window_to_geo(double lonlat[2], struct pan_state *e, double i, double j)
+void window_to_image_apm(double out[2], struct pan_state *e, double i, double j)
 {
-	double xy[2];
-	window_to_raster(xy, e, i, j);
-	raster_to_geo(lonlat, e, xy[0], xy[1]);
-}
-
-static
-void window_to_image_ap(double out[2], struct pan_state *e, double i, double j)
-{
-	double lonlath[3];
-	window_to_geo(lonlath, e, i, j);
-	lonlath[2] = e->base_h;
+	double xyh[3];
+	window_to_raster(xyh, e, i, j);
+	xyh[2] = e->base_h;
 
 	struct pan_view *v = obtain_view(e);
 	double p[3];
-	apply_projection(p, v->P, lonlath);
+	apply_projection(p, v->P, xyh);
 	out[0] = p[0];
 	out[1] = p[1];
+}
+
+static
+void image_to_window_apm(double ij[2], struct pan_state *e, double p, double q)
+{
+	struct pan_view *v = obtain_view(e);
+	double *P = v->P;
+	double a = P[0];
+	double b = P[1];
+	double c = P[4];
+	double d = P[5];
+	double det = a * d - b * c;
+	double x = p - P[2]*e->base_h - P[3];
+	double y = q - P[6]*e->base_h - P[7];
+	double raster[2];
+	raster[0] = ( d * x - b * y ) / det;
+	raster[1] = ( a * y - c * y ) / det;
+	raster_to_window(ij, e, raster[0], raster[1]);
+}
+
+
+// from the geographic raster to the image domain, using the RPC functions
+static void raster_to_image_exh(double out[2], struct pan_state *e,
+		double x, double y, double h)
+{
+	double lonlat[2];
+	raster_to_geo(lonlat, e, x, y);
+
+	struct pan_view *v = obtain_view(e);
+	double p[3];
+	eval_rpci(p, v->r, lonlat[0], lonlat[1], h);
+	out[0] = p[0];
+	out[1] = p[1];
+}
+
+static void vertical_direction(double vertical[2],
+		struct pan_view *v, double p, double q, double h)
+{
+	double lonlat[3];
+	eval_rpc(lonlat, v->r, p, q, h);
+
+	double eps_H = 100.0; // in meters
+	double p_bot[3], p_top[3];
+	eval_rpci(p_bot, v->r, lonlat[0], lonlat[1], h        );
+	eval_rpci(p_top, v->r, lonlat[0], lonlat[1], h + eps_H);
+	vertical[0] = ( p_top[0] - p_bot[0] ) / eps_H;
+	vertical[1] = ( p_top[1] - p_bot[1] ) / eps_H;
+}
+
+// from the image raster to the image coordinates
+// (typically, a translation along the vertical direction, proportional to h)
+//
+// This function is slow, intended to be approximated later by an affine map
+static void raster_to_image_raw(double out[2], struct pan_state *e,
+		double rx, double ry, double h)
+{
+	struct pan_view *v = obtain_view(e);
+
+	// image point corresponding to raster x,y
+	// (identity map)
+	double x = rx;
+	double y = ry;
+
+	double vertical[2];
+	vertical_direction(vertical, v, x, y, h);
+
+	out[0] = x + h*vertical[0];
+	out[1] = y + h*vertical[1];
+}
+
+static void image_to_raster_raw(double out[2], struct pan_state *e,
+		double p, double q, double h)
+{
+	struct pan_view *v = obtain_view(e);
+
+	double vertical[2];
+	vertical_direction(vertical, v, p, q, h);
+
+	out[0] = p - h * vertical[0];
+	out[1] = q - h * vertical[1];
+}
+
+static
+void window_to_image_exh(double out[2], struct pan_state *e,
+		double i, double j, double h)
+{
+	double xy[2];
+	window_to_raster(xy, e, i, j);
+	raster_to_image_exh(out, e, xy[0], xy[1], h);
 }
 
 static
 void window_to_image_ex(double out[2], struct pan_state *e, double i, double j)
 {
-	double lonlath[3];
-	window_to_geo(lonlath, e, i, j);
-	lonlath[2] = e->base_h;
-
-	struct pan_view *v = obtain_view(e);
-	double p[3];
-	eval_rpci(p, v->r, lonlath[0], lonlath[1], e->base_h);
-
-	out[0] = p[0];
-	out[1] = p[1];
+	window_to_image_exh(out, e, i, j, e->base_h);
 }
 
 static
@@ -351,22 +436,6 @@ void image_to_window_ex(double ij[2], struct pan_state *e, double p, double q)
 	eval_rpc(lonlat, v->r, p, q, e->base_h);
 	geo_to_raster(xy, e, lonlat[0], lonlat[1]);
 	raster_to_window(ij, e, xy[0], xy[1]);
-}
-
-static
-void window_to_image_raw(double p[2], struct pan_state *e, double i, double j)
-{
-	window_to_raster(p, e, i, j);
-	struct pan_view *v = obtain_view(e);
-	p[0] += v->w / 2.0;
-	p[1] += v->h / 2.0;
-}
-
-static
-void image_to_window_raw(double ij[2], struct pan_state *e, double p, double q)
-{
-	struct pan_view *v = obtain_view(e);
-	raster_to_window(ij, e, p - v->w / 2.0, q - v->h / 2.0);
 }
 
 static float rgb_getsamplec(void *vx, int w, int h, int i, int j, int l)
@@ -605,6 +674,20 @@ static int good_modulus(int nn, int p)
 	return r;
 }
 
+static void update_local_projection(struct pan_state *e,
+		double ix, double iy, double h)
+{
+	struct pan_view *v = obtain_view(e);
+
+	double xy[2];
+	window_to_raster(xy, e, ix, iy);
+	double x = xy[0];
+	double y = xy[1];
+
+	approximate_projection_gen(v->P, e, x, y, h, e->image_space ?
+			raster_to_image_raw : raster_to_image_exh);
+}
+
 // dump the image acording to the state of the viewport
 static void pan_repaint(struct FTR *f)
 {
@@ -620,28 +703,26 @@ static void pan_repaint(struct FTR *f)
 		v->dh = f->h;
 		v->repaint = 1;
 	}
-	if (!v->repaint) return;
+	if (!v->repaint) return; // if no repaint requested, return
 	v->repaint = 0;
 
-	// compute the RPC approximation at the center of the window
-	double ll[3];
-	window_to_geo(ll, e, f->w/2, f->h/2);
-	approximate_projection(v->P, v->r, ll[0], ll[1], e->base_h);
+	update_local_projection(e, f->w/2, f->h/2, e->base_h);
+
+	static void (*win_to_img)(double p[2],struct pan_state*,double,double);
+	win_to_img = window_to_image_apm;
+	if (e->image_space)      win_to_img = window_to_image_apm;
+	else if (e->force_exact) win_to_img = window_to_image_ex;
 
 	int o = obtain_octave(e);
 	int interp = e->interpolation_order;
 
+//#pragma omp parallel for
 	for (int j = 0; j < f->h; j++)
 	for (int i = 0; i < f->w; i++)
 	{
 		if (!e->diff_mode) {
 			double p[2];
-			if (e->ignore_rpc)
-				window_to_image_raw(p, e, i, j);
-			else if (e->force_exact)
-				window_to_image_ex(p, e, i, j);
-			else
-				window_to_image_ap(p, e, i, j);
+			win_to_img(p, e, i, j);
 			float c[3];
 			pixel(c, v, p[0], p[1], o, interp);
 			unsigned char *cc = v->display + 3 * (j * f->w + i);
@@ -651,11 +732,8 @@ static void pan_repaint(struct FTR *f)
 			int va = e->current_view;
 			int vb = good_modulus(e->current_view+1,e->nviews);
 			double p[2], q[2];
-			static void (*www)(double p[2],struct pan_state*,double,double) = window_to_image_ap;
-			if (e->ignore_rpc)       www = window_to_image_raw;
-			else if (e->force_exact) www = window_to_image_ex;
-			e->current_view = va; www(p, e, i, j);
-			e->current_view = vb; www(q, e, i, j);
+			e->current_view = va; win_to_img(p, e, i, j);
+			e->current_view = vb; win_to_img(q, e, i, j);
 			float ca[3], cb[3];
 			pixel(ca, e->view + va, p[0], p[1], o, interp);
 			pixel(cb, e->view + vb, q[0], q[1], o, interp);
@@ -671,14 +749,12 @@ static void pan_repaint(struct FTR *f)
 
 static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
+	pan_repaint(f);
+
 	struct pan_state *e = f->userdata;
 	struct pan_view *v = obtain_view(e);
 
-	pan_repaint(f);
-
-	int idx = v - e->view;
-	fprintf(stderr, "pan exposer idx = %d (%d %d)\n", idx, v->repaint, f->changed);
-
+	// copy the requested view into the display
 	assert(f->w == v->dw);
 	assert(f->h == v->dh);
 	memcpy(f->rgb, v->display, v->dw * v->dh * 3);
@@ -765,25 +841,30 @@ static void action_toggle_diff_mode(struct FTR *f)
 	request_repaints(f);
 }
 
-static void action_toggle_ignore_rpc(struct FTR *f, int x, int y)
+static void action_toggle_image_space(struct FTR *f, int x, int y)
 {
 	struct pan_state *e = f->userdata;
 
+	fprintf(stderr, "doing hacky things\n");
+
 	// assure that the center of the window is not moved
-	if (e->ignore_rpc) {
+	e->image_space = !e->image_space;
+	update_local_projection(e, f->w/2, f->h/2, e->base_h);
+	if (e->image_space) {
 		double c[2] = {x, y}, p[2], q[2];
-		window_to_image_raw(p, e, c[0], c[1]);
+		window_to_image_apm(p, e, c[0], c[1]);
 		image_to_window_ex(q, e, p[0], p[1]);
 		action_offset_viewport(f, c[0] - q[0], c[1] - q[1]);
 	} else {
 		double c[2] = {x, y}, p[2], q[2];
 		window_to_image_ex(p, e, c[0], c[1]);
-		image_to_window_raw(q, e, p[0], p[1]);
+		image_to_window_apm(q, e, p[0], p[1]);
 		action_offset_viewport(f, c[0] - q[0], c[1] - q[1]);
 	}
-
-	e->ignore_rpc = !e->ignore_rpc;
-
+	if (e->image_space)
+		fprintf(stderr, "base grid = IMAGE\n");
+	else
+		fprintf(stderr, "base grid = GEOGRAPHIC\n");
 	request_repaints(f);
 }
 
@@ -791,23 +872,42 @@ static void action_toggle_ignore_rpc(struct FTR *f, int x, int y)
 // we ignore the RPCs, we still want to be able to flip the images while
 // keeping the center of the image at the correct offset; to compute this
 // offset we need the RPC functions.
-static void hack_ignored_rpc_offsets(struct FTR *f, int a, int b, int x, int y)
+//
+// NOTE: this is obsolete.  Now, "ignorance" of the RPC function is simulated
+// by a constant approximation of it, and treated within the same framework
+//
+// Nonsense! Upon changing images, we must still assure that the central
+// pixel of the window does not move in image coordinates (at the given h).
+static void reposition_in_image_space(struct FTR *f, int a, int b, int x, int y)
 {
-	// TODO: remove this hack and deal properly with unrectified images
 	if (x < 0 || y < 0 || x >= f->w || y >= f->h) { x = f->w/2; y = f->h/2;}
-	struct pan_state *e = f->userdata;
+	struct pan_state *e = f->userdata; assert(e->image_space);
 	int save_view = e->current_view;
 	struct pan_view *va = e->view + a;
 	struct pan_view *vb = e->view + b;
-	double c[2] = {x, y}, p[2], q[2], no_c[2], lonlat[2];
+	double rc[2], imgac[2], imgbc[2], rdc[2], dc[2], lonlat[2];
+	window_to_raster(rc, e, x, y);
 	e->current_view = a;
-	window_to_image_raw(p, e, c[0], c[1]);
-	eval_rpc(lonlat, va->r, p[0], p[1], e->base_h);
-	eval_rpci(q, vb->r, lonlat[0], lonlat[1], e->base_h);
+	raster_to_image_raw(imgac, e, rc[0], rc[1], e->base_h);
+	eval_rpc(lonlat, va->r, imgac[0], imgac[1], e->base_h);
+	eval_rpci(imgbc, vb->r, lonlat[0], lonlat[1], e->base_h);
 	e->current_view = b;
-	image_to_window_raw(no_c, e, q[0], q[1]);
-	action_offset_viewport(f, - no_c[0] + c[0], - no_c[1] + c[1]);
+	image_to_raster_raw(rdc, e, imgbc[0], imgbc[1], e->base_h);
+	raster_to_window(dc, e, rdc[0], rdc[1]);
+	double offx = x - dc[0];
+	double offy = y - dc[1];
+	action_offset_viewport(f, offx, offy);
 	e->current_view = save_view;
+
+	fprintf(stderr, "reposition a b = %d %d\n", a, b);
+	fprintf(stderr, "reposition x y = %d %d\n", x, y);
+	fprintf(stderr, "reposition rc = %g %g\n", rc[0], rc[1]);
+	fprintf(stderr, "reposition imgac = %g %g\n", imgac[0], imgac[1]);
+	fprintf(stderr, "reposition lonlat = %g %g\n", lonlat[0], lonlat[1]);
+	fprintf(stderr, "reposition imgbc = %g %g\n", imgbc[0], imgbc[1]);
+	fprintf(stderr, "reposition rdc = %g %g\n", rdc[0], rdc[1]);
+	fprintf(stderr, "reposition dc = %g %g\n", dc[0], dc[1]);
+	fprintf(stderr, "reposition off = %g %g\n", offx, offy);
 }
 
 static void action_select_view(struct FTR *f, int i, int x, int y)
@@ -816,8 +916,9 @@ static void action_select_view(struct FTR *f, int i, int x, int y)
 	if (i >= 0 && i < e->nviews)
 	{
 		fprintf(stderr, "selecting view %d\n", i);
-		if (e->ignore_rpc && !e->diff_mode)
-			hack_ignored_rpc_offsets(f, e->current_view, i, x, y);
+		if (e->image_space && !e->diff_mode)
+			reposition_in_image_space(f, e->current_view, i, x, y);
+			//hack_ignored_rpc_offsets(f, e->current_view, i, x, y);
 		e->current_view = i;
 		f->changed = 1;
 	}
@@ -887,7 +988,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'd') {action_offset_base_h(f, -10);return;}
 
 	if (k == 'e') action_toggle_exact_rpc(f);
-	if (k == 'i') action_toggle_ignore_rpc(f, f->w/2, f->h/2);
+	if (k == 'i') action_toggle_image_space(f, f->w/2, f->h/2);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
