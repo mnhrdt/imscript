@@ -58,6 +58,7 @@ struct pan_view {
 	double rgbiox, rgbioy; // offset between P and MS (in P pixel units)
 
 	// current display of this view
+	float *fdisplay;
 	uint8_t *display;
 	int dw, dh;
 	int repaint;
@@ -84,6 +85,8 @@ struct pan_state {
 	int image_space;
 	int diff_mode;
 	int interpolation_order;
+	int image_rotation_status;
+	int qauto;
 };
 
 static uint8_t float_to_uint8(float x)
@@ -143,6 +146,7 @@ static void init_view(struct pan_view *v,
 
 	// setup display cache
 	v->display = NULL;
+	v->fdisplay = NULL;
 	v->repaint = 1;
 }
 
@@ -199,6 +203,8 @@ static void init_state(struct pan_state *e,
 	e->image_space = 0;
 	e->diff_mode = 0;
 	e->interpolation_order = 0;
+	e->image_rotation_status = 0;
+	e->qauto = 1;
 }
 
 static struct pan_view *obtain_view(struct pan_state *e)
@@ -369,6 +375,8 @@ static void raster_to_image_exh(double out[2], struct pan_state *e,
 static void vertical_direction(double vertical[2],
 		struct pan_view *v, double p, double q, double h)
 {
+	p = v->w / 2;
+	q = v->h / 2;
 	double lonlat[3];
 	eval_rpc(lonlat, v->r, p, q, h);
 
@@ -390,12 +398,19 @@ static void raster_to_image_raw(double out[2], struct pan_state *e,
 	struct pan_view *v = obtain_view(e);
 
 	// image point corresponding to raster x,y
-	// (identity map)
-	double x = rx;
-	double y = ry;
+	// (HERE identity map)
+	//double x = -rx;
+	//double y = -ry;
 
 	double vertical[2];
-	vertical_direction(vertical, v, x, y, h);
+	vertical_direction(vertical, v, rx, ry, h);
+
+	double alpha = atan2(vertical[1], vertical[0]) + M_PI/2;
+	if (e->image_rotation_status == 0) alpha = 0;
+	if (e->image_rotation_status == 1) alpha = -M_PI;
+	double x = cos(alpha) * rx - sin(alpha) * ry;
+	double y = sin(alpha) * rx + cos(alpha) * ry;
+
 
 	out[0] = x + h*vertical[0];
 	out[1] = y + h*vertical[1];
@@ -409,8 +424,16 @@ static void image_to_raster_raw(double out[2], struct pan_state *e,
 	double vertical[2];
 	vertical_direction(vertical, v, p, q, h);
 
-	out[0] = p - h * vertical[0];
-	out[1] = q - h * vertical[1];
+	double x = p - h * vertical[0];
+	double y = q - h * vertical[1];
+
+	// (HERE inverse identity map)
+	//double alpha = 0.1;
+	double alpha = atan2(vertical[1], vertical[0]) + M_PI/2;
+	if (e->image_rotation_status == 0) alpha = 0;
+	if (e->image_rotation_status == 1) alpha = -M_PI;
+	out[0] =  cos(alpha) * x + sin(alpha) * y;
+	out[1] = -sin(alpha) * x + cos(alpha) * y;
 }
 
 static
@@ -527,13 +550,20 @@ static float getgreenf(float c[4])
 	return c[1] * 0.6 + c[3] * 0.2;
 }
 
+static void rgbi_to_rgb_inplace(float c[4])
+{
+	c[0] = 1.00 * c[0]  +  0.05 * c[3];
+	c[1] = 0.60 * c[1]  +  0.20 * c[3];
+	c[2] = 1.30 * c[2]  -  0.20 * c[3];
+}
+
 static
 void pixel_from_preview(float *r, struct pan_view *v, double p, double q, int i)
 {
-	int ip = p * v->pw / v->w;
-	int iq = q * v->ph / v->h;
-	float fp = 1 * p * v->pw / v->tg->i->w;
-	float fq = 1 * q * v->ph / v->tg->i->h;
+	int ip = p * v->pw / v->tg->i->w;
+	int iq = q * v->ph / v->tg->i->h;
+	float fp = p * v->pw / v->tg->i->w;
+	float fq = q * v->ph / v->tg->i->h;
 	if (insideP(v->pw, v->ph, ip, iq)) {
 		if (i == 2)      preview_at_bil(r, v, fp, fq);
 		else if (i == 3) preview_at_bic(r, v, fp, fq);
@@ -541,9 +571,10 @@ void pixel_from_preview(float *r, struct pan_view *v, double p, double q, int i)
 			r[l] = rgb_getsamplec(v->preview, v->pw, v->ph,
 					ip, iq, l);
 	} else {
-		r[0] = 200;
-		r[1] = 50;
-		r[2] = 100;
+		// bright green
+		r[0] = 0;
+		r[1] = 255;
+		r[2] = 0;
 	}
 }
 
@@ -616,7 +647,7 @@ static void pixel_from_ms(float *out, struct pan_view *v, double p, double q,
 	if (i == 2)      tiffo_getpixel_float_bilinear(c, v->tc, 0, ipc, iqc);
 	else if (i == 3) tiffo_getpixel_float_bicubic(c, v->tc, 0, ipc, iqc);
 	else             tiffo_getpixel_float_1(c, v->tc, 0, ipc, iqc);
-	c[1] = getgreenf(c);
+	rgbi_to_rgb_inplace(c);
 	float g = (c[0] + c[1] + c[2] + c[3]) / 4;
 	float nc = 4*hypot(c[0], hypot(c[1], c[2]));
 	out[0] = c[0] * g / nc;
@@ -630,11 +661,13 @@ static void pixel_from_pms(float *out, struct pan_view *v, double p, double q,
 	float pc = (p + v->rgbiox) / 4;
 	float qc = (q + v->rgbioy) / 4;
 	float g, c[4];
-	if (i == 2)      tiffo_getpixel_float_bilinear(&g, v->tg, 0, p, q);
-	else if (i == 3) tiffo_getpixel_float_bicubic(&g, v->tg, 0, p, q);
-	else             tiffo_getpixel_float_1(&g, v->tg, 0, p, q);
-	tiffo_getpixel_float_bilinear(c,  v->tc, 0, pc, qc);
-	c[1] = getgreenf(c);
+	if (i == 2)      tiffo_getpixel_float_bilinear(&g, v->tg, 0, p , q );
+	else if (i == 3) tiffo_getpixel_float_bicubic (&g, v->tg, 0, p , q );
+	else             tiffo_getpixel_float_1       (&g, v->tg, 0, p , q );
+	if (i == 2)      tiffo_getpixel_float_bilinear(c , v->tc, 0, pc, qc);
+	else if (i == 3) tiffo_getpixel_float_bicubic (c , v->tc, 0, pc, qc);
+	else             tiffo_getpixel_float_1       (c , v->tc, 0, pc, qc);
+	rgbi_to_rgb_inplace(c);
 	float nc = 4*hypot(c[0], hypot(c[1], c[2]));
 	out[0] = c[0] * g / nc;
 	out[1] = c[1] * g / nc;
@@ -645,12 +678,13 @@ static void pixel_from_pms(float *out, struct pan_view *v, double p, double q,
 static
 void pixel(float *out, struct pan_view *v, double p, double q, int o, int i)
 {
-	if (p < 0 || q < 0 || p >= v->w || q >= v->w) {
-		out[0] = 0;
-		out[1] = 255;
-		out[2] = 0;
+	if (p < 0 || q < 0 || p >= v->w || q >= v->h) {
+		// pink
+		out[0] = 200;
+		out[1] = 50;
+		out[2] = 100;
 	}
-	if      (o == 0) pixel_from_preview (out, v, p, q, i);
+	else if (o == 0) pixel_from_preview (out, v, p, q, i);
 	else if (o == 1) pixel_from_ms      (out, v, p, q, i);
 	else if (o == 2) pixel_from_pms     (out, v, p, q, i);
 	else exit(fprintf(stderr,"ERROR: bad octave %d\n", o));
@@ -674,6 +708,46 @@ static int good_modulus(int nn, int p)
 	return r;
 }
 
+static void inplace_rgb_span(unsigned char *x, int n)
+{
+	unsigned char min[3] = {255, 255, 255}, max[3] = {0, 0, 0};
+	for (int i = 0; i < n; i++)
+	for (int l = 0; l < 3; l++)
+	{
+		if (x[3*i+l] < min[l]) min[l] = x[3*i+l];
+		if (x[3*i+l] > max[l]) max[l] = x[3*i+l];
+	}
+	fprintf(stderr, "qauto %d %d %d | %d %d %d\n",
+			min[0], min[1], min[2], max[0], max[1], max[2]);
+	for (int i = 0; i < n; i++)
+	for (int l = 0; l < 3; l++)
+		x[3*i+l] =255.0*(x[3*i+l]-(float)min[l])/(max[l]-(float)min[l]);
+}
+
+static void inplace_rgb_span2(float *x, int w, int h, double a)
+{
+	double avg[3] = {0, 0, 0}, var[3] = {0, 0, 0};
+	int mw = w/4, mh = h/4;
+	int n = (w-2*mw)*(h-2*mh);
+	for (int j = mh; j < h - mh ; j++)
+	for (int i = mw; i < w - mw ; i++)
+	for (int l = 0; l < 3; l++)
+		avg[l] += x[3*(j*w+i)+l]/n;
+	for (int j = mh; j < h - mh ; j++)
+	for (int i = mw; i < w - mw ; i++)
+	for (int l = 0; l < 3; l++)
+	{
+		double q = x[3*(j*w+i)+l] - avg[l];
+		var[l] += q * q / n;
+	}
+	fprintf(stderr, "span2 avg = %g %g %g\n", avg[0], avg[1], avg[2]);
+	fprintf(stderr, "span2 var = %g %g %g\n", var[0], var[1], var[2]);
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	for (int l = 0; l < 3; l++)
+		x[3*(j*w+i)+l] = 127 + a*(x[3*(j*w+i)+l] - avg[l])/sqrt(var[l]);
+}
+
 static void update_local_projection(struct pan_state *e,
 		double ix, double iy, double h)
 {
@@ -689,24 +763,25 @@ static void update_local_projection(struct pan_state *e,
 }
 
 // dump the image acording to the state of the viewport
-static void pan_repaint(struct FTR *f)
+static void pan_repaint(struct pan_state *e, int w, int h)
 {
-	struct pan_state *e = f->userdata;
 	struct pan_view *v = obtain_view(e);
+	fprintf(stderr, "pan repaint e=%p v=%p %d %d\n", (void*)e, (void*)v, w, h);
 
 	// setup the display buffer
-	if (!v->display || v->dw != f->w || v->dh != f->h) {
+	if (!v->display || v->dw != w || v->dh != h) {
 		if (v->display)
 			free(v->display);
-		v->display = xmalloc(f->w * f->h * 3);
-		v->dw = f->w;
-		v->dh = f->h;
+		v->display = xmalloc(w * h * 3);
+		v->fdisplay = xmalloc(w * h * 3 * sizeof*v->fdisplay);
+		v->dw = w;
+		v->dh = h;
 		v->repaint = 1;
 	}
 	if (!v->repaint) return; // if no repaint requested, return
 	v->repaint = 0;
 
-	update_local_projection(e, f->w/2, f->h/2, e->base_h);
+	update_local_projection(e, w/2, h/2, e->base_h);
 
 	static void (*win_to_img)(double p[2],struct pan_state*,double,double);
 	win_to_img = window_to_image_apm;
@@ -717,17 +792,17 @@ static void pan_repaint(struct FTR *f)
 	int interp = e->interpolation_order;
 
 //#pragma omp parallel for
-	for (int j = 0; j < f->h; j++)
-	for (int i = 0; i < f->w; i++)
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
 	{
 		if (!e->diff_mode) {
 			double p[2];
 			win_to_img(p, e, i, j);
 			float c[3];
 			pixel(c, v, p[0], p[1], o, interp);
-			unsigned char *cc = v->display + 3 * (j * f->w + i);
+			float *cc = v->fdisplay + 3 * (j * v->dw + i);
 			for (int l = 0; l < 3; l++)
-				cc[l] = float_to_uint8(e->a * c[l] + e->b);
+				cc[l] = e->a * c[l] + e->b;
 		} else { // diff mode
 			int va = e->current_view;
 			int vb = good_modulus(e->current_view+1,e->nviews);
@@ -737,22 +812,26 @@ static void pan_repaint(struct FTR *f)
 			float ca[3], cb[3];
 			pixel(ca, e->view + va, p[0], p[1], o, interp);
 			pixel(cb, e->view + vb, q[0], q[1], o, interp);
-			unsigned char *cc = v->display + 3 * (j * f->w + i);
+			float *cc = v->fdisplay + 3 * (j * v->dw + i);
 			for (int l = 0; l < 3; l++) {
 				float g = 2*e->a * (ca[l] - cb[l]) + 127;
-				cc[l] = float_to_uint8(g);
+				cc[l] = g;
 			}
 			e->current_view = va;
 		}
 	}
+	if (e->qauto)
+		inplace_rgb_span2(v->fdisplay, v->dw, v->dh, 60*e->a);
+	for (int i = 0; i < v->dw * v->dh * 3; i++)
+		v->display[i] = float_to_uint8(v->fdisplay[i]);
 }
 
 static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
-	pan_repaint(f);
-
 	struct pan_state *e = f->userdata;
 	struct pan_view *v = obtain_view(e);
+
+	pan_repaint(e, f->w, f->h);
 
 	// copy the requested view into the display
 	assert(f->w == v->dw);
@@ -849,17 +928,25 @@ static void action_toggle_image_space(struct FTR *f, int x, int y)
 
 	// assure that the center of the window is not moved
 	e->image_space = !e->image_space;
-	update_local_projection(e, f->w/2, f->h/2, e->base_h);
 	if (e->image_space) {
-		double c[2] = {x, y}, p[2], q[2];
-		window_to_image_apm(p, e, c[0], c[1]);
-		image_to_window_ex(q, e, p[0], p[1]);
-		action_offset_viewport(f, c[0] - q[0], c[1] - q[1]);
-	} else {
+		update_local_projection(e, f->w/2, f->h/2, e->base_h);
 		double c[2] = {x, y}, p[2], q[2];
 		window_to_image_ex(p, e, c[0], c[1]);
 		image_to_window_apm(q, e, p[0], p[1]);
 		action_offset_viewport(f, c[0] - q[0], c[1] - q[1]);
+		fprintf(stderr, "going window to image around %d %d\n", x, y);
+		fprintf(stderr, "\tp = %g %g\n", p[0], p[1]);
+		fprintf(stderr, "\tq = %g %g\n", q[0], q[1]);
+		fprintf(stderr, "\toff = %g %g\n", c[0]-q[0], c[1]-q[1]);
+	} else {
+		double c[2] = {x, y}, p[2], q[2];
+		window_to_image_apm(p, e, c[0], c[1]);
+		image_to_window_ex(q, e, p[0], p[1]);
+		action_offset_viewport(f, c[0] - q[0], c[1] - q[1]);
+		fprintf(stderr, "going image to window around %d %d\n", x, y);
+		fprintf(stderr, "\tp = %g %g\n", p[0], p[1]);
+		fprintf(stderr, "\tq = %g %g\n", q[0], q[1]);
+		fprintf(stderr, "\toff = %g %g\n", c[0]-q[0], c[1]-q[1]);
 	}
 	if (e->image_space)
 		fprintf(stderr, "base grid = IMAGE\n");
@@ -868,16 +955,22 @@ static void action_toggle_image_space(struct FTR *f, int x, int y)
 	request_repaints(f);
 }
 
+static void action_cycle_rotation_status(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->image_rotation_status = ( e->image_rotation_status + 1 ) % 3;
+	fprintf(stderr, "rotation status = ");
+	if (e->image_rotation_status == 0) fprintf(stderr, "UP\n");
+	if (e->image_rotation_status == 1) fprintf(stderr, "DOWN\n");
+	if (e->image_rotation_status == 2) fprintf(stderr, "VERTICAL\n");
+	// Missing: NORTH, SOUTH, SUN_UP, SUN_DOWN
+	request_repaints(f);
+}
+
 // This function is only called when "ignoring" the RPC functions.  Even when
 // we ignore the RPCs, we still want to be able to flip the images while
 // keeping the center of the image at the correct offset; to compute this
 // offset we need the RPC functions.
-//
-// NOTE: this is obsolete.  Now, "ignorance" of the RPC function is simulated
-// by a constant approximation of it, and treated within the same framework
-//
-// Nonsense! Upon changing images, we must still assure that the central
-// pixel of the window does not move in image coordinates (at the given h).
 static void reposition_in_image_space(struct FTR *f, int a, int b, int x, int y)
 {
 	if (x < 0 || y < 0 || x >= f->w || y >= f->h) { x = f->w/2; y = f->h/2;}
@@ -896,18 +989,9 @@ static void reposition_in_image_space(struct FTR *f, int a, int b, int x, int y)
 	raster_to_window(dc, e, rdc[0], rdc[1]);
 	double offx = x - dc[0];
 	double offy = y - dc[1];
-	action_offset_viewport(f, offx, offy);
+	e->offset_x -= offx/e->zoom_factor;
+	e->offset_y -= offy/e->zoom_factor;
 	e->current_view = save_view;
-
-	fprintf(stderr, "reposition a b = %d %d\n", a, b);
-	fprintf(stderr, "reposition x y = %d %d\n", x, y);
-	fprintf(stderr, "reposition rc = %g %g\n", rc[0], rc[1]);
-	fprintf(stderr, "reposition imgac = %g %g\n", imgac[0], imgac[1]);
-	fprintf(stderr, "reposition lonlat = %g %g\n", lonlat[0], lonlat[1]);
-	fprintf(stderr, "reposition imgbc = %g %g\n", imgbc[0], imgbc[1]);
-	fprintf(stderr, "reposition rdc = %g %g\n", rdc[0], rdc[1]);
-	fprintf(stderr, "reposition dc = %g %g\n", dc[0], dc[1]);
-	fprintf(stderr, "reposition off = %g %g\n", offx, offy);
 }
 
 static void action_select_view(struct FTR *f, int i, int x, int y)
@@ -915,10 +999,9 @@ static void action_select_view(struct FTR *f, int i, int x, int y)
 	struct pan_state *e = f->userdata;
 	if (i >= 0 && i < e->nviews)
 	{
-		fprintf(stderr, "selecting view %d\n", i);
-		if (e->image_space && !e->diff_mode)
+		fprintf(stderr, "selecting view %d (e=%p)\n", i, (void*)e);
+		if (e->image_space)
 			reposition_in_image_space(f, e->current_view, i, x, y);
-			//hack_ignored_rpc_offsets(f, e->current_view, i, x, y);
 		e->current_view = i;
 		f->changed = 1;
 	}
@@ -945,6 +1028,7 @@ static void action_offset_rgbi(struct FTR *f, double dx, double dy)
 static void action_cycle_view(struct FTR *f, int d, int x, int y)
 {
 	struct pan_state *e = f->userdata;
+	fprintf(stderr, "cycling view of %p\n", (void*)e);
 	int new = good_modulus(e->current_view + d, e->nviews);
 	action_select_view(f, new, x, y);
 }
@@ -998,6 +1082,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == ' ') action_cycle_view(f, 1, x, y);
 	if (k == '\b') action_cycle_view(f, -1, x, y);
 	if (k == '\'') action_toggle_diff_mode(f);
+	if (k == 'r') action_cycle_rotation_status(f);
 
 	// arrows move the viewport
 	if (k > 1000) {
@@ -1013,7 +1098,8 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 		}
 		if (k == FTR_KEY_PAGE_UP)   d[1] = +f->h/3;
 		if (k == FTR_KEY_PAGE_DOWN) d[1] = -f->h/3;
-		action_offset_viewport(f, d[0], d[1]);
+		if (d[0] && d[1])
+			action_offset_viewport(f, d[0], d[1]);
 	}
 
 	if (m & FTR_MASK_SHIFT) return;
@@ -1027,12 +1113,64 @@ static void pan_resize(struct FTR *f, int k, int m, int x, int y)
 	request_repaints(f);
 }
 
+// non-interactive control of the model
+static int pan_non_interactive(struct pan_state *e, char *command_string)
+{
+	fprintf(stderr, "non-interactive rpcflip \"%s\"\n", command_string);
+
+	// fill-in default options
+	int x = e->view->w/2;
+	int y = e->view->h/2;
+	int w = 512;
+	int h = 512;
+	int base_h = 250;
+	int interpord = 2;
+	float zoom = 1;
+	char *outdir = "/tmp/";
+	char *outnam = "rpcflipo";
+
+	// replace default options with the specified ones, if any
+	char *delim = " \n\t,;", *tok = strtok(command_string, delim);
+	do {
+		fprintf(stderr, "\tmot = \"%s\"\n", tok);
+		// change the fields that are recognized
+		if (*tok == 'w') w = atoi(tok+1);
+		if (*tok == 'h') h = atoi(tok+1);
+		if (*tok == 'x') x = atoi(tok+1);
+		if (*tok == 'y') y = atoi(tok+1);
+		if (*tok == 'b') base_h = atoi(tok+1);
+		if (*tok == 'i') interpord = atoi(tok+1);
+		if (*tok == 'z') zoom = atof(tok+1);
+	} while ( (tok =strtok(NULL, delim)) );
+
+	// dump output as requested
+	struct FTR f[1]; // fake FTR, because the actions (wrongly) require it
+	f->w = w; f->h = h; f->userdata = e;
+	e->image_space = 1;
+	e->interpolation_order = interpord;
+	e->offset_x = x;
+	e->offset_y = y;
+	e->zoom_factor = zoom;
+	e->base_h = base_h;
+	for (int i = 0; i < e->nviews; i++)
+	{
+		pan_repaint(e, w, h);
+		struct pan_view *v = obtain_view(e);
+		char buf[FILENAME_MAX];
+		snprintf(buf, FILENAME_MAX, "%s%s_%d.png", outdir, outnam, i);
+		iio_save_image_uint8_vec(buf, v->display, w, h, 3);
+		action_cycle_view(f, 1, w/2, h/2);
+	}
+
+	return 3;
+}
+
 int main_pan(int c, char *v[])
 {
 	TIFFSetWarningHandler(NULL);//suppress warnings
 
 	// process input arguments
-	char *filename_preview = pick_option(&c, &v, "p", "");
+	char *command_string = pick_option(&c, &v, "c", "");
 	if (c < 5 || (c - 1) % 5 != 0) {
 		fprintf(stderr, "usage:\n\t"
 				"%s [P.TIF P.JPG P.RPC MS.TIF MS.JPG]+\n", *v);
@@ -1070,6 +1208,10 @@ int main_pan(int c, char *v[])
 			filename_ctif,
 			filename_cpre,
 			n);
+
+	// if non-interactive, run the requested command string and exit
+	if (*command_string)
+		return pan_non_interactive(e, command_string);
 
 	// open window
 	struct FTR f = ftr_new_window(320, 320);
