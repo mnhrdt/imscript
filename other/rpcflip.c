@@ -51,6 +51,7 @@ struct pan_view {
 	// RGB preview of the whole image
 	uint8_t *preview;
 	int pw, ph;
+	char *pfg, *pfc;
 
 	// calibration
 	struct rpc r[1]; 
@@ -99,6 +100,7 @@ static uint8_t float_to_uint8(float x)
 //static
 uint8_t *load_nice_preview(char *fg, char *fc, int *w, int *h)
 {
+	fprintf(stderr, "load nice preview!\n");
 	int wg, hg, wc, hc;
 	uint8_t *g = (void*)iio_read_image_uint8_rgb(fg, &wg, &hg);
 	uint8_t *c = (void*)iio_read_image_uint8_rgb(fc, &wc, &hc);
@@ -131,7 +133,9 @@ static void init_view(struct pan_view *v,
 		char *fgtif, char *fgpre, char *fgrpc, char *fctif, char *fcpre)
 {
 	// build preview (use only color, by now)
-	v->preview = load_nice_preview(fgpre, fcpre, &v->pw, &v->ph);
+	v->preview = NULL;//load_nice_preview(fgpre, fcpre, &v->pw, &v->ph);
+	v->pfg = fgpre;
+	v->pfc = fcpre;
 
 	// load P and MS
 	int megabytes = 400;
@@ -560,6 +564,8 @@ static void rgbi_to_rgb_inplace(float c[4])
 static
 void pixel_from_preview(float *r, struct pan_view *v, double p, double q, int i)
 {
+	if (!v->preview)
+		v->preview = load_nice_preview(v->pfg, v->pfc, &v->pw, &v->ph);
 	int ip = p * v->pw / v->tg->i->w;
 	int iq = q * v->ph / v->tg->i->h;
 	float fp = p * v->pw / v->tg->i->w;
@@ -766,7 +772,6 @@ static void update_local_projection(struct pan_state *e,
 static void pan_repaint(struct pan_state *e, int w, int h)
 {
 	struct pan_view *v = obtain_view(e);
-	fprintf(stderr, "pan repaint e=%p v=%p %d %d\n", (void*)e, (void*)v, w, h);
 
 	// setup the display buffer
 	if (!v->display || v->dw != w || v->dh != h) {
@@ -847,6 +852,9 @@ static void request_repaints(struct FTR *f)
 	f->changed = 1;
 }
 
+// TODO: edit all actions so that they act directly on the "pan_state", not on
+// the "FTR".  This is necessary so that actions can be directly called even
+// when there is no interface (e.g., for scripted usage).
 
 static void action_offset_viewport(struct FTR *f, double dx, double dy)
 {
@@ -999,7 +1007,7 @@ static void action_select_view(struct FTR *f, int i, int x, int y)
 	struct pan_state *e = f->userdata;
 	if (i >= 0 && i < e->nviews)
 	{
-		fprintf(stderr, "selecting view %d (e=%p)\n", i, (void*)e);
+		fprintf(stderr, "selecting view %d\n", i);
 		if (e->image_space)
 			reposition_in_image_space(f, e->current_view, i, x, y);
 		e->current_view = i;
@@ -1028,7 +1036,6 @@ static void action_offset_rgbi(struct FTR *f, double dx, double dy)
 static void action_cycle_view(struct FTR *f, int d, int x, int y)
 {
 	struct pan_state *e = f->userdata;
-	fprintf(stderr, "cycling view of %p\n", (void*)e);
 	int new = good_modulus(e->current_view + d, e->nviews);
 	action_select_view(f, new, x, y);
 }
@@ -1142,7 +1149,9 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 		if (*tok == 'i') interpord = atoi(tok+1);
 		if (*tok == 'z') zoom = atof(tok+1);
 		if (*tok == 'd') strncpy(outdir, tok+1, FILENAME_MAX);
-		if (*tok == 'o') strncpy(outdir, tok+1, FILENAME_MAX);
+		if (*tok == 'o') strncpy(outnam, tok+1, FILENAME_MAX);
+		if (*tok == 'p') x = (atoi(tok+1) * e->view->w) / e->view->pw;
+		if (*tok == 'q') y = (atoi(tok+1) * e->view->h) / e->view->ph;
 	} while ( (tok =strtok(NULL, delim)) );
 
 	// dump output as requested
@@ -1161,10 +1170,10 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 		char buf[FILENAME_MAX];
 		snprintf(buf, FILENAME_MAX, "%s/%s_%d.png", outdir, outnam, i);
 		iio_save_image_uint8_vec(buf, v->display, w, h, 3);
-		action_cycle_view(f, 1, w/2, h/2);
+		action_select_view(f, i+1, w/2, h/2);
 	}
 
-	return 3;
+	return 0;
 }
 
 int main_pan(int c, char *v[])
