@@ -1126,8 +1126,8 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 	int base_h = 250;
 	int interpord = 2;
 	float zoom = 1;
-	char *outdir = "/tmp/";
-	char *outnam = "rpcflipo";
+	char outdir[FILENAME_MAX] = "/tmp/";
+	char outnam[FILENAME_MAX] = "rpcflipo";
 
 	// replace default options with the specified ones, if any
 	char *delim = " \n\t,;", *tok = strtok(command_string, delim);
@@ -1141,6 +1141,8 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 		if (*tok == 'b') base_h = atoi(tok+1);
 		if (*tok == 'i') interpord = atoi(tok+1);
 		if (*tok == 'z') zoom = atof(tok+1);
+		if (*tok == 'd') strncpy(outdir, tok+1, FILENAME_MAX);
+		if (*tok == 'o') strncpy(outdir, tok+1, FILENAME_MAX);
 	} while ( (tok =strtok(NULL, delim)) );
 
 	// dump output as requested
@@ -1157,7 +1159,7 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 		pan_repaint(e, w, h);
 		struct pan_view *v = obtain_view(e);
 		char buf[FILENAME_MAX];
-		snprintf(buf, FILENAME_MAX, "%s%s_%d.png", outdir, outnam, i);
+		snprintf(buf, FILENAME_MAX, "%s/%s_%d.png", outdir, outnam, i);
 		iio_save_image_uint8_vec(buf, v->display, w, h, 3);
 		action_cycle_view(f, 1, w/2, h/2);
 	}
