@@ -100,7 +100,7 @@ static uint8_t float_to_uint8(float x)
 //static
 uint8_t *load_nice_preview(char *fg, char *fc, int *w, int *h)
 {
-	fprintf(stderr, "load nice preview!\n");
+	//fprintf(stderr, "load nice preview!\n");
 	int wg, hg, wc, hc;
 	uint8_t *g = (void*)iio_read_image_uint8_rgb(fg, &wg, &hg);
 	uint8_t *c = (void*)iio_read_image_uint8_rgb(fc, &wc, &hc);
@@ -133,7 +133,8 @@ static void init_view(struct pan_view *v,
 		char *fgtif, char *fgpre, char *fgrpc, char *fctif, char *fcpre)
 {
 	// build preview (use only color, by now)
-	v->preview = NULL;//load_nice_preview(fgpre, fcpre, &v->pw, &v->ph);
+	//v->preview = load_nice_preview(fgpre, fcpre, &v->pw, &v->ph);
+	v->preview = NULL;
 	v->pfg = fgpre;
 	v->pfc = fcpre;
 
@@ -208,7 +209,7 @@ static void init_state(struct pan_state *e,
 	e->diff_mode = 0;
 	e->interpolation_order = 0;
 	e->image_rotation_status = 0;
-	e->qauto = 1;
+	e->qauto = 0;
 }
 
 static struct pan_view *obtain_view(struct pan_state *e)
@@ -714,20 +715,21 @@ static int good_modulus(int nn, int p)
 	return r;
 }
 
-static void inplace_rgb_span(unsigned char *x, int n)
+static void inplace_rgb_span(float *x, int w, int h, double a)
 {
-	unsigned char min[3] = {255, 255, 255}, max[3] = {0, 0, 0};
+	int n = w*h;
+	float min[3] = {INFINITY, INFINITY, INFINITY}, max[3] = {0, 0, 0};
 	for (int i = 0; i < n; i++)
 	for (int l = 0; l < 3; l++)
 	{
-		if (x[3*i+l] < min[l]) min[l] = x[3*i+l];
-		if (x[3*i+l] > max[l]) max[l] = x[3*i+l];
+		min[l] = fmin(min[l], x[3*i+l]);
+		max[l] = fmax(max[l], x[3*i+l]);
 	}
-	fprintf(stderr, "qauto %d %d %d | %d %d %d\n",
+	fprintf(stderr, "qauto %g %g %g | %g %g %g\n",
 			min[0], min[1], min[2], max[0], max[1], max[2]);
 	for (int i = 0; i < n; i++)
 	for (int l = 0; l < 3; l++)
-		x[3*i+l] =255.0*(x[3*i+l]-(float)min[l])/(max[l]-(float)min[l]);
+		x[3*i+l] =255.0 * ( x[3*i+l] - min[l] ) / ( max[l] - min[l] );
 }
 
 static void inplace_rgb_span2(float *x, int w, int h, double a)
@@ -746,8 +748,9 @@ static void inplace_rgb_span2(float *x, int w, int h, double a)
 		double q = x[3*(j*w+i)+l] - avg[l];
 		var[l] += q * q / n;
 	}
-	fprintf(stderr, "span2 avg = %g %g %g\n", avg[0], avg[1], avg[2]);
-	fprintf(stderr, "span2 var = %g %g %g\n", var[0], var[1], var[2]);
+	fprintf(stderr, "span2 avg = %g %g %g | dev = %g %g %g\n",
+				avg[0], avg[1], avg[2],
+				sqrt(var[0]), sqrt(var[1]), sqrt(var[2]));
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 	for (int l = 0; l < 3; l++)
@@ -825,8 +828,8 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 			e->current_view = va;
 		}
 	}
-	if (e->qauto)
-		inplace_rgb_span2(v->fdisplay, v->dw, v->dh, 60*e->a);
+	if (e->qauto == 1) inplace_rgb_span(v->fdisplay, v->dw, v->dh, 60*e->a);
+	if (e->qauto == 2)inplace_rgb_span2(v->fdisplay, v->dw, v->dh, 60*e->a);
 	for (int i = 0; i < v->dw * v->dh * 3; i++)
 		v->display[i] = float_to_uint8(v->fdisplay[i]);
 }
@@ -972,6 +975,7 @@ static void action_cycle_rotation_status(struct FTR *f)
 	if (e->image_rotation_status == 1) fprintf(stderr, "DOWN\n");
 	if (e->image_rotation_status == 2) fprintf(stderr, "VERTICAL\n");
 	// Missing: NORTH, SOUTH, SUN_UP, SUN_DOWN
+	// More seriously: this should be independent of the "raster type"
 	request_repaints(f);
 }
 
@@ -1131,7 +1135,8 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 	int w = 512;
 	int h = 512;
 	int base_h = 250;
-	int interpord = 2;
+	int interpord = 0;
+	int qauto = 0;
 	float zoom = 1;
 	char outdir[FILENAME_MAX] = "/tmp/";
 	char outnam[FILENAME_MAX] = "rpcflipo";
@@ -1150,19 +1155,32 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 		if (*tok == 'z') zoom = atof(tok+1);
 		if (*tok == 'd') strncpy(outdir, tok+1, FILENAME_MAX);
 		if (*tok == 'o') strncpy(outnam, tok+1, FILENAME_MAX);
-		if (*tok == 'p') x = (atoi(tok+1) * e->view->w) / e->view->pw;
-		if (*tok == 'q') y = (atoi(tok+1) * e->view->h) / e->view->ph;
+		if (*tok == 'c') qauto = atoi(tok+1);
+		if (*tok == 'p') {
+			struct pan_view *v = e->view;
+			if (!v->preview)v->preview = load_nice_preview(v->pfg,
+							v->pfc, &v->pw, &v->ph);
+			x = (atoi(tok+1) * e->view->w) / e->view->pw;
+		}
+		if (*tok == 'q') {
+			struct pan_view *v = e->view;
+			if (!v->preview) v->preview = load_nice_preview(v->pfg,
+							v->pfc, &v->pw, &v->ph);
+			y = (atoi(tok+1) * e->view->h) / e->view->ph;
+		}
 	} while ( (tok =strtok(NULL, delim)) );
 
 	// dump output as requested
 	struct FTR f[1]; // fake FTR, because the actions (wrongly) require it
 	f->w = w; f->h = h; f->userdata = e;
-	e->image_space = 1;
+	e->image_space = 1; // (this will be difficult to change)
 	e->interpolation_order = interpord;
-	e->offset_x = x;
-	e->offset_y = y;
+	e->offset_x = x - w/2;
+	e->offset_y = y - h/2;
 	e->zoom_factor = zoom;
 	e->base_h = base_h;
+	e->qauto = qauto;
+//#pragma omp parallel for // does not work
 	for (int i = 0; i < e->nviews; i++)
 	{
 		pan_repaint(e, w, h);
