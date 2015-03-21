@@ -38,7 +38,8 @@
 #define M_PI 3.14159265358979323846
 #endif
 #define EARTH_RADIUS 6378000.0
-#define WHEEL_FACTOR 1.259921049894873164767210607
+//#define WHEEL_FACTOR 1.259921049894873164767210607
+#define WHEEL_FACTOR 1.189207115002721066717499971
 #define BAD_MIN(a,b) ((a)<(b)?(a):(b))
 
 // data for a single view
@@ -89,6 +90,8 @@ struct pan_state {
 	int image_rotation_status;
 	int qauto;
 };
+
+static int msoctaves_instead_of_preview;
 
 static uint8_t float_to_uint8(float x)
 {
@@ -210,6 +213,7 @@ static void init_state(struct pan_state *e,
 	e->interpolation_order = 0;
 	e->image_rotation_status = 0;
 	e->qauto = 0;
+	msoctaves_instead_of_preview = e->view->tc->noctaves > 3;
 }
 
 static struct pan_view *obtain_view(struct pan_state *e)
@@ -230,9 +234,18 @@ static int obtain_octave(struct pan_state *e)
 	// 0: get the colors from the preview
 	// 1: get the colors from the MS image
 	// 2: get the intensities from the P image, and hues from the MS
-	if (e->zoom_factor < 0.18) return 0;
-	if (e->zoom_factor > 0.5) return 2;
-	return 1;
+	if (!msoctaves_instead_of_preview) { // regular case
+		if (e->zoom_factor < 0.18) return 0;
+		if (e->zoom_factor > 0.5) return 2;
+		return 1;
+	} else {
+		if (e->zoom_factor > 0.5) return 0;
+		if (e->zoom_factor > 0.18) return 1;
+		if (e->zoom_factor > 0.1) return 2;
+		int r = floor( -log2( e->zoom_factor ) );
+		fprintf(stderr, "oo z=%g r=%d\n", e->zoom_factor, r);
+		return r;
+	}
 }
 
 static void window_to_image_exh(double*,struct pan_state*,double,double,double);
@@ -662,6 +675,28 @@ static void pixel_from_ms(float *out, struct pan_view *v, double p, double q,
 	out[2] = c[2] * g / nc;
 }
 
+static void pixel_from_mso(float *out, struct pan_view *v, double p, double q,
+		int i, int o)
+{
+	////
+	//out[0] = 0;
+	//out[1] = 50;
+	//out[2] = 200;
+	int ofac = 1 << (o);
+	float c[4];
+	float ipc = (p + v->rgbiox) / ofac;
+	float iqc = (q + v->rgbioy) / ofac;
+	if (i == 2)      tiffo_getpixel_float_bilinear(c, v->tc, o-2, ipc, iqc);
+	else if (i == 3) tiffo_getpixel_float_bicubic(c, v->tc, o-2, ipc, iqc);
+	else             tiffo_getpixel_float_1(c, v->tc, o-2, ipc, iqc);
+	rgbi_to_rgb_inplace(c);
+	float g = (c[0] + c[1] + c[2] + c[3]) / 4;
+	float nc = 4*hypot(c[0], hypot(c[1], c[2]));
+	out[0] = c[0] * g / nc;
+	out[1] = c[1] * g / nc;
+	out[2] = c[2] * g / nc;
+}
+
 static void pixel_from_pms(float *out, struct pan_view *v, double p, double q,
 		int i)
 {
@@ -685,16 +720,28 @@ static void pixel_from_pms(float *out, struct pan_view *v, double p, double q,
 static
 void pixel(float *out, struct pan_view *v, double p, double q, int o, int i)
 {
+	// TODO: remove the conditionals inside this function by putting
+	// all the version inside a table of pointers to functions
 	if (p < 0 || q < 0 || p >= v->w || q >= v->h) {
 		// pink
 		out[0] = 200;
 		out[1] = 50;
 		out[2] = 100;
+		return;
 	}
-	else if (o == 0) pixel_from_preview (out, v, p, q, i);
-	else if (o == 1) pixel_from_ms      (out, v, p, q, i);
-	else if (o == 2) pixel_from_pms     (out, v, p, q, i);
-	else exit(fprintf(stderr,"ERROR: bad octave %d\n", o));
+	if (msoctaves_instead_of_preview) { // ms-octaves case
+		if (o == 0 || o == 1)
+			pixel_from_pms (out, v, p, q, i);
+		else if (o == 2)
+			pixel_from_ms  (out, v, p, q, i);
+		else
+			pixel_from_mso (out, v, p, q, i, o);
+	} else { // regular case
+		if (o == 0)      pixel_from_preview (out, v, p, q, i);
+		else if (o == 1) pixel_from_ms      (out, v, p, q, i);
+		else if (o == 2) pixel_from_pms     (out, v, p, q, i);
+		else exit(fprintf(stderr,"ERROR: bad octave %d\n", o));
+	}
 }
 
 // auxiliary function: compute n%p correctly, even for huge and negative numbers
@@ -979,6 +1026,17 @@ static void action_cycle_rotation_status(struct FTR *f)
 	request_repaints(f);
 }
 
+static void action_cycle_contrast(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->qauto = ( e->qauto + 1 ) % 3;
+	fprintf(stderr, "contrast change = ");
+	if (e->qauto == 0) fprintf(stderr, "NONE\n");
+	if (e->qauto == 1) fprintf(stderr, "MIN-MAX\n");
+	if (e->qauto == 2) fprintf(stderr, "AVG-STD\n");
+	request_repaints(f);
+}
+
 // This function is only called when "ignoring" the RPC functions.  Even when
 // we ignore the RPCs, we still want to be able to flip the images while
 // keeping the center of the image at the correct offset; to compute this
@@ -1094,6 +1152,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == '\b') action_cycle_view(f, -1, x, y);
 	if (k == '\'') action_toggle_diff_mode(f);
 	if (k == 'r') action_cycle_rotation_status(f);
+	if (k == 'c') action_cycle_contrast(f);
 
 	// arrows move the viewport
 	if (k > 1000) {
@@ -1173,10 +1232,10 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 	// dump output as requested
 	struct FTR f[1]; // fake FTR, because the actions (wrongly) require it
 	f->w = w; f->h = h; f->userdata = e;
-	e->image_space = 1; // (this will be difficult to change)
+	e->image_space = 0; // (this will be difficult to change)
 	e->interpolation_order = interpord;
-	e->offset_x = x - w/2;
-	e->offset_y = y - h/2;
+	e->offset_x = x - e->image_space*w/(2*zoom);
+	e->offset_y = y - e->image_space*h/(2*zoom);
 	e->zoom_factor = zoom;
 	e->base_h = base_h;
 	e->qauto = qauto;
