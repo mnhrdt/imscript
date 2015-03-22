@@ -1,24 +1,46 @@
-// icc -std=c99 -Ofast rpcflip.c iio.o -o rpcflip -lX11 -ltiff -lm
+//
+// A "Nadir" viewer for pleiades images, based on vflip by Gabriele Facciolo
+//
+// c99 -O3 rpcflip.c iio.o -o rpcflip -lX11 -ltiff -lm
+//
+// TODO:
+//
+// 1. transparent detection of the 12 significant bits on the 16 bit smaples
+// 2. automatic contrast adjust à la qauto
+// 3. setup base_h automatically using the SRTM4
+// 4. draw epipolar curves
+// 5. load an arbitrary DEM
+// 6. view the DEM (and the SRTM4)
+//
+
 #include <assert.h>
 #include <ctype.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #define TIFFU_OMIT_MAIN
 #include "tiffu.c"
+
+#define DONT_USE_TEST_MAIN
+#include "rpc.c"
 
 #ifndef FTR_BACKEND
 #define FTR_BACKEND 'x'
 #endif
 #include "ftr.c"
 
-#define DONT_USE_TEST_MAIN
-#include "rpc.c"
+#include "iio.h"
+#include "xmalloc.c"
 
-#define WHEEL_FACTOR 1.4
-
-
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+#define EARTH_RADIUS 6378000.0
+//#define WHEEL_FACTOR 1.259921049894873164767210607
+#define WHEEL_FACTOR 1.189207115002721066717499971
+#define BAD_MIN(a,b) ((a)<(b)?(a):(b))
 
 // data for a single view
 struct pan_view {
@@ -27,254 +49,435 @@ struct pan_view {
 	struct tiff_octaves tg[1]; // P
 	struct tiff_octaves tc[1]; // MS
 
-	// RGB preview
+	// RGB preview of the whole image
 	uint8_t *preview;
 	int pw, ph;
+	char *pfg, *pfc;
 
 	// calibration
 	struct rpc r[1]; 
-	double P[8] // affine approximation to the RPC
+	double P[8]; // local affine approximation of "raster to image"
+	double rgbiox, rgbioy; // offset between P and MS (in P pixel units)
+
+	// current display of this view
+	float *fdisplay;
+	uint8_t *display;
+	int dw, dh;
+	int repaint;
 };
 
-
 #define MAX_VIEWS 30
-struct flip_state {
+struct pan_state {
 	// 1. data for each view
 	int nviews;
-	struct pan_view[MAX_VIEWS];
+	int current_view;
+	struct pan_view view[MAX_VIEWS];
 
 	// 2. geographic coordinates (nominal pixel lon/lat resolution)
 	double base_h;
-	double dlon;
-	double dlat;
+	double lon_0, lon_d;
+	double lat_0, lat_d;
 
 	// 3. view port parameters
 	double a, b; // linear contrast change
 	double zoom_factor, offset_x, offset_y; // window <-> geography
-	int octave; // (redundant with octave)
+
+	// 4. visualization options
+	int force_exact;
+	int image_space;
+	int diff_mode;
+	int interpolation_order;
+	int image_rotation_status;
+	int qauto;
 };
 
-//// change of coordinates: from window "int" pixels to image "double" point
-//static void window_to_image(double p[2], struct pan_state *e, int i, int j)
-//{
-//	p[0] = e->offset_x + i / e->zoom_factor;
-//	p[1] = e->offset_y + j / e->zoom_factor;
-//}
-//
-//// change of coordinates: from image "double" point to window "int" pixel
-//static void image_to_window(int i[2], struct pan_state *e, double x, double y)
-//{
-//	i[0] = floor(x * e->zoom_factor - e->offset_x);
-//	i[1] = floor(y * e->zoom_factor - e->offset_y);
-//}
+static int msoctaves_instead_of_preview;
 
-static float getsample_0(float *x, int w, int h, int i, int j, int l)
+static uint8_t float_to_uint8(float x)
 {
-	if (i < 0 || i >= w) return 0;
-	if (j < 0 || j >= h) return 0;
-	return x[3*(j*w+i)+l];
+	if (x < 1) return 0;
+	if (x > 254) return 255;
+	return x;
 }
 
-static void interpolate_at(float *out, float *x, int w, int h, float p, float q)
+//static
+uint8_t *load_nice_preview(char *fg, char *fc, int *w, int *h)
 {
-	out[0] = getsample_0(x, w, h, (int)p, (int)q, 0);
-	out[1] = getsample_0(x, w, h, (int)p, (int)q, 1);
-	out[2] = getsample_0(x, w, h, (int)p, (int)q, 2);
-}
+	//fprintf(stderr, "load nice preview!\n");
+	int wg, hg, wc, hc;
+	uint8_t *g = (void*)iio_read_image_uint8_rgb(fg, &wg, &hg);
+	uint8_t *c = (void*)iio_read_image_uint8_rgb(fc, &wc, &hc);
+	uint8_t *r = xmalloc(3 * wg * hg);
+	memset(r, 0, 3 * wg * hg);
 
-static int mod(int n, int p)
-{
-	if (p < 1)
-		fail("bad modulus %d\n", p);
+	for (int j = 0; j < hg; j++)
+	for (int i = 0; i < wg; i++)
+	if (i < wc && j < hc)
+	{
+		int cidx = j*wc + i;
+		int gidx = j*wg + i;
+		float R = c[3*cidx + 0];
+		float G = c[3*cidx + 1];
+		float B = c[3*cidx + 2];
+		float nc = hypot( R, hypot(G, B));
+		float P = g[3*gidx];
+		r[3*gidx + 0] = float_to_uint8(3 * P * R / nc);
+		r[3*gidx + 1] = float_to_uint8(3 * P * G / nc);
+		r[3*gidx + 2] = float_to_uint8(3 * P * B / nc); }
 
-	int r;
-	if (n >= 0)
-		r = n % p;
-	else {
-		r = p - (-n) % p;
-		if (r == p)
-			r = 0;
-	}
-	if (r < 0 || r >= p)
-		fprintf(stderr, "mod(%d,%d)=%d\n",n,p,r);
-	assert(r >= 0);
-	assert(r < p);
+	free(g);
+	free(c);
+	*w = wg;
+	*h = hg;
 	return r;
 }
 
-static int insideP(int w, int h, int x, int y)
+static void init_view(struct pan_view *v,
+		char *fgtif, char *fgpre, char *fgrpc, char *fctif, char *fcpre)
 {
-	return x >= 0 && y >= 0 && x < w && y < h;
+	// build preview (use only color, by now)
+	//v->preview = load_nice_preview(fgpre, fcpre, &v->pw, &v->ph);
+	v->preview = NULL;
+	v->pfg = fgpre;
+	v->pfc = fcpre;
+
+	// load P and MS
+	int megabytes = 400;
+	tiff_octaves_init(v->tg, fgtif, megabytes);
+	tiff_octaves_init(v->tc, fctif, megabytes);
+	v->w = v->tg->i->w;
+	v->h = v->tg->i->h;
+	v->rgbiox = v->rgbioy = 4; // normally untouched
+
+	// load P's RPC
+	read_rpc_file_xml(v->r, fgrpc);
+
+	// setup display cache
+	v->display = NULL;
+	v->fdisplay = NULL;
+	v->repaint = 1;
 }
 
-//static void pixel_m1(float *out, struct pan_state *e, double p, double q)
-//{
-//	int fmt = e->tg->i->fmt;
-//	int bps = e->tg->i->bps;
-//	int spp = e->tg->i->spp;
-//	int ss = bps / 8;
-//	double factor = 1.0/e->zoom_factor;
-//	int ipg = 2*p/factor;
-//	int iqg = 2*q/factor;
-//	int ipc = 0.5 * (p + e->rgbiox) / factor;
-//	int iqc = 0.5 * (q + e->rgbioy) / factor;
-//	char *pix_gray = tiff_octaves_getpixel(e->tg, 0, ipg, iqg);
-//	char *pix_rgbi = tiff_octaves_getpixel(e->tc, 0, ipc, iqc);
+static void setup_nominal_pixels_according_to_first_view(struct pan_state *e)
+{
+	struct pan_view *v = e->view + 0;
+
+	// center of the image in image coordinates
+	double cx = v->w / 2;
+	double cy = v->h / 2;
+
+	// center of the image in geographic coordinates
+	double center[3], csouth[3];
+	eval_rpc(center, v->r, cx, cy    , e->base_h);
+	eval_rpc(csouth, v->r, cx, cy + 1, e->base_h);
+
+	// stepsize given by 1 pixel to the south
+	// XXX WARNING WRONG TODO FIXME : assumes North-South oriented image (!)
+	double lat_step = csouth[1] - center[1];
+	double latitude = center[1] * (M_PI/180);
+	double lonfactor = cos(latitude);
+	double lon_step = -lat_step / lonfactor;
+
+	// fill-in the fields
+	e->lat_d = lat_step;
+	e->lon_d = lon_step;
+	e->lon_0 = center[0];
+	e->lat_0 = center[1];
+}
+
+static void init_state(struct pan_state *e,
+	char *gi[], char *gp[], char *gr[], char *ci[], char *cp[], int n)
+{
+	// set views
+	assert(n < MAX_VIEWS);
+	e->nviews = n;
+	e->current_view = 0;
+	for (int i = 0; i < n; i++)
+		init_view(e->view + i, gi[i], gp[i], gr[i], ci[i], cp[i]);
+
+	// set geography
+	e->base_h = 0;
+	e->lon_0 = e->lat_0 = e->lon_d = e->lat_d = NAN;
+	setup_nominal_pixels_according_to_first_view(e);
+
+	// set viewport
+	e->a = 1;
+	e->b = 0;
+	e->zoom_factor = 1;
+	e->offset_x = e->offset_y = 0;
+
+	// set options
+	e->force_exact = 0;
+	e->image_space = 0;
+	e->diff_mode = 0;
+	e->interpolation_order = 0;
+	e->image_rotation_status = 0;
+	e->qauto = 0;
+	msoctaves_instead_of_preview = e->view->tc->noctaves > 3;
+}
+
+static struct pan_view *obtain_view(struct pan_state *e)
+{
+	assert(e->current_view >= 0);
+	assert(e->current_view < MAX_VIEWS);
+	assert(e->current_view < e->nviews);
+	return e->view + e->current_view;
+}
+
+static int obtain_octave(struct pan_state *e)
+{
+	// The octave depends on the zoom factor.
+	// It is not exactly an octave, but an index to an image to query
+	//
+	// Possible octaves:
+	//
+	// 0: get the colors from the preview
+	// 1: get the colors from the MS image
+	// 2: get the intensities from the P image, and hues from the MS
+	if (!msoctaves_instead_of_preview) { // regular case
+		if (e->zoom_factor < 0.18) return 0;
+		if (e->zoom_factor > 0.5) return 2;
+		return 1;
+	} else {
+		if (e->zoom_factor > 0.5) return 0;
+		if (e->zoom_factor > 0.18) return 1;
+		if (e->zoom_factor > 0.1) return 2;
+		int r = floor( -log2( e->zoom_factor ) );
+		fprintf(stderr, "oo z=%g r=%d\n", e->zoom_factor, r);
+		return r;
+	}
+}
+
+static void window_to_image_exh(double*,struct pan_state*,double,double,double);
+
+static void raster_to_image_exh(double out[2], struct pan_state *e,
+		double x, double y, double h);
+
+typedef void raster_to_image_t(double out[2], struct pan_state *e,
+		double x, double y, double h);
+
+// compute an affine approximation of a generic raster_to_image function
+static void approximate_projection_gen(double P[8],
+		struct pan_state *e,
+		double x, double y, double h,
+		raster_to_image_t *rtoi)
+{
+	//fprintf(stderr, "gen approximate projection rxyh=%g %g %g\n", x,y,h);
+	// finite difference steps
+	double eps_R = 0.5; // (in raster steps)
+	double eps_H = 1.0; // (in meters)
+
+	// eval the function at a coordinate tetrahedron
+	double v0[3], vx[3], vy[3], vh[3];
+	rtoi(v0, e, x         , y        , h        );
+	rtoi(vx, e, x + eps_R , y        , h        );
+	rtoi(vy, e, x         , y + eps_R, h        );
+	rtoi(vh, e, x         , y        , h + eps_H);
+
+	// compute forward differences
+	double pp = v0[0];
+	double qq = v0[1];
+	double px = ( vx[0] - v0[0] ) / eps_R;
+	double py = ( vy[0] - v0[0] ) / eps_R;
+	double ph = ( vh[0] - v0[0] ) / eps_H;
+	double qx = ( vx[1] - v0[1] ) / eps_R;
+	double qy = ( vy[1] - v0[1] ) / eps_R;
+	double qh = ( vh[1] - v0[1] ) / eps_H;
+
+	// fill-in the coefficients of the affine approximation
+	P[0]=px; P[1]=py; P[2]=ph;
+	P[4]=qx; P[5]=qy; P[6]=qh;
+	P[3] = pp - px * x - py * y - ph * h;
+	P[7] = qq - qx * x - qy * y - qh * h;
+}
+
+
+
+static void apply_projection(double out[3], double P[8], double x[3])
+{
+	out[0] = P[0] * x[0] + P[1] * x[1] + P[2] * x[2] + P[3];
+	out[1] = P[4] * x[0] + P[5] * x[1] + P[6] * x[2] + P[7];
+	out[2] = x[2];
+}
+
+// There are four (!) coordinate systems used in this program.
+// (I believe that this is the simplest solution, however the code could be
+// shortened by identifying the "raster" and the "window" coordinates.)
 //
-//	double c[4];
-//	c[0] = from_sample_to_double(pix_rgbi + 0*ss, fmt, bps);
-//	c[1] = from_sample_to_double(pix_rgbi + 1*ss, fmt, bps);
-//	c[2] = from_sample_to_double(pix_rgbi + 2*ss, fmt, bps);
-//	c[3] = from_sample_to_double(pix_rgbi + 3*ss, fmt, bps);
-//	c[1] = c[1] * 0.9 + c[3] * 0.1;
-//	double g = from_sample_to_double(pix_gray, fmt, bps);
-//	//double nc = (c[0] + c[1] + c[2]) / 3;
-//	double nc = hypot(c[0], hypot(c[1], c[2]));
-//	out[0] = c[0] * g / nc;
-//	out[1] = c[1] * g / nc;
-//	out[2] = c[2] * g / nc;
-//}
+// 1. IMAGE coordinates (p,q), integers in the range 0--40.000 representing the
+// position of a pixel in the "P" image.
 //
-//static void pixel_m1p(float *out, struct pan_state *e, double p, double q)
-//{
-//	if (!out) { float tmp[3]; pixel_m1(tmp, e, p, q); return; }
-//	int fmt = e->tg->i->fmt;
-//	int bps = e->tg->i->bps;
-//	int spp = e->tg->i->spp;
-//	int ss = bps / 8;
-//	double factor = 1.0/e->zoom_factor;
-//	int ipg = 2*p/factor;
-//	int iqg = 2*q/factor;
-//	int ipc = 0.5 * (p + e->rgbiox) / factor;
-//	int iqc = 0.5 * (q + e->rgbioy) / factor;
-//	char *pix_gray = tiff_octaves_getpixel_shy(e->tg, 0, ipg, iqg);
-//	char *pix_rgbi = tiff_octaves_getpixel(e->tc, 0, ipc, iqc);
+// 2. GEO coordinates (lon,lat), floating point numbers in degrees, e.g., in an
+// interval such as [ -137.4782 , -137.4779 ].  These coordinates are the
+// geographic position around the site of interest.
 //
-//	double c[4];
-//	c[0] = from_sample_to_double(pix_rgbi + 0*ss, fmt, bps);
-//	c[1] = from_sample_to_double(pix_rgbi + 1*ss, fmt, bps);
-//	c[2] = from_sample_to_double(pix_rgbi + 2*ss, fmt, bps);
-//	c[3] = from_sample_to_double(pix_rgbi + 3*ss, fmt, bps);
-//	c[1] = c[1] * 0.9 + c[3] * 0.1;
-//	//double g = from_sample_to_double(pix_gray, fmt, bps);
-//	double g;
-//	if (pix_gray)
-//		g = from_sample_to_double(pix_gray, fmt, bps);
-//	else
-//		g = (c[0] + c[1] + c[2] + c[3]) / 4;
-//	//double nc = (c[0] + c[1] + c[2]) / 3;
-//	double nc = hypot(c[0], hypot(c[1], c[2]));
-//	out[0] = c[0] * g / nc;
-//	out[1] = c[1] * g / nc;
-//	out[2] = c[2] * g / nc;
-//}
+// 3. RASTER coordinates (x,y), floating point numbers in the range 0--40.000
+// representing an isotropic grid over the geographic site, at the nominal
+// pixel resolution.
+
+static
+void window_to_raster(double xy[2], struct pan_state *e, double i, double j)
+{
+	xy[0] = e->offset_x + i / e->zoom_factor;
+	xy[1] = e->offset_y + j / e->zoom_factor;
+}
+
+static
+void raster_to_window(double ij[2], struct pan_state *e, double x, double y)
+{
+	ij[0] = ( x - e->offset_x ) * e->zoom_factor;
+	ij[1] = ( y - e->offset_y ) * e->zoom_factor;
+}
+
+static
+void raster_to_geo(double ll[2], struct pan_state *e, double x, double y)
+{
+	ll[0] = e->lon_0 + x * e->lon_d;
+	ll[1] = e->lat_0 + y * e->lat_d;
+}
+
+static
+void geo_to_raster(double xy[2], struct pan_state *e, double lon, double lat)
+{
+	xy[0] = ( lon - e->lon_0 ) / e->lon_d;
+	xy[1] = ( lat - e->lat_0 ) / e->lat_d;
+}
+
+static
+void window_to_image_apm(double out[2], struct pan_state *e, double i, double j)
+{
+	double xyh[3];
+	window_to_raster(xyh, e, i, j);
+	xyh[2] = e->base_h;
+
+	struct pan_view *v = obtain_view(e);
+	double p[3];
+	apply_projection(p, v->P, xyh);
+	out[0] = p[0];
+	out[1] = p[1];
+}
+
+static
+void image_to_window_apm(double ij[2], struct pan_state *e, double p, double q)
+{
+	struct pan_view *v = obtain_view(e);
+	double *P = v->P;
+	double a = P[0];
+	double b = P[1];
+	double c = P[4];
+	double d = P[5];
+	double det = a * d - b * c;
+	double x = p - P[2]*e->base_h - P[3];
+	double y = q - P[6]*e->base_h - P[7];
+	double raster[2];
+	raster[0] = ( d * x - b * y ) / det;
+	raster[1] = ( a * y - c * y ) / det;
+	raster_to_window(ij, e, raster[0], raster[1]);
+}
+
+
+// from the geographic raster to the image domain, using the RPC functions
+static void raster_to_image_exh(double out[2], struct pan_state *e,
+		double x, double y, double h)
+{
+	double lonlat[2];
+	raster_to_geo(lonlat, e, x, y);
+
+	struct pan_view *v = obtain_view(e);
+	double p[3];
+	eval_rpci(p, v->r, lonlat[0], lonlat[1], h);
+	out[0] = p[0];
+	out[1] = p[1];
+}
+
+static void vertical_direction(double vertical[2],
+		struct pan_view *v, double p, double q, double h)
+{
+	p = v->w / 2;
+	q = v->h / 2;
+	double lonlat[3];
+	eval_rpc(lonlat, v->r, p, q, h);
+
+	double eps_H = 100.0; // in meters
+	double p_bot[3], p_top[3];
+	eval_rpci(p_bot, v->r, lonlat[0], lonlat[1], h        );
+	eval_rpci(p_top, v->r, lonlat[0], lonlat[1], h + eps_H);
+	vertical[0] = ( p_top[0] - p_bot[0] ) / eps_H;
+	vertical[1] = ( p_top[1] - p_bot[1] ) / eps_H;
+}
+
+// from the image raster to the image coordinates
+// (typically, a translation along the vertical direction, proportional to h)
 //
-//static void pixel_m2(float *out, struct pan_state *e, double p, double q)
-//{
-//	int fmt = e->tg->i->fmt;
-//	int bps = e->tg->i->bps;
-//	int spp = e->tg->i->spp;
-//	int ss = bps / 8;
-//	double factor = 1.0/e->zoom_factor;
-//	int ipc = (p + e->rgbiox) / factor;
-//	int iqc = (q + e->rgbioy) / factor;
-//	char *pix_rgbi = tiff_octaves_getpixel(e->tc, 0, ipc, iqc);
-//
-//	double c[4];
-//	c[0] = from_sample_to_double(pix_rgbi + 0*ss, fmt, bps);
-//	c[1] = from_sample_to_double(pix_rgbi + 1*ss, fmt, bps);
-//	c[2] = from_sample_to_double(pix_rgbi + 2*ss, fmt, bps);
-//	c[3] = from_sample_to_double(pix_rgbi + 3*ss, fmt, bps);
-//	double g = (c[0] + c[1] + c[2] + c[3])/4;
-//	c[1] = c[1] * 0.9 + c[3] * 0.1;
-//	double nc = hypot(c[0], hypot(c[1], c[2]));
-//	out[0] = c[0] * g / nc;
-//	out[1] = c[1] * g / nc;
-//	out[2] = c[2] * g / nc;
-//}
-//
-//static void pixel_m2p(float *out, struct pan_state *e, double p, double q)
-//{
-//	if (!out) { float tmp[3]; pixel_m2p(tmp, e, p, q); return; }
-//	int fmt = e->tg->i->fmt;
-//	int bps = e->tg->i->bps;
-//	int spp = e->tg->i->spp;
-//	int ss = bps / 8;
-//	double factor = 1.0/e->zoom_factor;
-//	int ipc = (p + e->rgbiox) / factor;
-//	int iqc = (q + e->rgbioy) / factor;
-//	char *pix_rgbi = tiff_octaves_getpixel(e->tc, 0, ipc, iqc);
-//
-//	double c[4];
-//	c[0] = from_sample_to_double(pix_rgbi + 0*ss, fmt, bps);
-//	c[1] = from_sample_to_double(pix_rgbi + 1*ss, fmt, bps);
-//	c[2] = from_sample_to_double(pix_rgbi + 2*ss, fmt, bps);
-//	c[3] = from_sample_to_double(pix_rgbi + 3*ss, fmt, bps);
-//
-//	int ipg = 4*p/factor;
-//	int iqg = 4*q/factor;
-//	char *pix_gray = tiff_octaves_getpixel_shy(e->tg, 0, ipg, iqg);
-//	double g;
-//	if (pix_gray)
-//		g = from_sample_to_double(pix_gray, fmt, bps);
-//	else
-//		g = (c[0] + c[1] + c[2] + c[3]) / 4;
-//
-//	c[1] = c[1] * 0.9 + c[3] * 0.1;
-//	double nc = hypot(c[0], hypot(c[1], c[2]));
-//	out[0] = c[0] * g / nc;
-//	out[1] = c[1] * g / nc;
-//	out[2] = c[2] * g / nc;
-//}
-//
-//static void pixel_m3(float *out, struct pan_state *e, double p, double q)
-//{
-//	if (!out) return;
-//	int fmt = e->tg->i->fmt;
-//	int bps = e->tg->i->bps;
-//	int spp = e->tg->i->spp;
-//	int ss = bps / 8;
-//	double factor = 1.0/e->zoom_factor;
-//	int ipc = 2*(p + e->rgbiox) / factor;
-//	int iqc = 2*(q + e->rgbioy) / factor;
-//	char *pix_rgbi = tiff_octaves_getpixel(e->tc, 0, ipc, iqc);
-//
-//	double c[4];
-//	c[0] = from_sample_to_double(pix_rgbi + 0*ss, fmt, bps);
-//	c[1] = from_sample_to_double(pix_rgbi + 1*ss, fmt, bps);
-//	c[2] = from_sample_to_double(pix_rgbi + 2*ss, fmt, bps);
-//	c[3] = from_sample_to_double(pix_rgbi + 3*ss, fmt, bps);
-//	double g = (c[0] + c[1] + c[2] + c[3])/4;
-//	c[1] = c[1] * 0.9 + c[3] * 0.1;
-//	double nc = hypot(c[0], hypot(c[1], c[2]));
-//	out[0] = c[0] * g / nc;
-//	out[1] = c[1] * g / nc;
-//	out[2] = c[2] * g / nc;
-//}
-//
-//static void pixel_m4(float *out, struct pan_state *e, double p, double q)
-//{
-//	int fmt = e->tg->i->fmt;
-//	int bps = e->tg->i->bps;
-//	int spp = e->tg->i->spp;
-//	int ss = bps / 8;
-//	double factor = 1.0/e->zoom_factor;
-//	int ipc = 4*(p + e->rgbiox) / factor;
-//	int iqc = 4*(q + e->rgbioy) / factor;
-//	char *pix_rgbi = tiff_octaves_getpixel(e->tc, 0, ipc, iqc);
-//
-//	double c[4];
-//	c[0] = from_sample_to_double(pix_rgbi + 0*ss, fmt, bps);
-//	c[1] = from_sample_to_double(pix_rgbi + 1*ss, fmt, bps);
-//	c[2] = from_sample_to_double(pix_rgbi + 2*ss, fmt, bps);
-//	c[3] = from_sample_to_double(pix_rgbi + 3*ss, fmt, bps);
-//	double g = (c[0] + c[1] + c[2] + c[3])/4;
-//	c[1] = c[1] * 0.9 + c[3] * 0.1;
-//	double nc = hypot(c[0], hypot(c[1], c[2]));
-//	out[0] = c[0] * g / nc;
-//	out[1] = c[1] * g / nc;
-//	out[2] = c[2] * g / nc;
-//}
+// This function is slow, intended to be approximated later by an affine map
+static void raster_to_image_raw(double out[2], struct pan_state *e,
+		double rx, double ry, double h)
+{
+	struct pan_view *v = obtain_view(e);
+
+	// image point corresponding to raster x,y
+	// (HERE identity map)
+	//double x = -rx;
+	//double y = -ry;
+
+	double vertical[2];
+	vertical_direction(vertical, v, rx, ry, h);
+
+	double alpha = atan2(vertical[1], vertical[0]) + M_PI/2;
+	if (e->image_rotation_status == 0) alpha = 0;
+	if (e->image_rotation_status == 1) alpha = -M_PI;
+	double x = cos(alpha) * rx - sin(alpha) * ry;
+	double y = sin(alpha) * rx + cos(alpha) * ry;
+
+
+	out[0] = x + h*vertical[0];
+	out[1] = y + h*vertical[1];
+}
+
+static void image_to_raster_raw(double out[2], struct pan_state *e,
+		double p, double q, double h)
+{
+	struct pan_view *v = obtain_view(e);
+
+	double vertical[2];
+	vertical_direction(vertical, v, p, q, h);
+
+	double x = p - h * vertical[0];
+	double y = q - h * vertical[1];
+
+	// (HERE inverse identity map)
+	//double alpha = 0.1;
+	double alpha = atan2(vertical[1], vertical[0]) + M_PI/2;
+	if (e->image_rotation_status == 0) alpha = 0;
+	if (e->image_rotation_status == 1) alpha = -M_PI;
+	out[0] =  cos(alpha) * x + sin(alpha) * y;
+	out[1] = -sin(alpha) * x + cos(alpha) * y;
+}
+
+static
+void window_to_image_exh(double out[2], struct pan_state *e,
+		double i, double j, double h)
+{
+	double xy[2];
+	window_to_raster(xy, e, i, j);
+	raster_to_image_exh(out, e, xy[0], xy[1], h);
+}
+
+static
+void window_to_image_ex(double out[2], struct pan_state *e, double i, double j)
+{
+	window_to_image_exh(out, e, i, j, e->base_h);
+}
+
+static
+void image_to_window_ex(double ij[2], struct pan_state *e, double p, double q)
+{
+	struct pan_view *v = obtain_view(e);
+	double lonlat[3], xy[2];
+	eval_rpc(lonlat, v->r, p, q, e->base_h);
+	geo_to_raster(xy, e, lonlat[0], lonlat[1]);
+	raster_to_window(ij, e, xy[0], xy[1]);
+}
 
 static float rgb_getsamplec(void *vx, int w, int h, int i, int j, int l)
 {
@@ -300,575 +503,663 @@ static float evaluate_bilinear_cell(float a, float b, float c, float d,
 	return r;
 }
 
-static void preview_at(float *result, struct pan_state *e, double p, double q)
+static void preview_at_bil(float *out, struct pan_view *v, double p, double q)
 {
+	p -= 0.5;
+	q -= 0.5;
 	int ip = p;
 	int iq = q;
-	int w = e->pw;
-	int h = e->ph;
-	unsigned char *x = e->preview;
+	int w = v->pw;
+	int h = v->ph;
+	unsigned char *x = v->preview;
 	for (int l = 0; l < 3; l++) {
 		float a = rgb_getsamplec(x, w, h, ip  , iq  , l);
 		float b = rgb_getsamplec(x, w, h, ip+1, iq  , l);
 		float c = rgb_getsamplec(x, w, h, ip  , iq+1, l);
 		float d = rgb_getsamplec(x, w, h, ip+1, iq+1, l);
 		float r = evaluate_bilinear_cell(a, b, c, d, p-ip, q-iq);
-		result[l] = r;
+		out[l] = r;
 	}
 }
 
-static void pixel_m5(float *out, struct pan_state *e, double p, double q)
+static float cubic_interpolation(float v[4], float x)
 {
-	if (!out) return;
-	int fmt = e->tg->i->fmt;
-	int bps = e->tg->i->bps;
-	int spp = e->tg->i->spp;
-	int ss = bps / 8;
-	double factor = 1.0/e->zoom_factor;
+	return v[1] + 0.5 * x*(v[2] - v[0]
+			+ x*(2.0*v[0] - 5.0*v[1] + 4.0*v[2] - v[3]
+			+ x*(3.0*(v[1] - v[2]) + v[3] - v[0])));
+}
 
-	if (e->preview) {
-		int ipc = 8*(p + e->rgbiox) / factor;
-		int iqc = 8*(q + e->rgbioy) / factor;
-		char *pix_rgbi = tiff_octaves_getpixel_shy(e->tc, 0, ipc, iqc);
-		if (pix_rgbi) {
-			double c[4];
-			c[0] = from_sample_to_double(pix_rgbi + 0*ss, fmt, bps);
-			c[1] = from_sample_to_double(pix_rgbi + 1*ss, fmt, bps);
-			c[2] = from_sample_to_double(pix_rgbi + 2*ss, fmt, bps);
-			c[3] = from_sample_to_double(pix_rgbi + 3*ss, fmt, bps);
-			double g = (c[0] + c[1] + c[2] + c[3])/4;
-			c[1] = c[1] * 0.9 + c[3] * 0.1;
-			double nc = hypot(c[0], hypot(c[1], c[2]));
-			out[0] = c[0] * g / nc;
-			out[1] = c[1] * g / nc;
-			out[2] = c[2] * g / nc;
-		} else {
-			int ip = p * e->pw / e->tg->i->w;
-			int iq = q * e->ph / e->tg->i->h;
-			float fp = p * e->pw / e->tg->i->w;
-			float fq = q * e->ph / e->tg->i->h;
-			if (insideP(e->pw, e->ph, ip, iq)) {
-				preview_at(out, e, fp, fq);
-				out[0] *= 6;
-				out[1] *= 7;
-				out[2] *= 6;
-			} else {
-				out[0] = 2000;
-				out[1] = 50;
-				out[2] = 200;
-			}
-		}
+static float bicubic_interpolation_cell(float p[4][4], float x, float y)
+{
+	float v[4];
+	v[0] = cubic_interpolation(p[0], y);
+	v[1] = cubic_interpolation(p[1], y);
+	v[2] = cubic_interpolation(p[2], y);
+	v[3] = cubic_interpolation(p[3], y);
+	return cubic_interpolation(v, x);
+}
+
+
+static void preview_at_bic(float *out, struct pan_view *v, double x, double y)
+{
+	x -= 1.5;
+	y -= 1.5;
+	int ix = floor(x);
+	int iy = floor(y);
+	int w = v->pw;
+	int h = v->ph;
+	unsigned char *img = v->preview;
+	for (int l = 0; l < 3; l++) {
+		float c[4][4];
+		for (int j = 0; j < 4; j++)
+		for (int i = 0; i < 4; i++)
+			c[i][j] = rgb_getsamplec(img, w, h, ix + i, iy + j, l);
+		out[l] = bicubic_interpolation_cell(c, x - ix, y - iy);
+	}
+}
+
+static int insideP(int w, int h, int x, int y)
+{
+	return x >= 0 && y >= 0 && x < w && y < h;
+}
+
+static float getgreenf(float c[4])
+{
+	return c[1] * 0.6 + c[3] * 0.2;
+}
+
+static void rgbi_to_rgb_inplace(float c[4])
+{
+	c[0] = 1.00 * c[0]  +  0.05 * c[3];
+	c[1] = 0.60 * c[1]  +  0.20 * c[3];
+	c[2] = 1.30 * c[2]  -  0.20 * c[3];
+}
+
+static
+void pixel_from_preview(float *r, struct pan_view *v, double p, double q, int i)
+{
+	if (!v->preview)
+		v->preview = load_nice_preview(v->pfg, v->pfc, &v->pw, &v->ph);
+	int ip = p * v->pw / v->tg->i->w;
+	int iq = q * v->ph / v->tg->i->h;
+	float fp = p * v->pw / v->tg->i->w;
+	float fq = q * v->ph / v->tg->i->h;
+	if (insideP(v->pw, v->ph, ip, iq)) {
+		if (i == 2)      preview_at_bil(r, v, fp, fq);
+		else if (i == 3) preview_at_bic(r, v, fp, fq);
+		else for (int l = 0; l < 3; l++)
+			r[l] = rgb_getsamplec(v->preview, v->pw, v->ph,
+					ip, iq, l);
 	} else {
-		out[0] = 200;
-		out[1] = 2000;
-		out[2] = 0;
+		// bright green
+		r[0] = 0;
+		r[1] = 255;
+		r[2] = 0;
 	}
 }
 
-static void pixel_m4b(float *out, struct pan_state *e, double p, double q)
+static int tiffo_getpixel_float_raw(float *r, struct tiff_octaves *t,
+		int o, int i, int j)
 {
-	if (!out) { float tmp[3]; pixel_m4(tmp, e, p, q); return; }
-	int fmt = e->tg->i->fmt;
-	int bps = e->tg->i->bps;
-	int spp = e->tg->i->spp;
-	int ss = bps / 8;
-	double factor = 1.0/e->zoom_factor;
-
-	if (e->preview) {
-		int ipc = 4*(p + e->rgbiox) / factor;
-		int iqc = 4*(q + e->rgbioy) / factor;
-		char *pix_rgbi = tiff_octaves_getpixel_shy(e->tc, 0, ipc, iqc);
-		if (pix_rgbi) {
-			double c[4];
-			c[0] = from_sample_to_double(pix_rgbi + 0*ss, fmt, bps);
-			c[1] = from_sample_to_double(pix_rgbi + 1*ss, fmt, bps);
-			c[2] = from_sample_to_double(pix_rgbi + 2*ss, fmt, bps);
-			c[3] = from_sample_to_double(pix_rgbi + 3*ss, fmt, bps);
-			double g = (c[0] + c[1] + c[2] + c[3])/4;
-			c[1] = c[1] * 0.9 + c[3] * 0.1;
-			double nc = hypot(c[0], hypot(c[1], c[2]));
-			out[0] = c[0] * g / nc;
-			out[1] = c[1] * g / nc;
-			out[2] = c[2] * g / nc;
-		} else {
-			int ip = p * e->pw / e->tg->i->w;
-			int iq = q * e->ph / e->tg->i->h;
-			float fp = p * e->pw / e->tg->i->w;
-			float fq = q * e->ph / e->tg->i->h;
-			if (insideP(e->pw, e->ph, ip, iq)) {
-				preview_at(out, e, fp, fq);
-				out[0] *= 6;
-				out[1] *= 7;
-				out[2] *= 6;
-			} else {
-				out[0] = 2000;
-				out[1] = 50;
-				out[2] = 200;
-			}
-		}
-	} else {
-		out[0] = 200;
-		out[1] = 2000;
-		out[2] = 0;
-	}
+	void *p = tiff_octaves_getpixel(t, o, i, j);
+	convert_pixel_to_float(r, t->i, p);
+	return t->i->spp;
 }
 
-// evaluate the value a position (p,q) in big image coordinates
-static void pixel(float *out, struct pan_state *e, double p, double q)
+static int tiffo_getpixel_float_1(float *r, struct tiff_octaves *t,
+		int o, int i, int j)
 {
-	if (p < 0 || q < 0 || p > e->tg->i->w-1 || q > e->tg->i->h-1) {
-		int ip = p-256;
-		int iq = q-256;
-		int pip = mod(ip/256, 2);
-		int piq = mod(iq/256, 2);
-		int val = mod(pip+piq,2);
-		if (out)
-			out[0] = out[1] = out[2] = 127+val*64;
+	if (i < 0) i = 0;
+	if (j < 0) j = 0;
+	if (i >= t->i[o].w) i = t->i[o].w;
+	if (j >= t->i[o].h) i = t->i[o].h;
+	return tiffo_getpixel_float_raw(r, t, o, i, j);
+}
+
+static int tiffo_getpixel_float_bilinear(float *r, struct tiff_octaves *t,
+		int o, float p, float q)
+{
+	p -= 0.5;
+	q -= 0.5;
+	int ip = p;
+	int iq = q;
+	int pd = t->i->spp;
+	float v[4][pd];
+	tiffo_getpixel_float_1(v[0], t, o, ip  , iq  );
+	tiffo_getpixel_float_1(v[1], t, o, ip+1, iq  );
+	tiffo_getpixel_float_1(v[2], t, o, ip  , iq+1);
+	tiffo_getpixel_float_1(v[3], t, o, ip+1, iq+1);
+	for (int l = 0; l < pd; l++)
+		r[l] = evaluate_bilinear_cell(v[0][l], v[1][l],
+						v[2][l], v[3][l], p-ip, q-iq);
+	return pd;
+	
+}
+
+static int tiffo_getpixel_float_bicubic(float *r, struct tiff_octaves *t,
+		int o, float x, float y)
+{
+	x -= 1.5;
+	y -= 1.5;
+	int ix = floor(x);
+	int iy = floor(y);
+	int pd = t->i->spp;
+	float c[4][4][pd];
+	for (int j = 0; j < 4; j++)
+	for (int i = 0; i < 4; i++)
+		tiffo_getpixel_float_1(c[i][j], t, o, ix + i, iy + j);
+	for (int l = 0; l < pd; l++) {
+		float cl[4][4];
+		for (int j = 0; j < 4; j++)
+		for (int i = 0; i < 4; i++)
+			cl[i][j] = c[i][j][l];
+		r[l] = bicubic_interpolation_cell(cl, x - ix, y - iy);
+	}
+	return pd;
+}
+
+static void pixel_from_ms(float *out, struct pan_view *v, double p, double q,
+		int i)
+{
+	float c[4];
+	float ipc = (p + v->rgbiox) / 4;
+	float iqc = (q + v->rgbioy) / 4;
+	if (i == 2)      tiffo_getpixel_float_bilinear(c, v->tc, 0, ipc, iqc);
+	else if (i == 3) tiffo_getpixel_float_bicubic(c, v->tc, 0, ipc, iqc);
+	else             tiffo_getpixel_float_1(c, v->tc, 0, ipc, iqc);
+	rgbi_to_rgb_inplace(c);
+	float g = (c[0] + c[1] + c[2] + c[3]) / 4;
+	float nc = 4*hypot(c[0], hypot(c[1], c[2]));
+	out[0] = c[0] * g / nc;
+	out[1] = c[1] * g / nc;
+	out[2] = c[2] * g / nc;
+}
+
+static void pixel_from_mso(float *out, struct pan_view *v, double p, double q,
+		int i, int o)
+{
+	////
+	//out[0] = 0;
+	//out[1] = 50;
+	//out[2] = 200;
+	int ofac = 1 << (o);
+	float c[4];
+	float ipc = (p + v->rgbiox) / ofac;
+	float iqc = (q + v->rgbioy) / ofac;
+	if (i == 2)      tiffo_getpixel_float_bilinear(c, v->tc, o-2, ipc, iqc);
+	else if (i == 3) tiffo_getpixel_float_bicubic(c, v->tc, o-2, ipc, iqc);
+	else             tiffo_getpixel_float_1(c, v->tc, o-2, ipc, iqc);
+	rgbi_to_rgb_inplace(c);
+	float g = (c[0] + c[1] + c[2] + c[3]) / 4;
+	float nc = 4*hypot(c[0], hypot(c[1], c[2]));
+	out[0] = c[0] * g / nc;
+	out[1] = c[1] * g / nc;
+	out[2] = c[2] * g / nc;
+}
+
+static void pixel_from_pms(float *out, struct pan_view *v, double p, double q,
+		int i)
+{
+	float pc = (p + v->rgbiox) / 4;
+	float qc = (q + v->rgbioy) / 4;
+	float g, c[4];
+	if (i == 2)      tiffo_getpixel_float_bilinear(&g, v->tg, 0, p , q );
+	else if (i == 3) tiffo_getpixel_float_bicubic (&g, v->tg, 0, p , q );
+	else             tiffo_getpixel_float_1       (&g, v->tg, 0, p , q );
+	if (i == 2)      tiffo_getpixel_float_bilinear(c , v->tc, 0, pc, qc);
+	else if (i == 3) tiffo_getpixel_float_bicubic (c , v->tc, 0, pc, qc);
+	else             tiffo_getpixel_float_1       (c , v->tc, 0, pc, qc);
+	rgbi_to_rgb_inplace(c);
+	float nc = 4*hypot(c[0], hypot(c[1], c[2]));
+	out[0] = c[0] * g / nc;
+	out[1] = c[1] * g / nc;
+	out[2] = c[2] * g / nc;
+}
+
+// evaluate the value a position (p,q) in image coordinates
+static
+void pixel(float *out, struct pan_view *v, double p, double q, int o, int i)
+{
+	// TODO: remove the conditionals inside this function by putting
+	// all the version inside a table of pointers to functions
+	if (p < 0 || q < 0 || p >= v->w || q >= v->h) {
+		// pink
+		out[0] = 200;
+		out[1] = 50;
+		out[2] = 100;
 		return;
 	}
-
-	int fmt = e->tg->i->fmt;
-	int bps = e->tg->i->bps;
-	int spp = e->tg->i->spp;
-	int ss = bps / 8;
-
-	double factor = 1.0/e->zoom_factor;
-	int o = e->octave;
-	if (o == 1)  { pixel_m1p(out, e, p, q); return; }
-	if (o == 2)  { pixel_m2p(out, e, p, q); return; }
-	if (o == 3)  { pixel_m3(out, e, p, q); return; }
-	if (o == 4)  { pixel_m4b(out, e, p, q); return; }
-	if (o == 5)  { pixel_m5(out, e, p, q); return; }
-	if (o < 0) { o = 0; factor = 1; }
-	if (!out) return;
-
-	int ipg = p/factor;
-	int iqg = q/factor;
-	int ipc = 0.25 * (p + e->rgbiox) / factor;
-	int iqc = 0.25 * (q + e->rgbioy) / factor;
-	char *pix_gray = tiff_octaves_getpixel(e->tg, o, ipg, iqg);
-	char *pix_rgbi = tiff_octaves_getpixel(e->tc, o, ipc, iqc);
-
-
-	if (e->infrared) {
-		double c[4];
-		c[0] = from_sample_to_double(pix_rgbi + 0*ss, fmt, bps);
-		c[1] = from_sample_to_double(pix_rgbi + 1*ss, fmt, bps);
-		c[2] = from_sample_to_double(pix_rgbi + 2*ss, fmt, bps);
-		c[3] = from_sample_to_double(pix_rgbi + 3*ss, fmt, bps);
-		c[1] = c[1] * 0.9 + c[3] * 0.1;
-		double g = from_sample_to_double(pix_gray, fmt, bps);
-		//double nc = (c[0] + c[1] + c[2]) / 3;
-		double nc = hypot(c[0], hypot(c[1], c[2]));
-		out[0] = c[0] * g / nc;
-		out[1] = c[1] * g / nc;
-		out[2] = c[2] * g / nc;
-	} else {
-		out[0] = from_sample_to_double(pix_gray, fmt, bps);
-		out[1] = out[2] = out[0];
+	if (msoctaves_instead_of_preview) { // ms-octaves case
+		if (o == 0 || o == 1)
+			pixel_from_pms (out, v, p, q, i);
+		else if (o == 2)
+			pixel_from_ms  (out, v, p, q, i);
+		else
+			pixel_from_mso (out, v, p, q, i, o);
+	} else { // regular case
+		if (o == 0)      pixel_from_preview (out, v, p, q, i);
+		else if (o == 1) pixel_from_ms      (out, v, p, q, i);
+		else if (o == 2) pixel_from_pms     (out, v, p, q, i);
+		else exit(fprintf(stderr,"ERROR: bad octave %d\n", o));
 	}
 }
 
-static void action_print_value_under_cursor(struct FTR *f, int x, int y)
+// auxiliary function: compute n%p correctly, even for huge and negative numbers
+static int good_modulus(int nn, int p)
 {
-	if (x<f->w && x>=0 && y<f->h && y>=0) {
-		struct pan_state *e = f->userdata;
-		double p[2];
-		window_to_image(p, e, x, y);
-		float v[3];
-		pixel(v, e, p[0], p[1]);
-		fprintf(stderr, "%g %g, value %g\n",p[0],p[1],v[0]);
-		//float c[3];
-		//interpolate_at(c, e->frgb, e->w, e->h, p[0], p[1]);
-		//printf("%g\t%g\t: %g\t%g\t%g\n", p[0], p[1], c[0], c[1], c[2]);
+	if (!p) return 0;
+	if (p < 1) return good_modulus(nn, -p);
+	unsigned int r;
+	if (nn >= 0)
+		r = nn % p;
+	else {
+		unsigned int n = nn;
+		unsigned int pu = p;
+		r = pu - (-n) % pu;
+		if (r == pu)
+			r = 0;
 	}
+	return r;
 }
 
-static void action_offset_viewport(struct FTR *f, int dx, int dy)
+static void inplace_rgb_span(float *x, int w, int h, double a)
+{
+	int n = w*h;
+	float min[3] = {INFINITY, INFINITY, INFINITY}, max[3] = {0, 0, 0};
+	for (int i = 0; i < n; i++)
+	for (int l = 0; l < 3; l++)
+	{
+		min[l] = fmin(min[l], x[3*i+l]);
+		max[l] = fmax(max[l], x[3*i+l]);
+	}
+	fprintf(stderr, "qauto %g %g %g | %g %g %g\n",
+			min[0], min[1], min[2], max[0], max[1], max[2]);
+	for (int i = 0; i < n; i++)
+	for (int l = 0; l < 3; l++)
+		x[3*i+l] =255.0 * ( x[3*i+l] - min[l] ) / ( max[l] - min[l] );
+}
+
+static void inplace_rgb_span2(float *x, int w, int h, double a)
+{
+	double avg[3] = {0, 0, 0}, var[3] = {0, 0, 0};
+	int mw = w/4, mh = h/4;
+	int n = (w-2*mw)*(h-2*mh);
+	for (int j = mh; j < h - mh ; j++)
+	for (int i = mw; i < w - mw ; i++)
+	for (int l = 0; l < 3; l++)
+		avg[l] += x[3*(j*w+i)+l]/n;
+	for (int j = mh; j < h - mh ; j++)
+	for (int i = mw; i < w - mw ; i++)
+	for (int l = 0; l < 3; l++)
+	{
+		double q = x[3*(j*w+i)+l] - avg[l];
+		var[l] += q * q / n;
+	}
+	fprintf(stderr, "span2 avg = %g %g %g | dev = %g %g %g\n",
+				avg[0], avg[1], avg[2],
+				sqrt(var[0]), sqrt(var[1]), sqrt(var[2]));
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	for (int l = 0; l < 3; l++)
+		x[3*(j*w+i)+l] = 127 + a*(x[3*(j*w+i)+l] - avg[l])/sqrt(var[l]);
+}
+
+static void update_local_projection(struct pan_state *e,
+		double ix, double iy, double h)
+{
+	struct pan_view *v = obtain_view(e);
+
+	double xy[2];
+	window_to_raster(xy, e, ix, iy);
+	double x = xy[0];
+	double y = xy[1];
+
+	approximate_projection_gen(v->P, e, x, y, h, e->image_space ?
+			raster_to_image_raw : raster_to_image_exh);
+}
+
+// dump the image acording to the state of the viewport
+static void pan_repaint(struct pan_state *e, int w, int h)
+{
+	struct pan_view *v = obtain_view(e);
+
+	// setup the display buffer
+	if (!v->display || v->dw != w || v->dh != h) {
+		if (v->display)
+			free(v->display);
+		v->display = xmalloc(w * h * 3);
+		v->fdisplay = xmalloc(w * h * 3 * sizeof*v->fdisplay);
+		v->dw = w;
+		v->dh = h;
+		v->repaint = 1;
+	}
+	if (!v->repaint) return; // if no repaint requested, return
+	v->repaint = 0;
+
+	update_local_projection(e, w/2, h/2, e->base_h);
+
+	static void (*win_to_img)(double p[2],struct pan_state*,double,double);
+	win_to_img = window_to_image_apm;
+	if (e->image_space)      win_to_img = window_to_image_apm;
+	else if (e->force_exact) win_to_img = window_to_image_ex;
+
+	int o = obtain_octave(e);
+	int interp = e->interpolation_order;
+
+//#pragma omp parallel for
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		if (!e->diff_mode) {
+			double p[2];
+			win_to_img(p, e, i, j);
+			float c[3];
+			pixel(c, v, p[0], p[1], o, interp);
+			float *cc = v->fdisplay + 3 * (j * v->dw + i);
+			for (int l = 0; l < 3; l++)
+				cc[l] = e->a * c[l] + e->b;
+		} else { // diff mode
+			int va = e->current_view;
+			int vb = good_modulus(e->current_view+1,e->nviews);
+			double p[2], q[2];
+			e->current_view = va; win_to_img(p, e, i, j);
+			e->current_view = vb; win_to_img(q, e, i, j);
+			float ca[3], cb[3];
+			pixel(ca, e->view + va, p[0], p[1], o, interp);
+			pixel(cb, e->view + vb, q[0], q[1], o, interp);
+			float *cc = v->fdisplay + 3 * (j * v->dw + i);
+			for (int l = 0; l < 3; l++) {
+				float g = 2*e->a * (ca[l] - cb[l]) + 127;
+				cc[l] = g;
+			}
+			e->current_view = va;
+		}
+	}
+	if (e->qauto == 1) inplace_rgb_span(v->fdisplay, v->dw, v->dh, 60*e->a);
+	if (e->qauto == 2)inplace_rgb_span2(v->fdisplay, v->dw, v->dh, 60*e->a);
+	for (int i = 0; i < v->dw * v->dh * 3; i++)
+		v->display[i] = float_to_uint8(v->fdisplay[i]);
+}
+
+static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+	struct pan_view *v = obtain_view(e);
+
+	pan_repaint(e, f->w, f->h);
+
+	// copy the requested view into the display
+	assert(f->w == v->dw);
+	assert(f->h == v->dh);
+	memcpy(f->rgb, v->display, v->dw * v->dh * 3);
+}
+
+static void request_repaints(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	for (int i = 0; i < e->nviews; i++)
+		e->view[i].repaint = 1;
+	f->changed = 1;
+}
+
+// TODO: edit all actions so that they act directly on the "pan_state", not on
+// the "FTR".  This is necessary so that actions can be directly called even
+// when there is no interface (e.g., for scripted usage).
+
+static void action_offset_viewport(struct FTR *f, double dx, double dy)
 {
 	struct pan_state *e = f->userdata;
 	e->offset_x -= dx/e->zoom_factor;
 	e->offset_y -= dy/e->zoom_factor;
 
-	f->changed = 1;
+	request_repaints(f);
 }
 
-static void action_reset_zoom_and_position(struct FTR *f)
+static void action_change_zoom_by_factor(struct FTR *f, int x, int y, double F)
 {
 	struct pan_state *e = f->userdata;
-
-	e->zoom_factor = 1;
-	e->octave = 0;
-	e->offset_x = 0;
-	e->offset_y = 0;
-	/*
-	e->a = 1;
-	e->b = 0;
-	*/
-
-	if (e->preview) {
-		e->do_preview = true;
-		e->zoom_factor = e->tg->i->w / (double)e->pw;
-		fprintf(stderr, "preview zoom factor %g\n", e->zoom_factor);
-	}
-
-	f->changed = 1;
-}
-
-static void action_exit_preview(struct FTR *f, int x, int y)
-{
-	struct pan_state *e = f->userdata;
-
-	e->do_preview = false;
-	e->octave = 0;
-	e->offset_x = x*e->zoom_factor - e->pw/2;
-	e->offset_y = y*e->zoom_factor - e->ph/2;
-	e->zoom_factor = 1;
-	f->changed = 1;
-}
-
-static void action_contrast_change(struct FTR *f, float afac, float bshift)
-{
-	struct pan_state *e = f->userdata;
-
-	e->a *= afac;
-	e->b += bshift;
-
-	f->changed = 1;
-}
-
-static void action_qauto(struct FTR *f)
-{
-	struct pan_state *e = f->userdata;
-
-	//float m = INFINITY, M = -m;
-	float m = 0, M = 255;
-	//int pid = 3;
-	//for (int i = 0; i < 3 * e->pyr_w[pid] * e->pyr_h[pid]; i++)
-	//{
-	//	float g = e->pyr_rgb[pid][i];
-	//	m = fmin(m, g);
-	//	M = fmax(M, g);
-	//}
-
-	e->a = 255 / ( M - m );
-	e->b = 255 * m / ( m - M );
-
-	f->changed = 1;
-}
-
-static void action_center_contrast_at_point(struct FTR *f, int x, int y)
-{
-	struct pan_state *e = f->userdata;
-
-	double p[2];
-	window_to_image(p, e, x, y);
-	float c[3];
-	pixel(c, e, p[0], p[1]);
-	float C = (c[0] + c[1] + c[2])/3;
-
-	e->b = 127.5 - e->a * C;
-
-	f->changed = 1;
-}
-
-static void action_base_contrast_at_point(struct FTR *f, int x, int y)
-{
-	struct pan_state *e = f->userdata;
-
-	double p[2];
-	window_to_image(p, e, x, y);
-	float c[3];
-	pixel(c, e, p[0], p[1]);
-	float C = (c[0] + c[1] + c[2])/3;
-
-	e->b =  255 - e->a * C;
-
-	f->changed = 1;
-}
-
-static void action_contrast_span(struct FTR *f, float factor)
-{
-	struct pan_state *e = f->userdata;
-
-	float c = (127.5 - e->b)/ e->a;
-	e->a *= factor;
-	e->b = 127.5 - e->a * c;
-
-	f->changed = 1;
-}
-
-static void action_change_zoom_to_factor(struct FTR *f, int x, int y, double F)
-{
-	struct pan_state *e = f->userdata;
-
-	if (F == 1) e->octave = 0;
 
 	double c[2];
-	window_to_image(c, e, x, y);
+	window_to_raster(c, e, x, y);
 
-	e->zoom_factor = 1/F;
+	e->zoom_factor *= F;
 	e->offset_x = c[0] - x/e->zoom_factor;
 	e->offset_y = c[1] - y/e->zoom_factor;
-	fprintf(stderr, "\t zoom changed to %g {%g %g}\n", e->zoom_factor, e->offset_x, e->offset_y);
+	fprintf(stderr, "\t zoom changed to %g\n", e->zoom_factor);
 
-	f->changed = 1;
+	request_repaints(f);
 }
 
-//static void action_change_zoom_by_factor(struct FTR *f, int x, int y, double F)
-//{
-//	struct pan_state *e = f->userdata;
-//
-//	double c[2];
-//	window_to_image(c, e, x, y);
-//
-//	e->zoom_factor *= F;
-//	e->offset_x = c[0] - x/e->zoom_factor;
-//	e->offset_y = c[1] - y/e->zoom_factor;
-//	fprintf(stderr, "\t zoom changed %g\n", e->zoom_factor);
-//
-//	f->changed = 1;
-//}
+static void action_multiply_contrast(struct FTR *f, double fac)
+{
+	struct pan_state *e = f->userdata;
+	e->a *= fac;
+	fprintf(stderr, "\t constrast factor changed to %g\n", e->a);
 
-//static void action_reset_zoom_only(struct FTR *f, int x, int y)
-//{
-//	struct pan_state *e = f->userdata;
-//
-//	action_change_zoom_by_factor(f, x, y, 1/e->zoom_factor);
-//}
+	request_repaints(f);
+}
 
+static void action_offset_base_h(struct FTR *f, double d)
+{
+	struct pan_state *e = f->userdata;
+	e->base_h += d;
+	fprintf(stderr, "base_h = %g\n", e->base_h);
 
+	request_repaints(f);
+}
 
-//static void action_increase_zoom(struct FTR *f, int x, int y)
-//{
-//	action_change_zoom_by_factor(f, x, y, WHEEL_FACTOR);
-//}
-//
-//static void action_decrease_zoom(struct FTR *f, int x, int y)
-//{
-//	action_change_zoom_by_factor(f, x, y, 1.0/WHEEL_FACTOR);
-//}
+static void action_increase_zoom(struct FTR *f, int x, int y)
+{
+	action_change_zoom_by_factor(f, x, y, WHEEL_FACTOR);
+}
 
+static void action_decrease_zoom(struct FTR *f, int x, int y)
+{
+	action_change_zoom_by_factor(f, x, y, 1.0/WHEEL_FACTOR);
+}
 
-static void action_increase_octave(struct FTR *f, int x, int y)
+static void action_toggle_exact_rpc(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->force_exact = !e->force_exact;
+	if (e->force_exact)
+		fprintf(stderr, "use EXACT calibration\n");
+	else
+		fprintf(stderr, "use APPROXIMATE calibration\n");
+
+	request_repaints(f);
+}
+
+static void action_toggle_diff_mode(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->diff_mode = !e->diff_mode;
+
+	request_repaints(f);
+}
+
+static void action_toggle_image_space(struct FTR *f, int x, int y)
 {
 	struct pan_state *e = f->userdata;
 
-	//if (e->octave < e->tg->noctaves - 1) {
-	if (e->octave < 5)
-		e->octave += 1;
-		double fac = 1 << e->octave;
-		if (e->octave < 0) fac = 1.0/(1<<-e->octave);
-		action_change_zoom_to_factor(f, x, y, fac);
-	//}
+	fprintf(stderr, "doing hacky things\n");
 
-	fprintf(stderr, "increased octave to %d\n", e->octave);
-}
-
-static void action_decrease_octave(struct FTR *f, int x, int y)
-{
-	struct pan_state *e = f->userdata;
-
-	if (e->octave > 0) {
-		e->octave -= 1;
-		double fac = 1 << e->octave;
-		action_change_zoom_to_factor(f, x, y, fac);
+	// assure that the center of the window is not moved
+	e->image_space = !e->image_space;
+	if (e->image_space) {
+		update_local_projection(e, f->w/2, f->h/2, e->base_h);
+		double c[2] = {x, y}, p[2], q[2];
+		window_to_image_ex(p, e, c[0], c[1]);
+		image_to_window_apm(q, e, p[0], p[1]);
+		action_offset_viewport(f, c[0] - q[0], c[1] - q[1]);
+		fprintf(stderr, "going window to image around %d %d\n", x, y);
+		fprintf(stderr, "\tp = %g %g\n", p[0], p[1]);
+		fprintf(stderr, "\tq = %g %g\n", q[0], q[1]);
+		fprintf(stderr, "\toff = %g %g\n", c[0]-q[0], c[1]-q[1]);
+	} else {
+		double c[2] = {x, y}, p[2], q[2];
+		window_to_image_apm(p, e, c[0], c[1]);
+		image_to_window_ex(q, e, p[0], p[1]);
+		action_offset_viewport(f, c[0] - q[0], c[1] - q[1]);
+		fprintf(stderr, "going image to window around %d %d\n", x, y);
+		fprintf(stderr, "\tp = %g %g\n", p[0], p[1]);
+		fprintf(stderr, "\tq = %g %g\n", q[0], q[1]);
+		fprintf(stderr, "\toff = %g %g\n", c[0]-q[0], c[1]-q[1]);
 	}
-	else if (e->octave <= 0) {
-		e->octave -= 1;
-		double fac = 1.0/(1 << -e->octave);
-		action_change_zoom_to_factor(f, x, y, fac);
-	}
-
-	fprintf(stderr, "decreased octave to %d\n", e->octave);
+	if (e->image_space)
+		fprintf(stderr, "base grid = IMAGE\n");
+	else
+		fprintf(stderr, "base grid = GEOGRAPHIC\n");
+	request_repaints(f);
 }
 
-static void action_toggle_infrared(struct FTR *f)
+static void action_cycle_rotation_status(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
+	e->image_rotation_status = ( e->image_rotation_status + 1 ) % 3;
+	fprintf(stderr, "rotation status = ");
+	if (e->image_rotation_status == 0) fprintf(stderr, "UP\n");
+	if (e->image_rotation_status == 1) fprintf(stderr, "DOWN\n");
+	if (e->image_rotation_status == 2) fprintf(stderr, "VERTICAL\n");
+	// Missing: NORTH, SOUTH, SUN_UP, SUN_DOWN
+	// More seriously: this should be independent of the "raster type"
+	request_repaints(f);
+}
 
-	e->infrared = !e->infrared;
+static void action_cycle_contrast(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->qauto = ( e->qauto + 1 ) % 3;
+	fprintf(stderr, "contrast change = ");
+	if (e->qauto == 0) fprintf(stderr, "NONE\n");
+	if (e->qauto == 1) fprintf(stderr, "MIN-MAX\n");
+	if (e->qauto == 2) fprintf(stderr, "AVG-STD\n");
+	request_repaints(f);
+}
 
-	f->changed = 1;
+// This function is only called when "ignoring" the RPC functions.  Even when
+// we ignore the RPCs, we still want to be able to flip the images while
+// keeping the center of the image at the correct offset; to compute this
+// offset we need the RPC functions.
+static void reposition_in_image_space(struct FTR *f, int a, int b, int x, int y)
+{
+	if (x < 0 || y < 0 || x >= f->w || y >= f->h) { x = f->w/2; y = f->h/2;}
+	struct pan_state *e = f->userdata; assert(e->image_space);
+	int save_view = e->current_view;
+	struct pan_view *va = e->view + a;
+	struct pan_view *vb = e->view + b;
+	double rc[2], imgac[2], imgbc[2], rdc[2], dc[2], lonlat[2];
+	window_to_raster(rc, e, x, y);
+	e->current_view = a;
+	raster_to_image_raw(imgac, e, rc[0], rc[1], e->base_h);
+	eval_rpc(lonlat, va->r, imgac[0], imgac[1], e->base_h);
+	eval_rpci(imgbc, vb->r, lonlat[0], lonlat[1], e->base_h);
+	e->current_view = b;
+	image_to_raster_raw(rdc, e, imgbc[0], imgbc[1], e->base_h);
+	raster_to_window(dc, e, rdc[0], rdc[1]);
+	double offx = x - dc[0];
+	double offy = y - dc[1];
+	e->offset_x -= offx/e->zoom_factor;
+	e->offset_y -= offy/e->zoom_factor;
+	e->current_view = save_view;
+}
+
+static void action_select_view(struct FTR *f, int i, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+	if (i >= 0 && i < e->nviews)
+	{
+		fprintf(stderr, "selecting view %d\n", i);
+		if (e->image_space)
+			reposition_in_image_space(f, e->current_view, i, x, y);
+		e->current_view = i;
+		f->changed = 1;
+	}
+}
+
+static void action_select_interpolator(struct FTR *f, int k)
+{
+	struct pan_state *e = f->userdata;
+	if (k >= 0 || k < 3 || k == 4)
+	       	e->interpolation_order = k;
+	request_repaints(f);
 }
 
 static void action_offset_rgbi(struct FTR *f, double dx, double dy)
 {
 	struct pan_state *e = f->userdata;
-	e->rgbiox += dx;
-	e->rgbioy += dy;
-	f->changed = 1;
+	struct pan_view *v = obtain_view(e);
+	v->rgbiox += dx;
+	v->rgbioy += dy;
+	fprintf(stderr, "rgbi offset chanted to %g %g\n", v->rgbiox, v->rgbioy);
+	request_repaints(f);
 }
 
-static void dump_preview(struct FTR *f)
+static void action_cycle_view(struct FTR *f, int d, int x, int y)
 {
 	struct pan_state *e = f->userdata;
-	if (!e->preview) return;
-
-	f->w = e->pw;
-	f->h = e->ph;
-	memcpy(f->rgb, e->preview, 3*e->pw*e->ph);
-
-	if (e->preview_position_x >= 0)
-	{
-		int icon_hw = (e->pw/e->zoom_factor)/2;
-		int icon_hh = (e->ph/e->zoom_factor)/2;
-		for (int jj = -icon_hh; jj <= icon_hh; jj++)
-		for (int ii = -icon_hw; ii <= icon_hw; ii++)
-		{
-			int i = ii + e->preview_position_x;
-			int j = jj + e->preview_position_y;
-			if (i >= 0 && j >= 0 && i < f->w && j < f->h)
-			{
-				int idx = j * f->w + i;
-				f->rgb[3*idx+2] = 255;
-			}
-		}
-	}
-
-	f->changed = 1;
+	int new = good_modulus(e->current_view + d, e->nviews);
+	action_select_view(f, new, x, y);
 }
 
-static unsigned char float_to_byte(float x)
+static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 {
-	if (x < 0) return 0;
-	if (x > 255) return 255;
-	// set gamma=2
-	//float r = x * x / 255;
-	//
-	//float n = x / 255;
-	//float r = (n*n)*n;
-	//return r*255;
-	return x;
-}
-
-void foveate_caches(struct FTR *f)
-{
-	struct pan_state *e = f->userdata;
-	int w = f->w;
-	int h = f->h;
-
-	for (int i = w/4; i < 3*w/4; i += 50) 
-	for (int j = h/4; j < 3*h/4; j += 50) 
-	{
-		double p[2];
-		window_to_image(p, e, i, j);
-		pixel(NULL, e, p[0], p[1]);
-	}
-}
-
-// dump the image acording to the state of the viewport
-static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
-{
-	struct pan_state *e = f->userdata;
-
-	if (e->do_preview) {dump_preview(f); return;}
-
-	foveate_caches(f);
-
-	// for every pixel in the window
-	for (int j = 0; j < f->h; j++)
-	for (int i = 0; i < f->w; i++)
-	{
-		// compute the position of this pixel in the image
-		double p[2];
-		window_to_image(p, e, i, j);
-
-		// evaluate the color value of the image at this position
-		float c[3];
-		pixel(c, e, p[0], p[1]);
-
-		// transform the value into RGB using the contrast change (a,b)
-		unsigned char *dest = f->rgb + 3 * (j * f->w + i);
-		for (int l = 0; l < 3; l++)
-			dest[l] = float_to_byte(e->a * c[l] + e->b);
-	}
-	f->changed = 1;
+	if (b == FTR_BUTTON_UP && m & FTR_MASK_CONTROL) {
+		action_cycle_view(f, +1, x, y); return; }
+	if (b == FTR_BUTTON_DOWN && m & FTR_MASK_CONTROL) {
+		action_cycle_view(f, -1, x, y); return; }
+	if (b == FTR_BUTTON_DOWN)   action_increase_zoom(f, x, y);
+	if (b == FTR_BUTTON_UP  )   action_decrease_zoom(f, x, y);
 }
 
 // update offset variables by dragging
 static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 {
 	struct pan_state *e = f->userdata;
-	if (e->do_preview)
-	{
-		e->preview_position_x = x;
-		e->preview_position_y = y;
-		return;
-	}
-
 	static double ox = 0, oy = 0;
-
-	if (m == FTR_BUTTON_LEFT)   action_offset_viewport(f, x - ox, y - oy);
-	if (m == FTR_BUTTON_MIDDLE) action_print_value_under_cursor(f, x, y);
-	if (m == FTR_MASK_SHIFT)    action_center_contrast_at_point(f, x, y);
-	if (m == FTR_MASK_CONTROL)  action_base_contrast_at_point(f, x, y);
-
+	if (m == FTR_BUTTON_LEFT) action_offset_viewport(f, x - ox, y - oy);
 	ox = x;
 	oy = y;
 }
 
-static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
-{
-	struct pan_state *e = f->userdata;
-	if (e->do_preview && b == FTR_BUTTON_LEFT) {
-		action_exit_preview(f, x, y); return; }
-
-	//fprintf(stderr, "button b=%d m=%d\n", b, m);
-	if (b == FTR_BUTTON_UP && (m==FTR_MASK_SHIFT || m==FTR_MASK_CONTROL)) {
-		action_contrast_span(f, 1/1.3); return; }
-	if (b == FTR_BUTTON_DOWN && ((m==FTR_MASK_SHIFT)||m==FTR_MASK_CONTROL)){
-		action_contrast_span(f, 1.3); return; }
-	//if (b == FTR_BUTTON_RIGHT && m == FTR_MASK_CONTROL) {
-	//	action_reset_zoom_only(f, x, y); return; }
-	if (b == FTR_BUTTON_MIDDLE) action_print_value_under_cursor(f, x, y);
-	if (b == FTR_BUTTON_DOWN)   action_increase_octave(f, x, y);
-	if (b == FTR_BUTTON_UP  )   action_decrease_octave(f, x, y);
-	if (b == FTR_BUTTON_RIGHT)  action_reset_zoom_and_position(f);
-}
-
-void key_handler_print(struct FTR *f, int k, int m, int x, int y)
-{
-	fprintf(stderr, "key pressed %d '%c' (%d) at %d %d\n",
-			k, isalpha(k)?k:' ', m, x, y);
-}
-
+// keyboard handler
 void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
-	fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
-			k, isalpha(k)?k:' ', m, x, y);
-
-	if (k == 'i') action_toggle_infrared(f);
-	if (k == '+') action_decrease_octave(f, f->w/2, f->h/2);
-	if (k == '-') action_increase_octave(f, f->w/2, f->h/2);
-	if (k == '1') action_change_zoom_to_factor(f, x, y, 1);
-
+	if (k == '+' || k == '=') action_increase_zoom(f, f->w/2, f->h/2);
+	if (k == '-') action_decrease_zoom(f, f->w/2, f->h/2);
+	
 	if (k == 'j') action_offset_rgbi(f, 0, -1);
 	if (k == 'k') action_offset_rgbi(f, 0, 1);
 	if (k == 'h') action_offset_rgbi(f, 1, 0);
 	if (k == 'l') action_offset_rgbi(f, -1, 0);
 
-	//if (k == 'p') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1.1);
-	//if (k == 'm') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1/1.1);
-	//if (k == 'P') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1.006);
-	//if (k == 'M') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1/1.006);
+	if (k == 'a') action_multiply_contrast(f, 1.3);
+	if (k == 's') action_multiply_contrast(f, 1/1.3);
+	if (k == 'u' && m & FTR_MASK_SHIFT){action_offset_base_h(f, +1);return;}
+	if (k == 'd' && m & FTR_MASK_SHIFT){action_offset_base_h(f, -1);return;}
+	if (k == 'u') {action_offset_base_h(f, +10);return;}
+	if (k == 'd') {action_offset_base_h(f, -10);return;}
 
-	//if (k == 'a') action_contrast_change(f, 1.3, 0);
-	//if (k == 'A') action_contrast_change(f, 1/1.3, 0);
-	//if (k == 'b') action_contrast_change(f, 1, 1);
-	//if (k == 'B') action_contrast_change(f, 1, -1);
-	if (k == 'n') action_qauto(f);
+	if (k == 'e') action_toggle_exact_rpc(f);
+	if (k == 'i') action_toggle_image_space(f, f->w/2, f->h/2);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
 		ftr_notify_the_desire_to_stop_this_loop(f, 1);
 
+	// image flip operations
+	if (k == ' ') action_cycle_view(f, 1, x, y);
+	if (k == '\b') action_cycle_view(f, -1, x, y);
+	if (k == '\'') action_toggle_diff_mode(f);
+	if (k == 'r') action_cycle_rotation_status(f);
+	if (k == 'c') action_cycle_contrast(f);
+
 	// arrows move the viewport
 	if (k > 1000) {
 		int d[2] = {0, 0};
-		int inc = -10;
+		int inc = -BAD_MIN(f->w,f->h)/20;
 		if (m & FTR_MASK_SHIFT  ) inc /= 10;
-		if (m & FTR_MASK_CONTROL) inc *= 10;
+		if (m & FTR_MASK_CONTROL) inc *= 6;
 		switch (k) {
 		case FTR_KEY_LEFT : d[0] -= inc; break;
 		case FTR_KEY_RIGHT: d[0] += inc; break;
@@ -877,100 +1168,148 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 		}
 		if (k == FTR_KEY_PAGE_UP)   d[1] = +f->h/3;
 		if (k == FTR_KEY_PAGE_DOWN) d[1] = -f->h/3;
-		action_offset_viewport(f, d[0], d[1]);
+		if (d[0] && d[1])
+			action_offset_viewport(f, d[0], d[1]);
 	}
+
+	if (m & FTR_MASK_SHIFT) return;
+	if (k=='1' ||k=='2' ||k=='3')
+		action_select_interpolator(f, k-'0');
 }
 
-// image file input/output (wrapper around iio) {{{1
-#include <stdint.h>
-#include "iio.h"
-static unsigned char *read_image_uint8_rgb(char *fname, int *w, int *h)
+// resize handler
+static void pan_resize(struct FTR *f, int k, int m, int x, int y)
 {
-	int pd;
-	unsigned char *x = iio_read_image_uint8_vec(fname, w, h, &pd);
-	if (pd == 3) return x;
-	unsigned char *y = malloc(3**w**h);
-	for (int i = 0; i < *w**h; i++) {
-		switch(pd) {
-		case 1:
-			y[3*i+0] = y[3*i+1] = y[3*i+2] = x[i];
-			break;
-		case 2:
-			y[3*i+0] = x[2*i+0];
-			y[3*i+1] = y[3*i+2] = x[2*i+1];
-			break;
-		default:
-			assert(pd > 3);
-			for (int l = 0; l < 3; l++)
-				y[3*i+l] = x[pd*i+l];
-			break;
+	request_repaints(f);
+}
+
+// non-interactive control of the model
+static int pan_non_interactive(struct pan_state *e, char *command_string)
+{
+	fprintf(stderr, "non-interactive rpcflip \"%s\"\n", command_string);
+
+	// fill-in default options
+	int x = e->view->w/2;
+	int y = e->view->h/2;
+	int w = 512;
+	int h = 512;
+	int base_h = 250;
+	int interpord = 0;
+	int qauto = 0;
+	float zoom = 1;
+	char outdir[FILENAME_MAX] = "/tmp/";
+	char outnam[FILENAME_MAX] = "rpcflipo";
+
+	// replace default options with the specified ones, if any
+	char *delim = " \n\t,;", *tok = strtok(command_string, delim);
+	do {
+		fprintf(stderr, "\tmot = \"%s\"\n", tok);
+		// change the fields that are recognized
+		if (*tok == 'w') w = atoi(tok+1);
+		if (*tok == 'h') h = atoi(tok+1);
+		if (*tok == 'x') x = atoi(tok+1);
+		if (*tok == 'y') y = atoi(tok+1);
+		if (*tok == 'b') base_h = atoi(tok+1);
+		if (*tok == 'i') interpord = atoi(tok+1);
+		if (*tok == 'z') zoom = atof(tok+1);
+		if (*tok == 'd') strncpy(outdir, tok+1, FILENAME_MAX);
+		if (*tok == 'o') strncpy(outnam, tok+1, FILENAME_MAX);
+		if (*tok == 'c') qauto = atoi(tok+1);
+		if (*tok == 'p') {
+			struct pan_view *v = e->view;
+			if (!v->preview)v->preview = load_nice_preview(v->pfg,
+							v->pfc, &v->pw, &v->ph);
+			x = (atoi(tok+1) * e->view->w) / e->view->pw;
 		}
+		if (*tok == 'q') {
+			struct pan_view *v = e->view;
+			if (!v->preview) v->preview = load_nice_preview(v->pfg,
+							v->pfc, &v->pw, &v->ph);
+			y = (atoi(tok+1) * e->view->h) / e->view->ph;
+		}
+	} while ( (tok =strtok(NULL, delim)) );
+
+	// dump output as requested
+	struct FTR f[1]; // fake FTR, because the actions (wrongly) require it
+	f->w = w; f->h = h; f->userdata = e;
+	e->image_space = 0; // (this will be difficult to change)
+	e->interpolation_order = interpord;
+	e->offset_x = x - e->image_space*w/(2*zoom);
+	e->offset_y = y - e->image_space*h/(2*zoom);
+	e->zoom_factor = zoom;
+	e->base_h = base_h;
+	e->qauto = qauto;
+//#pragma omp parallel for // does not work
+	for (int i = 0; i < e->nviews; i++)
+	{
+		pan_repaint(e, w, h);
+		struct pan_view *v = obtain_view(e);
+		char buf[FILENAME_MAX];
+		snprintf(buf, FILENAME_MAX, "%s/%s_%d.png", outdir, outnam, i);
+		iio_save_image_uint8_vec(buf, v->display, w, h, 3);
+		action_select_view(f, i+1, w/2, h/2);
 	}
-	free(x);
-	return y;
+
+	return 0;
 }
-
-static void add_preview(struct pan_state *e, char *filename)
-{
-	e->preview = read_image_uint8_rgb(filename, &e->pw, &e->ph);
-	e->w = e->pw;
-	e->h = e->ph;
-	e->do_preview = true;
-	e->preview_position_x = 0;
-	e->preview_position_y = 0;
-}
-
-
-#define BAD_MIN(a,b) a<b?a:b
 
 int main_pan(int c, char *v[])
 {
 	TIFFSetWarningHandler(NULL);//suppress warnings
 
 	// process input arguments
-	char *filename_preview = pick_option(&c, &v, "p", "");
-	if (c != 3) {
-		fprintf(stderr, "usage:\n\t%s rgbi gray\n", *v);
-		//                          0 1    2
-		return 1;
+	char *command_string = pick_option(&c, &v, "c", "");
+	if (c < 5 || (c - 1) % 5 != 0) {
+		fprintf(stderr, "usage:\n\t"
+				"%s [P.TIF P.JPG P.RPC MS.TIF MS.JPG]+\n", *v);
+		//                0  1     2     3     4      5
+		return c;
 	}
-	char *filename_rgbi = v[1];
-	char *filename_gray = v[2];
+	int n = BAD_MIN((c - 1)/5,MAX_VIEWS);
+	fprintf(stderr, "we have %d views\n", n);
+	char *filename_gtif[n];
+	char *filename_gpre[n];
+	char *filename_grpc[n];
+	char *filename_ctif[n];
+	char *filename_cpre[n];
+	for (int i = 0; i < n; i++)
+	{
+		filename_gtif[i] = v[5*i+1];
+		filename_gpre[i] = v[5*i+2];
+		filename_grpc[i] = v[5*i+3];
+		filename_ctif[i] = v[5*i+4];
+		filename_cpre[i] = v[5*i+5];
+		fprintf(stderr, "view %d\n", i);
+		fprintf(stderr, "\tgtif %s\n", filename_gtif[i]);
+		fprintf(stderr, "\tgpre %s\n", filename_gpre[i]);
+		fprintf(stderr, "\tgrpc %s\n", filename_grpc[i]);
+		fprintf(stderr, "\tctif %s\n", filename_ctif[i]);
+		fprintf(stderr, "\tcpre %s\n", filename_cpre[i]);
+	}
 
-	// read image
+	// start state
 	struct pan_state e[1];
-	int megabytes = 300;
-	tiff_octaves_init(e->tg, filename_gray, megabytes);
-	tiff_octaves_init(e->tc, filename_rgbi, megabytes);
-	if (e->tg->i->spp != 1)
-		fail("file \"%s\" should be panchro (got %d)\n",
-				filename_gray, e->tg->i->spp);
-	if (e->tc->i->spp != 4)
-		fail("file \"%s\" should be rgbi (got %d)\n",
-				filename_rgbi, e->tc->i->spp);
-	e->w = 800;
-	e->h = 600;
-	//e->infrared = 4 == e->t->i->spp;
-	e->rgbiox = e->rgbioy = 4;
-	e->infrared = true;
-	e->preview = NULL;
-	e->do_preview = false;
-	e->a = 0.3;
-	e->b = -20;
-	if (*filename_preview) add_preview(e, filename_preview);
+	init_state(e,
+			filename_gtif,
+			filename_gpre,
+			filename_grpc,
+			filename_ctif,
+			filename_cpre,
+			n);
+
+	// if non-interactive, run the requested command string and exit
+	if (*command_string)
+		return pan_non_interactive(e, command_string);
 
 	// open window
-	struct FTR f;
-	if (e->preview)
-		f = ftr_new_window(e->pw, e->ph);
-	else
-		f = ftr_new_window(BAD_MIN(e->w,1200), BAD_MIN(e->h,800));
+	struct FTR f = ftr_new_window(320, 320);
 	f.userdata = e;
-	action_reset_zoom_and_position(&f);
+	f.changed = 1;
 	ftr_set_handler(&f, "key"   , pan_key_handler);
 	ftr_set_handler(&f, "button", pan_button_handler);
 	ftr_set_handler(&f, "motion", pan_motion_handler);
 	ftr_set_handler(&f, "expose", pan_exposer);
+	ftr_set_handler(&f, "resize", pan_resize);
 	int r = ftr_loop_run(&f);
 
 	// cleanup and exit (optional)

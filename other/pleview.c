@@ -91,6 +91,11 @@ static int insideP(int w, int h, int x, int y)
 	return x >= 0 && y >= 0 && x < w && y < h;
 }
 
+static float getgreen(float c[4])
+{
+	return c[1] * 0.6 + c[3] * 0.2;
+}
+
 static void pixel_m1(float *out, struct pan_state *e, double p, double q)
 {
 	int fmt = e->tg->i->fmt;
@@ -110,7 +115,7 @@ static void pixel_m1(float *out, struct pan_state *e, double p, double q)
 	c[1] = from_sample_to_double(pix_rgbi + 1*ss, fmt, bps);
 	c[2] = from_sample_to_double(pix_rgbi + 2*ss, fmt, bps);
 	c[3] = from_sample_to_double(pix_rgbi + 3*ss, fmt, bps);
-	c[1] = c[1] * 0.9 + c[3] * 0.1;
+	c[1] = getgreen(c);
 	double g = from_sample_to_double(pix_gray, fmt, bps);
 	//double nc = (c[0] + c[1] + c[2]) / 3;
 	double nc = hypot(c[0], hypot(c[1], c[2]));
@@ -139,7 +144,7 @@ static void pixel_m1p(float *out, struct pan_state *e, double p, double q)
 	c[1] = from_sample_to_double(pix_rgbi + 1*ss, fmt, bps);
 	c[2] = from_sample_to_double(pix_rgbi + 2*ss, fmt, bps);
 	c[3] = from_sample_to_double(pix_rgbi + 3*ss, fmt, bps);
-	c[1] = c[1] * 0.9 + c[3] * 0.1;
+	c[1] = getgreen(c);
 	//double g = from_sample_to_double(pix_gray, fmt, bps);
 	double g;
 	if (pix_gray)
@@ -170,7 +175,7 @@ static void pixel_m2(float *out, struct pan_state *e, double p, double q)
 	c[2] = from_sample_to_double(pix_rgbi + 2*ss, fmt, bps);
 	c[3] = from_sample_to_double(pix_rgbi + 3*ss, fmt, bps);
 	double g = (c[0] + c[1] + c[2] + c[3])/4;
-	c[1] = c[1] * 0.9 + c[3] * 0.1;
+	c[1] = getgreen(c);
 	double nc = hypot(c[0], hypot(c[1], c[2]));
 	out[0] = c[0] * g / nc;
 	out[1] = c[1] * g / nc;
@@ -204,11 +209,12 @@ static void pixel_m2p(float *out, struct pan_state *e, double p, double q)
 	else
 		g = (c[0] + c[1] + c[2] + c[3]) / 4;
 
-	c[1] = c[1] * 0.9 + c[3] * 0.1;
+	c[1] = getgreen(c);
 	double nc = hypot(c[0], hypot(c[1], c[2]));
 	out[0] = c[0] * g / nc;
 	out[1] = c[1] * g / nc;
 	out[2] = c[2] * g / nc;
+
 }
 
 static void pixel_m3(float *out, struct pan_state *e, double p, double q)
@@ -229,7 +235,7 @@ static void pixel_m3(float *out, struct pan_state *e, double p, double q)
 	c[2] = from_sample_to_double(pix_rgbi + 2*ss, fmt, bps);
 	c[3] = from_sample_to_double(pix_rgbi + 3*ss, fmt, bps);
 	double g = (c[0] + c[1] + c[2] + c[3])/4;
-	c[1] = c[1] * 0.9 + c[3] * 0.1;
+	c[1] = getgreen(c);
 	double nc = hypot(c[0], hypot(c[1], c[2]));
 	out[0] = c[0] * g / nc;
 	out[1] = c[1] * g / nc;
@@ -253,7 +259,7 @@ static void pixel_m4(float *out, struct pan_state *e, double p, double q)
 	c[2] = from_sample_to_double(pix_rgbi + 2*ss, fmt, bps);
 	c[3] = from_sample_to_double(pix_rgbi + 3*ss, fmt, bps);
 	double g = (c[0] + c[1] + c[2] + c[3])/4;
-	c[1] = c[1] * 0.9 + c[3] * 0.1;
+	c[1] = getgreen(c);
 	double nc = hypot(c[0], hypot(c[1], c[2]));
 	out[0] = c[0] * g / nc;
 	out[1] = c[1] * g / nc;
@@ -742,12 +748,13 @@ void foveate_caches(struct FTR *f)
 }
 
 // dump the image acording to the state of the viewport
+// (this is the central function of the program)
 static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
 	struct pan_state *e = f->userdata;
 
+	// hacks
 	if (e->do_preview) {dump_preview(f); return;}
-
 	foveate_caches(f);
 
 	// for every pixel in the window

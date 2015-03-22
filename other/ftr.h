@@ -11,7 +11,7 @@ struct FTR {
 	void *userdata; // ignored by the library
 
 	// hidden implementation details
-	char pad[100];
+	char pad[200];
 };
 
 // type of a handler function
