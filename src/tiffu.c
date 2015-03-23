@@ -1759,7 +1759,9 @@ void *tiff_octaves_gettile(struct tiff_octaves *t, int o, int i, int j)
 	if (tidx < 0) return NULL;
 
 	// if tile does not exist, read it from file
-	if (!t->c[o][tidx]) {
+	if (!t->c[o][tidx])
+//#pragma omp critical
+	{
 		if (t->a[0] && t->curtiles == t->maxtiles)
 			free_oldest_tile_octave(t);
 
@@ -2400,8 +2402,8 @@ void my_tifferror(const char *module, const char *fmt, va_list ap)
 #ifndef TIFFU_OMIT_MAIN
 int main(int c, char *v[])
 {
-	//TIFFSetWarningHandler(NULL);//suppress warnings
-	//TIFFSetErrorHandler(my_tifferror);
+	TIFFSetWarningHandler(NULL);//suppress warnings
+	TIFFSetErrorHandler(my_tifferror);
 
 	if (c < 2) {
 	err:	fprintf(stderr, "usage:\n\t%s {info|ntiles|tget|...}\n", *v);
