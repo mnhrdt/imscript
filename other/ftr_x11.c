@@ -217,7 +217,7 @@ static void process_next_event(struct FTR *ff)
 	XEvent event = { .type = GenericEvent } ;
 	if (!f->changed)
 		XNextEvent(f->display, &event);
-	//fprintf(stderr,"ev %d\t\"%s\"\n",event.type,event_names[event.type]);
+	//fprintf(stderr,"ev(%p,%p) %d\t\"%s\"\n",(void*)f->display,(void*)f->window,event.type,event_names[event.type]);
 
 	if (event.type == Expose || f->changed) {
 		if (f->handle_expose)
