@@ -38,8 +38,9 @@
 #define M_PI 3.14159265358979323846
 #endif
 #define EARTH_RADIUS 6378000.0
+#define WHEEL_FACTOR 2.0
 //#define WHEEL_FACTOR 1.259921049894873164767210607
-#define WHEEL_FACTOR 1.189207115002721066717499971
+//#define WHEEL_FACTOR 1.189207115002721066717499971
 #define BAD_MIN(a,b) ((a)<(b)?(a):(b))
 
 // data for a single view
@@ -776,7 +777,10 @@ static void inplace_rgb_span(float *x, int w, int h, double a)
 			min[0], min[1], min[2], max[0], max[1], max[2]);
 	for (int i = 0; i < n; i++)
 	for (int l = 0; l < 3; l++)
-		x[3*i+l] =255.0 * ( x[3*i+l] - min[l] ) / ( max[l] - min[l] );
+	{
+		float xx = ( x[3*i+l] - min[l] ) / ( max[l] - min[l] );
+		x[3*i+l] = 255.0 * pow( xx, a );
+	}
 }
 
 static void inplace_rgb_span2(float *x, int w, int h, double a)
@@ -798,6 +802,7 @@ static void inplace_rgb_span2(float *x, int w, int h, double a)
 	fprintf(stderr, "span2 avg = %g %g %g | dev = %g %g %g\n",
 				avg[0], avg[1], avg[2],
 				sqrt(var[0]), sqrt(var[1]), sqrt(var[2]));
+	if (isfinite(*avg) && isfinite(*var))
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 	for (int l = 0; l < 3; l++)
@@ -875,8 +880,8 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 			e->current_view = va;
 		}
 	}
-	if (e->qauto == 1) inplace_rgb_span(v->fdisplay, v->dw, v->dh, 60*e->a);
-	if (e->qauto == 2)inplace_rgb_span2(v->fdisplay, v->dw, v->dh, 60*e->a);
+	if (e->qauto == 1) inplace_rgb_span(v->fdisplay, v->dw, v->dh, e->a);
+	if (e->qauto == 2)inplace_rgb_span2(v->fdisplay, v->dw, v->dh, 40*e->a);
 	for (int i = 0; i < v->dw * v->dh * 3; i++)
 		v->display[i] = float_to_uint8(v->fdisplay[i]);
 }
@@ -1168,7 +1173,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 		}
 		if (k == FTR_KEY_PAGE_UP)   d[1] = +f->h/3;
 		if (k == FTR_KEY_PAGE_DOWN) d[1] = -f->h/3;
-		if (d[0] && d[1])
+		if (d[0] || d[1])
 			action_offset_viewport(f, d[0], d[1]);
 	}
 
@@ -1232,7 +1237,8 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 	// dump output as requested
 	struct FTR f[1]; // fake FTR, because the actions (wrongly) require it
 	f->w = w; f->h = h; f->userdata = e;
-	e->image_space = 0; // (this will be difficult to change)
+	e->image_space = 1; // (this will be difficult to change)
+	e->image_rotation_status = 0;
 	e->interpolation_order = interpord;
 	e->offset_x = x - e->image_space*w/(2*zoom);
 	e->offset_y = y - e->image_space*h/(2*zoom);
@@ -1303,6 +1309,7 @@ int main_pan(int c, char *v[])
 
 	// open window
 	struct FTR f = ftr_new_window(320, 320);
+	//struct FTR f = ftr_new_window(800, 600);
 	f.userdata = e;
 	f.changed = 1;
 	ftr_set_handler(&f, "key"   , pan_key_handler);
