@@ -35,10 +35,6 @@
 
 #include <tiffio.h>
 
-#include "fail.c"
-#include "xmalloc.c"
-#include "pickopt.c"
-
 
 // structs {{{1
 
@@ -72,6 +68,72 @@ struct tiff_info {
 
 // general utility functions {{{1
 
+
+// exit the program printing an error message
+#ifndef _FAIL_C
+#define _FAIL_C
+static void fail(const char *fmt, ...)
+{
+	va_list argp;
+	fprintf(stderr, "\nERROR: ");
+	va_start(argp, fmt);
+	vfprintf(stderr, fmt, argp);
+	va_end(argp);
+	fprintf(stderr, "\n\n");
+	fflush(NULL);
+#  ifdef NDEBUG
+	exit(-1);
+#  else//NDEBUG
+	exit(*(int *)0x43);
+#  endif//NDEBUG
+}
+#endif//_FAIL_C
+
+
+// like malloc, but always returns a valid pointer
+#ifndef _XMALLOC_C
+#define _XMALLOC_C
+static void *xmalloc(size_t size)
+{
+	if (size == 0)
+		fail("xmalloc: zero size");
+	void *p = malloc(size);
+	if (!p)
+	{
+		double sm = size / (0x100000 * 1.0);
+		fail("xmalloc: out of memory when requesting "
+			"%zu bytes (%gMB)",//:\"%s\"",
+			size, sm);//, strerror(errno));
+	}
+	return p;
+}
+#endif//_XMALLOC_C
+
+// function to pick a unix-style option from the command line arguments
+//
+// @c pointer to original argc
+// @v pointer to original argv
+// @o option name (after hyphen)
+// @d default value
+static char *pick_option(int *c, char ***v, char *o, char *d)
+{
+	int argc = *c;
+	char **argv = *v;
+	int id = d ? 1 : 0;
+	for (int i = 0; i < argc - id; i++)
+		if (argv[i][0] == '-' && 0 == strcmp(argv[i]+1, o))
+		{
+			char *r = argv[i+id]+1-id;
+			*c -= id+1;
+			for (int j = i; j < argc - id; j++)
+				(*v)[j] = (*v)[j+id+1];
+			return r;
+		}
+	return d;
+}
+
+// open a TIFF file, with some magic to access subimages
+// (i.e., filename "file.tif,3" refers to the third sub-image)
 static TIFF *tiffopen_fancy(char *filename, char *mode)
 {
 	//fprintf(stderr, "tiffopen fancy \"%s\",\"%s\"\n", filename, mode);
@@ -2406,7 +2468,8 @@ int main(int c, char *v[])
 	TIFFSetErrorHandler(my_tifferror);
 
 	if (c < 2) {
-	err:	fprintf(stderr, "usage:\n\t%s {info|ntiles|tget|...}\n", *v);
+	err:	fprintf(stderr, "usage:\n\t"
+			"%s {info|imprintf|ntiles|tget|crop|...}\n", *v);
 		return 1;
 	}
 
