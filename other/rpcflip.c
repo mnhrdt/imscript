@@ -20,13 +20,16 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#ifndef TIFFU_C_INCLUDED
 #define TIFFU_OMIT_MAIN
 #include "tiffu.c"
+#endif//TIFFU_C_INCLUDED
+#include "srtm4o.c"
 
 #define DONT_USE_TEST_MAIN
 #include "rpc.c"
 
-double srtm4(double,double);
+//double srtm4o(double,double,int);
 double egm96(double,double);
 
 #ifndef FTR_BACKEND
@@ -93,7 +96,7 @@ struct pan_state {
 	int interpolation_order;
 	int image_rotation_status;
 	int qauto;
-	int show_srtm4;
+	int show_srtm4, so;
 	int srtm4_base;
 };
 
@@ -220,6 +223,7 @@ static void init_state(struct pan_state *e,
 	e->image_rotation_status = 0;
 	e->qauto = 0;
 	e->show_srtm4 = 0;
+	e->so = 0;
 	e->srtm4_base = 0;
 	msoctaves_instead_of_preview = e->view->tc->noctaves > 3;
 }
@@ -357,15 +361,12 @@ void window_to_image_apm(double out[2], struct pan_state *e, double i, double j)
 	double xyh[3];
 	window_to_raster(xyh, e, i, j);
 	double hhh = e->base_h;
-	if (e->srtm4_base) {
-		double ll[2];
-		raster_to_geo(ll, e, xyh[0], xyh[1]);
-		//double srtm4_wrt_ellipsoid(double,double);
-		//hhh = srtm4_wrt_ellipsoid(ll[0], ll[1]);
-		hhh = srtm4(ll[0], ll[1]) + egm96(ll[0], ll[1]);
-		hhh = fmax(hhh, 0);
-		hhh += e->base_h;
-	}
+	//if (e->srtm4_base) {
+	//	double ll[2];
+	//	raster_to_geo(ll, e, xyh[0], xyh[1]);
+	//	hhh = srtm4(ll[0], ll[1]) + egm96(ll[0], ll[1]);
+	//	hhh += e->base_h;
+	//}
 	xyh[2] = hhh;
 
 	struct pan_view *v = obtain_view(e);
@@ -423,10 +424,6 @@ static void vertical_direction(double vertical[2],
 	eval_rpci(p_top, v->r, lonlat[0], lonlat[1], h + eps_H);
 	vertical[0] = ( p_top[0] - p_bot[0] ) / eps_H;
 	vertical[1] = ( p_top[1] - p_bot[1] ) / eps_H;
-
-	//double srtm4(double,double);
-	//double hhh = srtm4(lonlat[0], lonlat[1]);
-	//fprintf(stderr, "srtm4(%g %g) = %g\n", lonlat[0], lonlat[1], hhh);
 }
 
 // from the image raster to the image coordinates
@@ -863,6 +860,15 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 	if (!v->repaint) return; // if no repaint requested, return
 	v->repaint = 0;
 
+	double dh = 0;
+	if (e->srtm4_base) {
+		abort();
+		double xy[2], ll[2];
+		window_to_raster(xy, e, w/2, h/2);
+		raster_to_geo(ll, e, xy[0], xy[1]);
+		dh = srtm4o(ll[0], ll[1], 0) + egm96(ll[0], ll[1]);
+		e->base_h = dh;
+	}
 	update_local_projection(e, w/2, h/2, e->base_h);
 
 	static void (*win_to_img)(double p[2],struct pan_state*,double,double);
@@ -878,11 +884,17 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 	for (int i = 0; i < w; i++)
 	{
 		if (!e->image_space && e->show_srtm4) {
-			double xy[2], ll[2];
+			double xy[3], ll[3];
 			window_to_raster(xy, e, i, j);
 			raster_to_geo(ll, e, xy[0], xy[1]);
-			double hhh = srtm4(ll[0], ll[1]) + egm96(ll[0], ll[1]);
-			//double hhh = egm96(ll[0], ll[1]);
+			int so = -6 + lrint(-log2(e->zoom_factor));
+			if (so < 0) so = 0;
+			if (!i && !j)
+			{
+				fprintf(stderr, "z=%g, so=%d ofac=%d\n", e->zoom_factor, so, 1 << so);
+				so = -so;
+			}
+			double hhh = srtm4o(ll[0], ll[1], so);// + egm96(ll[0], ll[1]);
 			float *cc = v->fdisplay + 3 * (j * v->dw + i);
 			for (int l = 0; l < 3; l++)
 				cc[l] = e->a * hhh + e->b;
@@ -1013,6 +1025,14 @@ static void action_toggle_srtm4(struct FTR *f)
 	request_repaints(f);
 }
 
+static void action_shift_so(struct FTR *f, int dso)
+{
+	struct pan_state *e = f->userdata;
+	e->so += dso;
+	request_repaints(f);
+}
+
+
 static void action_toggle_srtm4_base(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
@@ -1020,7 +1040,7 @@ static void action_toggle_srtm4_base(struct FTR *f)
 	if (e->srtm4_base)
 		fprintf(stderr, "use SRTM4 base_h\n");
 	else
-		fprintf(stderr, "use fixed base_h (%g)\n", e->base_h);
+		fprintf(stderr, "use base_h = %g\n", e->base_h);
 	request_repaints(f);
 }
 
@@ -1198,6 +1218,8 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'z') action_toggle_srtm4(f);
 	if (k == 'v') action_toggle_srtm4_base(f);
 	if (k == 'i') action_toggle_image_space(f, f->w/2, f->h/2);
+	if (k == '6') action_shift_so(f, -1);
+	if (k == '7') action_shift_so(f, +1);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')

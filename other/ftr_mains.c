@@ -1411,6 +1411,9 @@ static void print_event_resize(struct FTR *f, int b, int m, int x, int y)
 int main_events(int c, char *v[])
 {
 	struct FTR f = ftr_new_window(320, 200);
+	for (int i = 0; i < 3 * f.w * f.h; i++)
+		f.rgb[i] = 0xa0*!(i%3);
+	f.changed = 1;
 	fprintf(stderr, "i'm here!\n");
 	ftr_set_handler(&f, "key", print_event_key);
 	ftr_set_handler(&f, "button", print_event_button);

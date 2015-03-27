@@ -7,7 +7,7 @@
 #include "iio.h"
 
 // location of data file
-#define EGM96_025_TIF "egm96_025.tiff"
+#define EGM96_025_TIF "/home/coco/.srtm4/egm96_025.tiff"
 
 
 // data loaded in RAM
@@ -91,10 +91,6 @@ double egm96(double longitude, double latitude)
 	float fi = 4 * longitude;
 	float fj = 4 * (90 - latitude);
 	return bilinear_interpolation_at(global_egm96_025_data, w, h, fi, fj);
-
-	//int i = lrint(fi);
-	//int j = lrint(fj);
-	//return getpixel_per(global_egm96_025_data, w, h, i, j);
 }
 
 #ifdef MAIN_EGM96
