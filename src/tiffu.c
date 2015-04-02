@@ -1704,12 +1704,12 @@ void tiff_octaves_init(struct tiff_octaves *t, char *filepattern, int megabytes)
 	{
 		//int oo = o + FIRST_OCTAVE();
 		snprintf(t->filename[o], FILENAME_MAX, filepattern, o);
-		fprintf(stderr, "f[%d]=%s\n", o, t->filename[o]);
+		//fprintf(stderr, "f[%d]=%s\n", o, t->filename[o]);
 		if (!get_tiff_info_filename_e(t->i + o, t->filename[o]))
 			break;
 		if (t->i[o].bps < 8 || t->i[o].packed)
 			fail("caching of packed samples is not supported");
-		if (1) {
+		if (0) {
 			fprintf(stderr, "\tw = %d\n", (int)t->i[o].w);
 			fprintf(stderr, "\th = %d\n", (int)t->i[o].h);
 			fprintf(stderr, "\ttiled = %d\n", t->i[o].tiled);

@@ -21,7 +21,7 @@ static void apply_transform(double y[3], double A[12], double x[3])
 int main(int c, char *v[])
 {
 	if (c != 2 && c != 3 && c != 4) {
-		fprintf(stderr, "usage:\n\t%s \"a1 .. a8\" [in [out]]\n", *v);
+		fprintf(stderr, "usage:\n\t%s \"a1 .. a12\" [in [out]]\n", *v);
 		//                         0   1            2   3
 		return 1;
 	}
@@ -41,14 +41,22 @@ int main(int c, char *v[])
 
 	int n, nmax = 10000;
 	char buf[nmax];
+	int cx = 0, maxconvert = 0;
 	while (n = getlinen(buf, nmax, fi))
 	{
+		if (!maxconvert && buf==strstr(buf, "element vertex "))
+		{
+			int tt, rr = sscanf(buf, "element vertex %d", &tt);
+			if (rr == 1)
+				maxconvert = tt;
+		}
 		double x[3], y[3];
 		int d, r = sscanf(buf, "%lf %lf %lf %n", x, x+1, x+2, &d);
-		if (r == 3) {
+		if (r == 3 && cx < maxconvert) {
 			apply_transform(y, A, x);
 			fprintf(fo, "%lf %lf %lf ", y[0], y[1], y[2]);
 			fputs(buf + d, fo);
+			cx += 1;
 		} else
 			fputs(buf, fo);
 		fputc('\n', fo);
