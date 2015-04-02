@@ -42,13 +42,13 @@ int main(int c, char *v[])
 	char line[lmax];
 	while (n = getlinen(line, lmax, fi))
 	{
-		double xy[4], xyz[6];
-		int r = sscanf(line, "%lf %lf %lf %lf", xy, xy+1, xy+2, xy+3);
+		double m[4];
+		int r = sscanf(line, "%lf %lf %lf %lf", m, m + 1, m + 2, m + 3);
 		if (r != 4) continue;
-		int ia = lrint(xy[0]);
-		int ja = lrint(xy[1]);
-		int ib = lrint(xy[2]);
-		int jb = lrint(xy[3]);
+		int ia = lrint(m[0]);
+		int ja = lrint(m[1]);
+		int ib = lrint(m[2]);
+		int jb = lrint(m[3]);
 		if (!insideP(wa, ha, ia, ja)) continue;
 		if (!insideP(wb, hb, ib, jb)) continue;
 		double va = a[wa * ja + ia];
@@ -56,7 +56,7 @@ int main(int c, char *v[])
 		if (!isfinite(va)) continue;
 		if (!isfinite(vb)) continue;
 		fprintf(fo, "%lf %lf %lf %lf %lf %lf\n",
-				xy[0], xy[1], va, xy[2], xy[3], vb);
+				m[0], m[1], va, m[2], m[3], vb);
 	}
 
 	free(a);
