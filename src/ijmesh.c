@@ -76,7 +76,7 @@ int main(int c, char *v[])
 		uint8_t rgb[3];
 		for (int k = 0; k < pd; k++) rgb[k] = color[j][i][k];
 		for (int k = pd; k < 3; k++) rgb[k] = rgb[k-1];
-		double xyz[3] = {j, i, height[j][i]};
+		double xyz[3] = {i, j, height[j][i]};
 		printf("%.16lf %.16lf %.16lf %d %d %d\n",
 				xyz[0], xyz[1], xyz[2], rgb[0], rgb[1], rgb[2]);
 		cx += 1;
