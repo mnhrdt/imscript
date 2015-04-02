@@ -35,10 +35,6 @@
 
 #include <tiffio.h>
 
-#include "fail.c"
-#include "xmalloc.c"
-#include "pickopt.c"
-
 
 // structs {{{1
 
@@ -72,6 +68,72 @@ struct tiff_info {
 
 // general utility functions {{{1
 
+
+// exit the program printing an error message
+#ifndef _FAIL_C
+#define _FAIL_C
+static void fail(const char *fmt, ...)
+{
+	va_list argp;
+	fprintf(stderr, "\nERROR: ");
+	va_start(argp, fmt);
+	vfprintf(stderr, fmt, argp);
+	va_end(argp);
+	fprintf(stderr, "\n\n");
+	fflush(NULL);
+#  ifdef NDEBUG
+	exit(-1);
+#  else//NDEBUG
+	exit(*(int *)0x43);
+#  endif//NDEBUG
+}
+#endif//_FAIL_C
+
+
+// like malloc, but always returns a valid pointer
+#ifndef _XMALLOC_C
+#define _XMALLOC_C
+static void *xmalloc(size_t size)
+{
+	if (size == 0)
+		fail("xmalloc: zero size");
+	void *p = malloc(size);
+	if (!p)
+	{
+		double sm = size / (0x100000 * 1.0);
+		fail("xmalloc: out of memory when requesting "
+			"%zu bytes (%gMB)",//:\"%s\"",
+			size, sm);//, strerror(errno));
+	}
+	return p;
+}
+#endif//_XMALLOC_C
+
+// function to pick a unix-style option from the command line arguments
+//
+// @c pointer to original argc
+// @v pointer to original argv
+// @o option name (after hyphen)
+// @d default value
+static char *pick_option(int *c, char ***v, char *o, char *d)
+{
+	int argc = *c;
+	char **argv = *v;
+	int id = d ? 1 : 0;
+	for (int i = 0; i < argc - id; i++)
+		if (argv[i][0] == '-' && 0 == strcmp(argv[i]+1, o))
+		{
+			char *r = argv[i+id]+1-id;
+			*c -= id+1;
+			for (int j = i; j < argc - id; j++)
+				(*v)[j] = (*v)[j+id+1];
+			return r;
+		}
+	return d;
+}
+
+// open a TIFF file, with some magic to access subimages
+// (i.e., filename "file.tif,3" refers to the third sub-image)
 static TIFF *tiffopen_fancy(char *filename, char *mode)
 {
 	//fprintf(stderr, "tiffopen fancy \"%s\",\"%s\"\n", filename, mode);
@@ -169,6 +231,11 @@ static void get_tiff_info(struct tiff_info *t, TIFF *tif)
 		t->td = how_many(t->h, t->th);
 		t->ntiles = TIFFNumberOfTiles(tif);
 		assert(t->ta * t->td == t->ntiles);
+	} else {
+		t->ta = t->td = 1;
+		t->tw = t->w;
+		t->th = t->h;
+		t->ntiles = 1;
 	}
 }
 
@@ -1634,7 +1701,7 @@ struct tiff_octaves {
 
 void tiff_octaves_init(struct tiff_octaves *t, char *filepattern, int megabytes)
 {
-	//fprintf(stderr, "tiff octaves init\n");
+	fprintf(stderr, "tiff octaves init \"%s\"(%dMB)\n", filepattern, megabytes);
 	// create filenames until possible
 	t->noctaves = 0;
 	for (int o = 0; o < MAX_OCTAVES; o++)
@@ -1646,6 +1713,13 @@ void tiff_octaves_init(struct tiff_octaves *t, char *filepattern, int megabytes)
 			break;
 		if (t->i[o].bps < 8 || t->i[o].packed)
 			fail("caching of packed samples is not supported");
+		if (0) {
+			fprintf(stderr, "\tw = %d\n", (int)t->i[o].w);
+			fprintf(stderr, "\th = %d\n", (int)t->i[o].h);
+			fprintf(stderr, "\ttiled = %d\n", t->i[o].tiled);
+			fprintf(stderr, "\ttw = %d\n", (int)t->i[o].tw);
+			fprintf(stderr, "\tth = %d\n", (int)t->i[o].th);
+		}
 		if (o > 0) { // check consistency
 			if (0 == strcmp(t->filename[o], t->filename[0])) break;
 			if (t->i[o].bps != t->i->bps) fail("inconsistent bps");
@@ -1663,7 +1737,7 @@ void tiff_octaves_init(struct tiff_octaves *t, char *filepattern, int megabytes)
 	// set up essential data
 	for (int o = 0; o < t->noctaves; o++)
 	{
-		t->c[o] = xmalloc(t->i[o].ntiles * sizeof*t->c);
+		t->c[o] = xmalloc((1 + t->i[o].ntiles) * sizeof*t->c);
 		for (int j = 0; j < t->i[o].ntiles; j++)
 			t->c[o][j] = 0;
 	}
@@ -1763,7 +1837,9 @@ void *tiff_octaves_gettile(struct tiff_octaves *t, int o, int i, int j)
 	if (tidx < 0) return NULL;
 
 	// if tile does not exist, read it from file
-	if (!t->c[o][tidx]) {
+	if (!t->c[o][tidx])
+//#pragma omp critical
+	{
 		if (t->a[0] && t->curtiles == t->maxtiles)
 			free_oldest_tile_octave(t);
 
@@ -1782,6 +1858,7 @@ void *tiff_octaves_gettile(struct tiff_octaves *t, int o, int i, int j)
 
 void *tiff_octaves_getpixel(struct tiff_octaves *t, int o, int i, int j)
 {
+	//fprintf(stderr, "t_o_g(%d, %d, %d)\n", o, i, j);
 	void *tile = tiff_octaves_gettile(t, o, i, j);
 	if (!tile) return NULL;
 
@@ -2405,10 +2482,11 @@ void my_tifferror(const char *module, const char *fmt, va_list ap)
 int main(int c, char *v[])
 {
 	//TIFFSetWarningHandler(NULL);//suppress warnings
-	//TIFFSetErrorHandler(my_tifferror);
+	TIFFSetErrorHandler(my_tifferror);
 
 	if (c < 2) {
-	err:	fprintf(stderr, "usage:\n\t%s {info|ntiles|tget|...}\n", *v);
+	err:	fprintf(stderr, "usage:\n\t"
+			"%s {info|imprintf|ntiles|tget|crop|...}\n", *v);
 		return 1;
 	}
 
@@ -2433,4 +2511,5 @@ int main(int c, char *v[])
 	goto err;
 }
 #endif//TIFFU_OMIT_MAIN
+#define TIFFU_C_INCLUDED
 // vim:set foldmethod=marker:

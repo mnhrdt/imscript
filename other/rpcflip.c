@@ -20,11 +20,17 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#ifndef TIFFU_C_INCLUDED
 #define TIFFU_OMIT_MAIN
 #include "tiffu.c"
+#endif//TIFFU_C_INCLUDED
+#include "srtm4o.c"
 
 #define DONT_USE_TEST_MAIN
 #include "rpc.c"
+
+//double srtm4o(double,double,int);
+double egm96(double,double);
 
 #ifndef FTR_BACKEND
 #define FTR_BACKEND 'x'
@@ -38,8 +44,9 @@
 #define M_PI 3.14159265358979323846
 #endif
 #define EARTH_RADIUS 6378000.0
+#define WHEEL_FACTOR 2.0
 //#define WHEEL_FACTOR 1.259921049894873164767210607
-#define WHEEL_FACTOR 1.189207115002721066717499971
+//#define WHEEL_FACTOR 1.189207115002721066717499971
 #define BAD_MIN(a,b) ((a)<(b)?(a):(b))
 
 // data for a single view
@@ -89,6 +96,8 @@ struct pan_state {
 	int interpolation_order;
 	int image_rotation_status;
 	int qauto;
+	int show_srtm4, so;
+	int srtm4_base;
 };
 
 static int msoctaves_instead_of_preview;
@@ -213,6 +222,9 @@ static void init_state(struct pan_state *e,
 	e->interpolation_order = 0;
 	e->image_rotation_status = 0;
 	e->qauto = 0;
+	e->show_srtm4 = 0;
+	e->so = 0;
+	e->srtm4_base = 0;
 	msoctaves_instead_of_preview = e->view->tc->noctaves > 3;
 }
 
@@ -348,7 +360,14 @@ void window_to_image_apm(double out[2], struct pan_state *e, double i, double j)
 {
 	double xyh[3];
 	window_to_raster(xyh, e, i, j);
-	xyh[2] = e->base_h;
+	double hhh = e->base_h;
+	//if (e->srtm4_base) {
+	//	double ll[2];
+	//	raster_to_geo(ll, e, xyh[0], xyh[1]);
+	//	hhh = srtm4(ll[0], ll[1]) + egm96(ll[0], ll[1]);
+	//	hhh += e->base_h;
+	//}
+	xyh[2] = hhh;
 
 	struct pan_view *v = obtain_view(e);
 	double p[3];
@@ -397,6 +416,7 @@ static void vertical_direction(double vertical[2],
 	q = v->h / 2;
 	double lonlat[3];
 	eval_rpc(lonlat, v->r, p, q, h);
+
 
 	double eps_H = 100.0; // in meters
 	double p_bot[3], p_top[3];
@@ -776,7 +796,10 @@ static void inplace_rgb_span(float *x, int w, int h, double a)
 			min[0], min[1], min[2], max[0], max[1], max[2]);
 	for (int i = 0; i < n; i++)
 	for (int l = 0; l < 3; l++)
-		x[3*i+l] =255.0 * ( x[3*i+l] - min[l] ) / ( max[l] - min[l] );
+	{
+		float xx = ( x[3*i+l] - min[l] ) / ( max[l] - min[l] );
+		x[3*i+l] = 255.0 * pow( xx, a );
+	}
 }
 
 static void inplace_rgb_span2(float *x, int w, int h, double a)
@@ -798,6 +821,7 @@ static void inplace_rgb_span2(float *x, int w, int h, double a)
 	fprintf(stderr, "span2 avg = %g %g %g | dev = %g %g %g\n",
 				avg[0], avg[1], avg[2],
 				sqrt(var[0]), sqrt(var[1]), sqrt(var[2]));
+	if (isfinite(*avg) && isfinite(*var))
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 	for (int l = 0; l < 3; l++)
@@ -836,6 +860,15 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 	if (!v->repaint) return; // if no repaint requested, return
 	v->repaint = 0;
 
+	double dh = 0;
+	if (e->srtm4_base) {
+		abort();
+		double xy[2], ll[2];
+		window_to_raster(xy, e, w/2, h/2);
+		raster_to_geo(ll, e, xy[0], xy[1]);
+		dh = srtm4o(ll[0], ll[1], 0) + egm96(ll[0], ll[1]);
+		e->base_h = dh;
+	}
 	update_local_projection(e, w/2, h/2, e->base_h);
 
 	static void (*win_to_img)(double p[2],struct pan_state*,double,double);
@@ -850,7 +883,22 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 	{
-		if (!e->diff_mode) {
+		if (!e->image_space && e->show_srtm4) {
+			double xy[3], ll[3];
+			window_to_raster(xy, e, i, j);
+			raster_to_geo(ll, e, xy[0], xy[1]);
+			int so = -6 + lrint(-log2(e->zoom_factor));
+			if (so < 0) so = 0;
+			if (!i && !j)
+			{
+				fprintf(stderr, "z=%g, so=%d ofac=%d\n", e->zoom_factor, so, 1 << so);
+				so = -so;
+			}
+			double hhh = srtm4o(ll[0], ll[1], so);// + egm96(ll[0], ll[1]);
+			float *cc = v->fdisplay + 3 * (j * v->dw + i);
+			for (int l = 0; l < 3; l++)
+				cc[l] = e->a * hhh + e->b;
+		} else if (!e->diff_mode) {
 			double p[2];
 			win_to_img(p, e, i, j);
 			float c[3];
@@ -875,8 +923,8 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 			e->current_view = va;
 		}
 	}
-	if (e->qauto == 1) inplace_rgb_span(v->fdisplay, v->dw, v->dh, 60*e->a);
-	if (e->qauto == 2)inplace_rgb_span2(v->fdisplay, v->dw, v->dh, 60*e->a);
+	if (e->qauto == 1) inplace_rgb_span(v->fdisplay, v->dw, v->dh, 1/e->a);
+	if (e->qauto == 2)inplace_rgb_span2(v->fdisplay, v->dw, v->dh, 40*e->a);
 	for (int i = 0; i < v->dw * v->dh * 3; i++)
 		v->display[i] = float_to_uint8(v->fdisplay[i]);
 }
@@ -967,6 +1015,32 @@ static void action_toggle_exact_rpc(struct FTR *f)
 	else
 		fprintf(stderr, "use APPROXIMATE calibration\n");
 
+	request_repaints(f);
+}
+
+static void action_toggle_srtm4(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->show_srtm4 = !e->show_srtm4;
+	request_repaints(f);
+}
+
+static void action_shift_so(struct FTR *f, int dso)
+{
+	struct pan_state *e = f->userdata;
+	e->so += dso;
+	request_repaints(f);
+}
+
+
+static void action_toggle_srtm4_base(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->srtm4_base = !e->srtm4_base;
+	if (e->srtm4_base)
+		fprintf(stderr, "use SRTM4 base_h\n");
+	else
+		fprintf(stderr, "use base_h = %g\n", e->base_h);
 	request_repaints(f);
 }
 
@@ -1141,7 +1215,11 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'd') {action_offset_base_h(f, -10);return;}
 
 	if (k == 'e') action_toggle_exact_rpc(f);
+	if (k == 'z') action_toggle_srtm4(f);
+	if (k == 'v') action_toggle_srtm4_base(f);
 	if (k == 'i') action_toggle_image_space(f, f->w/2, f->h/2);
+	if (k == '6') action_shift_so(f, -1);
+	if (k == '7') action_shift_so(f, +1);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
@@ -1168,7 +1246,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 		}
 		if (k == FTR_KEY_PAGE_UP)   d[1] = +f->h/3;
 		if (k == FTR_KEY_PAGE_DOWN) d[1] = -f->h/3;
-		if (d[0] && d[1])
+		if (d[0] || d[1])
 			action_offset_viewport(f, d[0], d[1]);
 	}
 
@@ -1232,14 +1310,15 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 	// dump output as requested
 	struct FTR f[1]; // fake FTR, because the actions (wrongly) require it
 	f->w = w; f->h = h; f->userdata = e;
-	e->image_space = 0; // (this will be difficult to change)
+	e->image_space = 1; // (this will be difficult to change)
+	e->image_rotation_status = 0;
 	e->interpolation_order = interpord;
 	e->offset_x = x - e->image_space*w/(2*zoom);
 	e->offset_y = y - e->image_space*h/(2*zoom);
 	e->zoom_factor = zoom;
 	e->base_h = base_h;
 	e->qauto = qauto;
-//#pragma omp parallel for // does not work
+//#pragma omp parallel for // DOES NOT WORK (...leaving the domain of the sun)
 	for (int i = 0; i < e->nviews; i++)
 	{
 		pan_repaint(e, w, h);
@@ -1247,7 +1326,7 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 		char buf[FILENAME_MAX];
 		snprintf(buf, FILENAME_MAX, "%s/%s_%d.png", outdir, outnam, i);
 		iio_save_image_uint8_vec(buf, v->display, w, h, 3);
-		action_select_view(f, i+1, w/2, h/2);
+		action_select_view(f, i+1, w/2, h/2); // not parallelizable
 	}
 
 	return 0;
@@ -1303,6 +1382,7 @@ int main_pan(int c, char *v[])
 
 	// open window
 	struct FTR f = ftr_new_window(320, 320);
+	//struct FTR f = ftr_new_window(800, 600);
 	f.userdata = e;
 	f.changed = 1;
 	ftr_set_handler(&f, "key"   , pan_key_handler);

@@ -58,8 +58,10 @@ static void my_displayfunc(void)
 
 	struct _FTR *f = ftr_freeglut_global_state;
 
-	if (f->handle_expose && f->changed)
+	if (f->handle_expose && f->changed) {
 		f->handle_expose((void*)f, 0, 0, 0, 0);
+		f->changed = 0;
+	}
 
 	if (f->handle_idle)
 		glutIdleFunc(my_idle); // ugly hack to allow toggling

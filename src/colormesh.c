@@ -32,6 +32,7 @@ static void getxyz(double xyz[3], struct rpc *r, int i, int j, double h)
 
 #include "smapa.h"
 SMART_PARAMETER_SILENT(IJMESH,0)
+SMART_PARAMETER_SILENT(NOMESH,0)
 
 int main(int c, char *v[])
 {
@@ -55,19 +56,27 @@ int main(int c, char *v[])
 
 	struct rpc r[1]; read_rpc_file_xml(r, fname_rpc);
 
+	int nvert = 0;
+	for (int i = 0; i < w*h; i++)
+		if (isfinite(heights[i]))
+			nvert += 1;
+	int omit_mesh = NOMESH() || nvert != w*h;
+
 	printf("ply\n");
 	printf("format ascii 1.0\n");
 	//printf("format binary_little_endian 1.0\n");
 	printf("comment created by cutrecombine\n");
-	printf("element vertex %d\n", w*h);
+	printf("element vertex %d\n", nvert);
 	printf("property float x\n");
 	printf("property float y\n");
 	printf("property float z\n");
 	printf("property uchar red\n");
 	printf("property uchar green\n");
 	printf("property uchar blue\n");
-	printf("element face %d\n", (w-1)*(h-1));
-	printf("property list uchar int vertex_index\n");
+	if (!omit_mesh) {
+		printf("element face %d\n", (w-1)*(h-1));
+		printf("property list uchar int vertex_index\n");
+	}
 	printf("end_header\n");
 
 	uint8_t (*color)[w][pd] = (void*)colors;
@@ -75,6 +84,7 @@ int main(int c, char *v[])
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 	{
+		if (!isfinite(height[j][i])) continue;
 		uint8_t rgb[3];
 		for (int k = 0; k < pd; k++) rgb[k] = color[j][i][k];
 		for (int k = pd; k < 3; k++) rgb[k] = rgb[k-1];
@@ -84,6 +94,7 @@ int main(int c, char *v[])
 		printf("%.16lf %.16lf %.16lf %d %d %d\n",
 				xyz[0], xyz[1], xyz[2], rgb[0], rgb[1], rgb[2]);
 	}
+	if (!omit_mesh)
 	for (int j = 0; j < h-1; j++)
 	for (int i = 0; i < w-1; i++)
 	{
