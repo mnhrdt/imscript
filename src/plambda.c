@@ -407,6 +407,8 @@ static int matrix_product(float *ab, float *a, float *b, int na, int nb)
 		a_nrows = a_ncols = b_nrows = b_ncols = 2;
 	} else if (na == 9 && nb == 9) {
 		a_nrows = a_ncols = b_nrows = b_ncols = 3;
+	} else if (na == 16 && nb == 16) {
+		a_nrows = a_ncols = b_nrows = b_ncols = 4;
 	} else if (na == 9 && nb == 3) {
 		a_nrows = a_ncols = b_nrows = 3;
 		b_ncols = 1;

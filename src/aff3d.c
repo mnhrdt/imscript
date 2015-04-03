@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include "xfopen.c"
 #include "parsenumbers.c"
@@ -48,11 +49,15 @@ int main(int c, char *v[])
 		{
 			int tt, rr = sscanf(buf, "element vertex %d", &tt);
 			if (rr == 1)
+			{
 				maxconvert = tt;
+				fprintf(stderr, "treating at most %d points\n",
+						maxconvert);
+			}
 		}
 		double x[3], y[3];
 		int d, r = sscanf(buf, "%lf %lf %lf %n", x, x+1, x+2, &d);
-		if (r == 3 && cx < maxconvert) {
+		if (r == 3 && (!maxconvert || cx < maxconvert)) {
 			apply_transform(y, A, x);
 			fprintf(fo, "%lf %lf %lf ", y[0], y[1], y[2]);
 			fputs(buf + d, fo);
@@ -61,6 +66,9 @@ int main(int c, char *v[])
 			fputs(buf, fo);
 		fputc('\n', fo);
 	}
+	fprintf(stderr, "converted %d points\n", cx);
+	if (maxconvert)
+		assert(maxconvert == cx);
 
 	xfclose(fo);
 	xfclose(fi);
