@@ -5,6 +5,8 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 #include "iio.h"
 
@@ -197,6 +199,20 @@ static void action_contrast_change(struct FTR *f, float afac, float bshift)
 	f->changed = 1;
 }
 
+static void action_center_contrast_at_point(struct FTR *f, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+
+	double p[2];
+	window_to_image(p, e, x, y);
+	complex float c[e->pd];
+	cpixel(c, e, p[0], p[1]);
+	//float C = (c[0] + c[1] + c[2])/3;
+	double X = log(e->log_offset + cabs(*c));
+	e->b = 127.5 - e->a * X;
+	f->changed = 1;
+}
+
 static void action_clear_mask(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
@@ -374,6 +390,11 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		}
 		if (e->pd < 3)
 			cc[1] = cc[2] = cc[0];
+		int ip = lrint(p[0]);
+		int iq = lrint(p[1]);
+		if (insideP(e->w, e->h, ip, iq) && !e->mask[e->w*iq+ip])
+			cc[0] = cc[1] = cc[2] = 0;
+
 	}
 	if (e->painting) {
 		int from[2] = {
@@ -404,7 +425,7 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 
 	if (m == FTR_BUTTON_LEFT)   action_offset_viewport(f, x - ox, y - oy);
 	//if (m == FTR_BUTTON_MIDDLE) action_print_value_under_cursor(f, x, y);
-	//if (m == FTR_MASK_SHIFT)    action_center_contrast_at_point(f, x, y);
+	if (m == FTR_MASK_SHIFT)    action_center_contrast_at_point(f, x, y);
 	//
 	struct pan_state *e = f->userdata;
 	if (e->painting) {
@@ -557,18 +578,23 @@ static void create_pyramid(struct pan_state *e)
 	}
 }
 
+#include "pickopt.c"
+
 int main_pan(int c, char *v[])
 {
 	// process input arguments
+	char *imask_option = pick_option(&c, &v, "m", "");
 	if (c > 4) {
 		fprintf(stderr, "usage:\n\t"
 				"%s [in.fft [out.fft [out.mask]]]\n", *v);
 		//                0  1       2        3
-		return 1;
+		return c;
 	}
 	char *filename_in   = c > 1 ? v[1] : "-";
 	char *filename_out  = c > 2 ? v[2] : "-";
 	char *filename_mask = c > 3 ? v[3] : NULL;
+	char *filename_imask = *imask_option ? imask_option : NULL;
+
 
 	// read image
 	struct pan_state e[1];
@@ -578,8 +604,17 @@ int main_pan(int c, char *v[])
 		return fprintf(stderr, "input must be a fft (got pd=%d)\n", pd);
 	e->pd = pd / 2;
 	create_pyramid(e);
-	e->mask = malloc(e->w * e->h);
-	memset(e->mask, 1, e->w * e->h);
+	if (filename_imask) {
+		int mw, mh;
+		e->mask = iio_read_image_uint8(filename_imask,&mw,&mh);
+		if (mw != e->w || mh != e->h)
+			return fprintf(stderr, "input mask bad size\n");
+		fprintf(stderr, "using input mask from file \"%s\"\n",
+				filename_imask);
+	} else {
+		e->mask = malloc(e->w * e->h);
+		memset(e->mask, 1, e->w * e->h);
+	}
 
 	// open window
 	struct FTR f = ftr_new_window(BAD_MIN(e->w,512), BAD_MIN(e->h,512));
