@@ -1,33 +1,33 @@
 // PLAMBDA(1)                  imscript                  PLAMBDA(1)        {{{1
 //
 // NAME                                                                    {{{2
-// 	plambda - a RPN calculator for image pixels
+//	plambda - a RPN calculator for image pixels
 //
 // SYNOPSIS                                                                {{{2
-// 	plambda a.pnb b.png c.png ... "lambda expression" > output
-// 	plambda a.pnb b.png c.png ... "lambda expression" -o output.png
-// 	plambda -c num1 num2 ... "lambda expression"
+//	plambda a.pnb b.png c.png ... "lambda expression" > output
+//	plambda a.pnb b.png c.png ... "lambda expression" -o output.png
+//	plambda -c num1 num2 ... "lambda expression"
 //
 // DESCRIPTION                                                             {{{2
-// 	Plambda applies an expression to all the pixels of a collection of
-// 	images, and produces a single output image.  Each input image
-// 	corresponds to one of the variables of the expression (in alphabetical
-// 	order).  There are modifiers to the variables that allow access to the
-// 	values of neighboring pixels, or to particular components of a pixel.
+//	Plambda applies an expression to all the pixels of a collection of
+//	images, and produces a single output image.  Each input image
+//	corresponds to one of the variables of the expression (in alphabetical
+//	order).  There are modifiers to the variables that allow access to the
+//	values of neighboring pixels, or to particular components of a pixel.
 //
 // LANGUAGE                                                                {{{2
-// 	A "plambda" program is a sequence of tokens.  Tokens may be constants,
-// 	variables, or operators.  Constants and variables get their value
-// 	computed and pushed to the stack.  Operators pop values from the stack,
-// 	apply a function to them, and push back the results.
+//	A "plambda" program is a sequence of tokens.  Tokens may be constants,
+//	variables, or operators.  Constants and variables get their value
+//	computed and pushed to the stack.  Operators pop values from the stack,
+//	apply a function to them, and push back the results.
 //
-// 	CONSTANTS: numeric constants written in scientific notation, and "pi"
-// 	OPERATORS: +, -, *, ^, /, and all the functions from math.h
-// 	VARIABLES: anything not recognized as a constant or operator.  There
-// 	must be as many variables as input images, and they are assigned to
-// 	images in alphabetical order.
+//	CONSTANTS: numeric constants written in scientific notation, and "pi"
+//	OPERATORS: +, -, *, ^, /, and all the functions from math.h
+//	VARIABLES: anything not recognized as a constant or operator.  There
+//	must be as many variables as input images, and they are assigned to
+//	images in alphabetical order.
 //
-// 	All operators (unary, binary and ternary) are vectorializable.
+//	All operators (unary, binary and ternary) are vectorializable.
 //
 //	Some "sugar" is added to the language:
 //
@@ -130,12 +130,12 @@
 //
 //
 // OPTIONS                                                                 {{{2
-//      -o file     save output to named file
-//      -c          act as a symbolic calculator
-//      -h          print short help message
-//      --help      print longer help message
-//      --man       print manpage (requires help2man)
-//      --version   print program version
+//	-o file		save output to named file
+//	-c		act as a symbolic calculator
+//	-h		print short help message
+//	--help		print longer help message
+//	--man		print manpage (requires help2man)
+//	--version	print program version
 //
 // EXAMPLES                                                                {{{2
 // 	Sum two images:
@@ -204,19 +204,19 @@
 //
 // AUTHOR                                                                  {{{2
 //
-//      Written by Enric Meinhardt-Llopis
+//	Written by Enric Meinhardt-Llopis
 //
 //
 // REPORTING BUGS                                                          {{{2
 //
-//      Download last version from https://github.com/mnhrdt
-//      Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>
+//	Download last version from https://github.com/mnhrdt
+//	Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>
 //
 // TODO LIST                                                               {{{2
 //
-//      * implement shunting-yard algorithm to admit infix notation
-//      * handle 3D and nD images
-//      * merge colonvars and magicvars (the only difficulty lies in naming)
+//	* implement shunting-yard algorithm to admit infix notation
+//	* handle 3D and nD images
+//	* merge colonvars and magicvars (the only difficulty lies in naming)
 
 
 // #includes {{{1
@@ -2609,6 +2609,6 @@ int main(int c, char **v)
 		c -= 1;
 	}
 	return f(c,v);
-}
+}   
 
 // vim:set foldmethod=marker:
