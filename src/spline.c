@@ -104,6 +104,45 @@ static bool fill_poles(double* z, int order)
 	return true;
 }
 
+static bool fill_poles_more_precise(double* z, int order)
+{
+	switch(order) {
+	case 1: break;
+	case 3: z[0] = sqrt(3)-2;  /* sqrt(3)-2 */
+		break;
+	case 5: //z[0] = -0.430575;
+		//z[1] = -0.0430963;
+		z[0] = -4.305753470999738e-1;
+		z[1] = -4.309628820326465e-2;
+		break;
+	case 7: //z[0] = -0.53528;
+		//z[1] = -0.122555;
+		//z[2] = -0.00914869;
+		z[0] = -5.352804307964382e-1;
+		z[1] = -1.225546151923267e-1;
+		z[2] = -9.148694809608277e-3;
+		break;
+	case 9: //z[0] = -0.607997; z[1] = -0.201751;
+		//z[2] = -0.0432226; z[3] = -0.00212131;
+		z[0] = -6.079973891686259e-1;
+		z[1] = -2.017505201931532e-1;
+		z[2] = -4.322260854048175e-2;
+		z[3] = -2.121306903180818e-3;
+		break;
+	case 11:// z[0] = -0.661266;
+		//z[1] = -0.27218; z[2] = -0.0897596;
+		//z[3] = -0.0166696; z[4] = -0.000510558;
+		z[0] = -6.612660689007345e-1;
+		z[1] = -2.721803492947859e-1;
+		z[2] = -8.975959979371331e-2;
+		z[3] = -1.666962736623466e-2;
+		z[4] = -5.105575344465021e-4;
+		break;
+	default: return false;
+	}
+	return true;
+}
+
 // Prepare image (in-place) for cardinal spline interpolation.
 bool prepare_spline(float *img, int w, int h, int pd, int order)
 {
@@ -117,7 +156,7 @@ bool prepare_spline(float *img, int w, int h, int pd, int order)
 
 	// Init poles of associated z-filter
 	double z[5];
-	if(! fill_poles(z, order))
+	if(! fill_poles_more_precise(z, order))
 		return false;
 	int npoles = order / 2;
 
@@ -380,9 +419,10 @@ static void naive_affine_map_using_spline(float *y, int out_w, int out_h,
 		iio_save_image_float_vec(buf, fx, w, h, pd);
 	}
 	double invA[6]; invert_affinity(invA, A);
-	fprintf(stderr, "A = %g %g %g  %g %g %g\n", A[0], A[1], A[2], A[3], A[4], A[5]);
-	fprintf(stderr, "invA = %g %g %g  %g %g %g\n",
-			invA[0], invA[1], invA[2], invA[3], invA[4], invA[5]);
+	//fprintf(stderr, "A = %g %g %g  %g %g %g\n",
+	//		A[0], A[1], A[2], A[3], A[4], A[5]);
+	//fprintf(stderr, "invA = %g %g %g  %g %g %g\n",
+	//		invA[0], invA[1], invA[2], invA[3], invA[4], invA[5]);
 	for (int j = 0; j < out_h; j++)
 	for (int i = 0; i < out_w; i++)
 	{
