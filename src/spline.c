@@ -27,6 +27,7 @@
 // 	3. Change spaces to tabs
 // 	4. Remove Doxygen-style markup in comments
 // 	5. Remove coefficients of even-order splines
+// 	6. Added an optional "main" function
 //
 // Please, look at file "spline_orig_mm.c" for the original file.
 
@@ -335,3 +336,97 @@ bool evaluate_spline_at(float *out,
 	}
 	return true;
 }
+
+// this main serves as a unit test of the code above
+#ifdef MAIN_SPLINE
+#include <stdio.h>
+#include <stdlib.h>
+#include "iio.h"
+
+static double invert_affinity(double invA[6], double A[6])
+{
+	double a, b, c, d, p, q;
+	a=A[0]; b=A[1]; p=A[2];
+	c=A[3]; d=A[4]; q=A[5];
+	double det = a*d - b*c;
+	invA[0] =  d; invA[1] = -b;
+	invA[3] = -c; invA[4] =  a;
+	invA[2] = b*q - d*p;
+	invA[5] = c*p - a*q;
+	for (int i = 0; i < 6; i++)
+		invA[i] /= det;
+	return det;
+}
+
+static void apply_affinity(double y[2], double A[6], double x[2])
+{
+	double p = A[0]*x[0] + A[1]*x[1] + A[2];
+	double q = A[3]*x[0] + A[4]*x[1] + A[5];
+	y[0] = p;
+	y[1] = q;
+}
+
+static void naive_affine_map_using_spline(float *y, int out_w, int out_h,
+		float *x, int w, int h, int pd, double A[6], int order)
+{
+	float *fx = malloc(w * h * pd * sizeof*fx);
+	for (int i = 0; i < w * h * pd; i++)
+		fx[i] = x[i];
+	bool r = prepare_spline(fx, w, h, pd, order);
+	if (!r) exit(fprintf(stderr,"prepare spline failed (ord=%d)\n",order));
+	if (1) {
+		char buf[FILENAME_MAX];
+		snprintf(buf,FILENAME_MAX,"/tmp/prepared_spline_%d.tiff",order);
+		iio_save_image_float_vec(buf, fx, w, h, pd);
+	}
+	double invA[6]; invert_affinity(invA, A);
+	fprintf(stderr, "A = %g %g %g  %g %g %g\n", A[0], A[1], A[2], A[3], A[4], A[5]);
+	fprintf(stderr, "invA = %g %g %g  %g %g %g\n",
+			invA[0], invA[1], invA[2], invA[3], invA[4], invA[5]);
+	for (int j = 0; j < out_h; j++)
+	for (int i = 0; i < out_w; i++)
+	{
+		double p[2] = {i, j};
+		apply_affinity(p, A, p);
+		float *out = y + (j * out_w + i) * pd;
+		evaluate_spline_at(out, fx, w, h, pd, order, p[0], p[1]);
+	}
+	free(fx);
+}
+
+int main(int c, char *v[])
+{
+	// process input arguments
+	if (c < 10 || c > 13 ) {
+		fprintf(stderr, "usage:\n\t"
+			"%s a b p c d q W H ord [in.png [out.png]]\n", *v);
+		//       0  1 2 3 4 5 6 7 8  9   10      11
+		return 1;
+	}
+	double A[6]; for (int i = 0; i < 6; i++) A[i] = atof(v[1+i]);
+	int out_w = atoi(v[7]);
+	int out_h = atoi(v[8]);
+	int order = atoi(v[9]);
+	char *filename_in  = c > 10 ? v[10] : "-";
+	char *filename_out = c > 11 ? v[11] : "-";
+
+	// read input image
+	int w, h, pd;
+	float *x = iio_read_image_float_vec(filename_in, &w, &h, &pd);
+
+	// allocate space for output image
+	float *y = malloc(out_w * out_h * pd * sizeof*y);
+	if (!y) return 2;
+
+	// perform the computation
+	naive_affine_map_using_spline(y, out_w, out_h, x, w, h, pd, A, order);
+
+	// save output result
+	iio_save_image_float_vec(filename_out, y, out_w, out_h, pd);
+
+	// cleanup and exit
+	free(x);
+	free(y);
+	return 0;
+}
+#endif//MAIN_SPLINE
