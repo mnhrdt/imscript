@@ -83,56 +83,21 @@ static bool fill_poles(double* z, int order)
 {
 	switch(order) {
 	case 1: break;
-	case 3: z[0] = -0.26794919;  /* sqrt(3)-2 */
-		break;
-	case 5: z[0] = -0.430575;
-		z[1] = -0.0430963;
-		break;
-	case 7: z[0] = -0.53528;
-		z[1] = -0.122555;
-		z[2] = -0.00914869;
-		break;
-	case 9: z[0] = -0.607997; z[1] = -0.201751;
-		z[2] = -0.0432226; z[3] = -0.00212131;
-		break;
-	case 11: z[0] = -0.661266;
-		z[1] = -0.27218; z[2] = -0.0897596;
-		z[3] = -0.0166696; z[4] = -0.000510558;
-		break;
-	default: return false;
-	}
-	return true;
-}
-
-static bool fill_poles_more_precise(double* z, int order)
-{
-	switch(order) {
-	case 1: break;
 	case 3: z[0] = sqrt(3)-2;  /* sqrt(3)-2 */
 		break;
-	case 5: //z[0] = -0.430575;
-		//z[1] = -0.0430963;
-		z[0] = -4.305753470999738e-1;
+	case 5: z[0] = -4.305753470999738e-1;
 		z[1] = -4.309628820326465e-2;
 		break;
-	case 7: //z[0] = -0.53528;
-		//z[1] = -0.122555;
-		//z[2] = -0.00914869;
-		z[0] = -5.352804307964382e-1;
+	case 7: z[0] = -5.352804307964382e-1;
 		z[1] = -1.225546151923267e-1;
 		z[2] = -9.148694809608277e-3;
 		break;
-	case 9: //z[0] = -0.607997; z[1] = -0.201751;
-		//z[2] = -0.0432226; z[3] = -0.00212131;
-		z[0] = -6.079973891686259e-1;
+	case 9: z[0] = -6.079973891686259e-1;
 		z[1] = -2.017505201931532e-1;
 		z[2] = -4.322260854048175e-2;
 		z[3] = -2.121306903180818e-3;
 		break;
-	case 11:// z[0] = -0.661266;
-		//z[1] = -0.27218; z[2] = -0.0897596;
-		//z[3] = -0.0166696; z[4] = -0.000510558;
-		z[0] = -6.612660689007345e-1;
+	case 11:z[0] = -6.612660689007345e-1;
 		z[1] = -2.721803492947859e-1;
 		z[2] = -8.975959979371331e-2;
 		z[3] = -1.666962736623466e-2;
@@ -156,7 +121,7 @@ bool prepare_spline(float *img, int w, int h, int pd, int order)
 
 	// Init poles of associated z-filter
 	double z[5];
-	if(! fill_poles_more_precise(z, order))
+	if(! fill_poles(z, order))
 		return false;
 	int npoles = order / 2;
 
@@ -245,26 +210,20 @@ static float getsample_ass(float *x, int w, int h, int pd, int i, int j, int l)
 	return x[(i+j*w)*pd + l];
 }
 
-static int good_modulus(int nn, int p)
+// like n%p, but works for all numbers
+static int good_modulus(int n, int p)
 {
 	if (!p) return 0;
-	if (p < 1) return good_modulus(nn, -p);
+	if (p < 1) return good_modulus(n, -p);
 
-	unsigned int r;
-	if (nn >= 0)
-		r = nn % p;
-	else {
-		unsigned int n = nn;
-		r = p - (-n) % p;
-		if ((int)r == p)
-			r = 0;
-	}
-	//assert(r >= 0);
-	//if(!(r<p))fprintf(stderr, "bad modulus nn=%d r=%d p=%d\n", nn, r, p);
-	//assert(r < p);
+	int r = n % p;
+	r = r < 0 ? r + p : r;
+	assert(r >= 0);
+	assert(r < p);
 	return r;
 }
 
+// symmetrized and periodized index
 static int positive_reflex(int n, int p)
 {
 	int r = good_modulus(n, 2*p);
@@ -272,12 +231,12 @@ static int positive_reflex(int n, int p)
 		r -= 1;
 	if (r > p)
 		r = 2*p - r;
-	//assert(r >= 0);
-	//assert(r < p);
+	assert(r >= 0);
+	assert(r < p);
 	return r;
 }
 
-// extrapolate by reflection
+// extrapolate by periodized reflection
 static float getsample_2(float *x, int w, int h, int pd, int i, int j, int l)
 {
 	i = positive_reflex(i, w);
