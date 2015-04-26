@@ -46,7 +46,7 @@ int main(int c, char *v[])
 	for (int i = 0; i < w-1; i++)
 	{
 		int q[4] = {vid[j][i], vid[j+1][i], vid[j+1][i+1], vid[j][i+1]};
-		if (q[0] >= 0 && q[1] >= 0 && q[2] >= 0 && q[3] >= 3)
+		if (q[0] >= 0 && q[1] >= 0 && q[2] >= 0 && q[3] >= 0)
 			nfaces += 1;
 	}
 
@@ -88,7 +88,7 @@ int main(int c, char *v[])
 	for (int i = 0; i < w-1; i++)
 	{
 		int q[4] = {vid[j][i], vid[j+1][i], vid[j+1][i+1], vid[j][i+1]};
-		if (q[0] >= 0 && q[1] >= 0 && q[2] >= 0 && q[3] >= 3)
+		if (q[0] >= 0 && q[1] >= 0 && q[2] >= 0 && q[3] >= 0)
 		{
 			printf("4 %d %d %d %d\n", q[0], q[1], q[2], q[3]);
 			cx += 1;
