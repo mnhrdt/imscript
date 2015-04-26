@@ -62,7 +62,7 @@ struct pan_view {
 	char *pfg, *pfc;
 
 	// calibration
-	struct rpc r[1]; 
+	struct rpc r[1];
 	double P[8]; // local affine approximation of "raster to image"
 	double rgbiox, rgbioy; // offset between P and MS (in P pixel units)
 
@@ -653,7 +653,6 @@ static int tiffo_getpixel_float_bilinear(float *r, struct tiff_octaves *t,
 		r[l] = evaluate_bilinear_cell(v[0][l], v[1][l],
 						v[2][l], v[3][l], p-ip, q-iq);
 	return pd;
-	
 }
 
 static int tiffo_getpixel_float_bicubic(float *r, struct tiff_octaves *t,
@@ -887,14 +886,15 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 			double xy[3], ll[3];
 			window_to_raster(xy, e, i, j);
 			raster_to_geo(ll, e, xy[0], xy[1]);
-			int so = -6 + lrint(-log2(e->zoom_factor));
+			int so = -8 + lrint(-log2(e->zoom_factor));
 			if (so < 0) so = 0;
 			if (!i && !j)
 			{
-				fprintf(stderr, "z=%g, so=%d ofac=%d\n", e->zoom_factor, so, 1 << so);
+				fprintf(stderr, "z=%g, so=%d ofac=%d\n",
+						e->zoom_factor, so, 1 << so);
 				so = -so;
 			}
-			double hhh = srtm4o(ll[0], ll[1], so);// + egm96(ll[0], ll[1]);
+			double hhh = srtm4o(ll[0], ll[1], so) + egm96(ll[0], ll[1]);
 			float *cc = v->fdisplay + 3 * (j * v->dw + i);
 			for (int l = 0; l < 3; l++)
 				cc[l] = e->a * hhh + e->b;
@@ -1032,6 +1032,23 @@ static void action_shift_so(struct FTR *f, int dso)
 	request_repaints(f);
 }
 
+static void action_dump_view(struct FTR *f)
+{
+	static int dump_view_counter = 0;
+	int pid = getpid();
+	char fnamei[FILENAME_MAX], fnamef[FILENAME_MAX];
+	char *fmti = "/tmp/rpcflip_dump_%d_%d.png";
+	char *fmtf = "/tmp/rpcflip_dump_%d_%d.tiff";
+	snprintf(fnamei, FILENAME_MAX, fmti, pid, dump_view_counter);
+	snprintf(fnamef, FILENAME_MAX, fmtf, pid, dump_view_counter);
+	struct pan_state *e = f->userdata;
+	struct pan_view  *v = obtain_view(e);
+	iio_save_image_uint8_vec(fnamei, v->display, v->dw, v->dh, 3);
+	iio_save_image_float_vec(fnamef, v->fdisplay, v->dw, v->dh, 3);
+	fprintf(stderr, "dumped rgb_8 view to file \"%s\"\n", fnamei);
+	fprintf(stderr, "dumped rgb_f view to file \"%s\"\n", fnamef);
+	dump_view_counter += 1;
+}
 
 static void action_toggle_srtm4_base(struct FTR *f)
 {
@@ -1201,7 +1218,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
 	if (k == '+' || k == '=') action_increase_zoom(f, f->w/2, f->h/2);
 	if (k == '-') action_decrease_zoom(f, f->w/2, f->h/2);
-	
+
 	if (k == 'j') action_offset_rgbi(f, 0, -1);
 	if (k == 'k') action_offset_rgbi(f, 0, 1);
 	if (k == 'h') action_offset_rgbi(f, 1, 0);
@@ -1220,6 +1237,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'i') action_toggle_image_space(f, f->w/2, f->h/2);
 	if (k == '6') action_shift_so(f, -1);
 	if (k == '7') action_shift_so(f, +1);
+	if (k == 't') action_dump_view(f);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
