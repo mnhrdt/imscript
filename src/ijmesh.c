@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "iio.h"
 
@@ -19,8 +20,16 @@ int main(int c, char *v[])
 
 	// read input images
 	int w, h, pd, ww, hh;
-	uint8_t *colors = iio_read_image_uint8_vec(fname_colors, &w, &h, &pd);
 	float *heights = iio_read_image_float(fname_heights, &ww, &hh);
+	uint8_t *colors;
+	if (0 == strcmp(fname_colors, "WHITE")) {
+		pd = 1;
+		w = ww; h = hh;
+		colors = malloc(w * h);
+		memset(colors, 255, w * h);
+	} else {
+		colors= iio_read_image_uint8_vec(fname_colors, &w, &h, &pd);
+	}
 	if (w != ww || h != hh)
 		return fprintf(stderr, "color and height image size mismatch");
 	if (pd != 1 && pd != 3)
@@ -46,7 +55,7 @@ int main(int c, char *v[])
 	for (int i = 0; i < w-1; i++)
 	{
 		int q[4] = {vid[j][i], vid[j+1][i], vid[j+1][i+1], vid[j][i+1]};
-		if (q[0] >= 0 && q[1] >= 0 && q[2] >= 0 && q[3] >= 3)
+		if (q[0] >= 0 && q[1] >= 0 && q[2] >= 0 && q[3] >= 0)
 			nfaces += 1;
 	}
 
@@ -88,7 +97,7 @@ int main(int c, char *v[])
 	for (int i = 0; i < w-1; i++)
 	{
 		int q[4] = {vid[j][i], vid[j+1][i], vid[j+1][i+1], vid[j][i+1]};
-		if (q[0] >= 0 && q[1] >= 0 && q[2] >= 0 && q[3] >= 3)
+		if (q[0] >= 0 && q[1] >= 0 && q[2] >= 0 && q[3] >= 0)
 		{
 			printf("4 %d %d %d %d\n", q[0], q[1], q[2], q[3]);
 			cx += 1;
