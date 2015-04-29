@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "iio.h"
 
@@ -19,8 +20,16 @@ int main(int c, char *v[])
 
 	// read input images
 	int w, h, pd, ww, hh;
-	uint8_t *colors = iio_read_image_uint8_vec(fname_colors, &w, &h, &pd);
 	float *heights = iio_read_image_float(fname_heights, &ww, &hh);
+	uint8_t *colors;
+	if (0 == strcmp(fname_colors, "WHITE")) {
+		pd = 1;
+		w = ww; h = hh;
+		colors = malloc(w * h);
+		memset(colors, 255, w * h);
+	} else {
+		colors= iio_read_image_uint8_vec(fname_colors, &w, &h, &pd);
+	}
 	if (w != ww || h != hh)
 		return fprintf(stderr, "color and height image size mismatch");
 	if (pd != 1 && pd != 3)
