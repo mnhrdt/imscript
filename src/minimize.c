@@ -9,7 +9,7 @@
 //
 // 	./program opt1 opt2 ... optM par1 par2 ... parN
 //
-// where par1 ... parN are floating-point numbers and opt1 ... optN are
+// where par1 ... parN are floating-point numbers and opt1 ... optM are
 // arbitrary strings.
 //
 // Suppose that running this program prints a single floating point
