@@ -117,6 +117,8 @@ int main(int c, char *v[])
 			run_program_as_of, n, p);
 
 	fprintf(stderr, "minimization returned %d\n", r);
+	for (int i = 0; i < n; i++)
+		printf("%lf%c", result[i], i<n-1?' ':'\n');
 
 	return EXIT_SUCCESS;
 }
