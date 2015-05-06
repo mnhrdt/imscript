@@ -1,7 +1,6 @@
 // compute the reprojection error
 // paired with "minimize.c", this is a poor man's bundle adjustment
 
-#include <stdio.h>
 #include <math.h>
 
 // compute the vector product of two vectors
@@ -135,12 +134,19 @@ static double compute_reprojection_error(int n, double *P, int nc, double *c)
 	return r;
 }
 
+
+#include <stdio.h>
+#include <stdbool.h>
 #include "xfopen.c"
 #include "parsenumbers.c"
+#include "pickopt.c"
 
 int main(int c, char *v[])
 {
 	// check and process input arguments
+	bool do_normalize = pick_option(&c, &v, "n", 0);
+	bool do_root = pick_option(&c, &v, "r", 0);
+	double units = atof(pick_option(&c, &v, "u", "1"));
 	if (c < 26) {
 falla:
 		fprintf(stderr, "usage:\n\t%s 2ncols.txt P1 ... P12n\n", *v);
@@ -172,6 +178,9 @@ falla:
 
 	// compute and print reprojection error
 	double err = compute_reprojection_error(n, P[0], ncorr, corr);
+	if (do_normalize) err /= ncorr;
+	if (do_root) err = sqrt(err);
+	err *= units;
 	printf("%lf\n", err);
 
 	// cleanup and exit
