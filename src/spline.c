@@ -33,47 +33,47 @@
 
 
 #include <assert.h>
-#include <math.h>
 #include <stdbool.h>
+#include <math.h>
 
-static double initcausal(float* c, int step, int n, double z)
+static double initcausal(float *c, int step, int n, double z)
 {
 	double zk,z2k,iz,sum;
 
-	zk = z; iz = 1./z;
-	z2k = pow(z,(double)n-1.);
+	zk = z; iz = 1/z;
+	z2k = pow(z,n-1);
 	sum = c[0] + z2k * c[step*(n-1)];
 	z2k = z2k*z2k*iz;
-	for(int k = 1; k <= n-2; k++) {
-		sum += (zk+z2k)*c[step*k];
+	for (int k = 1; k <= n-2; k++) {
+		sum += (zk + z2k) * c[step*k];
 		zk *= z;
 		z2k *= iz;
 	}
-	return (sum/(1.-zk*zk));
+	return (sum/(1-zk*zk));
 }
 
-static double initanticausal(float* c, int step, int n, double z)
+static double initanticausal(float *c, int step, int n, double z)
 {
-	return (z/(z*z-1.)) * (z*c[step*(n-2)]+c[step*(n-1)]);
+	return (z/(z*z-1)) * (z * c[step*(n-2)] + c[step*(n-1)]);
 }
 
-static void invspline1D(float* c, int step, int size, double* z, int npoles)
+static void invspline1D(float *c, int step, int size, double *z, int npoles)
 {
 	/* normalization */
-	double lambda=1.0;
-	for(int k = npoles-1; k >= 0; k--)
-		lambda *= (1.-z[k])*(1.-1./z[k]);
-	for(int n = size-1; n >= 0; n--)
+	double lambda=1;
+	for (int k = npoles-1; k >= 0; k--)
+		lambda *= (1-z[k])*(1-1/z[k]);
+	for (int n = size-1; n >= 0; n--)
 		c[step*n] *= lambda;
 
-	for(int k=0 ; k < npoles; k++) { // Loop on poles
+	for (int k = 0 ; k < npoles; k++) { // Loop on poles
 		/* forward recursion */
 		c[0] = initcausal(c, step, size, z[k]);
-		for(int n=1; n < size; n++)
+		for (int n = 1; n < size; n++)
 			c[step*n] += z[k]*c[step*(n-1)];
 		/* backward recursion */
 		c[step*(size-1)] = initanticausal(c, step, size, z[k]);
-		for(int n=size-2; n >= 0; n--)
+		for (int n = size-2; n >= 0; n--)
 			c[step*n] = z[k]*(c[step*(n+1)]-c[step*n]);
 	}
 }
@@ -121,14 +121,14 @@ bool prepare_spline(float *img, int w, int h, int pd, int order)
 
 	// Init poles of associated z-filter
 	double z[5];
-	if(! fill_poles(z, order))
+	if (! fill_poles(z, order))
 		return false;
 	int npoles = order / 2;
 
-	for(int k = 0; k < pd; k++) { // Loop on image components
-		for(int y = 0; y < h; y++) // Filter on lines
+	for (int k = 0; k < pd; k++) { // Loop on image components
+		for (int y = 0; y < h; y++) // Filter on lines
 			invspline1D(img + (y*w+0)*pd + k, pd * 1, w, z, npoles);
-		for(int x = 0; x < w; x++) // Filter on columns
+		for (int x = 0; x < w; x++) // Filter on columns
 			invspline1D(img + (0*w+x)*pd + k, pd * w, h, z, npoles);
 	}
 
@@ -138,33 +138,33 @@ bool prepare_spline(float *img, int w, int h, int pd, int order)
 /* c[] = values of interpolation function at ...,t-2,t-1,t,t+1,... */
 
 /* coefficients for cubic interpolant (Keys' function) */
-static void keys(float* c, float t, float a)
+static void keys(float *c, float t, float a)
 {
-	float t2 = t*t;
-	float at = a*t;
-	c[0] = a*t2*(1.0f-t);
-	c[1] = (2.0f*a+3.0f - (a+2.0f)*t)*t2 - at;
-	c[2] = ((a+2.0f)*t - a-3.0f)*t2 + 1.0f;
-	c[3] = a*(t-2.0f)*t2 + at;
+	float t2 = t * t;
+	float at = a * t;
+	c[0] = a * t2 * (1 - t);
+	c[1] = ( 2*a + 3 - (a + 2)*t ) * t2 - at;
+	c[2] = ((a + 2)*t - a - 3) * t2 + 1;
+	c[3] = a * (t - 2) * t2 + at;
 }
 
 /* coefficients for cubic spline */
-static void spline3(float* c, float t)
+static void spline3(float *c, float t)
 {
-	float tmp = 1.0f-t;
-	c[0] = 0.1666666666f *t*t*t;
-	c[1] = 0.6666666666f -0.5f*tmp*tmp*(1.0f+t);
-	c[2] = 0.6666666666f -0.5f*t*t*(2.0f-t);
-	c[3] = 0.1666666666f *tmp*tmp*tmp;
+	float T = 1 - t;
+	c[0] = t * t * t / 6;
+	c[1] = ( 4 - 3 * (1 + t) * T * T ) / 6;
+	c[2] = ( 4 - 3 * (2 - t) * t * t ) / 6;
+	c[3] = T * T * T / 6;
 }
 
 /* pre-computation for spline of order >3 */
-static void init_splinen(float* a, int n)
+static void init_splinen(float *a, int n)
 {
-	a[0] = 1.;
-	for(int k=2; k <= n; k++)
-		a[0] /= k;
-	for(int k=1; k <= n+1; k++)
+	a[0] = 1;
+	for ( int k = 2; k <= n; k++)
+	          a[0] /= k;
+	for ( int k = 1; k <= n+1; k++)
 		a[k] = - a[k-1] *(n+2-k)/k;
 }
 
@@ -218,6 +218,7 @@ static int good_modulus(int n, int p)
 
 	int r = n % p;
 	r = r < 0 ? r + p : r;
+
 	assert(r >= 0);
 	assert(r < p);
 	return r;
@@ -255,12 +256,12 @@ bool evaluate_spline_at(float *out,
 	float  cx[12],cy[12];
 
 	/* CHECK ORDER */
-	if(order != 0 && order != 1 && order != -3 &&
-			order != 3 && order != 5 && order != 7 && order != 9 && order != 11)
+	if (order != 0 && order != 1 && order != -3 && order != 3 &&
+			order != 5 && order != 7 && order != 9 && order != 11)
 		return false;
 
 	float ak[13];
-	if(order > 3)
+	if (order > 3)
 		init_splinen(ak, order);
 
 	/* INTERPOLATION */
@@ -273,18 +274,18 @@ bool evaluate_spline_at(float *out,
 		for(int i = 0; i < pd; i++)
 			out[i] = p[i];
 	} else { /* higher order interpolations */
-		if (!(x>=0.0f && x<=w && y>=0.0f && y<=h))
+		if (!(x>=0 && x<=w && y>=0 && y<=h))
 			return false;
-		x -= 0.5f; y -= 0.5f;
+		x -= 0.5; y -= 0.5;
 		int xi = (x<0)? -1: x;
 		int yi = (y<0)? -1: y;
 		float ux = x - xi;
 		float uy = y - yi;
-		float paramKeys = 0.5;
+		float paramKeys = -0.5;
 		switch(order)  {
 		case 1: /* first order interpolation (bilinear) */
-			cx[0] = ux; cx[1] = 1.0f-ux;
-			cy[0] = uy; cy[1] = 1.0f-uy;
+			cx[0] = ux; cx[1] = 1-ux;
+			cy[0] = uy; cy[1] = 1-uy;
 			break;
 		case -3: /* third order interpolation (bicubic Keys) */
 			keys(cx, ux, paramKeys);
@@ -299,18 +300,18 @@ bool evaluate_spline_at(float *out,
 			splinen(cy, uy, ak, order);
 			break;
 		}
-		int n2 = (order==-3)? 2: (order+1)/2;
-		int n1 = 1-n2;
+		int n2 = (order == -3) ? 2 : (order+1)/2;
+		int n1 = 1 - n2;
 		/* this test saves computation time */
 		if (insideP(w, h, xi+n1, yi+n1) && insideP(w, h, xi+n1, yi+n2))
 		{
-			for(int k = 0; k < pd; k++) {
-				out[k] = 0.0f;
-				for(int dy = n1; dy <= n2; dy++) {
+			for (int k = 0; k < pd; k++) {
+				out[k] = 0;
+				for (int dy = n1; dy <= n2; dy++) {
 					int ii = xi + n1;
 					int jj = yi + dy;
 					float* v = img + (jj*w+ii)*pd+k;
-					for(int dx = n1; dx <= n2; dx++) {
+					for (int dx = n1; dx <= n2; dx++) {
 						float f = *v;
 						out[k]+=cy[n2-dy]*cx[n2-dx] * f;
 						v += pd;
@@ -318,12 +319,11 @@ bool evaluate_spline_at(float *out,
 				}
 			}
 		} else
-			for(int k = 0; k < pd; k++)
+			for (int k = 0; k < pd; k++)
 			{
-				out[k] = 0.0f;
-				for(int dy = n1; dy <= n2; dy++)
-				for(int dx = n1; dx <= n2; dx++) {
-					//float v = im.pixel_ext(xi+dx, yi+dy)[deltaComp];
+				out[k] = 0;
+				for (int dy = n1; dy <= n2; dy++)
+				for (int dx = n1; dx <= n2; dx++) {
 					int ii = xi + dx;
 					int jj = yi + dy;
 					getsample_t S = getsample_2;
@@ -372,16 +372,12 @@ static void naive_affine_map_using_spline(float *y, int out_w, int out_h,
 		fx[i] = x[i];
 	bool r = prepare_spline(fx, w, h, pd, order);
 	if (!r) exit(fprintf(stderr,"prepare spline failed (ord=%d)\n",order));
-	if (1) {
-		char buf[FILENAME_MAX];
-		snprintf(buf,FILENAME_MAX,"/tmp/prepared_spline_%d.tiff",order);
-		iio_save_image_float_vec(buf, fx, w, h, pd);
-	}
+	//if (1) {
+	//	char buf[FILENAME_MAX];
+	//	snprintf(buf,FILENAME_MAX,"/tmp/prepared_spline_%d.tiff",order);
+	//	iio_save_image_float_vec(buf, fx, w, h, pd);
+	//}
 	double invA[6]; invert_affinity(invA, A);
-	//fprintf(stderr, "A = %g %g %g  %g %g %g\n",
-	//		A[0], A[1], A[2], A[3], A[4], A[5]);
-	//fprintf(stderr, "invA = %g %g %g  %g %g %g\n",
-	//		invA[0], invA[1], invA[2], invA[3], invA[4], invA[5]);
 	for (int j = 0; j < out_h; j++)
 	for (int i = 0; i < out_w; i++)
 	{
