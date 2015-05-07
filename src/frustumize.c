@@ -120,6 +120,11 @@ static void obtain_pixel_direction(double d[3], double P[12], double ij1[3])
 #include "iio.h"
 #include "parsenumbers.c"
 #include "pickopt.c"
+#include "smapa.h"
+
+SMART_PARAMETER(FRUST_R,255)
+SMART_PARAMETER(FRUST_G,0)
+SMART_PARAMETER(FRUST_B,0)
 
 int main(int c, char *v[])
 {
@@ -199,8 +204,9 @@ int main(int c, char *v[])
 		for (int k = pd; k < 3; k++) rgb[k] = rgb[k-1];
 		if (idx+1 == idx_left || idx+1 == idx_right)
 		{
-			rgb[0] = 255;
-			rgb[1] = rgb[2] = 0;
+			rgb[0] = FRUST_R();
+			rgb[1] = FRUST_G();
+			rgb[2] = FRUST_B();
 		}
 
 		// get pixel direction
@@ -230,7 +236,8 @@ int main(int c, char *v[])
 
 	// put the focal point (in red, at position "2*w*h")
 	printf("%.16lf %.16lf %.16lf %d %d %d\n",
-				center[0], center[1], center[2], 255, 0, 0);
+				center[0], center[1], center[2],
+				(int)FRUST_R(), (int)FRUST_G(), (int)FRUST_B());
 
 
 	// base of the triangle
