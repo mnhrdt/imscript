@@ -193,14 +193,14 @@ int main(int c, char *v[])
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 	{
+		// coordinates in the original image
+		int ii = (i * iw) / w;
+		int jj = (j * ih) / h;
+
 		// get rgb at this point
 		uint8_t rgb[3];
 		for (int k = 0; k < pd; k++)
-		{
-			int ii = i * iw / w;
-			int jj = j * ih / h;
 			rgb[k] = color[jj][ii][k];
-		}
 		for (int k = pd; k < 3; k++) rgb[k] = rgb[k-1];
 		if (idx+1 == idx_left || idx+1 == idx_right)
 		{
@@ -211,7 +211,7 @@ int main(int c, char *v[])
 
 		// get pixel direction
 		double direction[3];
-		double ij1[3] = {i, j, 1};
+		double ij1[3] = {ii, jj, 1};
 		obtain_pixel_direction(direction, P, ij1);
 
 		// cut two sides of the frustum
