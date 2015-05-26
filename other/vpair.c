@@ -18,6 +18,9 @@
 #define BAD_MIN(a,b) a<b?a:b
 #define BAD_MAX(a,b) a>b?a:b
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 // data structure for the image viewer
 // this data goes into the "userdata" field of the FTR window structure
@@ -33,6 +36,8 @@ struct pan_state {
 	float hough_scale, hough_offx, hough_offy;
 	int show_line;
 	float line_theta, line_rho;
+	int show_point;
+	int point_x, point_y;
 
 	// 3. pointer to the window
 	struct FTR *f;
@@ -127,11 +132,12 @@ static bool cut_line_with_rectangle(double out_a[2], double out_b[2],
 	return false;
 }
 
-static void get_line_from_polar(double line[3], double rho, double theta)
+static void get_line_from_polar(double line[3], double rho, double theta,
+		int w, int h)
 {
 	line[0] = cos(theta);
 	line[1] = sin(theta);
-	line[2] = rho;
+	line[2] = rho - w*cos(theta)/2 - h*sin(theta)/2;
 }
 
 // funtion to test whether a point is inside the window
@@ -180,7 +186,7 @@ static void plot_segment_red(struct FTR *f,
 	traverse_segment(x0, y0, xf, yf, plot_pixel_red, f);
 }
 
-static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
+static void pan_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
 {
 	struct pan_state *e = f->userdata;
 
@@ -205,27 +211,43 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	if (e->show_line)
 	{
 		double line[3];
-		get_line_from_polar(line, e->line_rho, e->line_theta);
+		get_line_from_polar(line, e->line_rho, e->line_theta,
+				e->image_w, e->image_h);
 		double rectangle[2] = {e->image_w, e->image_h};
 		double p[2], q[2];
 		if (cut_line_with_rectangle(p, q, line, rectangle))
 			plot_segment_red(f, p[0], p[1], q[0], q[1]);
-		//int i = e->line_rho;
-		//int j = e->line_theta;
-		//if (insideP(e->left_w, f->h, i, j))
-		//{
-		//	f->rgb[(j*f->w+i)*3+0] = 0;
-		//	f->rgb[(j*f->w+i)*3+1] = 255;
-		//	f->rgb[(j*f->w+i)*3+2] = 0;
-		//}
+	}
+
+	// if necessary, show point
+	if (e->show_point)
+	{
+		for (int i_theta = 0; i_theta < e->hough_w; i_theta++)
+		{
+			int n_theta = e->hough_w;
+			int n_rho = e->hough_h;
+			int w = e->image_w;
+			int h = e->image_h;
+			float x = e->point_x;
+			float y = e->point_y;
+			float theta = i_theta * 2 * M_PI / n_theta;
+			float alpha = M_PI + atan2(y, x);
+			float rho = hypot(x, y) * cos(alpha - theta);
+			int i_rho   = n_rho   * (0.5 + rho   / hypot(w, h) );
+			if (insideP(f->w, f->h, i_theta + e->left_w, i_rho))
+			{
+				int fidx = i_rho * f->w + i_theta + e->left_w;
+				f->rgb[3*fidx+0] = 255;
+				f->rgb[3*fidx+1] /= 2;
+				f->rgb[3*fidx+2] /= 2;
+			}
+		}
 	}
 }
 
-
-
 static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 {
-	fprintf(stderr, "motion F (b=%d m=%d, xy=%d %d)\n", b, m, x, y);
+	//fprintf(stderr, "motion F (b=%d m=%d, xy=%d %d)\n", b, m, x, y);
 
 	struct pan_state *e = f->userdata;
 
@@ -233,24 +255,65 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 	if (x >= e->left_w && x < f->w && y >= 0 && y < f->h)
 	{
 		e->show_line = 1;
-		e->line_theta = -y * (2*3.1416) / e->hough_h;
-		e->line_rho = ((x - e->left_w) / hypot(e->hough_w, e->hough_h)) * e->hough_w;
-		fprintf(stderr, "show at theta=%g rho=%g\n", e->line_theta, e->line_rho);
+		e->line_theta = (x - e->left_w) * 2 * M_PI / e->hough_w;
+		e->line_rho = (y / (float)e->hough_h - 0.5) * hypot(e->hough_w, e->hough_h);
+		//fprintf(stderr, "the hough (x,y)=(%d %d) is theta=%g rho=%g\n", x-e->left_w, y, e->line_theta, e->line_rho);
 	} else
 		e->show_line = 0;
+
+	// if i'm on the right side, request point showing)
+	if (x >= 0 && x < e->left_w && y >= 0 && y < f->h)
+	{
+		e->show_point = 1;
+		e->point_x = x - e->image_w / 2;
+		e->point_y = y - e->image_h / 2;
+		//fprintf(stderr, "the point (x,y)=(%d %d) will be plotted \n", e->point_x, e->point_y);
+	} else
+		e->show_point = 0;
 
 	f->changed = 1;
 }
 
 void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
-	fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
-			k, isalpha(k)?k:' ', m, x, y);
+	//fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
+	//		k, isalpha(k)?k:' ', m, x, y);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
 		ftr_notify_the_desire_to_stop_this_loop(f, 1);
 
+}
+
+static
+void gradient(float *grad, float *colors, int w, int h, int pd)
+{
+	float *x = xmalloc(w * h * sizeof*x);
+
+	// associated gray image (temporal to this function)
+	for (int i = 0; i < w * h; i++)
+		x[i] = 0;
+	for (int i = 0; i < w * h; i++)
+	for (int l = 0; l < pd; l++)
+		x[i] += colors[i*pd+l];
+
+	// forward-difference gradient
+	for (int i = 0; i < w * h * 2; i++)
+		grad[i] = 0;
+	for (int j = 0; j < h-1; j++)
+	for (int i = 0; i < w-1; j++)
+	{
+		grad[2*(j*w+i)+0] = x[j*w+i+1] - x[j*w+i];
+		grad[2*(j*w+i)+1] = x[j*w+i+w] - x[j*w+i];
+	}
+
+	free(x);
+}
+
+static
+void ghough(float *transform, int n_theta, int n_rho, float *grad, int w, int h)
+{
+	// copy from ghough2
 }
 
 int main_pan(int c, char *v[])
@@ -272,8 +335,17 @@ int main_pan(int c, char *v[])
 	struct pan_state e[1];
 	e->image = iio_read_image_float_vec(filename_image,
 			&e->image_w, &e->image_h, &e->image_pd);
-	e->hough = iio_read_image_float_vec(filename_hough,
-			&e->hough_w, &e->hough_h, &e->hough_pd);
+	if (0 == strcmp(filename_hough, "NONE")) {
+		fail("caca");
+		//e->hough_w = e->image_w;
+		//e->hough_h = e->image_h;
+		//e->hough = xmalloc(1 * e->hough_w * e->hough_h * sizeof(float));
+		//float *g = xmalloc(2 * e->image_w * e->image_h * sizeof(float));
+		//gradient(g, e->image, e->image_w, e->image_h, e->image_pd);
+		//ghough(e->hough, e->hough_h
+	} else
+		e->hough = iio_read_image_float_vec(filename_hough,
+				&e->hough_w, &e->hough_h, &e->hough_pd);
 	if (e->image_pd != 3 || e->hough_pd != 1)
 		return fprintf(stderr, "I expect left=color & right=gray\n");
 
