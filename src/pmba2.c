@@ -60,7 +60,7 @@ static double matrix_inversion(double ia[9], double a[9])
 	return det;
 }
 
-static double matrix_times_vector(double y[3], double A[9], double x[3])
+static void matrix_times_vector(double y[3], double A[9], double x[3])
 {
 	// 0 1 2
 	// 3 4 5
@@ -126,7 +126,7 @@ static void fill_rotation_matrix_from_quaternion(double *R, double r[4])
 }
 
 static void compute_left_3x3_block_of_camera_matrix(double M[9], double r[10],
-        double P[6])
+        double P[3])
 {
     // r contains the reference parameters of the camera in that order:
     // f, px, py, cx, cy, cz, qx, qy, qz, qw
@@ -135,14 +135,14 @@ static void compute_left_3x3_block_of_camera_matrix(double M[9], double r[10],
     double R[9];
     fill_rotation_matrix_from_quaternion(R, r+6);
     double Rp[9];
-    fill_rotation_matrix_from_angles(Rp, P+3);
+    fill_rotation_matrix_from_angles(Rp, P);
     double tmp[9];
     matrix_product(tmp, Rp, R);
     matrix_product(M, K, tmp);
 }
 
 // find the straight line determined by a pixel on the given camera
-static void from_pixel_to_line(double l[6], double r[10], double P[6],
+static void from_pixel_to_line(double l[6], double r[10], int nvar, double *P,
         double ij[2])
 {
 	// 1. set-up output location
@@ -150,9 +150,15 @@ static void from_pixel_to_line(double l[6], double r[10], double P[6],
 	double *direction = l + 3;
 
 	// 2. compute camera center
-    center[0] = r[3] + P[0];
-    center[1] = r[4] + P[1];
-    center[2] = r[5] + P[2];
+    center[0] = r[3];
+    center[1] = r[4];
+    center[2] = r[5];
+    if (nvar == 6) {
+        center[0] += P[0];
+        center[1] += P[1];
+        center[2] += P[2];
+        P += 3;
+    }
 
 	// 3. compute line of sight of this pixel
     double M[9];
@@ -167,7 +173,7 @@ static void from_pixel_to_line(double l[6], double r[10], double P[6],
 }
 
 // compute alternate bundle adjustment cost (ie distance between rays)
-static double compute_aba_cost(int n, double *ref, double *P, int nc,
+static double compute_aba_cost(int n, double *ref, int nvar, double *P, int nc,
         double *c)
 {
 	long double r = 0;
@@ -180,14 +186,14 @@ static double compute_aba_cost(int n, double *ref, double *P, int nc,
 		double *kj = ck + 2*j;  // j-th point of the k-th correspondence
 		double *ri = ref + 10*i;  // i-th camera reference parameters
 		double *rj = ref + 10*j;  // j-th camera reference parameters
-		double *Pi = P + 6*i;  // i-th perturbation parameters
-		double *Pj = P + 6*j;  // j-th perturbation parameters
+		double *Pi = P + nvar*i;  // i-th perturbation parameters
+		double *Pj = P + nvar*j;  // j-th perturbation parameters
 		if (!isfinite(ki[0] + ki[1] + kj[0] + kj[1]))
 			continue;
 		//fprintf(stderr, "ki=(%g %g) kj=(%g %g)\n", ki[0], ki[1], kj[0], kj[1]);
-		double lin_ki[9], lin_kj[9];
-		from_pixel_to_line(lin_ki, ri, Pi, ki);
-		from_pixel_to_line(lin_kj, rj, Pj, kj);
+		double lin_ki[6], lin_kj[6];
+		from_pixel_to_line(lin_ki, ri, nvar, Pi, ki);
+		from_pixel_to_line(lin_kj, rj, nvar, Pj, kj);
 		double e = distance_between_two_straight_lines(lin_ki, lin_kj);
 		//fprintf(stderr, "e[%d][%d,%d] = %g\n", k, i, j, e);
 		if (isfinite(e))
@@ -209,22 +215,27 @@ int main(int c, char *v[])
 	bool do_normalize = pick_option(&c, &v, "n", 0);
 	bool do_root = pick_option(&c, &v, "r", 0);
 	double units = atof(pick_option(&c, &v, "u", "1"));
-	if (c < 16) {
+	bool no_translation = pick_option(&c, &v, "-no-translation", 0);
+    int nvar = no_translation ? 3 : 6;
+
+	if (c < (2 + 2 * (1 + nvar))) {
 falla:
 		//                         0    1         2
 		fprintf(stderr, "usage:\n\t%s 2ncols.txt ref1.txt ... refn.txt"
-                " P1 ... P6n\n", *v);
+                " [--no-translation] P1 ... P3n [ ... P6n]\n", *v);
+        //fprintf(stderr, "c: %d, nvar: %d\n", c, nvar);
 		return c;
 	}
-	int n = (c - 2)/7;
+
+	int n = (c - 2) / (1 + nvar);
+	if ((1 + nvar) * n + 2 != c) goto falla;
 	//fprintf(stderr, "n_views = %d\n", n);
-	if (7*n + 2 != c) goto falla;
 	char *filename_corr = v[1];
-	double P[n][6];
+	double P[n][nvar];
 	for (int i = 0; i < n; i++)
-	for (int k = 0; k < 6; k++)
+	for (int k = 0; k < nvar; k++)
 	{
-		P[i][k] = atof(v[2+n + 6*i + k]);
+		P[i][k] = atof(v[2+n + nvar*i + k]);
 		//fprintf(stderr, "P[%d][%d] = %lf\n", i, k, P[i][k]);
 	}
 
@@ -245,8 +256,7 @@ falla:
         read_n_doubles_from_string(ref[i], v[2+i], 10);
 
 	// compute and print reprojection error
-    double err = compute_aba_cost(n, ref[0], P[0],
-            ncorr, corr);
+    double err = compute_aba_cost(n, ref[0], nvar, P[0], ncorr, corr);
 	if (do_normalize) err /= ncorr;
 	if (do_root) err = sqrt(err);
 	err *= units;
