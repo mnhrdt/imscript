@@ -37,13 +37,12 @@ struct pan_state {
 	float hough_scale, hough_offx, hough_offy;
 
 	// 3. viewer state (decoration)
-	//int show_line;
-	//float line_theta, line_rho;
-	//int show_point;
-	//int point_x, point_y;
 	int show_dip_bundle;
 	double dip_a, dip_b;
 	int dip_offset, dip_stride;
+	int show_tangent;
+	double tangent_space[3];
+	double tangent_trans[3];
 
 	// 4. pointer to the window
 	struct FTR *f;
@@ -107,13 +106,15 @@ static bool cut_line_with_segment(double out[2], double line[3],
 }
 
 static bool cut_line_with_rectangle(double out_a[2], double out_b[2],
-		double line[3], double rectangle[2])
+		double line[3], double rec_from[2], double rec_to[4])
 {
-	double w = rectangle[0];
-	double h = rectangle[1];
-
 	// four vertices of the rectangle
-	double v[4][2] = { {0, 0}, {w, 0}, {w, h}, {0, h} };
+	double v[4][2] = {
+		{ rec_from[0], rec_from[1] },
+		{ rec_to[0]  , rec_from[1] },
+		{ rec_to[0]  , rec_to[1]   },
+		{ rec_from[0], rec_to[1]   }
+	};
 
 	// intersections with each of the edges
 	bool xP[4]; // whether it intersects
@@ -126,8 +127,7 @@ static bool cut_line_with_rectangle(double out_a[2], double out_b[2],
 	if (n_intersections == 2) { // generic case: 2 intersections
 		int cx = 0;
 		for (int i = 0; i < 4; i++)
-			if (xP[i])
-			{
+			if (xP[i]) {
 				double *out = cx ? out_b : out_a;
 				out[0] = x[i][0];
 				out[1] = x[i][1];
@@ -137,6 +137,38 @@ static bool cut_line_with_rectangle(double out_a[2], double out_b[2],
 	}
 	return false;
 }
+
+//static bool cut_line_with_rectangle(double out_a[2], double out_b[2],
+//		double line[3], double rectangle[2])
+//{
+//	double w = rectangle[0];
+//	double h = rectangle[1];
+//
+//	// four vertices of the rectangle
+//	double v[4][2] = { {0, 0}, {w, 0}, {w, h}, {0, h} };
+//
+//	// intersections with each of the edges
+//	bool xP[4]; // whether it intersects
+//	double x[4][2]; // where it intersects
+//	for (int i = 0; i < 4; i++)
+//		xP[i] = cut_line_with_segment(x[i], line, v[i], v[ (i+1)%4 ] );
+//
+//	// write output
+//	int n_intersections = xP[0] + xP[1] + xP[2] + xP[3];
+//	if (n_intersections == 2) { // generic case: 2 intersections
+//		int cx = 0;
+//		for (int i = 0; i < 4; i++)
+//			if (xP[i])
+//			{
+//				double *out = cx ? out_b : out_a;
+//				out[0] = x[i][0];
+//				out[1] = x[i][1];
+//				cx += 1;
+//			}
+//		return true;
+//	}
+//	return false;
+//}
 
 static void get_line_from_polar(double line[3], double rho, double theta,
 		int w, int h)
@@ -284,6 +316,51 @@ static void pan_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
 			}
 		}
 	}
+
+	// if necessary, show transformed tangent
+	if (e->show_tangent)
+	{
+		fprintf(stderr, "spatial tangent %g %g %g\n",
+				e->tangent_space[0],
+				e->tangent_space[1],
+				e->tangent_space[2]);
+		double rec[4] = {0, 0, e->image_w, e->image_h};
+		double p[2], q[2];
+		if (cut_line_with_rectangle(p, q, e->tangent_space, rec, rec+2))
+		{
+			fprintf(stderr, "p = %g %g\n", p[0], p[1]);
+			fprintf(stderr, "q = %g %g\n", q[0], q[1]);
+			plot_segment_red(f, p[0], p[1], q[0], q[1]);
+		}
+
+		fprintf(stderr, "transformed tangent %g %g %g\n",
+				e->tangent_trans[0],
+				e->tangent_trans[1],
+				e->tangent_trans[2]);
+		double arad = e->aradius;
+		double rek[4] = {-arad, -arad, arad, arad};
+		//double p[2], q[2];
+		if (cut_line_with_rectangle(p, q, e->tangent_trans, rek, rek+2))
+		{
+			int tside = e->hough_w;
+			int ipa = (p[0] / arad + 0.5) * (tside - 1) + e->left_w;
+			int ipb = (p[1] / arad + 0.5) * (tside - 1);
+			int iqa = (q[0] / arad + 0.5) * (tside - 1) + e->left_w;
+			int iqb = (q[1] / arad + 0.5) * (tside - 1);
+			if (ipa < e->left_w) ipa = e->left_w;
+			if (iqa < e->left_w) iqa = e->left_w;
+			fprintf(stderr, "ip = %d %d, iq= %d %d\n", ipa, ipb, iqa, iqb);
+			plot_segment_red(f, ipa, ipb, iqa, iqb);
+		}
+		//
+	//	double line[3];
+	//	get_line_from_polar(line, e->line_rho, e->line_theta,
+	//			e->image_w, e->image_h);
+	//	double rectangle[2] = {e->image_w, e->image_h};
+	//	double p[2], q[2];
+	//	if (cut_line_with_rectangle(p, q, line, rectangle))
+	//		plot_segment_red(f, p[0], p[1], q[0], q[1]);
+	}
 }
 
 static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
@@ -313,6 +390,16 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 	f->changed = 1;
 }
 
+static void fw_gradient_at(float g[2], float *x, int w, int h, int i, int j)
+{
+	double x00 = getsample_0( x, w, h, 1, i + 0, j + 0, 0);
+	double x10 = getsample_0( x, w, h, 1, i + 1, j + 0, 0);
+	double x01 = getsample_0( x, w, h, 1, i + 0, j + 1, 0);
+	g[0] = x10 - x00;
+	g[1] = x01 - x00;
+}
+
+
 static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 {
 	//fprintf(stderr, "motion F (b=%d m=%d, xy=%d %d)\n", b, m, x, y);
@@ -332,6 +419,25 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 		e->show_dip_bundle = 1;
 	} else
 		e->show_dip_bundle = 0;
+
+	// if i'm on the left side, request tangent drawing
+	if (x >= 0 && x < e->left_w && y >= 0 && y < f->h)
+	{
+		// (x,y) is the point
+		// g[0], g[1] is the gradient
+		float g[2];
+		fw_gradient_at(g, e->image, e->image_w, e->image_h, x, y);
+		e->tangent_space[0] = g[0];
+		e->tangent_space[1] = g[1];
+		e->tangent_space[2] = -(g[0] * x + g[1] * y);
+
+		float theta = x * 2 * M_PI / e->image_w;
+		e->tangent_trans[0] = -g[1] * sin(theta);
+		e->tangent_trans[1] = g[1] * cos(theta);
+		e->tangent_trans[2] = g[0];
+		e->show_tangent = 1;
+	} else
+		e->show_tangent = 0;
 
 #if 0
 	// if i'm on the left side, request line showing)
