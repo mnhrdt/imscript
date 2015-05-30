@@ -138,38 +138,6 @@ static bool cut_line_with_rectangle(double out_a[2], double out_b[2],
 	return false;
 }
 
-//static bool cut_line_with_rectangle(double out_a[2], double out_b[2],
-//		double line[3], double rectangle[2])
-//{
-//	double w = rectangle[0];
-//	double h = rectangle[1];
-//
-//	// four vertices of the rectangle
-//	double v[4][2] = { {0, 0}, {w, 0}, {w, h}, {0, h} };
-//
-//	// intersections with each of the edges
-//	bool xP[4]; // whether it intersects
-//	double x[4][2]; // where it intersects
-//	for (int i = 0; i < 4; i++)
-//		xP[i] = cut_line_with_segment(x[i], line, v[i], v[ (i+1)%4 ] );
-//
-//	// write output
-//	int n_intersections = xP[0] + xP[1] + xP[2] + xP[3];
-//	if (n_intersections == 2) { // generic case: 2 intersections
-//		int cx = 0;
-//		for (int i = 0; i < 4; i++)
-//			if (xP[i])
-//			{
-//				double *out = cx ? out_b : out_a;
-//				out[0] = x[i][0];
-//				out[1] = x[i][1];
-//				cx += 1;
-//			}
-//		return true;
-//	}
-//	return false;
-//}
-
 static void get_line_from_polar(double line[3], double rho, double theta,
 		int w, int h)
 {
@@ -245,43 +213,6 @@ static void pan_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
 		f->rgb[(j*f->w+i)*3+l] = getsample_0(e->hough,
 				e->hough_w, e->hough_h, 1, i-e->left_w, j, 0);
 
-	//// if necessary, show line
-	//if (e->show_line)
-	//{
-	//	double line[3];
-	//	get_line_from_polar(line, e->line_rho, e->line_theta,
-	//			e->image_w, e->image_h);
-	//	double rectangle[2] = {e->image_w, e->image_h};
-	//	double p[2], q[2];
-	//	if (cut_line_with_rectangle(p, q, line, rectangle))
-	//		plot_segment_red(f, p[0], p[1], q[0], q[1]);
-	//}
-
-	//// if necessary, show point
-	//if (e->show_point)
-	//{
-	//	for (int i_theta = 0; i_theta < e->hough_w; i_theta++)
-	//	{
-	//		int n_theta = e->hough_w;
-	//		int n_rho = e->hough_h;
-	//		int w = e->image_w;
-	//		int h = e->image_h;
-	//		float x = e->point_x;
-	//		float y = e->point_y;
-	//		float theta = i_theta * 2 * M_PI / n_theta;
-	//		float alpha = M_PI + atan2(y, x);
-	//		float rho = hypot(x, y) * cos(alpha - theta);
-	//		int i_rho   = n_rho   * (0.5 + rho   / hypot(w, h) );
-	//		if (insideP(f->w, f->h, i_theta + e->left_w, i_rho))
-	//		{
-	//			int fidx = i_rho * f->w + i_theta + e->left_w;
-	//			f->rgb[3*fidx+0] = 255;
-	//			f->rgb[3*fidx+1] /= 2;
-	//			f->rgb[3*fidx+2] /= 2;
-	//		}
-	//	}
-	//}
-
 	// if necessary, show dip bundle
 	if (e->show_dip_bundle)
 	{
@@ -291,7 +222,8 @@ static void pan_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
 			int n_z = e->image_h;
 			float theta = i_theta * 2 * M_PI / n_theta;
 			float z = e->dip_a * cos(theta) + e->dip_b * sin(theta);
-			int i_z = 50 * e->aradius * z + n_z / 2;
+			float magic_factor = n_theta / M_PI;
+			int i_z = magic_factor * z;
 			for (int kk = -n_z/2 - 100;
 					kk <= n_z; kk += e->dip_stride)
 			{
@@ -343,23 +275,16 @@ static void pan_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
 		if (cut_line_with_rectangle(p, q, e->tangent_trans, rek, rek+2))
 		{
 			int tside = e->hough_w;
-			int ipa = (p[0] / arad + 0.5) * (tside - 1) + e->left_w;
-			int ipb = (p[1] / arad + 0.5) * (tside - 1);
-			int iqa = (q[0] / arad + 0.5) * (tside - 1) + e->left_w;
-			int iqb = (q[1] / arad + 0.5) * (tside - 1);
-			if (ipa < e->left_w) ipa = e->left_w;
-			if (iqa < e->left_w) iqa = e->left_w;
+			double alf = (tside - 1) / (2.0 * arad);
+			double bet = (tside - 1) / 2.0;
+			int ipa = alf * p[0] + bet + e->left_w;
+			int ipb = alf * p[1] + bet;
+			int iqa = alf * q[0] + bet + e->left_w;
+			int iqb = alf * q[1] + bet;
+			fprintf(stderr, "p = %g %g, q= %g %g\n", p[0], p[1], q[0], q[1]);
 			fprintf(stderr, "ip = %d %d, iq= %d %d\n", ipa, ipb, iqa, iqb);
 			plot_segment_red(f, ipa, ipb, iqa, iqb);
 		}
-		//
-	//	double line[3];
-	//	get_line_from_polar(line, e->line_rho, e->line_theta,
-	//			e->image_w, e->image_h);
-	//	double rectangle[2] = {e->image_w, e->image_h};
-	//	double p[2], q[2];
-	//	if (cut_line_with_rectangle(p, q, line, rectangle))
-	//		plot_segment_red(f, p[0], p[1], q[0], q[1]);
 	}
 }
 
@@ -395,8 +320,11 @@ static void fw_gradient_at(float g[2], float *x, int w, int h, int i, int j)
 	double x00 = getsample_0( x, w, h, 1, i + 0, j + 0, 0);
 	double x10 = getsample_0( x, w, h, 1, i + 1, j + 0, 0);
 	double x01 = getsample_0( x, w, h, 1, i + 0, j + 1, 0);
-	g[0] = x10 - x00;
-	g[1] = x01 - x00;
+	double x11 = getsample_0( x, w, h, 1, i + 1, j + 1, 0);
+	g[0] = 0.5 * (x10 - x00 + x11 - x01);
+	g[1] = 0.5 * (x01 - x00 + x11 - x10);
+	//g[0] = x10 - x00;
+	//g[1] = x01 - x00;
 }
 
 
@@ -416,6 +344,7 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 		int ib = y;
 		e->dip_a = arad * (ia / (tside - 1.0) - 0.5);
 		e->dip_b = arad * (ib / (tside - 1.0) - 0.5);
+		fprintf(stderr, "vdip = %g %g\n", e->dip_a, e->dip_b);
 		e->show_dip_bundle = 1;
 	} else
 		e->show_dip_bundle = 0;
@@ -438,28 +367,6 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 		e->show_tangent = 1;
 	} else
 		e->show_tangent = 0;
-
-#if 0
-	// if i'm on the left side, request line showing)
-	if (x >= e->left_w && x < f->w && y >= 0 && y < f->h)
-	{
-		e->show_line = 1;
-		e->line_theta = (x - e->left_w) * 2 * M_PI / e->hough_w;
-		e->line_rho = (y / (float)e->hough_h - 0.5) * hypot(e->hough_w, e->hough_h);
-		//fprintf(stderr, "the hough (x,y)=(%d %d) is theta=%g rho=%g\n", x-e->left_w, y, e->line_theta, e->line_rho);
-	} else
-		e->show_line = 0;
-
-	// if i'm on the right side, request point showing)
-	if (x >= 0 && x < e->left_w && y >= 0 && y < f->h)
-	{
-		e->show_point = 1;
-		e->point_x = x - e->image_w / 2;
-		e->point_y = y - e->image_h / 2;
-		//fprintf(stderr, "the point (x,y)=(%d %d) will be plotted \n", e->point_x, e->point_y);
-	} else
-		e->show_point = 0;
-#endif
 
 	f->changed = 1;
 }
@@ -498,12 +405,6 @@ void gradient(float *grad, float *colors, int w, int h, int pd)
 	}
 
 	free(x);
-}
-
-static
-void ghough(float *transform, int n_theta, int n_rho, float *grad, int w, int h)
-{
-	// copy from ghough2
 }
 
 int main_pan(int c, char *v[])

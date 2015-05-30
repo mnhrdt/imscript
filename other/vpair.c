@@ -353,12 +353,14 @@ int main_pan(int c, char *v[])
 	struct FTR f = ftr_new_window(e->image_w + e->hough_w, e->image_h);
 	f.userdata = e;
 	e->f = &f;
+
+	// setup "state" variables
 	e->left_w = e->image_w;
 	e->right_w = e->hough_w;
 	e->show_line = 0;
 	f.changed = 1;
 
-	// set handlers
+	// set event handlers
 	ftr_set_handler(&f, "expose", pan_exposer);
 	ftr_set_handler(&f, "motion", pan_motion_handler);
 	ftr_set_handler(&f, "key"   , pan_key_handler);

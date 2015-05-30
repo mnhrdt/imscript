@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include <math.h>
 
+#include <stdlib.h>
+#include "iio.h"
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -95,14 +98,16 @@ static
 bool get_positive_gradient(double g[2], float *x, int w, int h, int i, int j)
 {
 	if (!insideP(w, h, i, j)) return false;
-	if (!insideP(w, h, i+1, j)) return false;
-	if (!insideP(w, h, i, j+1)) return false;
+	if (!insideP(w, h, i+1, j+1)) return false;
 	double xij = x[ (j + 0)*w + (i + 0) ];
 	double xIj = x[ (j + 0)*w + (i + 1) ];
 	double xiJ = x[ (j + 1)*w + (i + 0) ];
-	if (xij < 0 || xIj < 0 || xiJ < 0) return false;
-	g[0] = xIj - xij;
-	g[1] = xiJ - xij;
+	double xIJ = x[ (j + 1)*w + (i + 1) ];
+	if (xij <= 9 || xIj <= 9 || xiJ <= 9 || xIJ <= 9) return false;
+	g[0] = 0.5 * (xIj - xij + xIJ - xiJ);
+	g[1] = 0.5 * (xiJ - xij + xIJ - xIj);
+	//g[0] = xIj - xij;
+	//g[1] = xiJ - xij;
 	return true;
 }
 
@@ -153,6 +158,11 @@ static void accumulate_line(float *acc, int w, int h,
 
 void tdip(float *transform, double arad, int tside, float *dip, int w, int h)
 {
+	// gradient mask image (for debugging purposes)
+	float *tmp = malloc(w * h * sizeof*tmp);
+	for (int i = 0;  i < w*h; i++)
+		tmp[i] = NAN;
+
 	// set accumulator to 0
 	for (int i = 0; i < tside * tside; i++)
 		transform[i] = 0;
@@ -164,20 +174,21 @@ void tdip(float *transform, double arad, int tside, float *dip, int w, int h)
 		double g[2] = {0, 0};
 		if (get_positive_gradient(g, dip, w, h, i, j))
 		{
-			if (fabs(g[1]) < 1e-2 || fabs(g[0]) < 1e-2)
+			if (fabs(g[1]) < 1e-2 ||  fabs(g[0]) < 1e-2)
 				continue;
 			double gn = hypot(g[0], g[1]);
 			if (gn < 9)
 				continue;
+			tmp[w*j+i] = gn;
 
 			double theta = i * 2 * M_PI / w;
 			double l[3] = {-sin(theta), cos(theta), g[0]/g[1]};
 			double rec[4] = {-arad, -arad, arad, arad};
-			double aa[2], bb[2];
+			double aa[2], bb[2]; // (bad names)
 			if (cut_line_with_rectangle(aa, bb, l, rec, rec+2))
 			{
-				double alf = (tside - 1) / arad;
-				double bet = (tside - 1)/2.0;
+				double alf = (tside - 1) / (2.0 * arad);
+				double bet = (tside - 1) / 2.0;
 				int iaa[2] = {alf*aa[0] + bet, alf*aa[1] + bet};
 				int ibb[2] = {alf*bb[0] + bet, alf*bb[1] + bet};
 				//fprintf(stderr, "i,j=%d,%d, g=%g,%g l=%g,%g,%g, aa=%d,%d bb=%d,%d\n", i, j, g[0], g[1], l[0], l[1], l[2], iaa[0], iaa[1], ibb[0], ibb[1]);
@@ -194,6 +205,10 @@ void tdip(float *transform, double arad, int tside, float *dip, int w, int h)
 			//}
 		}
 	}
+
+	// debug stuff
+	iio_save_image_float_vec("/tmp/gradmask.tiff", tmp, w, h, 1);
+	free(tmp);
 }
 
 
