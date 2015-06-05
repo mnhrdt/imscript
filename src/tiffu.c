@@ -2107,6 +2107,91 @@ static int main_zoomout(int c, char *v[])
 	return 0;
 }
 
+// main_vzoomout {{{1
+
+static void vzoom_out_by_factor_two(char *fname_out, char *fname_in, int op)
+{
+	// get information of input file
+	struct tiff_info tin[1], tout[1];
+	get_tiff_info_filename(tin, fname_in);
+	if (!tin->tiled) fail("I can only zoom out tiled images");
+
+	// create output file
+	tout[0] = tin[0];
+	tout->w = ceil(tin->w);
+	tout->h = ceil(tin->h/2.0);
+	create_zero_tiff_file_tinfo(fname_out, tout, true, tin->compressed);
+	get_tiff_info_filename(tout, fname_out);
+
+	//// create buffer tile for output file
+	struct tiff_tile buf[1];
+	read_tile_from_file(buf, fname_out, 0);
+	TIFF *tif = TIFFOpen(fname_out, "r+");
+
+	// create cache structure for input file
+	int tilesize = tinfo_tilesize(tin);
+	int megabytes = tilesize / 250000;
+	if (megabytes < 100) megabytes = 100;
+	struct tiff_tile_cache cin[1];
+	//fprintf(stderr, "requesting %d cache megabytes\n", megabytes);
+	tiff_tile_cache_init(cin, fname_in, megabytes);
+
+
+	// fill-in tiles
+	for (int tj = 0; tj < tout->td; tj++)
+	for (int ti = 0; ti < tout->ta; ti++)
+	{
+		// variables used below:
+		// ti, tj, tout, buf, tilesize, cin, fname_out
+		int offx = ti * tout->tw;
+		int offy = tj * tout->th;
+		int tidx = my_computetile(tout, offx, offy);
+		memset(buf->data, tidx, tilesize);
+		if (tidx < 0) fail("offsets %d %d outside", offx, offy);
+		for (int j = 0; j < tout->th; j++)
+		for (int i = 0; i < tout->tw; i++)
+		{
+			int neig[4][2] = { {0,0}, {1,0}, {0,1}, {1,1}};
+			void *p[4];
+			for (int k = 0; k < 4; k++)
+			{
+				int ii = 2 * (offx + i) + neig[k][0];
+				int jj = 2 * (offy + j) + neig[k][1];
+				p[k] = tiff_tile_cache_getpixel(cin, ii, jj);
+			}
+			if(!p[0]||!p[3]){/*fprintf(stderr,"\tlost %d %d\n",offx+i,offy+j);*/continue;}
+			int psiz = tinfo_pixelsize(tout);
+			int ppos = (i + j * buf->w) * psiz;
+			void *pdest = ppos + (char*)buf->data;
+			//memcpy(pdest, p[0], psiz);
+			combine_4pixels(pdest,p, tin->spp,tin->fmt,tin->bps,op);
+		}
+		TIFFWriteTile(tif, buf->data, offx, offy, 0, 0);
+		//fprintf(stderr, "writing tile %d\n", tidx);
+		//put_tile_into_file(fname_out, buf, tidx);
+	}
+	free(buf->data);
+	TIFFClose(tif);
+	tiff_tile_cache_free(cin);
+}
+
+static int main_vzoomout(int c, char *v[])
+{
+	if (c != 4) {
+		fprintf(stderr, "usage:\n\t"
+				"%s {f|v|i|a} in.tiff out.tiff\n", *v);
+		//                0  1        2       3
+		return 1;
+	}
+	int op = v[1][0];
+	char *filename_in = v[2];
+	char *filename_out = v[3];
+
+	vzoom_out_by_factor_two(filename_out, filename_in, op);
+
+	return 0;
+}
+
 // main_crop {{{1
 static int main_crop(int c, char *v[])
 {
@@ -2500,6 +2585,7 @@ int main(int c, char *v[])
 	if (0 == strcmp(v[1], "meta"))     return main_meta    (c-1, v+1);
 	if (0 == strcmp(v[1], "getpixel")) return main_getpixel(c-1, v+1);
 	if (0 == strcmp(v[1], "zoomout"))  return main_zoomout (c-1, v+1);
+	if (0 == strcmp(v[1], "vzoomout")) return main_vzoomout(c-1, v+1);
 	if (0 == strcmp(v[1], "manwhole")) return main_manwhole(c-1, v+1);
 	if (0 == strcmp(v[1], "octaves"))  return main_octaves (c-1, v+1);
 	if (0 == strcmp(v[1], "dlist"))    return main_dlist   (c-1, v+1);
