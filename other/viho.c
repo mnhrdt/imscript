@@ -51,6 +51,8 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
 
 //// user interface library
 #include "ftr.h"
@@ -238,7 +240,7 @@ static void homography_from_eight_points(double H[3][3],
 	compose_homographies(H, H2, iH1);
 }
 
-/// compute the vector product of two vectors
+// compute the vector product of two vectors
 static void vector_product(double axb[3], double a[3], double b[3])
 {
 	// a0 a1 a2
@@ -319,20 +321,12 @@ static void adjust_affine_corner(struct viewer_state *e)
 typedef float (*extrapolator_t)(float*,int,int,int,int,int,int);
 
 // auxiliary function: compute n%p correctly, even for huge and negative numbers
-static int good_modulus(int nn, int p)
+static int good_modulus(int n, int p)
 {
-	if (!p) return 0;
-	if (p < 1) return good_modulus(nn, -p);
-
-	unsigned int r;
-	if (nn >= 0)
-		r = nn % p;
-	else {
-		unsigned int n = nn;
-		r = p - (-n) % p;
-		if (r == p)
-			r = 0;
-	}
+	int r = n % p;
+	r = r < 0 ? r + p : r;
+	assert(r >= 0);
+	assert(r < p);
 	return r;
 }
 

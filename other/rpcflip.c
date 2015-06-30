@@ -55,11 +55,12 @@ struct pan_view {
 	int w, h;                  // pixel dimensions of the P image
 	struct tiff_octaves tg[1]; // P
 	struct tiff_octaves tc[1]; // MS
+	int gray_only;
 
 	// RGB preview of the whole image
 	uint8_t *preview;
 	int pw, ph;
-	char *pfg, *pfc;
+	char *pfg, *pfc; // filenames
 
 	// calibration
 	struct rpc r[1];
@@ -115,7 +116,13 @@ uint8_t *load_nice_preview(char *fg, char *fc, int *w, int *h)
 	//fprintf(stderr, "load nice preview!\n");
 	int wg, hg, wc, hc;
 	uint8_t *g = (void*)iio_read_image_uint8_rgb(fg, &wg, &hg);
-	uint8_t *c = (void*)iio_read_image_uint8_rgb(fc, &wc, &hc);
+	uint8_t *c = NULL;
+	if (fc)
+		c = (void*)iio_read_image_uint8_rgb(fc, &wc, &hc);
+	else {
+		wc = wg;
+		hc = hg;
+	}
 	uint8_t *r = xmalloc(3 * wg * hg);
 	memset(r, 0, 3 * wg * hg);
 
@@ -125,9 +132,12 @@ uint8_t *load_nice_preview(char *fg, char *fc, int *w, int *h)
 	{
 		int cidx = j*wc + i;
 		int gidx = j*wg + i;
-		float R = c[3*cidx + 0];
-		float G = c[3*cidx + 1];
-		float B = c[3*cidx + 2];
+		float R, G, B;
+		if (c) {
+			R = c[3*cidx + 0];
+			G = c[3*cidx + 1];
+			B = c[3*cidx + 2];
+		} else R = G = B = 127;
 		float nc = hypot( R, hypot(G, B));
 		float P = g[3*gidx];
 		r[3*gidx + 0] = float_to_uint8(3 * P * R / nc);
@@ -135,7 +145,7 @@ uint8_t *load_nice_preview(char *fg, char *fc, int *w, int *h)
 		r[3*gidx + 2] = float_to_uint8(3 * P * B / nc); }
 
 	free(g);
-	free(c);
+	if (c) free(c);
 	*w = wg;
 	*h = hg;
 	return r;
@@ -153,7 +163,9 @@ static void init_view(struct pan_view *v,
 	// load P and MS
 	int megabytes = 400;
 	tiff_octaves_init(v->tg, fgtif, megabytes);
-	tiff_octaves_init(v->tc, fctif, megabytes);
+	if (fctif)
+		tiff_octaves_init(v->tc, fctif, megabytes);
+	else v->tc = NULL;
 	v->w = v->tg->i->w;
 	v->h = v->tg->i->h;
 	v->rgbiox = v->rgbioy = 4; // normally untouched
@@ -1392,6 +1404,64 @@ int main_pan(int c, char *v[])
 			filename_grpc,
 			filename_ctif,
 			filename_cpre,
+			n);
+
+	// if non-interactive, run the requested command string and exit
+	if (*command_string)
+		return pan_non_interactive(e, command_string);
+
+	// open window
+	struct FTR f = ftr_new_window(320, 320);
+	//struct FTR f = ftr_new_window(800, 600);
+	f.userdata = e;
+	f.changed = 1;
+	ftr_set_handler(&f, "key"   , pan_key_handler);
+	ftr_set_handler(&f, "button", pan_button_handler);
+	ftr_set_handler(&f, "motion", pan_motion_handler);
+	ftr_set_handler(&f, "expose", pan_exposer);
+	ftr_set_handler(&f, "resize", pan_resize);
+	int r = ftr_loop_run(&f);
+
+	// cleanup and exit (optional)
+	ftr_close(&f);
+	return r;
+}
+
+int main_pangray(int c, char *v[])
+{
+	TIFFSetWarningHandler(NULL);//suppress warnings
+
+	// process input arguments
+	char *command_string = pick_option(&c, &v, "c", "");
+	if (c < 3 || (c - 1) % 3 != 0) {
+		fprintf(stderr, "usage:\n\t"
+				"%s [P.TIF P.JPG P.RPC]+\n", *v);
+		//                0  1     2     3
+		return c;
+	}
+	int n = BAD_MIN((c - 1)/3,MAX_VIEWS);
+	fprintf(stderr, "we have %d views\n", n);
+	char *filename_gtif[n];
+	char *filename_gpre[n];
+	char *filename_grpc[n];
+	for (int i = 0; i < n; i++)
+	{
+		filename_gtif[i] = v[3*i+1];
+		filename_gpre[i] = v[3*i+2];
+		filename_grpc[i] = v[3*i+3];
+		fprintf(stderr, "view %d\n", i);
+		fprintf(stderr, "\tgtif %s\n", filename_gtif[i]);
+		fprintf(stderr, "\tgpre %s\n", filename_gpre[i]);
+		fprintf(stderr, "\tgrpc %s\n", filename_grpc[i]);
+	}
+
+	// start state
+	struct pan_state e[1];
+	init_state(e,
+			filename_gtif,
+			filename_gpre,
+			filename_grpc,
+			NULL, NULL,
 			n);
 
 	// if non-interactive, run the requested command string and exit

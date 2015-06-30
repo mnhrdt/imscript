@@ -418,6 +418,12 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	f->changed = 1;
 }
 
+static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+	pan_repaint(e, f->w, f->h);
+}
+
 // update offset variables by dragging
 static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 {

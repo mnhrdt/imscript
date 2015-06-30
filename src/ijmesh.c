@@ -92,6 +92,7 @@ int main(int c, char *v[])
 	}
 	assert(cx == nvertices);
 
+	// output faces
 	cx = 0;
 	for (int j = 0; j < h-1; j++)
 	for (int i = 0; i < w-1; i++)

@@ -18,7 +18,7 @@ void ghough(float *transform, int n_theta, int n_rho, float *grad, int w, int h)
 		float ng = hypot(g[0], g[1]);
 		float theta = M_PI + atan2(g[1], g[0]);
 		float alpha = M_PI + atan2(j, i);
-		float rho = hypot(w,h)+hypot(i, j) * cos(alpha - theta);
+		float rho = hypot(w,h) + hypot(i, j) * cos(alpha - theta);
 		float max_rho = 2*hypot(w, h);
 		float max_theta = 2*M_PI;
 		int i_rho   = n_rho   * rho   / max_rho;
@@ -43,7 +43,7 @@ int main(int c, char *v[])
 	// process input arguments
 	if (c != 3) {
 		fprintf(stderr, "usage:\n\t"
-				"%s nrho ntheta <gradient >hough", *v);
+				"%s nrho ntheta <gradient >hough\n", *v);
 		//               0  1    2
 		return 1;
 	}
@@ -52,19 +52,19 @@ int main(int c, char *v[])
 
 	// read input gradient
 	int w, h, pd;
-	float *in = iio_read_image_float_vec("-", &w, &h, &pd);
+	float *gradient = iio_read_image_float_vec("-", &w, &h, &pd);
 	if (pd != 2) return fprintf(stderr, "I expect a gradient!\n");
 
 	// compute transform
-	float *out = malloc(nrho * ntheta * sizeof*out);
-	ghough(out, nrho, ntheta, in, w, h);
+	float *transform = malloc(nrho * ntheta * sizeof*transform);
+	ghough(transform, nrho, ntheta, gradient, w, h);
 
 	// save output image
-	iio_save_image_float_vec("-", out, nrho, ntheta, 1);
+	iio_save_image_float_vec("-", transform, nrho, ntheta, 1);
 
 	// cleanup and exti
-	free(out);
-	free(in);
+	free(gradient);
+	free(transform);
 	return 0;
 }
 #endif//MAIN_GHOUGH

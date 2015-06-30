@@ -137,6 +137,7 @@ static char *get_tile_filename(int tlon, int tlat, bool check_octaves)
 }
 
 static struct tiff_octaves *global_table_of_tiles[360][180] = {{0}};
+static int global_table_of_count[360][180] = {{0}};
 
 static struct tiff_octaves *produce_tile(int tlon, int tlat)
 {
@@ -149,12 +150,17 @@ static struct tiff_octaves *produce_tile(int tlon, int tlat)
 		if (!file_exists(fname0)) {
 			fname = get_tile_filename(tlon, tlat, false);
 			fprintf(stderr, "trying now file \"%s\"\n", fname);
-			if (!file_exists(fname))
+			if (!file_exists(fname)
+				&& global_table_of_count[tlon][tlat] < 2)
+			{
+				global_table_of_count[tlon][tlat] += 1;
 				download_tile_file(tlon, tlat);
+			}
 		}
-		if (!file_exists(fname) && !file_exists(fname0)) {
-			fprintf(stderr, "WARNING: srtm4 tile \"%d %d\" "
-					"not available\n", tlon, tlat);
+		if (!file_exists(fname) && !file_exists(fname0))
+		{
+			//fprintf(stderr, "WARNING: srtm4 tile \"%d %d\" "
+			//		"not available\n", tlon, tlat);
 			return NULL;
 		}
 		t = malloc(sizeof*t);
@@ -169,6 +175,8 @@ static struct tiff_octaves *produce_tile(int tlon, int tlat)
 
 static double getpixelo_double(struct tiff_octaves *t, double x, double y, int o)
 {
+	if (o > t->noctaves)
+		o = t->noctaves - 1;
 	float ofac = 1 << o;
 	int i = x / ofac;
 	int j = y / ofac;
@@ -192,8 +200,10 @@ double srtm4o(double lon, double lat, int octave)
 	struct tiff_octaves *t = produce_tile(tlon, tlat);
 	if (t == NULL)
 		return NO_DATA;
-	else
-		return getpixelo_double(t, xlon, xlat, fabs(octave));
+	else {
+		double r = getpixelo_double(t, xlon, xlat, fabs(octave));
+		return r > 0 ? r : 0;
+	}
 }
 
 void srtm4_free_tiles(void)

@@ -1,17 +1,10 @@
-#define _POSIX_SOURCE
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <signal.h>
+#include <stdio.h> // fprintf
+#include <stdlib.h> // malloc, exit, free
+#include <string.h> // strcmp
 #include <X11/Xlib.h>
-//#include <X11/Xutil.h> // only for XDestroyImage, that can be easily removed
-#include <unistd.h> // only for "fork"
-
 
 #include "ftr.h"
 
-// X11-specific part {{{1
 struct _FTR {
 	// visible state
 	int w, h;
@@ -28,7 +21,6 @@ struct _FTR {
 	ftr_event_handler_t handle_resize;
 	ftr_event_handler_t handle_idle;
 	ftr_event_handler_t handle_idle_toggled;
-	ftr_event_handler_t handle_wheel;
 	int max_w, max_h;
 	int stop_loop;
 
@@ -39,58 +31,11 @@ struct _FTR {
 	GC gc;
 	XImage *ximage;
 	int imgupdate;
-
-	int wheel_ax;
-
-	pid_t child_pid;
 };
 
 // Check that _FTR can fit inside a FTR
 // (if this line fails, increase the padding at the end of struct FTR on ftr.h)
 typedef char check_FTR_size[sizeof(struct _FTR)<=sizeof(struct FTR)?1:-1];
-
-
-// for debug purposes
-char *event_names[] ={
-"Nothing		0",
-"None			1",
-"KeyPress		2",
-"KeyRelease		3",
-"ButtonPress		4",
-"ButtonRelease		5",
-"MotionNotify		6",
-"EnterNotify		7",
-"LeaveNotify		8",
-"FocusIn		9",
-"FocusOut		10",
-"KeymapNotify		11",
-"Expose			12",
-"GraphicsExpose		13",
-"NoExpose		14",
-"VisibilityNotify	15",
-"CreateNotify		16",
-"DestroyNotify		17",
-"UnmapNotify		18",
-"MapNotify		19",
-"MapRequest		20",
-"ReparentNotify		21",
-"ConfigureNotify	22",
-"ConfigureRequest	23",
-"GravityNotify		24",
-"ResizeRequest		25",
-"CirculateNotify	26",
-"CirculateRequest	27",
-"PropertyNotify		28",
-"SelectionClear		29",
-"SelectionRequest	30",
-"SelectionNotify	31",
-"ColormapNotify		32",
-"ClientMessage		33",
-"MappingNotify		34",
-"GenericEvent		35",
-"LASTEvent		36"};
-
-
 
 struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 {
@@ -119,7 +64,6 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 			//white, black);
 	f->ximage = NULL;
 	f->imgupdate = 1;
-	f->wheel_ax = 0;
 	int mask = 0
 		| ExposureMask
 		| KeyPressMask
@@ -141,7 +85,6 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	f->handle_resize = NULL;
 	f->handle_idle = NULL;
 	f->handle_idle_toggled = NULL;
-	f->handle_wheel = NULL;
 	f->stop_loop = 0;
 	f->changed = 0;
 
@@ -156,8 +99,10 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 void ftr_close(struct FTR *ff)
 {
 	struct _FTR *f = (void*)ff;
-	if (f->ximage) f->ximage->f.destroy_image(f->ximage);
-	if (f->rgb) free(f->rgb);
+	if (f->ximage)
+		f->ximage->f.destroy_image(f->ximage);
+	if (f->rgb)
+		free(f->rgb);
 	XCloseDisplay(f->display);
 }
 
@@ -173,6 +118,7 @@ static int x_keycode_to_keysym(struct _FTR *f, int keycode)
 
 static int keycode_to_ftr(struct _FTR *f, int keycode, int keystate)
 {
+	(void)keystate;
 	int key = x_keycode_to_keysym(f, keycode);
 
 	if (keycode == 9)   return 27;    // ascii ESC
@@ -216,8 +162,7 @@ static void process_next_event(struct FTR *ff)
 
 	XEvent event = { .type = GenericEvent } ;
 	if (!f->changed)
-		XNextEvent(f->display, &event); // blocks and waits!
-	//fprintf(stderr,"ev(%p,%p) %d\t\"%s\"\n",(void*)f->display,(void*)f->window,event.type,event_names[event.type]);
+		XNextEvent(f->display, &event);
 
 	if (event.type == Expose || f->changed) {
 		if (f->handle_expose)
@@ -225,22 +170,19 @@ static void process_next_event(struct FTR *ff)
 		f->changed = 0;
 
 		if (!f->ximage || f->imgupdate) {
-			if (f->ximage) f->ximage->f.destroy_image(f->ximage);
-			//f->ximage = XShmGetImage(f->display, f->window,
-			//		0, 0, f->w, f->h, AllPlanes, ZPixmap);
+			if (f->ximage)
+				f->ximage->f.destroy_image(f->ximage);
 			f->ximage = XGetImage(f->display, f->window,
 					0, 0, f->w, f->h, AllPlanes, ZPixmap);
 			f->imgupdate = 0;
 		}
 		for (int i = 0; i < f->w*f->h; i++) {
-			// drain bramage
+			// volca
 			f->ximage->data[4*i+0] = f->rgb[3*i+2];
 			f->ximage->data[4*i+1] = f->rgb[3*i+1];
 			f->ximage->data[4*i+2] = f->rgb[3*i+0];
 			f->ximage->data[4*i+3] = 0;
 		}
-		//XShmPutImage(f->display, f->window, f->gc, f->ximage,
-		//		0, 0, 0, 0, f->w, f->h, 0);
 		XPutImage(f->display, f->window, f->gc, f->ximage,
 				0, 0, 0, 0, f->w, f->h);
 		if (f->handle_expose2)
@@ -259,37 +201,16 @@ static void process_next_event(struct FTR *ff)
 		}
 	}
 
-	if (event.type == ButtonPress && f->handle_wheel) {
-		XButtonEvent e = event.xbutton;
-		if (e.button == 4 || e.button == 5) {
-			int np = XPending(f->display);
-			f->wheel_ax += e.button==4 ? 1 : -1;
-			fprintf(stderr, "\twheel acc(%d) %d\n", f->wheel_ax, np);
-			if (np < 2) {
-				f->handle_wheel(ff,f->wheel_ax,e.state,e.x,e.y);
-				f->wheel_ax = 0;
-			}
-			return;
-		}
-	}
-
 	// "expose" and "resize" are never lost
 	// the mouse and keyboard events are ignored when too busy
-	//
 	int ne = XPending(f->display);
 	if (ne > 1) // magical "1" here
-	//if (ne > 0) // magical "1" here
-	//{
-	//	fprintf(stderr, "\tlost{%d} %s\n", ne, event_names[event.type]);
 	      return;
-	//}
 
 	// call the motion handler also for enter/leave events
 	// (this is natural for most applications)
-	if (!f->handle_wheel) {//wheel accumulation does not work well with this
 	if (event.type == EnterNotify && f->handle_motion) {
 		XCrossingEvent e = event.xcrossing;
-		//fprintf(stderr, "enter notify (%d %d)\n", e.x, e.y);
 		if (XPending(f->display)) return;
 		f->handle_motion(ff, -1, e.state, e.x, e.y);
 	}
@@ -297,10 +218,8 @@ static void process_next_event(struct FTR *ff)
 		XCrossingEvent e = event.xcrossing;
 		int x = do_bound(0, f->w - 1, e.x);
 		int y = do_bound(0, f->h - 1, e.y);
-		//fprintf(stderr,"LEAVE notify (%d %d)[%d %d]\n",e.x,e.y,x,y);
 		if (XPending(f->display)) return;
 		f->handle_motion(ff, -2, e.state, x, y);
-	}
 	}
 
 
@@ -308,16 +227,8 @@ static void process_next_event(struct FTR *ff)
 		XMotionEvent e = event.xmotion;
 		f->handle_motion(ff, e.is_hint, e.state, e.x, e.y);
 	}
-	if (event.type == ButtonPress && (f->handle_button||f->handle_wheel)) {
+	if (event.type == ButtonPress && f->handle_button) {
 		XButtonEvent e = event.xbutton;
-		if (f->handle_wheel && (e.button == 4 || e.button == 5)) {
-			f->wheel_ax += e.button==4 ? 1 : -1;
-			fprintf(stderr, "\twheel ack %d\n", f->wheel_ax);
-			//if (!XPending(f->display)) {
-				f->handle_wheel(ff,f->wheel_ax,e.state,e.x,e.y);
-				f->wheel_ax = 0;
-			//}
-		}
 		f->handle_button(ff, 1<<(7+e.button), e.state, e.x, e.y);
 		static int ugly_disable = 1;
 		if (ugly_disable && (e.button == 4 || e.button == 5))
@@ -334,8 +245,6 @@ static void process_next_event(struct FTR *ff)
 	}
 	if (event.type == KeyPress && f->handle_key) {
 		XKeyEvent e = event.xkey;
-		//f->handle_key(ff, e.keycode, e.state, e.x, e.y);
-		//int keysym = XKeycodeToKeysym(f->display, e.keycode, e.state);
 		int key = keycode_to_ftr(f, e.keycode, e.state);
 		f->handle_key(ff, key, e.state, e.x, e.y);
 	}
@@ -345,8 +254,6 @@ int ftr_loop_run(struct FTR *ff)
 {
 	struct _FTR *f = (void*)ff;
 
-	//f->changed = 1;
-
 	while (!f->stop_loop)
 	{
 		if (!f->handle_idle || f->changed || XPending(f->display) > 0)
@@ -355,63 +262,13 @@ int ftr_loop_run(struct FTR *ff)
 			f->handle_idle(ff, 0, 0, 0, 0);
 			XEvent ev;
 			ev.type = Expose;
-			//XLockDisplay(f->display);
 			XSendEvent(f->display, f->window, 0, NoEventMask, &ev);
 			XFlush(f->display);
-			//XUnlockDisplay(f->display);
 		}
 	}
 
 	int r = f->stop_loop;
 	f->stop_loop = 0;
-	return r;
-}
-
-int ftr_loop_run2(struct FTR *ff, struct FTR *gg)
-{
-	struct _FTR *f = (void*)ff;
-	struct _FTR *g = (void*)gg;
-
-	char *dn_f = XDisplayString(f->display);
-	char *dn_g = XDisplayString(g->display);
-	if (0 != strcmp(dn_f, dn_g))
-		exit(fprintf(stderr, "FTR error: two displays bad bad bad (%p,%p)(\"%s\",\"%s\")\n", (void*)f->display, (void*)g->display, dn_f, dn_g));
-
-	fprintf(stderr, "dn_f = %p \"%s\"\n", (void*)f->display, dn_f);
-	fprintf(stderr, "dn_g = %p \"%s\"\n", (void*)g->display, dn_g);
-
-	while (!f->stop_loop && !g->stop_loop)
-	{
-		int pending_f = XPending(f->display);
-		int pending_g = XPending(g->display);
-
-		fprintf(stderr, "pending fg = %d %d\n", pending_f, pending_g);
-
-		// treat g
-		if (!g->handle_idle || g->changed || pending_g > 0)
-			process_next_event(gg);
-		else if (g->handle_idle) {
-			g->handle_idle(gg, 0, 0, 0, 0);
-			XEvent ev;
-			ev.type = Expose;
-			XSendEvent(g->display, g->window, 0, NoEventMask, &ev);
-			XFlush(g->display);
-		}
-
-		// treat f
-		if (!f->handle_idle || f->changed || pending_f > 0)
-			process_next_event(ff);
-		else if (f->handle_idle) {
-			f->handle_idle(ff, 0, 0, 0, 0);
-			XEvent ev;
-			ev.type = Expose;
-			XSendEvent(f->display, f->window, 0, NoEventMask, &ev);
-			XFlush(f->display);
-		}
-	}
-
-	int r = f->stop_loop + g->stop_loop;
-	f->stop_loop = g->stop_loop = 0;
 	return r;
 }
 
@@ -427,9 +284,115 @@ void ftr_notify_the_desire_to_stop_this_loop(struct FTR *ff, int retval)
 	f->stop_loop = retval?retval:-1;
 }
 
-// common to all implementations {{{1
+struct FTR ftr_new_window(int w, int h)
+{
+	return ftr_new_window_with_image_uint8_rgb(NULL, w, h);
+}
 
+void ftr_handler_exit_on_ESC(struct FTR *f, int k, int m, int x, int y)
+{
+	(void)m; (void)x; (void)y;
+	if  (k == '\033')
+		ftr_notify_the_desire_to_stop_this_loop(f, 0);
+}
 
-#include "ftr_common_inc.c"
+void ftr_handler_exit_on_ESC_or_q(struct FTR *f, int k, int m, int x, int y)
+{
+	(void)m; (void)x; (void)y;
+	if  (k == '\033' || k=='q' || k=='Q')
+		ftr_notify_the_desire_to_stop_this_loop(f, 0);
+}
+
+void ftr_handler_stop_loop(struct FTR *f, int k, int m, int x, int y)
+{
+	(void)k; (void)m; (void)x; (void)y;
+	ftr_notify_the_desire_to_stop_this_loop(f, 0);
+}
+
+void ftr_handler_dummy(struct FTR *f, int k, int m, int x, int y)
+{
+	(void)f; (void)k; (void)m; (void)x; (void)y;
+}
+
+void ftr_handler_toggle_idle(struct FTR *ff, int k, int m, int x, int y)
+{
+	(void)k; (void)m; (void)x; (void)y;
+	struct _FTR *f = (void*)ff;
+	ftr_event_handler_t tmp = f->handle_idle;
+	f->handle_idle = f->handle_idle_toggled;
+	f->handle_idle_toggled = tmp;
+}
+
+int ftr_set_handler(struct FTR *ff, char *id, ftr_event_handler_t e)
+{
+	struct _FTR *f = (void*)ff;
+	if (0) ;
+	else if (0 == strcmp(id, "key"))    { f->handle_key    = e; return 0; }
+	else if (0 == strcmp(id, "button")) { f->handle_button = e; return 0; }
+	else if (0 == strcmp(id, "motion")) { f->handle_motion = e; return 0; }
+	else if (0 == strcmp(id, "expose")) { f->handle_expose = e; return 0; }
+	else if (0 == strcmp(id, "resize")) { f->handle_resize = e; return 0; }
+	else if (0 == strcmp(id, "idle"))   { f->handle_idle   = e; return 0; }
+	return fprintf(stderr, "WARNING: unrecognized event \"%s\"\n", id);
+}
+
+ftr_event_handler_t ftr_get_handler(struct FTR *ff, char *id)
+{
+	struct _FTR *f = (void*)ff;
+	if (0) ;
+	else if (0 == strcmp(id, "key"))    return f->handle_key   ;
+	else if (0 == strcmp(id, "button")) return f->handle_button;
+	else if (0 == strcmp(id, "motion")) return f->handle_motion;
+	else if (0 == strcmp(id, "expose")) return f->handle_expose;
+	else if (0 == strcmp(id, "resize")) return f->handle_resize;
+	else if (0 == strcmp(id, "idle"))   return f->handle_idle  ;
+	return fprintf(stderr, "WARNING: bad event \"%s\"\n", id),
+		(ftr_event_handler_t)NULL;
+}
+
+static void handle_click_wait(struct FTR *f, int b, int m, int x, int y)
+{
+	(void)m;
+	if (b == FTR_BUTTON_LEFT || b == FTR_BUTTON_RIGHT)
+		ftr_notify_the_desire_to_stop_this_loop(f, 10000*y + x);
+}
+
+static void handle_click_wait3(struct FTR *f, int b, int m, int x, int y)
+{
+	(void)m;
+	if (b == FTR_BUTTON_LEFT || b == FTR_BUTTON_RIGHT)
+	{
+		int bit = b == FTR_BUTTON_LEFT;
+		ftr_notify_the_desire_to_stop_this_loop(f, 2*(10000*y + x)+bit);
+	}
+}
+
+void ftr_wait_for_mouse_click(struct FTR *f, int *x, int *y)
+{
+	ftr_set_handler(f, "button", handle_click_wait);
+	int r = ftr_loop_run(f);
+	if (x) *x = r % 10000;
+	if (y) *y = r / 10000;
+}
+
+void ftr_wait_for_mouse_click3(struct FTR *f, int *x, int *y, int *b)
+{
+	ftr_set_handler(f, "button", handle_click_wait3);
+	int r = ftr_loop_run(f);
+	int bit = r % 2;
+	r /= 2;
+	if (x) *x = r % 10000;
+	if (y) *y = r / 10000;
+	if (b) *b = bit ? FTR_BUTTON_LEFT : FTR_BUTTON_RIGHT;
+}
+
+int main()
+{
+	struct FTR f = ftr_new_window(800, 600);
+	for (int i = 0; i < 3 * f.w * f.h; i++)
+		f.rgb[i] = rand();
+	f.changed = 1;
+	return ftr_loop_run(&f);;
+}
 
 // vim:set foldmethod=marker:

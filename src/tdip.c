@@ -183,6 +183,8 @@ void tdip(float *transform, double arad, int tside, float *dip, int w, int h)
 
 			double theta = i * 2 * M_PI / w;
 			double l[3] = {-sin(theta), cos(theta), g[0]/g[1]};
+
+#if 1
 			double rec[4] = {-arad, -arad, arad, arad};
 			double aa[2], bb[2]; // (bad names)
 			if (cut_line_with_rectangle(aa, bb, l, rec, rec+2))
@@ -195,14 +197,18 @@ void tdip(float *transform, double arad, int tside, float *dip, int w, int h)
 				accumulate_line(transform, tside, tside,
 						iaa, ibb, gn);
 			}
+#endif
 
-			//int ip[2] = {500 + 100 * p[0], 500 + 100 * p[1]};
-			////fprintf(stdout, "%g %g\t%d %d\n", p[0], p[1], ip[0], ip[1]);
-			//if (insideP(tside, tside, ip[0], ip[1]))
-			//{
-			//	double gn = hypot(g[0], g[1]);
-			//	transform[tside*ip[1] + ip[0]] += gn;
-			//}
+#if 0
+			double p[2] = {l[0]/l[2], l[1]/l[2]};
+			int ip[2] = {500 + 40 * p[0], 500 + 40 * p[1]};
+			//fprintf(stderr, "%g %g\t%d %d\n", p[0], p[1], ip[0], ip[1]);
+			if (insideP(tside, tside, ip[0], ip[1]))
+			{
+				double gn = hypot(g[0], g[1]);
+				transform[tside*ip[1] + ip[0]] += gn;
+			}
+#endif
 		}
 	}
 
