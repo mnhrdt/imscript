@@ -39,7 +39,11 @@ static void voterline(double abc[3], int w, int h, int ntheta, int nrho,
 	if (folding) theta /= 2;
 	abc[0] = cos(theta);
 	abc[1] = sin(theta);
-	abc[2] = rho - (abc[0] * w - abc[1] * h)/2;
+	abc[2] = rho - (abc[0] * w + abc[1] * h)/2;
+	fprintf(stderr, "voterline [%d %d] [%d %d] (%d %d): t=%g r=%g"
+			" {%g %g %g}\n",
+		w, h, ntheta, nrho, i_theta, i_rho, theta*180/M_PI, rho,
+		abc[0], abc[1], abc[2]);
 }
 
 void ihough(float *transform, int ntheta, int nrho, float *imag, int w, int h,
@@ -223,7 +227,10 @@ static void plot_generic_pixel(int x, int y, void *p)
 static void plot_transparent_red_line(uint8_t *o, int w, int h, double l[3])
 {
 	double rec_from[2] = {0, 0}, rec_to[2] = {w, h}, a[2], b[2];
-	cut_line_with_rectangle(a, b, l, rec_from, rec_to);
+	bool cut = cut_line_with_rectangle(a, b, l, rec_from, rec_to);
+	fprintf(stderr, "cut l[%g %g %g]:\n", l[0], l[1], l[2]);
+	if (!cut) return;
+	fprintf(stderr, "\t(%g %g)-(%g %g)\n", a[0], a[1], b[0], b[1]);
 	struct plot_state p_red[1] = {{o, w, h, {255, 0, 0, 255}}};
 	traverse_segment(a[0], a[1], b[0], b[1], plot_generic_pixel, p_red);
 }
@@ -306,6 +313,8 @@ int main(int c, char *v[])
 	float click_b         = atof(pick_option(&c, &v, "b", "nan"));
 	char *f_left          =      pick_option(&c, &v, "l", "/dev/null");
 	char *f_right         =      pick_option(&c, &v, "r", "/dev/null");
+	char *f_in            =      pick_option(&c, &v, "i", "-");
+	char *f_out           =      pick_option(&c, &v, "o", "-");
 
 	// process input arguments
 	if (c != 4) {
@@ -320,9 +329,11 @@ int main(int c, char *v[])
 
 	// read input intensities
 	int w, h, pd;
-	float *bubbles = iio_read_image_float_vec("-", &w, &h, &pd);
+	float *bubbles = iio_read_image_float_vec(f_in, &w, &h, &pd);
 	if (pd != 1) return fprintf(stderr, "I expect an intensity!\n");
 
+	if (ntheta < 0) ntheta = w;
+	if (nrho < 0) nrho = h;
 
 	// compute transform
 	if (omit_computation)
@@ -332,7 +343,7 @@ int main(int c, char *v[])
 		ihough(transform, ntheta, nrho, bubbles, w, h, mtres, fold);
 
 	// save output image
-	iio_save_image_float_vec("-", transform, ntheta, nrho, 1);
+	iio_save_image_float_vec(f_out, transform, ntheta, nrho, 1);
 
 after_computation:
 
