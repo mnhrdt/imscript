@@ -40,12 +40,13 @@ static void voterline(double abc[3], int w, int h, int ntheta, int nrho,
 	abc[0] = cos(theta);
 	abc[1] = sin(theta);
 	abc[2] = rho - (abc[0] * w + abc[1] * h)/2;
-	fprintf(stderr, "voterline [%d %d] [%d %d] (%d %d): t=%g r=%g"
-			" {%g %g %g}\n",
-		w, h, ntheta, nrho, i_theta, i_rho, theta*180/M_PI, rho,
-		abc[0], abc[1], abc[2]);
+	//fprintf(stderr, "voterline [%d %d] [%d %d] (%d %d): t=%g r=%g"
+	//		" {%g %g %g}\n",
+	//	w, h, ntheta, nrho, i_theta, i_rho, theta*180/M_PI, rho,
+	//	abc[0], abc[1], abc[2]);
 }
 
+// reading paradigm
 void ihough(float *transform, int ntheta, int nrho, float *imag, int w, int h,
 		float minmag, bool folding)
 {
@@ -73,41 +74,6 @@ void ihough(float *transform, int ntheta, int nrho, float *imag, int w, int h,
 				transform[it] += magnitude;
 			}
 		}
-	}
-}
-
-#define MAIN_IHOUGH2
-
-#ifdef MAIN_IHOUGH2
-#include <stdio.h>
-#include <stdlib.h>
-#include "iio.h"
-
-static void plot_transparent_red_dot(uint8_t *o, int w, int h, int x, int y)
-{
-	for (int j = -20; j <= 20; j++)
-	for (int i = -20; i <= 20; i++)
-	{
-		if (hypot(i,j)>20) continue;
-		int ii = x + i;
-		int jj = y + j;
-		float ifac = 0.99;//exp(-hypot(i,j)/10);
-		if (insideP(w, h, ii, jj))
-		{
-			int idx = jj * w + ii;
-			o[idx*4 + 0] = 128*ifac;
-			o[idx*4 + 1] = 0;
-			o[idx*4 + 2] = 0;
-			o[idx*4 + 3] = 100;
-		}
-	}
-	if (insideP(w, h, x, y))
-	{
-		int idx = y * w + x;
-		o[idx*4 + 0] = 255;
-		o[idx*4 + 1] = 0;
-		o[idx*4 + 2] = 0;
-		o[idx*4 + 3] = 255;
 	}
 }
 
@@ -210,6 +176,87 @@ void traverse_segment(int px, int py, int qx, int qy,
 	}
 }
 
+struct urn {
+	float *x;
+	int w, h;
+	double ax, mima;
+};
+
+static void accumulate_urn(int x, int y, void *p)
+{
+	struct urn *u = p;
+	if (insideP(u->w, u->h, x, y))
+	{
+		double v = u->x[y*u->w+x];
+		if (v > u->mima)
+			u->ax += u->x[y*u->w+x];
+	}
+}
+
+static double accumulate_line(float *x, int w, int h, double l[3], double mima)
+{
+	double rec_from[2] = {0, 0}, rec_to[2] = {w, h}, a[2], b[2];
+	bool cut = cut_line_with_rectangle(a, b, l, rec_from, rec_to);
+	if (!cut) return 0;
+	struct urn u = {x, w, h, 0, mima};
+	traverse_segment(a[0], a[1], b[0], b[1], accumulate_urn, &u);
+	return u.ax;
+}
+
+// writing paradigm
+void ihoughw(float *transform, int ntheta, int nrho, float *imag, int w, int h,
+		float minmag, bool folding)
+{
+	// fill counts to zero
+	for (int i = 0; i < ntheta * nrho; i++)
+		transform[i] = 0;
+
+	// for each candidate
+	// traverse the corresponding straight line of voters and accumulate
+	for (int j = 0; j < nrho; j++)
+	for (int i = 0; i < ntheta; i++)
+	{
+		double l[3];
+		voterline(l, w, h, ntheta, nrho, i, j, folding);
+		transform[j*ntheta +i] = accumulate_line(imag, w, h, l, minmag);
+	}
+}
+
+#define MAIN_IHOUGH2
+
+#ifdef MAIN_IHOUGH2
+#include <stdio.h>
+#include <stdlib.h>
+#include "iio.h"
+
+static void plot_transparent_red_dot(uint8_t *o, int w, int h, int x, int y)
+{
+	for (int j = -20; j <= 20; j++)
+	for (int i = -20; i <= 20; i++)
+	{
+		if (hypot(i,j)>20) continue;
+		int ii = x + i;
+		int jj = y + j;
+		float ifac = 0.99;//exp(-hypot(i,j)/10);
+		if (insideP(w, h, ii, jj))
+		{
+			int idx = jj * w + ii;
+			o[idx*4 + 0] = 128*ifac;
+			o[idx*4 + 1] = 0;
+			o[idx*4 + 2] = 0;
+			o[idx*4 + 3] = 100;
+		}
+	}
+	if (insideP(w, h, x, y))
+	{
+		int idx = y * w + x;
+		o[idx*4 + 0] = 255;
+		o[idx*4 + 1] = 0;
+		o[idx*4 + 2] = 0;
+		o[idx*4 + 3] = 255;
+	}
+}
+
 struct plot_state {
 	uint8_t *x;
 	int w, h;
@@ -307,6 +354,7 @@ int main(int c, char *v[])
 	// extract optional parameters
 	bool fold             =      pick_option(&c, &v, "f", NULL);
 	bool omit_computation =      pick_option(&c, &v, "n", NULL);
+	bool writing_paradigm =      pick_option(&c, &v, "w", NULL);
 	float click_x         = atof(pick_option(&c, &v, "x", "nan"));
 	float click_y         = atof(pick_option(&c, &v, "y", "nan"));
 	float click_a         = atof(pick_option(&c, &v, "a", "nan"));
@@ -340,7 +388,12 @@ int main(int c, char *v[])
 		goto after_computation;
 	float *transform = malloc(ntheta * nrho * sizeof*transform);
 	if (!omit_computation)
-		ihough(transform, ntheta, nrho, bubbles, w, h, mtres, fold);
+	{
+		if (!writing_paradigm)
+			ihough(transform, ntheta, nrho, bubbles, w, h, mtres, fold);
+		else
+			ihoughw(transform, ntheta, nrho, bubbles, w, h, mtres, fold);
+	}
 
 	// save output image
 	iio_save_image_float_vec(f_out, transform, ntheta, nrho, 1);
