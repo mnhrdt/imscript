@@ -1143,7 +1143,7 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 	} else if (magic == 'W') {
 		compute_ordered_component_stats(ti, x, w, h, pd);
 		FORI(pd) {
-			int qposi = round(qq*w*h/1000000.0);
+			int qposi = round(qq*(w*h/1000000.0));
 			qposi = bound(0, qposi, w*h-1);
 			out[i] = ti->sorted_components[i][qposi];
 		}
