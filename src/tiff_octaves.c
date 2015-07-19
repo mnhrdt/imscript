@@ -332,7 +332,6 @@ static void read_tile_from_file(struct tiff_tile *t, char *filename, int tidx)
 
 
 
-
 // getpixel cache with octaves {{{1
 
 #define MAX_OCTAVES 25
@@ -355,27 +354,32 @@ struct tiff_octaves {
 //#include "smapa.h"
 //SMART_PARAMETER(FIRST_OCTAVE,0)
 
+void my_tifferror(const char *module, const char *fmt, va_list ap)
+{
+	(void)ap;
+	if (0 == strcmp(fmt, "%llu: Invalid tile byte count, tile %lu"))
+		fprintf(stderr, "got a zero tile\n");
+	else
+		fprintf(stderr, "TIFF ERROR(%s): \"%s\"\n", module, fmt);
+}
+static void disable_tiff_warnings_and_errors(void)
+{
+	TIFFSetWarningHandler(NULL);//suppress warnings
+	TIFFSetErrorHandler(NULL);
+}
+
 void tiff_octaves_init(struct tiff_octaves *t, char *filepattern, int megabytes)
 {
-	fprintf(stderr, "tiff octaves init \"%s\"(%dMB)\n", filepattern, megabytes);
+	//fprintf(stderr, "tiff octaves init \"%s\"(%dMB)\n", filepattern, megabytes);
 	// create filenames until possible
 	t->noctaves = 0;
 	for (int o = 0; o < MAX_OCTAVES; o++)
 	{
-		//int oo = o + FIRST_OCTAVE();
 		snprintf(t->filename[o], FILENAME_MAX, filepattern, o);
-		//fprintf(stderr, "f[%d]=%s\n", o, t->filename[o]);
 		if (!get_tiff_info_filename_e(t->i + o, t->filename[o]))
 			break;
 		if (t->i[o].bps < 8 || t->i[o].packed)
 			fail("caching of packed samples is not supported");
-		if (0) {
-			fprintf(stderr, "\tw = %d\n", (int)t->i[o].w);
-			fprintf(stderr, "\th = %d\n", (int)t->i[o].h);
-			fprintf(stderr, "\ttiled = %d\n", t->i[o].tiled);
-			fprintf(stderr, "\ttw = %d\n", (int)t->i[o].tw);
-			fprintf(stderr, "\tth = %d\n", (int)t->i[o].th);
-		}
 		if (o > 0) { // check consistency
 			if (0 == strcmp(t->filename[o], t->filename[0])) break;
 			if (t->i[o].bps != t->i->bps) fail("inconsistent bps");
@@ -396,18 +400,6 @@ void tiff_octaves_init(struct tiff_octaves *t, char *filepattern, int megabytes)
 		t->c[o] = xmalloc((1 + t->i[o].ntiles) * sizeof*t->c);
 		for (int j = 0; j < t->i[o].ntiles; j++)
 			t->c[o][j] = 0;
-	}
-
-	// print debug info
-	fprintf(stderr, "%d octaves:\n", t->noctaves);
-	for (int o = 0; o < t->noctaves; o++)
-	{
-		struct tiff_info *ti = t->i + o;
-		fprintf(stderr, "\toctave %d:", o);
-		fprintf(stderr, " %dx%d", ti->w, ti->h);
-		fprintf(stderr, " %d tiles (%dx%d) of size %dx%d",
-				ti->ntiles, ti->ta, ti->td, ti->tw, ti->th);
-		fprintf(stderr, "\n");
 	}
 
 	// set up data for old tile deletion
@@ -499,7 +491,7 @@ void *tiff_octaves_gettile(struct tiff_octaves *t, int o, int i, int j)
 		if (t->a[0] && t->curtiles == t->maxtiles)
 			free_oldest_tile_octave(t);
 
-		fprintf(stderr,"CACHE: LOADing tile %d of octave %d\n",tidx,o);
+		//fprintf(stderr,"CACHE: LOADing tile %d of octave %d\n",tidx,o);
 		struct tiff_tile tmp[1];
 		read_tile_from_file(tmp, t->filename[o], tidx);
 		t->c[o][tidx] = tmp->data;

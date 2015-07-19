@@ -6,7 +6,6 @@
 
 #include "fi.h"
 #include "iio.h"
-#define TIFFU_OMIT_MAIN
 #include "tiff_octaves.c"
 
 // the following struct is an implementation detail,
@@ -36,9 +35,16 @@ static bool filename_corresponds_to_tiffo(char *filename)
 	if (0 == strcmp(filename, "-"))
 		return false;
 	struct tiff_info ti[1];
+	disable_tiff_warnings_and_errors();
 	bool r = get_tiff_info_filename_e(ti, filename);
-	if (!r)
-		return false;
+	if (!r) {
+		char buf[FILENAME_MAX];
+		snprintf(buf, FILENAME_MAX, filename, 0);
+		r = get_tiff_info_filename_e(ti, buf);
+		if (!r)
+			return false;
+		return ti->tiled;
+	}
 	return ti->tiled;
 }
 
@@ -128,12 +134,18 @@ int main(int c, char *v[])
 	// do stuff
 	double megabytes = 100;
 	struct fancy_image f = fancy_image_open(filename, megabytes);
-	printf("image \"%s\" : %dx%d, %d\n", filename, f.w, f.h, f.pd);
-	for (int x = 1; x < 100000; x *= 10)
-	{
-		float s = fancy_image_getsample_float(&f, x, x, 0);
+	printf("image \"%s\"\n", filename);
+	printf("\tw  = %d\n", f.w);
+	printf("\th  = %d\n", f.h);
+	printf("\tpd = %d\n", f.pd);
+	printf("\tno = %d\n", f.no);
+	int x = 1;
+	float s;
+	do {
+		s = fancy_image_getsample_float(&f, x, x, 0);
 		printf("\tsample(%d,%d,0) = %g\n", x, x, s);
-	}
+		x *= 10;
+	} while(isfinite(s));
 	fancy_image_close(&f);
 
 	// exit
