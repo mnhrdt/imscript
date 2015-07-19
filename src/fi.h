@@ -12,7 +12,12 @@ struct fancy_image {
 	int h;  // height
 	int pd; // pixel dimension (samples per pixel)
 	int no; // number of octaves
-	char pad[200];
+
+	char pad[200000]; // padding for internal details
+	// Note: the current padding is large (200Kb), because
+	// it contains a potentially long list of filenames.
+	// If this poses problems, It can be solved very easily, just ask me.
+	//  --Enric
 };
 
 
@@ -22,7 +27,7 @@ struct fancy_image {
 
 // open an image with the desired amount of cache
 // (the cache size is honored only for tiled tiffs)
-struct fancy_image fancy_image_open(const char *filename, double megabytes);
+struct fancy_image fancy_image_open(char *filename, double megabytes);
 
 // close an image and free its associated cache
 void fancy_image_close(struct fancy_image *f);
