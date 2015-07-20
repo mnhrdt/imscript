@@ -4,6 +4,7 @@
 //
 // A data structure for dealing with large images
 
+
 // The data structure.
 //
 // The fieds of this struct are intended to be read by the users.
@@ -60,3 +61,23 @@ void fancy_image_getpixel_oct(float *out, struct fancy_image *f, int octave,
 // and automatic choice of the octave
 void fancy_image_trilinear(float *out, struct fancy_image *f,
 		double x, double y, double dx, double dy);
+
+
+
+// future API
+// ----------
+// default option string = "r,megabytes=100,octaves=0"
+//
+//
+//
+//struct fancy_image *fancy_image_open(char *filename, char *options);
+//float fancy_image_getsample(struct fancy_image *f, int i, int, int);
+//float fancy_image_getsample_oct(struct fancy_image *f, int o, int i, int, int);
+//void fancy_image_setsample(struct fancy_image *f, int i, int j, int l, float v);
+//int fancy_image_close(struct fancy_image *f);
+//
+//void f(void)
+//{
+//	struct fancy_image f = fancy_image_open("f.tiff", "r,megabytes=100");
+//	struct fancy_image f = fancy_image_open("f.tiff", "w,megabytes=100");
+//}
