@@ -222,20 +222,26 @@ float fancy_image_getsample_oct(struct fancy_image *fi,
 {
 	struct FI *f = (void*)fi;
 
-	if (i < 0 || j < 0 || i >= f->w || j >= f->h)
-		return NAN;
 	if (octave < 0 || octave >= f->no)
 		return NAN;
+	//if (i < 0 || j < 0 || i >= f->w || j >= f->h)
+	//	return NAN;
 	if (l < 0) l = 0;
 	if (l >= f->pd) l = f->pd - 1;
 
 	if (f->tiffo) {
 		uint8_t *p_pixel = tiff_octaves_getpixel(f->t, octave, i, j);
+		if (!p_pixel) return NAN;
 		uint8_t *p_sample = p_pixel + (l * f->t->i->bps) / 8;
 		return convert_sample_to_float(f->t->i, p_sample);
 	} else {
-		int idx = (j * f->w + i) * f->pd + l;
-		return f->pyr_x[octave][idx];
+		float *x = f->pyr_x[octave];
+		int    w = f->pyr_w[octave];
+		int    h = f->pyr_h[octave];
+		if (i < 0 || j < 0 || i >= w || j >= h)
+			return NAN;
+		int  idx = (j * w + i) * f->pd + l;
+		return x[idx];
 	}
 }
 
