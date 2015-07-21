@@ -23,7 +23,7 @@ struct FI {
 	int max_octaves;
 	bool option_read;
 	bool option_write;
-	bool option_verbose;
+	int option_verbose;
 
 	// implementation details
 	bool tiffo;
@@ -125,21 +125,46 @@ static void set_default_options(struct FI *f)
 	f->megabytes = 100;
 	f->option_read = true;
 	f->option_write = false;
-	f->option_verbose = false;
+	f->option_verbose = 0;
 	f->max_octaves = MAX_OCTAVES;
 }
 
+static void interpret_options(struct FI *f, char *options_arg)
+{
+	set_default_options(f);
+
+	int n = 1 + strlen(options_arg);
+	char o[n];
+	strncpy(o, options_arg, n);
+	char *tok = strtok(o, ",");
+	while (tok) {
+		fprintf(stderr, "TOKEN \"%s\"\n", tok);
+		if (0 == strcmp(tok, "r"   ))  f->option_read  = true;
+		if (0 == strcmp(tok, "rw"  ))  f->option_read  = true;
+		if (0 == strcmp(tok, "wr"  ))  f->option_read  = true;
+		if (0 == strcmp(tok, "read"))  f->option_read  = true;
+		if (0 == strcmp(tok, "w"   ))  f->option_write = true;
+		if (0 == strcmp(tok, "rw"  ))  f->option_write = true;
+		if (0 == strcmp(tok, "wr"  ))  f->option_write = true;
+		if (0 == strcmp(tok, "write")) f->option_write = true;
+		double x;
+		if (1 == sscanf(tok, "megabytes=%lf", &x)) f->megabytes = x;
+		if (1 == sscanf(tok, "octaves=%lf", &x)) f->max_octaves = x;
+		if (1 == sscanf(tok, "verbose=%lf", &x)) f->option_verbose = x;
+		tok = strtok(NULL, ",");
+	}
+}
+
+
 // API: open a fancy image
-struct fancy_image fancy_image_open(char *filename, double megabytes)
+struct fancy_image fancy_image_open(char *filename, char *options)
 {
 	// create return struct and its alias
 	struct fancy_image r[1];
 	struct FI *f = (void*)r;
 
 	// process options parameter
-	set_default_options(f);
-	if (isfinite(megabytes))
-		f->megabytes = megabytes;
+	interpret_options(f, options);
 
 	// read the image
 	if (filename_corresponds_to_tiffo(filename)) {
@@ -153,6 +178,18 @@ struct fancy_image fancy_image_open(char *filename, double megabytes)
 		f->tiffo = false;
 		f->x = iio_read_image_float_vec(filename, &f->w, &f->h, &f->pd);
 		f->no = build_pyramid(f, f->max_octaves);
+	}
+
+	if (f->option_verbose) {
+		fprintf(stderr, "FANCY IMAGE \"%s\"\n", filename);
+		fprintf(stderr, "\tw = %d\n", f->w);
+		fprintf(stderr, "\th = %d\n", f->h);
+		fprintf(stderr, "\tpd = %d\n", f->pd);
+		fprintf(stderr, "\tno = %d\n", f->no);
+		fprintf(stderr, "\n");
+		fprintf(stderr, "\tmax_octaves= %d\n", f->max_octaves);
+		fprintf(stderr, "\ttiffo = %d\n", f->tiffo);
+		fprintf(stderr, "\tmegabytes = %g\n", f->megabytes);
 	}
 
 	// return image struct
@@ -250,20 +287,20 @@ float fancy_image_getsample_oct(struct fancy_image *fi,
 int main_example(int c, char *v[])
 {
 	// process input arguments
-	if (c != 6) {
-		fprintf(stderr, "usage:\n\t%s image i j l o\n", *v);
-		//                          0 1     2 3 4 5
+	if (c != 7) {
+		fprintf(stderr, "usage:\n\t%s image opts o i j l\n", *v);
+		//                          0 1     2    3 4 5 6
 		return 1;
 	}
 	char *filename = v[1];
-	int arg_i = atoi(v[2]);
-	int arg_j = atoi(v[3]);
-	int arg_l = atoi(v[4]);
-	int arg_o = atoi(v[5]);
+	char *opts  = v[2];
+	int arg_o = atoi(v[3]);
+	int arg_i = atoi(v[4]);
+	int arg_j = atoi(v[5]);
+	int arg_l = atoi(v[6]);
 
 	// do stuff
-	double megabytes = 100;
-	struct fancy_image f = fancy_image_open(filename, megabytes);
+	struct fancy_image f = fancy_image_open(filename, opts);
 	printf("image \"%s\"\n", filename);
 	printf("\tw  = %d\n", f.w);
 	printf("\th  = %d\n", f.h);
@@ -288,19 +325,21 @@ int main_example(int c, char *v[])
 int main_croparound(int c, char *v[])
 {
 	// process input arguments
-	if (c != 7) {
-		fprintf(stderr, "usage:\n\t%s in.tiff o cx cy ww out.png\n",*v);
-		//                          0 1       2 3  4  5  6
+	if (c != 8) {
+		fprintf(stderr, "usage:\n\t"
+				"%s in.tiff opts o cx cy ww out.png\n",*v);
+		//                0 1       2    3 4  5  6  7
 		return 1;
 	}
 	char *filename_in = v[1];
-	int octave = atoi(v[2]);
-	int cent_x = atoi(v[3]);
-	int cent_y = atoi(v[4]);
-	int diamet = atoi(v[5]);
-	char *filename_out = v[6];
+	char *opts   = v[2];
+	int octave = atoi(v[3]);
+	int cent_x = atoi(v[4]);
+	int cent_y = atoi(v[5]);
+	int diamet = atoi(v[6]);
+	char *filename_out = v[7];
 
-	struct fancy_image f = fancy_image_open(filename_in, 100);
+	struct fancy_image f = fancy_image_open(filename_in, opts);
 	if (!f.pd) return 2;
 	if (octave < 0) octave = 0;
 	if (octave >= f.no) octave = f.no - 1;
