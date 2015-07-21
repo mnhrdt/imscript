@@ -42,7 +42,7 @@ float fancy_image_getsample_oct(struct fancy_image *f,
 		int octave, int i,int j, int l);
 
 // 
-bool fancy_image_setsample(struct fancy_image *f, int i, int j, int l, float v);
+int fancy_image_setsample(struct fancy_image *f, int i, int j, int l, float v);
 
 // obtain a sample of the image at the given point
 // (if the point is outside the image domain, return NAN)

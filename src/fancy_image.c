@@ -298,7 +298,7 @@ float fancy_image_getsample_oct(struct fancy_image *fi,
 }
 
 // API: set a sample of an image
-bool fancy_image_setsample(struct fancy_image *fi, int i, int j, int l, float v)
+int fancy_image_setsample(struct fancy_image *fi, int i, int j, int l, float v)
 {
 	struct FI *f = (void*)fi;
 	if (!f->option_write) return false;
