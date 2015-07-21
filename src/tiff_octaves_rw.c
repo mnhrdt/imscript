@@ -17,8 +17,6 @@ struct tiff_tile {
 	int16_t spp, bps, fmt;
 	bool broken;
 	uint8_t *data;
-
-	int offx, offy;
 };
 
 struct tiff_info {
@@ -69,6 +67,7 @@ static void fail(const char *fmt, ...)
 #define _XMALLOC_C
 static void *xmalloc(size_t size)
 {
+	fprintf(stderr, "malloc %zu (%gMB)\n", size, size / (0x100000 * 1.0));
 	if (size == 0)
 		fail("xmalloc: zero size");
 	void *p = malloc(size);
@@ -243,6 +242,28 @@ static int tiff_tile_corner(int p[2], TIFF *tif, int tidx)
 	return 1;
 }
 
+static int tiff_samplesperpixel(TIFF *tif)
+{
+	uint16_t spp;
+	TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLESPERPIXEL, &spp);
+	return spp;
+}
+
+// divide by 8 to obtain the size per sample (then, 0=packed data)
+static int tiff_bitspersample(TIFF *tif)
+{
+	uint16_t bps;
+	TIFFGetFieldDefaulted(tif, TIFFTAG_BITSPERSAMPLE, &bps);
+	return bps;
+}
+
+//static int tiff_sampleformat(TIFF *tif)
+//{
+//	uint16_t fmt;
+//	TIFFGetFieldDefaulted(tif, TIFFTAG_SAMPLEFORMAT, &fmt);
+//	return fmt;
+//}
+
 
 
 static void read_scanlines(struct tiff_tile *tout, TIFF *tif)
@@ -331,6 +352,36 @@ static void read_tile_from_file(struct tiff_tile *t, char *filename, int tidx)
 	TIFFClose(tif);
 }
 
+// overwrite a tile on an existing tiled TIFF image
+static void put_tile_into_file(char *filename, struct tiff_tile *t, int tidx)
+{
+	if (t->broken) fail("can not save broken tiles yet");
+
+	// Note, the mode "r+" is officially undocumented, but its behaviour is
+	// described on file tif_open.c from libtiff.
+	TIFF *tif = tiffopen_fancy(filename, "r+");
+	if (!tif) fail("could not open TIFF file \"%s\" for writing", filename);
+
+	int tw = tiff_tilewidth(tif);
+	int th = tiff_tilewidth(tif);
+	int spp = tiff_samplesperpixel(tif);
+	int bps = tiff_bitspersample(tif);
+	//int fmt = tiff_sampleformat(tif);
+	if (tw != t->w) fail("tw=%d different to t->w=%d", tw, t->w);
+	if (th != t->h) fail("th=%d different to t->h=%d", th, t->h);
+	if (spp != t->spp) fail("spp=%d different to t->spp=%d", spp, t->spp);
+	if (bps != t->bps) fail("bps=%d different to t->bps=%d", bps, t->bps);
+	if (spp != t->spp) fail("spp=%d different to t->spp=%d", spp, t->spp);
+
+	int ii[2];
+	int r = tiff_tile_corner(ii, tif, tidx);
+	if (!r) fail("bad tile %d", tidx);
+
+	r = TIFFWriteTile(tif, t->data, ii[0], ii[1], 0, 0);
+
+	TIFFClose(tif);
+}
+
 
 
 // getpixel cache with octaves {{{1
@@ -376,7 +427,7 @@ static void disable_tiff_warnings_and_errors(void)
 void tiff_octaves_init0(struct tiff_octaves *t, char *filepattern,
 		double megabytes, int max_octaves)
 {
-	//fprintf(stderr, "tiff octaves init \"%s\"(%dMB)\n", filepattern, megabytes);
+	fprintf(stderr, "tiff octaves init \"%s\"(%gMB)\n", filepattern, megabytes);
 	// create filenames until possible
 	t->noctaves = 0;
 	for (int o = 0; o < max_octaves; o++)
@@ -418,11 +469,12 @@ void tiff_octaves_init0(struct tiff_octaves *t, char *filepattern,
 	// set up data for old tile deletion
 	if (megabytes) {
 		for (int o = 0; o < t->noctaves; o++)
-			t->a[o] = malloc(t->i[o].ntiles * sizeof*t->a[o]);
+			t->a[o] = xmalloc(t->i[o].ntiles * sizeof*t->a[o]);
 		t->ax = 0;
 		int tilesize = t->i->tw * t->i->th * (t->i->bps/8) * t->i->spp;
 		double mbts = tilesize / (1024.0 * 1024);
 		t->maxtiles = megabytes / mbts;
+		fprintf(stderr, "maxtiles = %d\n", t->maxtiles);
 		t->curtiles = 0;
 	} else  {
 		// unlimited tile usage
@@ -440,12 +492,24 @@ static void re_write_tile(struct tiff_octaves *t, int tidx)
 {
 	if (!t->option_write)
 		return;
-	if (tidx < t->i->ntiles || tidx >= t->i->ntiles)
+	if (tidx < 0 || tidx >= t->i->ntiles)
 		return;
-	fprintf(stderr, "now I should write %ith tile of \"%s\"\n", tidx,
-			t->filename[0]
-			);
+
+	assert(t->c[0][tidx]);
+	struct tiff_tile ti[1];
+	//read_tile_from_file(ti, t->filename[0], tidx);
+	ti->w = t->i->tw;
+	ti->h = t->i->th;
+	ti->spp = t->i->spp;
+	ti->bps = t->i->bps;
+	ti->fmt = t->i->fmt;
+	ti->broken = false;
+	ti->data = t->c[0][tidx];
+	//int tisize = ti->w * ti->h * ti->spp * ti->bps / 8;
+	//memcpy(ti->data, t->c[0][tidx], tisize);
+	put_tile_into_file(t->filename[0], ti, tidx);
 	t->changed[tidx] = false;
+	//free(ti->data);
 }
 
 
@@ -495,7 +559,7 @@ static void free_oldest_tile_octave(struct tiff_octaves *t)
 
 	// free it
 	//
-	//fprintf(stderr, "CACHE: FREEing tile %d of octave %d\n", imin, omin);
+	fprintf(stderr, "CACHE: FREEing tile %d of octave %d\n", imin, omin);
 	if (t->option_write && omin == 0 && t->changed[imin])
 		re_write_tile(t, imin);
 	free(t->c[omin][imin]);
@@ -532,7 +596,7 @@ void *tiff_octaves_gettile(struct tiff_octaves *t, int o, int i, int j)
 		if (t->a[0] && t->curtiles == t->maxtiles)
 			free_oldest_tile_octave(t);
 
-		//fprintf(stderr,"CACHE: LOADing tile %d of octave %d\n",tidx,o);
+		fprintf(stderr,"CACHE: LOADing tile %d of octave %d\n",tidx,o);
 		struct tiff_tile tmp[1];
 		read_tile_from_file(tmp, t->filename[o], tidx);
 		t->c[o][tidx] = tmp->data;
@@ -571,12 +635,19 @@ void tiff_octaves_setpixel(struct tiff_octaves *t, int i, int j, void *p)
 	void *tile = tiff_octaves_gettile(t, 0, i, j);
 	if (!tile) return;
 
-	int pixel_index = j * t->i->w + i;
+	int ii = i % t->i->tw;
+	int jj = j % t->i->th;
+	int pixel_index = jj * t->i->tw + ii;
 	int pixel_size = (t->i->spp * t->i->bps) / 8;
 	int pixel_position = pixel_index * pixel_size;
 	void *where = pixel_position + (char*)tile;
 	memcpy(where, p, pixel_size);
-
+	//{
+	//	char *from = (char*)p;
+	//	char *to = pixel_position + (char*)tile;
+	//	for (int k = 0; k < pixel_size; k++)
+	//		to[k] = from[k];
+	//}
 	t->changed[tidx] = true;
 }
 

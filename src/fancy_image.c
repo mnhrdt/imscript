@@ -4,7 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "fi.h"
+#include "fancy_image.h"
+
 #include "iio.h"
 #include "tiff_octaves_rw.c"
 
@@ -30,7 +31,8 @@ struct FI {
 	struct tiff_octaves t[1];
 	float *x, *pyr_x[MAX_OCTAVES];
 	int pyr_w[MAX_OCTAVES], pyr_h[MAX_OCTAVES];
-	bool changed_x;
+	bool x_changed;
+	char x_filename[FILENAME_MAX];
 
 };
 
@@ -188,6 +190,8 @@ struct fancy_image fancy_image_open(char *filename, char *options)
 		f->tiffo = false;
 		f->x = iio_read_image_float_vec(filename, &f->w, &f->h, &f->pd);
 		f->no = build_pyramid(f, f->max_octaves);
+		strncpy(f->x_filename, filename, FILENAME_MAX);
+		f->x_changed = false;
 	}
 
 	if (f->option_verbose) {
@@ -228,6 +232,9 @@ void fancy_image_close(struct fancy_image *fi)
 	if (f->tiffo)
 		tiff_octaves_free(f->t);
 	else {
+		if (f->option_write && f->x_changed)
+			iio_save_image_float_vec(f->x_filename, f->x,
+					f->w, f->h, f->pd);
 		if (f->no > 1)
 			free_pyramid(f);
 		else
@@ -304,14 +311,14 @@ bool fancy_image_setsample(struct fancy_image *fi, int i, int j, int l, float v)
 		float p[f->pd];
 		// TODO: remove this silly loop
 		for (int k = 0; k < f->pd; k++)
-			p[k] = fancy_image_getsample(fi, i, j, l);
+			p[k] = fancy_image_getsample(fi, i, j, k);
 		p[l] = v;
 		tiff_octaves_setpixel_float(f->t, i, j, p);
 		return true;
 	} else {
 		int idx = (j * f->w + i) * f->pd + l;
 		f->x[idx] = v;
-		return f->changed_x = true;
+		return f->x_changed = true;
 	}
 }
 
@@ -376,7 +383,7 @@ int main_croparound(int c, char *v[])
 	if (!f.pd) return 2;
 	//if (octave < 0) octave = 0;
 	//if (octave >= f.no) octave = f.no - 1;
-	float *x = malloc(diamet * diamet * f.pd * sizeof*x);
+	float *x = xmalloc(diamet * diamet * f.pd * sizeof*x);
 	for (int j = 0; j < diamet; j++)
 	for (int i = 0; i < diamet; i++)
 	for (int l = 0; l < f.pd; l++)
@@ -391,5 +398,62 @@ int main_croparound(int c, char *v[])
 	free(x);
 	return 0;
 }
-int main(int c, char *v[]) { return main_croparound(c, v); }
+int main_setsample(int c, char *v[])
+{
+	if (c != 7) {
+		fprintf(stderr, "usage:\n\t"
+				"%s inout.tiff opts i j l v\n",*v);
+		//                0 1          2    3 4 5 6
+		return 1;
+	}
+	char *filename = v[1];
+	char *opts = v[2];
+	int arg_i = atoi(v[3]);
+	int arg_j = atoi(v[4]);
+	int arg_l = atoi(v[5]);
+	float arg_v = atof(v[6]);
+
+	struct fancy_image f = fancy_image_open(filename, opts);
+	fancy_image_setsample(&f, arg_i, arg_j, arg_l, arg_v);
+	fancy_image_close(&f);
+
+	return 0;
+}
+
+int main_times(int c, char *v[])
+{
+	// process input arguments
+	if (c != 3) {
+		fprintf(stderr, "usage:\n\t%s file.tiff factor\n", *v);
+		//                          0 1         2
+		return 1;
+	}
+	char *filename = v[1];
+	double factor = atof(v[2]);
+
+	// open image
+	struct fancy_image f = fancy_image_open(filename, "rw,megabytes=2,verbose=1");
+
+	// process data
+	for (int j = 0; j < f.h; j++)
+		{
+		if (0 == j%100) fprintf(stderr, "line %d of %d\n", j, f.h);
+	for (int i = 0; i < f.w; i++)
+	for (int l = 0; l < f.pd; l++)
+	{
+		double x = fancy_image_getsample(&f, i, j, l);
+		x = x * factor;
+		fancy_image_setsample(&f, i, j, l, x);
+	}
+		}
+
+	// close image (and save remaining updated tiles)
+	fancy_image_close(&f);
+
+	// exit
+	return 0;
+}
+//int main(int c, char *v[]) { return main_croparound(c, v); }
+//int main(int c, char *v[]) { return main_setsample(c, v); }
+int main(int c, char *v[]) { return main_times(c, v); }
 #endif
