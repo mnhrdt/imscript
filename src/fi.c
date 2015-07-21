@@ -30,6 +30,7 @@ struct FI {
 	struct tiff_octaves t[1];
 	float *x, *pyr_x[MAX_OCTAVES];
 	int pyr_w[MAX_OCTAVES], pyr_h[MAX_OCTAVES];
+	bool changed_x;
 
 };
 
@@ -178,6 +179,7 @@ struct fancy_image fancy_image_open(char *filename, char *options)
 	if (filename_corresponds_to_tiffo(filename)) {
 		f->tiffo = true;
 		tiff_octaves_init0(f->t, filename, f->megabytes,f->max_octaves);
+		if (f->option_write) f->t->option_write = true;
 		f->w = f->t->i->w;
 		f->h = f->t->i->h;
 		f->pd = f->t->i->spp;
@@ -285,6 +287,31 @@ float fancy_image_getsample_oct(struct fancy_image *fi,
 			return NAN;
 		int  idx = (j * w + i) * f->pd + l;
 		return x[idx];
+	}
+}
+
+// API: set a sample of an image
+bool fancy_image_setsample(struct fancy_image *fi, int i, int j, int l, float v)
+{
+	struct FI *f = (void*)fi;
+	if (!f->option_write) return false;
+
+	if (i < 0 || i >= f->w) return false;
+	if (j < 0 || j >= f->h) return false;
+	if (l < 0 || l >= f->pd) return false;
+
+	if (f->tiffo) {
+		float p[f->pd];
+		// TODO: remove this silly loop
+		for (int k = 0; k < f->pd; k++)
+			p[k] = fancy_image_getsample(fi, i, j, l);
+		p[l] = v;
+		tiff_octaves_setpixel_float(f->t, i, j, p);
+		return true;
+	} else {
+		int idx = (j * f->w + i) * f->pd + l;
+		f->x[idx] = v;
+		return f->changed_x = true;
 	}
 }
 

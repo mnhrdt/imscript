@@ -122,7 +122,7 @@ static TIFF *tiffopen_fancy(char *filename, char *mode)
 	if (!tif) return tif;
 	for (int i = 0; i < index; i++)
 		TIFFReadDirectory(tif);
-	
+
 	return tif;
 }
 
@@ -257,6 +257,7 @@ static void read_scanlines(struct tiff_tile *tout, TIFF *tif)
 	tout->bps = tinfo->bps;
 	tout->fmt = tinfo->fmt;
 	tout->spp = tinfo->spp;
+	tout->broken = false;
 
 	// define useful constants
 	int pixel_size = tinfo->spp * tinfo->bps/8;
@@ -343,6 +344,10 @@ struct tiff_octaves {
 	struct tiff_info i[MAX_OCTAVES];
 	void **c[MAX_OCTAVES];        // pointers to cached tiles
 
+	bool option_read;
+	bool option_write;
+	bool *changed;
+
 	// data only necessary to delete tiles when the memory is full
 	//
 	unsigned int *a[MAX_OCTAVES]; // access counter for each tile
@@ -402,6 +407,13 @@ void tiff_octaves_init0(struct tiff_octaves *t, char *filepattern,
 		for (int j = 0; j < t->i[o].ntiles; j++)
 			t->c[o][j] = 0;
 	}
+	
+	// set up writing cache for setpixel
+	t->option_read = true;
+	t->option_write = false;
+	t->changed = xmalloc(t->i->ntiles * sizeof*t->changed);
+	for (int i = 0; i < t->i->ntiles; i++)
+		t->changed[i] = false;
 
 	// set up data for old tile deletion
 	if (megabytes) {
@@ -424,15 +436,34 @@ void tiff_octaves_init(struct tiff_octaves *t, char *filepattern,
 	tiff_octaves_init0(t, filepattern, megabytes, MAX_OCTAVES);
 }
 
+static void re_write_tile(struct tiff_octaves *t, int tidx)
+{
+	if (!t->option_write)
+		return;
+	if (tidx < t->i->ntiles || tidx >= t->i->ntiles)
+		return;
+	fprintf(stderr, "now I should write %ith tile of \"%s\"\n", tidx,
+			t->filename[0]
+			);
+	t->changed[tidx] = false;
+}
+
 
 void tiff_octaves_free(struct tiff_octaves *t)
 {
+	if (t->option_write)
+		for (int i = 0; i < t->i->ntiles; i++)
+			if (t->changed[i])
+				re_write_tile(t, i);
 	for (int i = 0; i < t->noctaves; i++)
 	{
 		for (int j = 0; j < t->i[i].ntiles; j++)
 			free(t->c[i][j]);
 		free(t->c[i]);
+		if (t->a[0])
+			free(t->a[i]);
 	}
+	free(t->changed);
 }
 
 static int bound(int a, int x, int b)
@@ -465,6 +496,8 @@ static void free_oldest_tile_octave(struct tiff_octaves *t)
 	// free it
 	//
 	//fprintf(stderr, "CACHE: FREEing tile %d of octave %d\n", imin, omin);
+	if (t->option_write && omin == 0 && t->changed[imin])
+		re_write_tile(t, imin);
 	free(t->c[omin][imin]);
 	t->c[omin][imin] = 0;
 	t->a[omin][imin] = 0;
@@ -484,9 +517,9 @@ static void notify_tile_access_octave(struct tiff_octaves *t, int o, int i)
 void *tiff_octaves_gettile(struct tiff_octaves *t, int o, int i, int j)
 {
 	// sanitize input
-	o = bound(0, o, t->noctaves - 1);
-	i = bound(0, i, t->i[o].w - 1);
-	j = bound(0, j, t->i[o].h - 1);
+	if (o < 0 || o >= t->noctaves) return NULL;
+	if (i < 0 || i >= t->i[o].w) return NULL;
+	if (j < 0 || j >= t->i[o].h) return NULL;
 
 	// get valid tile index
 	int tidx = my_computetile(t->i + o, i, j);
@@ -525,6 +558,59 @@ void *tiff_octaves_getpixel(struct tiff_octaves *t, int o, int i, int j)
 	int pixel_index = jj * ti->tw + ii;
 	int pixel_position = pixel_index * ti->spp * (ti->bps / 8);
 	return pixel_position + (char*)tile;
+}
+
+void tiff_octaves_setpixel(struct tiff_octaves *t, int i, int j, void *p)
+{
+	if (i < 0 || i >= t->i->w) return;
+	if (j < 0 || j >= t->i->h) return;
+
+	int tidx = my_computetile(t->i, i, j);
+	if (tidx < 0) return;
+	assert(tidx < t->i->ntiles);
+	void *tile = tiff_octaves_gettile(t, 0, i, j);
+	if (!tile) return;
+
+	int pixel_index = j * t->i->w + i;
+	int pixel_size = (t->i->spp * t->i->bps) / 8;
+	int pixel_position = pixel_index * pixel_size;
+	void *where = pixel_position + (char*)tile;
+	memcpy(where, p, pixel_size);
+
+	t->changed[tidx] = true;
+}
+
+static
+void convert_floats_to_samples(struct tiff_info *ti, void *s, float *f, int n)
+{
+#define FIN for(int i=0;i<n;i++)
+	switch(ti->fmt) {
+	case SAMPLEFORMAT_UINT:
+		if (8 == ti->bps)        FIN ((uint8_t *)s)[i] = f[i];
+		else if (16 == ti->bps)  FIN ((uint16_t*)s)[i] = f[i];
+		else if (32 == ti->bps)  FIN ((uint32_t*)s)[i] = f[i];
+		break;
+	case SAMPLEFORMAT_INT:
+		if (8 == ti->bps)        FIN (( int8_t *)s)[i] = f[i];
+		else if (16 == ti->bps)  FIN (( int16_t*)s)[i] = f[i];
+		else if (32 == ti->bps)  FIN (( int32_t*)s)[i] = f[i];
+		break;
+	case SAMPLEFORMAT_IEEEFP:
+		if (32 == ti->bps)       FIN (( float  *)s)[i] = f[i];
+		else if (64 == ti->bps)  FIN (( double *)s)[i] = f[i];
+		break;
+	default:
+		fail("unrecognized sample fmt(%d) size(%d)", ti->fmt, ti->bps);
+	}
+#undef FIN
+}
+
+void tiff_octaves_setpixel_float(struct tiff_octaves *t, int i, int j, float *p)
+{
+	int pixel_size = (t->i->spp * t->i->bps) / 8;
+	char pix[pixel_size];
+	convert_floats_to_samples(t->i, pix, p, t->i->spp);
+	tiff_octaves_setpixel(t, i, j, pix);
 }
 
 // shy versions of the previous two functions
