@@ -2,8 +2,41 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
+#include <execinfo.h>
 
-#include "fail.c"
+#define BACKTRACE_SYMBOLS 50
+
+void print_trace(FILE *f)
+{
+	void *array[BACKTRACE_SYMBOLS];
+	size_t size, i;
+	char **strings;
+
+	size = backtrace (array, BACKTRACE_SYMBOLS);
+	strings = backtrace_symbols (array, size);
+
+	fprintf (f, "Obtained %zu stack frames.\n", size);
+
+	for (i = 0; i < size; i++)
+		fprintf (f, "%s\n", strings[i]);
+
+	free (strings);
+}
+
+void bad_fail(const char *fmt, ...)
+{
+	va_list argp;
+	fprintf(stderr, "\nERROR: ");
+	va_start(argp, fmt);
+	vfprintf(stderr, fmt, argp);
+	va_end(argp);
+	fprintf(stderr, "\n\n");
+	fflush(NULL);
+	print_trace(stderr);
+	exit(*(int *)0x43);
+}
+
 
 #define SIZE_OF_MEGABYTE 1048576.0
 static size_t xmalloc_global_size = 0;
@@ -37,7 +70,7 @@ void print_malloc_stats(void)
 static void xmalloc_error(size_t s)
 {
 	double sm = s / (0x100000 * 1.0);
-	fail("xmalloc: out of memory while requesting "
+	bad_fail("xmalloc: out of memory while requesting "
 			"%zu bytes (%gMB):\"%s\"",
 			s, sm, strerror(errno));
 }
@@ -51,7 +84,7 @@ void *xmalloc(size_t size)
 			size/SIZE_OF_MEGABYTE);
 
 	if (size == 0)
-		fail("xmalloc: zero size");
+		bad_fail("xmalloc: zero size");
 	//new = malloc(size + 2 * sizeof(size_t));
 	new = malloc(size + sizeof(struct xmalloc_secret_stuff));
 	if (new == NULL)
@@ -82,7 +115,7 @@ void *xmalloc(size_t size)
 void xfree(void *p)
 {
 	if (!p)
-		fail("thou shalt not free a null pointer!");
+		bad_fail("thou shalt not free a null pointer!");
 	struct xmalloc_secret_stuff *secret = xmalloc_get_secret_stuff(p);
 	assert(p == xmalloc_get_stuff(secret));
 	xmalloc_global_size -= secret->size;

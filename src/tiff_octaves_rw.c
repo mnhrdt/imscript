@@ -61,13 +61,21 @@ static void fail(const char *fmt, ...)
 }
 #endif//_FAIL_C
 
+//static double global_accumulated_size = 0;
+//static double global_tile_size = 0;
 
-// like malloc, but always returns a valid pointer
+
+// enable "XMALLOC_STATS" for debugging purposes
+//#define XMALLOC_STATS
+
+#ifdef XMALLOC_STATS
+#include "xmalloc_stats.c"
+#else
+
 #ifndef _XMALLOC_C
 #define _XMALLOC_C
 static void *xmalloc(size_t size)
 {
-	fprintf(stderr, "malloc %zu (%gMB)\n", size, size / (0x100000 * 1.0));
 	if (size == 0)
 		fail("xmalloc: zero size");
 	void *p = malloc(size);
@@ -81,6 +89,9 @@ static void *xmalloc(size_t size)
 	return p;
 }
 #endif//_XMALLOC_C
+#define xfree free
+#endif//XMALLOC_STATS
+
 
 
 static int my_computetile(struct tiff_info *t, int i, int j)
@@ -427,7 +438,7 @@ static void disable_tiff_warnings_and_errors(void)
 void tiff_octaves_init0(struct tiff_octaves *t, char *filepattern,
 		double megabytes, int max_octaves)
 {
-	fprintf(stderr, "tiff octaves init \"%s\"(%gMB)\n", filepattern, megabytes);
+	//fprintf(stderr, "tiff octaves init \"%s\"(%gMB)\n", filepattern, megabytes);
 	// create filenames until possible
 	t->noctaves = 0;
 	for (int o = 0; o < max_octaves; o++)
@@ -458,10 +469,10 @@ void tiff_octaves_init0(struct tiff_octaves *t, char *filepattern,
 		for (int j = 0; j < t->i[o].ntiles; j++)
 			t->c[o][j] = 0;
 	}
-	
+
 	// set up writing cache for setpixel
 	t->option_read = true;
-	t->option_write = false;
+	t->option_write = true;
 	t->changed = xmalloc(t->i->ntiles * sizeof*t->changed);
 	for (int i = 0; i < t->i->ntiles; i++)
 		t->changed[i] = false;
@@ -474,7 +485,7 @@ void tiff_octaves_init0(struct tiff_octaves *t, char *filepattern,
 		int tilesize = t->i->tw * t->i->th * (t->i->bps/8) * t->i->spp;
 		double mbts = tilesize / (1024.0 * 1024);
 		t->maxtiles = megabytes / mbts;
-		fprintf(stderr, "maxtiles = %d\n", t->maxtiles);
+		//fprintf(stderr, "maxtiles = %d\n", t->maxtiles);
 		t->curtiles = 0;
 	} else  {
 		// unlimited tile usage
@@ -505,11 +516,8 @@ static void re_write_tile(struct tiff_octaves *t, int tidx)
 	ti->fmt = t->i->fmt;
 	ti->broken = false;
 	ti->data = t->c[0][tidx];
-	//int tisize = ti->w * ti->h * ti->spp * ti->bps / 8;
-	//memcpy(ti->data, t->c[0][tidx], tisize);
 	put_tile_into_file(t->filename[0], ti, tidx);
 	t->changed[tidx] = false;
-	//free(ti->data);
 }
 
 
@@ -522,12 +530,13 @@ void tiff_octaves_free(struct tiff_octaves *t)
 	for (int i = 0; i < t->noctaves; i++)
 	{
 		for (int j = 0; j < t->i[i].ntiles; j++)
-			free(t->c[i][j]);
-		free(t->c[i]);
+			if (t->c[i][j])
+				xfree(t->c[i][j]);
+		xfree(t->c[i]);
 		if (t->a[0])
-			free(t->a[i]);
+			xfree(t->a[i]);
 	}
-	free(t->changed);
+	xfree(t->changed);
 }
 
 static int bound(int a, int x, int b)
@@ -537,13 +546,14 @@ static int bound(int a, int x, int b)
 	return x;
 }
 
+
 static void free_oldest_tile_octave(struct tiff_octaves *t)
 {
 	// find oldest tile
 	int omin = -1, imin = -1;
 	for (int o = 0; o < t->noctaves; o++)
 		for (int i = 0; i < t->i[o].ntiles; i++)
-			if (t->a[o][i]) {
+			if (t->c[o][i]) {
 				if (imin >= 0) {
 					if (t->a[o][i] < t->a[omin][imin]) {
 						imin = i;
@@ -559,10 +569,11 @@ static void free_oldest_tile_octave(struct tiff_octaves *t)
 
 	// free it
 	//
-	fprintf(stderr, "CACHE: FREEing tile %d of octave %d\n", imin, omin);
+	//fprintf(stderr, "CACHE: FREEing tile %d of octave %d (%g)\n", imin, omin,global_accumulated_size);
 	if (t->option_write && omin == 0 && t->changed[imin])
 		re_write_tile(t, imin);
-	free(t->c[omin][imin]);
+	assert(t->c[omin][imin]);
+	xfree(t->c[omin][imin]);
 	t->c[omin][imin] = 0;
 	t->a[omin][imin] = 0;
 	t->curtiles -= 1;
@@ -575,6 +586,7 @@ static void free_oldest_tile_octave(struct tiff_octaves *t)
 
 static void notify_tile_access_octave(struct tiff_octaves *t, int o, int i)
 {
+	//fprintf(stderr, "notify tile %d\n", i);
 	t->a[o][i] = ++t->ax;
 }
 
@@ -596,7 +608,7 @@ void *tiff_octaves_gettile(struct tiff_octaves *t, int o, int i, int j)
 		if (t->a[0] && t->curtiles == t->maxtiles)
 			free_oldest_tile_octave(t);
 
-		fprintf(stderr,"CACHE: LOADing tile %d of octave %d\n",tidx,o);
+		//fprintf(stderr,"CACHE: LOADing tile %d of octave %d (%g)\n",tidx,o, global_accumulated_size);
 		struct tiff_tile tmp[1];
 		read_tile_from_file(tmp, t->filename[o], tidx);
 		t->c[o][tidx] = tmp->data;

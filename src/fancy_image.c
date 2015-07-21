@@ -432,12 +432,10 @@ int main_times(int c, char *v[])
 	double factor = atof(v[2]);
 
 	// open image
-	struct fancy_image f = fancy_image_open(filename, "rw,megabytes=2,verbose=1");
+	struct fancy_image f = fancy_image_open(filename, "rw,megabytes=33");
 
 	// process data
 	for (int j = 0; j < f.h; j++)
-		{
-		if (0 == j%100) fprintf(stderr, "line %d of %d\n", j, f.h);
 	for (int i = 0; i < f.w; i++)
 	for (int l = 0; l < f.pd; l++)
 	{
@@ -445,7 +443,6 @@ int main_times(int c, char *v[])
 		x = x * factor;
 		fancy_image_setsample(&f, i, j, l, x);
 	}
-		}
 
 	// close image (and save remaining updated tiles)
 	fancy_image_close(&f);
@@ -453,6 +450,9 @@ int main_times(int c, char *v[])
 	// exit
 	return 0;
 }
+
+
+
 //int main(int c, char *v[]) { return main_croparound(c, v); }
 //int main(int c, char *v[]) { return main_setsample(c, v); }
 int main(int c, char *v[]) { return main_times(c, v); }
