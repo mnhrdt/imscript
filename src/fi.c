@@ -6,7 +6,7 @@
 
 #include "fi.h"
 #include "iio.h"
-#include "tiff_octaves.c"
+#include "tiff_octaves_rw.c"
 
 // the following struct is an implementation detail,
 // it is only used on this file
@@ -108,9 +108,13 @@ static int build_pyramid(struct FI *f, int max_octaves)
 		s += 1;
 		if (sw + sh <= 2) break;
 	}
-	fprintf(stderr, "IMG %dx%d,%d (no=%d)\n", f->w, f->h, f->pd, s);
-	for (int i = 0; i < s; i++)
-		fprintf(stderr, "\tpyr[%d] : %dx%d\n", i, f->pyr_w[i], f->pyr_h[i]);
+	if (f->option_verbose)
+	{
+		fprintf(stderr, "IMG %dx%d,%d (no=%d)\n", f->w, f->h, f->pd, s);
+		for (int i = 0; i < s; i++)
+			fprintf(stderr, "\tpyr[%d] : %dx%d\n", i,
+					f->pyr_w[i], f->pyr_h[i]);
+	}
 	return s;
 }
 
@@ -138,7 +142,7 @@ static void interpret_options(struct FI *f, char *options_arg)
 	strncpy(o, options_arg, n);
 	char *tok = strtok(o, ",");
 	while (tok) {
-		fprintf(stderr, "TOKEN \"%s\"\n", tok);
+		//fprintf(stderr, "TOKEN \"%s\"\n", tok);
 		if (0 == strcmp(tok, "r"   ))  f->option_read  = true;
 		if (0 == strcmp(tok, "rw"  ))  f->option_read  = true;
 		if (0 == strcmp(tok, "wr"  ))  f->option_read  = true;
@@ -153,6 +157,10 @@ static void interpret_options(struct FI *f, char *options_arg)
 		if (1 == sscanf(tok, "verbose=%lf", &x)) f->option_verbose = x;
 		tok = strtok(NULL, ",");
 	}
+
+	// pyramidal writing is complicated, so we disable it
+	if (f->option_write)
+		f->max_octaves = 1;
 }
 
 
@@ -169,7 +177,7 @@ struct fancy_image fancy_image_open(char *filename, char *options)
 	// read the image
 	if (filename_corresponds_to_tiffo(filename)) {
 		f->tiffo = true;
-		tiff_octaves_init(f->t, filename, f->megabytes);
+		tiff_octaves_init0(f->t, filename, f->megabytes,f->max_octaves);
 		f->w = f->t->i->w;
 		f->h = f->t->i->h;
 		f->pd = f->t->i->spp;
@@ -261,8 +269,6 @@ float fancy_image_getsample_oct(struct fancy_image *fi,
 
 	if (octave < 0 || octave >= f->no)
 		return NAN;
-	//if (i < 0 || j < 0 || i >= f->w || j >= f->h)
-	//	return NAN;
 	if (l < 0) l = 0;
 	if (l >= f->pd) l = f->pd - 1;
 
@@ -341,8 +347,8 @@ int main_croparound(int c, char *v[])
 
 	struct fancy_image f = fancy_image_open(filename_in, opts);
 	if (!f.pd) return 2;
-	if (octave < 0) octave = 0;
-	if (octave >= f.no) octave = f.no - 1;
+	//if (octave < 0) octave = 0;
+	//if (octave >= f.no) octave = f.no - 1;
 	float *x = malloc(diamet * diamet * f.pd * sizeof*x);
 	for (int j = 0; j < diamet; j++)
 	for (int i = 0; i < diamet; i++)
