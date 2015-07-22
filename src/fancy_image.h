@@ -55,6 +55,11 @@ float fancy_image_getsample(struct fancy_image *f, int i,int j, int l);
 // UTILITY API: functions that have a more comfortable interface
 // All these utility functions are defined in terms of the Basic Api above
 
+void fancy_image_fill_rectangle_float_vec(float *out, int w, int h,
+		struct fancy_image *f, int octave, int x0, int y0);
+
+void fancy_image_fill_rectangle_float_split(float *out, int w, int h,
+		struct fancy_image *f, int octave, int x0, int y0);
 
 // fill-in the array "out" with "f->pd" numbers
 void fancy_image_getpixel(float *out, struct fancy_image *f, int i,int j);

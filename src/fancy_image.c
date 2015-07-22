@@ -322,6 +322,32 @@ int fancy_image_setsample(struct fancy_image *fi, int i, int j, int l, float v)
 	}
 }
 
+void fancy_image_fill_rectangle_float_vec(
+		float *out, int w, int h,
+		struct fancy_image *f, int o, int x0, int y0)
+{
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	for (int l = 0; l < f->pd; l++)
+	{
+		int idx = (j * w + i) * f->pd + l;
+		out[idx] = fancy_image_getsample_oct(f, o, x0 + i, y0 + j, l);
+	}
+}
+
+void fancy_image_fill_rectangle_float_split(
+		float *out, int w, int h,
+		struct fancy_image *f, int o, int x0, int y0)
+{
+	for (int l = 0; l < f->pd; l++)
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		int idx = l*w*h + j*w + i;
+		out[idx] = fancy_image_getsample_oct(f, o, x0 + i, y0 + j, l);
+	}
+}
+
 #ifdef MAIN_FI
 #include <stdio.h>
 int main_example(int c, char *v[])
