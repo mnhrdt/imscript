@@ -28,7 +28,7 @@ struct fancy_image {
 
 // open an image with the desired amount of cache
 // (the cache size is honored only for tiled tiffs)
-struct fancy_image fancy_image_open(char *filename, char *options);
+struct fancy_image *fancy_image_open(char *filename, char *options);
 // The default options are the following:
 // 	r,megabytes=100,octaves=0,verbose=0
 

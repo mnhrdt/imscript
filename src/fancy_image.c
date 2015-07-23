@@ -168,10 +168,11 @@ static void interpret_options(struct FI *f, char *options_arg)
 
 
 // API: open a fancy image
-struct fancy_image fancy_image_open(char *filename, char *options)
+struct fancy_image *fancy_image_open(char *filename, char *options)
 {
 	// create return struct and its alias
-	struct fancy_image r[1];
+	//struct fancy_image r[1];
+	struct fancy_image *r = xmalloc(sizeof*r); // I hate this malloc!
 	struct FI *f = (void*)r;
 
 	// process options parameter
@@ -207,7 +208,7 @@ struct fancy_image fancy_image_open(char *filename, char *options)
 	}
 
 	// return image struct
-	return *r;
+	return r;
 }
 
 int fancy_image_width_octave(struct fancy_image *fi, int octave)
@@ -240,6 +241,7 @@ void fancy_image_close(struct fancy_image *fi)
 		else
 			free(f->x);
 	}
+	free(f);
 }
 
 // internal conversion function function
@@ -366,14 +368,14 @@ int main_example(int c, char *v[])
 	int arg_l = atoi(v[6]);
 
 	// do stuff
-	struct fancy_image f = fancy_image_open(filename, opts);
+	struct fancy_image *f = fancy_image_open(filename, opts);
 	printf("image \"%s\"\n", filename);
-	printf("\tw  = %d\n", f.w);
-	printf("\th  = %d\n", f.h);
-	printf("\tpd = %d\n", f.pd);
-	printf("\tno = %d\n", f.no);
+	printf("\tw  = %d\n", f->w);
+	printf("\th  = %d\n", f->h);
+	printf("\tpd = %d\n", f->pd);
+	printf("\tno = %d\n", f->no);
 
-	float s = fancy_image_getsample_oct(&f, arg_o, arg_i, arg_j, arg_l);
+	float s = fancy_image_getsample_oct(f, arg_o, arg_i, arg_j, arg_l);
 	printf("\t (%d)[%d,%d]{%d} = %g\n", arg_o, arg_i, arg_j, arg_l, s);
 
 	//int x = 1;
@@ -383,7 +385,7 @@ int main_example(int c, char *v[])
 	//	printf("\tsample(%d,%d,0) = %g\n", x, x, s);
 	//	x *= 10;
 	//} while(isfinite(s));
-	fancy_image_close(&f);
+	fancy_image_close(f);
 
 	// exit
 	return 0;
@@ -405,22 +407,22 @@ int main_croparound(int c, char *v[])
 	int diamet = atoi(v[6]);
 	char *filename_out = v[7];
 
-	struct fancy_image f = fancy_image_open(filename_in, opts);
-	if (!f.pd) return 2;
+	struct fancy_image *f = fancy_image_open(filename_in, opts);
+	if (!f->pd) return 2;
 	//if (octave < 0) octave = 0;
 	//if (octave >= f.no) octave = f.no - 1;
-	float *x = xmalloc(diamet * diamet * f.pd * sizeof*x);
+	float *x = xmalloc(diamet * diamet * f->pd * sizeof*x);
 	for (int j = 0; j < diamet; j++)
 	for (int i = 0; i < diamet; i++)
-	for (int l = 0; l < f.pd; l++)
+	for (int l = 0; l < f->pd; l++)
 	{
 		int ii = cent_x - diamet/2 + i;
 		int jj = cent_y - diamet/2 + j;
-		int idx_o = (j * diamet + i) * f.pd + l;
-		x[idx_o] = fancy_image_getsample_oct(&f, octave, ii, jj, l);
+		int idx_o = (j * diamet + i) * f->pd + l;
+		x[idx_o] = fancy_image_getsample_oct(f, octave, ii, jj, l);
 	}
-	fancy_image_close(&f);
-	iio_save_image_float_vec(filename_out, x, diamet, diamet, f.pd);
+	fancy_image_close(f);
+	iio_save_image_float_vec(filename_out, x, diamet, diamet, f->pd);
 	free(x);
 	return 0;
 }
@@ -439,9 +441,9 @@ int main_setsample(int c, char *v[])
 	int arg_l = atoi(v[5]);
 	float arg_v = atof(v[6]);
 
-	struct fancy_image f = fancy_image_open(filename, opts);
-	fancy_image_setsample(&f, arg_i, arg_j, arg_l, arg_v);
-	fancy_image_close(&f);
+	struct fancy_image *f = fancy_image_open(filename, opts);
+	fancy_image_setsample(f, arg_i, arg_j, arg_l, arg_v);
+	fancy_image_close(f);
 
 	return 0;
 }
@@ -458,20 +460,20 @@ int main_times(int c, char *v[])
 	double factor = atof(v[2]);
 
 	// open image
-	struct fancy_image f = fancy_image_open(filename, "rw,megabytes=33");
+	struct fancy_image *f = fancy_image_open(filename, "rw,megabytes=33");
 
 	// process data
-	for (int j = 0; j < f.h; j++)
-	for (int i = 0; i < f.w; i++)
-	for (int l = 0; l < f.pd; l++)
+	for (int j = 0; j < f->h; j++)
+	for (int i = 0; i < f->w; i++)
+	for (int l = 0; l < f->pd; l++)
 	{
-		double x = fancy_image_getsample(&f, i, j, l);
+		double x = fancy_image_getsample(f, i, j, l);
 		x = x * factor;
-		fancy_image_setsample(&f, i, j, l, x);
+		fancy_image_setsample(f, i, j, l, x);
 	}
 
 	// close image (and save remaining updated tiles)
-	fancy_image_close(&f);
+	fancy_image_close(f);
 
 	// exit
 	return 0;
@@ -482,4 +484,4 @@ int main_times(int c, char *v[])
 //int main(int c, char *v[]) { return main_croparound(c, v); }
 //int main(int c, char *v[]) { return main_setsample(c, v); }
 int main(int c, char *v[]) { return main_times(c, v); }
-#endif
+#endif//MAIN_FI
