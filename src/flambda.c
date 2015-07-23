@@ -237,6 +237,8 @@
 #include "parsenumbers.c"
 #include "colorcoords.c"
 
+#include "fancy_image.h"
+
 
 // #defines {{{1
 
@@ -1170,6 +1172,12 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 	return 0;
 }
 
+static int eval_magicvar_fancy(float *out, int magic, int img_index,
+		int comp, int qq, struct fancy_image *x)
+{
+	return 0;
+}
+
 // lexing and parsing {{{1
 
 // if the token resolves to a numeric constant, store it in *x and return true
@@ -1994,6 +2002,26 @@ static float getsample_cfg(float *x, int w, int h, int pd, int i, int j, int l)
 	return p(x, w, h, pd, i, j, l);
 }
 
+typedef float (*getsample_operator_fancy)(struct fancy_image *,int,int,int);
+
+SMART_PARAMETER_SILENT(FLAMBDA_GETPIXEL,-1)
+static float getsample_cfg_fancy(struct fancy_image *x, int i, int j, int l)
+{
+	return fancy_image_getsample(x, i, j, l);
+	//getsample_operator p = get_sample_operator(getsample_1);
+	//int option = PLAMBDA_GETPIXEL();
+	//switch (option) {
+	//case -1: break;
+	//case 0: p = getsample_0; break;
+	//case 1: p = getsample_1; break;
+	//case 2: p = getsample_2; break;
+	//case 3: p = getsample_per; break;
+	//case 4: p = getsample_nan; break;
+	//default: fail("unrecognized PLAMBDA_GETPIXEL value %d", option);
+	//}
+	//return p(x, w, h, pd, i, j, l);
+}
+
 #define H 0.5
 #define Q 0.25
 #define O 0.125
@@ -2059,6 +2087,17 @@ static float apply_3x3_stencil(float *img, int w, int h, int pd,
 	return r;
 }
 
+static float apply_3x3_stencil_fancy(struct fancy_image *img,
+		int ai, int aj, int channel, float *s)
+{
+	assert(s);
+	getsample_operator_fancy P = getsample_cfg_fancy;
+	float r = 0;
+	for (int i = 0; i < 9; i++)
+		r += s[i] * P(img, ai-1+i%3, aj-1+i/3, channel);
+	return r;
+}
+
 //static float imageop_scalar_old(float *img, int w, int h, int pd,
 //		int ai, int aj, int al, struct plambda_token *t)
 //{
@@ -2083,6 +2122,29 @@ static float imageop_scalar(float *img, int w, int h, int pd,
 			return hypot(gx, gy);
 			}
 		default: fail("unrecognized imageop operator %d\n", t->imageop_operator);
+		}
+	}
+	return 0;
+}
+
+static float imageop_scalar_fancy(struct fancy_image *img,
+		int ai, int aj, int al, struct plambda_token *t)
+{
+	float *s = get_stencil_3x3(t->imageop_operator, t->imageop_scheme);
+	if (s)
+		return apply_3x3_stencil_fancy(img, ai, aj, al, s);
+	else {
+		switch(t->imageop_operator) {
+		case IMAGEOP_NGRAD:
+			{
+			float *sx=get_stencil_3x3(IMAGEOP_X,t->imageop_scheme);
+			float *sy=get_stencil_3x3(IMAGEOP_Y,t->imageop_scheme);
+			float gx = apply_3x3_stencil_fancy(img, ai, aj, al, sx);
+			float gy = apply_3x3_stencil_fancy(img, ai, aj, al, sy);
+			return hypot(gx, gy);
+			}
+		default: fail("unrecognized imageop operator %d\n",
+					 t->imageop_operator);
 		}
 	}
 	return 0;
@@ -2128,6 +2190,47 @@ static int imageop_vector(float *out, float *img, int w, int h, int pd,
 	}
 }
 
+static int imageop_vector_fancy(float *out, struct fancy_image *img,
+		int ai, int aj, struct plambda_token *t)
+{
+	int pd = img->pd;
+	float *sx = get_stencil_3x3(IMAGEOP_X, t->imageop_scheme);
+	float *sy = get_stencil_3x3(IMAGEOP_Y, t->imageop_scheme);
+	switch (t->imageop_operator) {
+	case IMAGEOP_GRAD:
+		//if (pd != 1) fail("can not yet compute gradient of a vector");
+		//out[0] = apply_3x3_stencil(img, w,h,pd, ai,aj,0, sx);
+		//out[1] = apply_3x3_stencil(img, w,h,pd, ai,aj,0, sy);
+		//return 2;
+		for (int l = 0; l < pd; l++) {
+			out[2*l+0] = apply_3x3_stencil_fancy(img, ai,aj,l, sx);
+			out[2*l+1] = apply_3x3_stencil_fancy(img, ai,aj,l, sy);
+		}
+		return 2*pd;
+	case IMAGEOP_DIV:
+		//if (pd!=2)fail("can not compute divergence of a %d-vector",pd);
+		//float ax = apply_3x3_stencil(img, w,h,pd, ai,aj,0, sx);
+		//float by = apply_3x3_stencil(img, w,h,pd, ai,aj,1, sy);
+		//out[0] = ax + by;
+		//return 1;
+		if (pd%2)fail("can not compute divergence of a %d-vector",pd);
+		for (int l = 0; l < pd/2; l++) {
+			float ax = apply_3x3_stencil_fancy(img,ai,aj,2*l+0,sx);
+			float by = apply_3x3_stencil_fancy(img,ai,aj,2*l+1,sy);
+			out[l] = ax + by;
+		}
+		return pd/2;
+	case IMAGEOP_SHADOW:
+		if (pd != 1) fail("can not yet compute shadow of a vector");
+		float vdx[3]={1,0,apply_3x3_stencil_fancy(img, ai,aj,0, sx)};
+		float vdy[3]={0,1,apply_3x3_stencil_fancy(img, ai,aj,0, sy)};
+		float sun[3] = {-1, -1, 1}, nor[3];
+		vector_product(nor, vdx, vdy, 3, 3);
+		return scalar_product(out, nor, sun, 3, 3);
+	default: fail("unrecognized imageop %d\n", t->imageop_operator);
+	}
+}
+
 
 // compute the requested imageop at the given point
 static int imageop(float *out, float *img, int w, int h, int pd,
@@ -2148,11 +2251,31 @@ static int imageop(float *out, float *img, int w, int h, int pd,
 	return retval;
 }
 
-// returns the dimension of the output
-static int run_program_vectorially_at(float *out, struct plambda_program *p,
-		float **val, int *w, int *h, int *pd, int ai, int aj)
+static int imageop_fancy(float *out, struct fancy_image *img,
+				int ai, int aj, struct plambda_token *t)
 {
-	getsample_operator P = getsample_cfg;
+	int retval = 1;
+	int pi = ai + t->displacement[0];
+	int pj = aj + t->displacement[1];
+	int channel = t->component;
+	if (t->imageop_operator > 1000)
+		return imageop_vector_fancy(out, img, pi, pj, t);
+	if (channel < 0) { // means the whole of it
+		retval = img->pd;
+		FORL(img->pd)
+			out[l] = imageop_scalar_fancy(img, pi, pj, l, t);
+	} else
+		*out = imageop_scalar_fancy(img, pi, pj, channel, t);
+	return retval;
+}
+
+
+// returns the dimension of the output
+static int run_program_vectorially_at_fancy(float *out,
+		struct plambda_program *p,
+		struct fancy_image *val[], int ai, int aj)
+{
+	getsample_operator_fancy P = getsample_cfg_fancy;
 	struct value_vstack s[1];
 	s->n = 0;
 	FORI(p->n) {
@@ -2165,8 +2288,8 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			vstack_push_scalar(s, t->value);
 			break;
 		case PLAMBDA_COLONVAR: {
-			int imw = w ? *w : 1;
-			int imh = h ? *h : 1;
+			int imw = val[0]->w;
+			int imh = val[0]->h;
 			/*hack*/if ('X' == t->colonvar) {
 				float v[2] = {ai, aj};
 				vstack_push_vector(s, v, 2);
@@ -2177,46 +2300,40 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 			break;
 				       }
 		case PLAMBDA_SCALAR: {
-			float *img = val[t->index];
-			int imw = w ? w[t->index] : 1;
-			int imh = h ? h[t->index] : 1;
-			int pdv = pd[t->index];
+			struct fancy_image *img = val[t->index];
 			int dai = ai + t->displacement[0];
 			int daj = aj + t->displacement[1];
 			int cmp = t->component;
-			float x = P(img, imw, imh, pdv, dai, daj, cmp);
+			float x = P(img, dai, daj, cmp);
 			vstack_push_scalar(s, x);
 			break;
 				     }
 		case PLAMBDA_VECTOR: {
-			float *img = val[t->index];
-			int imw = w ? w[t->index] : 1;
-			int imh = h ? h[t->index] : 1;
-			int pdv = pd[t->index];
+			struct fancy_image *img = val[t->index];
+			int pdv = img->pd;
 			int dai = ai + t->displacement[0];
 			int daj = aj + t->displacement[1];
 			float x[pdv];
 			if (t->component == -1) { // regular vector
 				FORL(pdv)
-				x[l] = P(img, imw, imh, pdv, dai, daj, l);
+				x[l] = P(img, dai, daj, l);
 				vstack_push_vector(s, x, pdv);
 			} else if (t->component == -2 && 0==pdv%2) {// 1st half
 				FORL(pdv/2)
-				x[l] = P(img, imw, imh, pdv, dai, daj, l);
+				x[l] = P(img, dai, daj, l);
 				vstack_push_vector(s, x, pdv/2);
 			} else if (t->component == -3 && 0==pdv%2) {// 2nd half
 				FORL(pdv/2)
-				x[l] = P(img, imw, imh, pdv, dai, daj, pdv/2+l);
+				x[l] = P(img, dai, daj, pdv/2+l);
 				vstack_push_vector(s, x, pdv/2);
 			}
 				     }
 			break;
 		case PLAMBDA_IMAGEOP: {
-			float *img = val[t->index], lout[PLAMBDA_MAX_PIXELDIM];
-			int pdv = pd[t->index];
-			int imw = w ? w[t->index] : 1;
-			int imh = h ? h[t->index] : 1;
-			int rdim = imageop(lout, img, imw, imh, pdv, ai, aj, t);
+			struct fancy_image *img = val[t->index];
+			int pdv = img->pd;
+			float lout[PLAMBDA_MAX_PIXELDIM];
+			int rdim = imageop_fancy(lout, img, ai, aj, t);
 			vstack_push_vector(s, lout, rdim);
 			break;
 				      }
@@ -2235,17 +2352,12 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 				     }
 			break;
 		case PLAMBDA_MAGIC: {
-#ifdef _OPENMP
-			fail("magic variables are not available in "
-					"parallel plambda");
-#endif//_OPENMP
-			int imw = w ? w[t->index] : 1;
-			int imh = h ? h[t->index] : 1;
-			int pdv = pd[t->index];
-			float *img = val[t->index], x[pdv];
-			int rm = eval_magicvar(x, t->colonvar, t->index,
+			struct fancy_image *img = val[t->index];
+			int pdv = img->pd;
+			float x[pdv];
+			int rm = eval_magicvar_fancy(x, t->colonvar, t->index,
 					t->component, t->displacement[0],
-					img, imw, imh, pdv);
+					img);
 			vstack_push_vector(s, x, rm);
 				    }
 			break;
@@ -2259,28 +2371,26 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 
 // evaluation (higher level) {{{1
 
-static int eval_dim(struct plambda_program *p, float **val, int *pd)
-{
-	int r = run_program_vectorially_at(NULL, p, val, NULL, NULL, pd, 0, 0);
-	return r;
-}
 
-// returns the dimension of the output
-static int run_program_vectorially(struct fancy_image *out, int pdmax,
+static void run_program_vectorially_fancy(struct fancy_image *out,
 		struct plambda_program *p,
 		struct fancy_image *val[])
 {
 	for (int j = 0; j < val[0]->h; j++)
+	{
+		if (val[0]->h > 3000 && 0 == j%100)
+			fprintf(stderr, "line %d/%d (%g%%)\n",
+					j, val[0]->h, j*100.0/val[0]->h);
 	for (int i = 0; i < val[0]->w; i++)
 	{
-		float result[pdmax];
-		int r = run_program_vectorially_at(result, p, val, i, j);
-		assert(r == pdmax);
-		if (r != pdmax) fail("r != pdmax");
+		float result[out->pd];
+		int r = run_program_vectorially_at_fancy(result, p, val, i, j);
+		if (r != out->pd)
+			fail("r != out->pd");
 		for (int l = 0; l < r; l++)
 			fancy_image_setsample(out, i, j, l, result[l]);
 	}
-	return pdmax;
+	}
 }
 
 // mains {{{1
@@ -2296,53 +2406,6 @@ static void add_hidden_variables(char *out, int maxplen, int newvars, char *in)
 
 SMART_PARAMETER_SILENT(SRAND,0)
 
-int main_calc(int c, char **v)
-{
-	if (c < 2) {
-		fprintf(stderr, "usage:\n\t%s v1 v2 ... \"plambda\"\n", *v);
-		//                          0 1  2        c-1
-		return EXIT_FAILURE;
-	}
-
-	struct plambda_program p[1];
-	plambda_compile_program(p, v[c-1]);
-
-	int n = c - 2, pd[n], pdmax = PLAMBDA_MAX_PIXELDIM;
-	if (n > 0 && p->var->n == 0) {
-		int maxplen = n*20 + strlen(v[c-1]) + 100;
-		char newprogram[maxplen];
-		add_hidden_variables(newprogram, maxplen, n, v[c-1]);
-		plambda_compile_program(p, newprogram);
-	}
-	if (n != p->var->n)
-		fail("the program expects %d variables but %d vectors "
-					"were given", p->var->n, n);
-
-	float *x[n];
-	FORI(n) x[i] = alloc_parse_floats(pdmax, v[i+1], pd+i);
-
-	FORI(n) if (!strstr(p->var->t[i], "hidden"))
-		fprintf(stderr, "calculator correspondence \"%s\" = \"%s\"\n",
-				p->var->t[i], v[i+1]);
-
-
-	float out[pdmax];
-	int od = run_program_vectorially_at(out, p, x, NULL, NULL, pd, 0, 0);
-
-	char *fmt = getenv("PLAMBDA_FFMT");
-	if (!fmt) fmt = "%.15lf";
-	for (int i = 0; i < od; i++)
-	{
-		printf(fmt, out[i]);
-		putchar(i==(od-1)?'\n':' ');
-	}
-
-	collection_of_varnames_end(p->var);
-	FORI(n) free(x[i]);
-
-
-	return EXIT_SUCCESS;
-}
 
 // @c pointer to original argc
 // @v pointer to original argv
@@ -2364,27 +2427,28 @@ static char *pick_option(int *c, char ***v, char *o, char *d)
 	return d;
 }
 
-#include "fancy_image.h"
 int main_images(int c, char **v)
 {
-	//fprintf(stderr, "main images c = %d\n", c);
-	//for (int i = 0; i < c; i++)
-	//	fprintf(stderr, "main images argv[%d] = %s\n", i, v[i]);
+	fprintf(stderr, "main images c = %d\n", c);
+	for (int i = 0; i < c; i++)
+		fprintf(stderr, "main images argv[%d] = %s\n", i, v[i]);
 	if (c < 2) {
 		fprintf(stderr, "usage:\n\t%s in1 in2 ... \"plambda\"\n", *v);
 		//                          0 1   2         c-1
 		return EXIT_FAILURE;
 	}
 	char *filename_out = pick_option(&c, &v, "o", "-");
+	if (0 == strcmp(filename_out, "-"))
+		fail("flambda requires -o option\n");
 
 	struct plambda_program p[1];
 
 	plambda_compile_program(p, v[c-1]);
 
 	int n = c - 2;
-	//fprintf(stderr, "n = %d\n", n);
+	fprintf(stderr, "n = %d\n", n);
 	if (n > 0 && p->var->n == 0) {
-		//fprintf(stderr, "will add hidden variables! n=%d, vn=%d\n", n, p->var->n);
+		fprintf(stderr, "will add hidden variables! n=%d, vn=%d\n", n, p->var->n);
 		int maxplen = n*10 + strlen(v[c-1]) + 100;
 		char newprogram[maxplen];
 		add_hidden_variables(newprogram, maxplen, n, v[c-1]);
@@ -2393,14 +2457,8 @@ int main_images(int c, char **v)
 	if (n != p->var->n && !(n == 1 && p->var->n == 0))
 		fail("the program expects %d variables but %d images "
 					"were given", p->var->n, n);
-	//int w[n], h[n], pd[n];
-	//float *x[n];
-	//FORI(n) x[i] = iio_read_image_float_vec(v[i+1], w + i, h + i, pd + i);
 	struct fancy_image *x[n];
 	FORI(n) x[i] = fancy_image_open(v[i+1], "r");
-	//FORI(n-1)
-	//	if (w[0] != w[i+1] || h[0] != h[i+1])// || pd[0] != pd[i+1])
-	//		fail("input images size mismatch");
 
 	if (n>1) FORI(n) if (!strstr(p->var->t[i], "hidden"))
 		fprintf(stderr, "plambda correspondence \"%s\" = \"%s\"\n",
@@ -2408,12 +2466,8 @@ int main_images(int c, char **v)
 
 	xsrand(SRAND());
 
-	//print_compiled_program(p);
-	int pdreal = eval_dim(p, x, pd);
-
 	struct fancy_image *out = fancy_image_open(filename_out, "rw");
-	int opd = run_program_vectorially_fancy(out, pdreal, p, x);
-	assert(opd == pdreal);
+	run_program_vectorially_fancy(out, p, x);
 
 	fancy_image_close(out);
 	FORI(n) fancy_image_close(x[i]);
@@ -2600,15 +2654,16 @@ int main(int c, char **v)
 	if (c == 2 && 0 == strcmp(v[1], "--version")) return print_version();
 	if (c == 2 && 0 == strcmp(v[1], "--man")) return do_man();
 
-	int (*f)(int, char**) = (**v=='c' || c==2) ? main_calc : main_images;
-	if (f == main_images && c > 2 && 0 == strcmp(v[1], "-c"))
-	{
-		for (int i = 1; i <= c; i++)
-			v[i] = v[i+1];
-		f = main_calc;
-		c -= 1;
-	}
-	return f(c,v);
+	return main_images(c, v);
+	//int (*f)(int, char**) = (**v=='c' || c==2) ? main_calc : main_images;
+	//if (f == main_images && c > 2 && 0 == strcmp(v[1], "-c"))
+	//{
+	//	for (int i = 1; i <= c; i++)
+	//		v[i] = v[i+1];
+	//	f = main_calc;
+	//	c -= 1;
+	//}
+	//return f(c,v);
 }   
 
 // vim:set foldmethod=marker:

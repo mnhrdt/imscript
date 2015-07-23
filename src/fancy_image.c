@@ -97,7 +97,6 @@ static int build_pyramid(struct FI *f, int max_octaves)
 	int s = 1;
 	while(1) {
 		if (s > max_octaves) break;
-		fprintf(stderr, "s = %d\n", s);
 		int      lw   = f->pyr_w[s-1];
 		int      lh   = f->pyr_h[s-1];
 		float   *lx   = f->pyr_x[s-1];
