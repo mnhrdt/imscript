@@ -60,7 +60,7 @@ endif
 
 
 SRC = $(SRCIIO) $(SRCFFT) $(SRCGSL)
-PROGRAMS = $(addprefix $(BINDIR)/,$(SRC) flow_ms rgfield rgfields rgfieldst elap2)
+PROGRAMS = $(addprefix $(BINDIR)/,$(SRC) flow_ms rgfield rgfields rgfieldst elap2 flambda)
 
 
 .PHONY: default
@@ -112,6 +112,9 @@ $(BINDIR)/rgfieldst: $(addprefix $(SRCDIR)/,rgfieldst.c gblur.o iio.o)
 	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS) $(FFTFLAGS)
 
 $(BINDIR)/elap2: $(addprefix $(SRCDIR)/,elap2.c distance.o iio.o)
+	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS)
+
+$(BINDIR)/flambda: $(addprefix $(SRCDIR)/,flambda.c fancy_image.o iio.o)
 	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS)
 
 .PHONY: clean
