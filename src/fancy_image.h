@@ -31,6 +31,12 @@ struct fancy_image {
 struct fancy_image *fancy_image_open(char *filename, char *options);
 // The default options are the following:
 // 	r,megabytes=100,octaves=0,verbose=0
+//
+// Options for reading and writing an existing file
+// 	rw
+//
+// Options for creating a new file
+// 	c,width=*,height=*,pd=*,type=*[,tw=*,th=*]
 
 // close an image and free its associated cache
 // (if the option "write" was given, it may write tiles upon this call)
@@ -47,8 +53,6 @@ int fancy_image_setsample(struct fancy_image *f, int i, int j, int l, float v);
 // obtain a sample of the image at the given point
 // (if the point is outside the image domain, return NAN)
 float fancy_image_getsample(struct fancy_image *f, int i,int j, int l);
-
-
 
 
 
