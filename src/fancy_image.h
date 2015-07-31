@@ -28,7 +28,7 @@ struct fancy_image {
 
 // open an image with the desired amount of cache
 // (the cache size is honored only for tiled tiffs)
-struct fancy_image *fancy_image_open(char *filename, char *options);
+//
 // The default options are the following:
 // 	r,megabytes=100,octaves=0,verbose=0
 //
@@ -37,22 +37,37 @@ struct fancy_image *fancy_image_open(char *filename, char *options);
 //
 // Options for creating a new file
 // 	c,width=*,height=*,pd=*,type=*[,tw=*,th=*]
+//
+struct fancy_image *fancy_image_open(char *filename, char *options);
+
 
 // close an image and free its associated cache
 // (if the option "write" was given, it may write tiles upon this call)
 void fancy_image_close(struct fancy_image *f);
 
+
 // obtain a sample of the image at the given point and octave
 // (if the coordinates or the octave are out of range, return NAN)
-float fancy_image_getsample_oct(struct fancy_image *f,
-		int octave, int i,int j, int l);
+float fancy_image_getsample_oct(struct fancy_image *f, int octave, int i,int j, int l);
 
-// 
+
+// set a sample of the given image
+// return a boolean wether it failed or not
+// the file will be actually written when calling "fancy_image_close"
 int fancy_image_setsample(struct fancy_image *f, int i, int j, int l, float v);
+
 
 // obtain a sample of the image at the given point
 // (if the point is outside the image domain, return NAN)
 float fancy_image_getsample(struct fancy_image *f, int i,int j, int l);
+
+
+
+
+
+
+
+
 
 
 

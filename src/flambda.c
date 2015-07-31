@@ -1175,6 +1175,7 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 static int eval_magicvar_fancy(float *out, int magic, int img_index,
 		int comp, int qq, struct fancy_image *x)
 {
+	fail("magic variables are not supported in flambda\n");
 	return 0;
 }
 
