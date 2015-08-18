@@ -94,6 +94,11 @@ void fancy_image_trilinear(float *out, struct fancy_image *f,
 		double x, double y, double dx, double dy);
 
 
+// leaky abstraction
+int fancy_image_leak_tiff_info(int *tw, int *th, int *fmt, int *bps,
+		struct fancy_image *f);
+
+
 
 // future API
 // ----------

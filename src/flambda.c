@@ -2008,6 +2008,7 @@ typedef float (*getsample_operator_fancy)(struct fancy_image *,int,int,int);
 SMART_PARAMETER_SILENT(FLAMBDA_GETPIXEL,-1)
 static float getsample_cfg_fancy(struct fancy_image *x, int i, int j, int l)
 {
+	// TODO : fancy boundary conditions
 	return fancy_image_getsample(x, i, j, l);
 	//getsample_operator p = get_sample_operator(getsample_1);
 	//int option = PLAMBDA_GETPIXEL();
@@ -2385,11 +2386,22 @@ static void run_program_vectorially_fancy(struct fancy_image *out,
 	for (int i = 0; i < val[0]->w; i++)
 	{
 		float result[out->pd];
-		int r = run_program_vectorially_at_fancy(result, p, val, i, j);
+		int r = run_program_vectorially_at_fancy(
+				result,
+			       	p,
+			       	val,
+			       	i,
+			       	j);
 		if (r != out->pd)
 			fail("r != out->pd");
+
 		for (int l = 0; l < r; l++)
-			fancy_image_setsample(out, i, j, l, result[l]);
+		{
+			int r = fancy_image_setsample(out, i, j, l, result[l]);
+			if (!r)
+				fail("cannot set sample (%d,%d)[%d] to %g!\n",
+					i, j, l, result[l]);
+		}
 	}
 	}
 }
@@ -2426,6 +2438,12 @@ static char *pick_option(int *c, char ***v, char *o, char *d)
 			return r;
 		}
 	return d;
+}
+
+static int eval_dim(struct plambda_program *p, struct fancy_image *val[])
+{
+	int r = run_program_vectorially_at_fancy(NULL, p, val, 0, 0);
+	return r;
 }
 
 int main_images(int c, char **v)
@@ -2467,7 +2485,18 @@ int main_images(int c, char **v)
 
 	xsrand(SRAND());
 
-	struct fancy_image *out = fancy_image_open(filename_out, "rw");
+
+	// create output image
+	int pdreal = eval_dim(p, x);
+	int tw = 0, th = 0, fmt = 0, bps = 0;
+	fancy_image_leak_tiff_info(&tw, &th, &fmt, &bps, x[0]);
+	char outopt[2*FILENAME_MAX];
+	snprintf(outopt, 2*FILENAME_MAX,
+		"creat,w=%d,h=%d,spp=%d,tw=%d,th=%d,fmt=%d,bps=%d,verbose=0",
+			x[0]->w, x[0]->h, pdreal, tw, th, fmt, bps);
+	struct fancy_image *out = fancy_image_open(filename_out, outopt);
+
+	// core
 	run_program_vectorially_fancy(out, p, x);
 
 	fancy_image_close(out);
@@ -2665,6 +2694,6 @@ int main(int c, char **v)
 	//	c -= 1;
 	//}
 	//return f(c,v);
-}   
+}
 
 // vim:set foldmethod=marker:

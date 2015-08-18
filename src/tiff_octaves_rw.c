@@ -143,7 +143,6 @@ static int how_many(int n, int u)
 	assert(n > 0);
 	assert(u > 0);
 	return n/u + (bool)(n%u);
-
 }
 
 
@@ -393,6 +392,64 @@ static void put_tile_into_file(char *filename, struct tiff_tile *t, int tidx)
 	TIFFClose(tif);
 }
 
+//static int fmt_from_string(char *f)
+//{
+//	if (0 == strcmp(f, "uint")) return SAMPLEFORMAT_UINT;
+//	if (0 == strcmp(f, "int")) return SAMPLEFORMAT_INT;
+//	if (0 == strcmp(f, "ieeefp")) return SAMPLEFORMAT_IEEEFP;
+//	//if (0 == strcmp(f, "void")) return SAMPLEFORMAT_VOID;
+//	if (0 == strcmp(f, "complexint")) return SAMPLEFORMAT_COMPLEXINT;
+//	if (0 == strcmp(f, "complexieeefp")) return SAMPLEFORMAT_COMPLEXIEEEFP;
+//	return SAMPLEFORMAT_VOID;
+//}
+
+static void create_zero_tiff_file(char *filename, int w, int h,
+		int tw, int th, int spp, int bps, int fmt, bool incomplete,
+		bool compressed)
+{
+	//if (bps != 8 && bps != 16 && bps == 32 && bps != 64
+	//		&& bps != 128 && bps != 92)
+	//	fail("bad bps=%d", bps);
+	//if (spp < 1) fail("bad spp=%d", spp);
+	//int fmt_id = fmt_from_string(fmt);
+	double gigabytes = (spp/8.0) * w * h * bps / 1024.0 / 1024.0 / 1024.0;
+	//fprintf(stderr, "gigabytes = %g\n", gigabytes);
+	TIFF *tif = TIFFOpen(filename, gigabytes > 1 ? "w8" : "w");
+	TIFFSetField(tif, TIFFTAG_IMAGEWIDTH, w);
+	TIFFSetField(tif, TIFFTAG_IMAGELENGTH, h);
+	TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, spp);
+	TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, bps);
+	TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT, fmt);
+	TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
+	TIFFSetField(tif, TIFFTAG_TILEWIDTH, tw);
+	TIFFSetField(tif, TIFFTAG_TILELENGTH, th);
+	if (compressed)
+		TIFFSetField(tif, TIFFTAG_COMPRESSION, COMPRESSION_LZW);
+
+
+	int tilesize = tw * th * bps/8 * spp;
+	uint8_t *buf = xmalloc(tilesize);
+	for (int i = 0; i < tilesize; i++)
+	{
+		float x = ((i/((spp*bps)/8))%tw)/((double)tw)-0.5;
+		float y = ((i/((spp*bps)/8))/th)/((double)th)-0.5;
+		//buf[i] = 0;
+		buf[i] = 127.5+128*cos(90*pow(hypot(x,y+0.3*x),1+(i%spp-1)/1.3));
+	}
+	TIFFWriteTile(tif, buf, 0, 0, 0, 0);
+	TIFFClose(tif);
+	if (!incomplete) {
+		for (int j = 0; j < h; j += th)
+		for (int i = 0; i < w; i += tw)
+		{
+			tif = TIFFOpen(filename, "r+");
+			TIFFWriteTile(tif, buf, i, j, 0, 0);
+			TIFFClose(tif);
+		}
+	}
+	free(buf);
+}
+
 
 
 // getpixel cache with octaves {{{1
@@ -421,14 +478,14 @@ struct tiff_octaves {
 //#include "smapa.h"
 //SMART_PARAMETER(FIRST_OCTAVE,0)
 
-void my_tifferror(const char *module, const char *fmt, va_list ap)
-{
-	(void)ap;
-	if (0 == strcmp(fmt, "%llu: Invalid tile byte count, tile %lu"))
-		fprintf(stderr, "got a zero tile\n");
-	else
-		fprintf(stderr, "TIFF ERROR(%s): \"%s\"\n", module, fmt);
-}
+//void my_tifferror(const char *module, const char *fmt, va_list ap)
+//{
+//	(void)ap;
+//	if (0 == strcmp(fmt, "%llu: Invalid tile byte count, tile %lu"))
+//		fprintf(stderr, "got a zero tile\n");
+//	else
+//		fprintf(stderr, "TIFF ERROR(%s): \"%s\"\n", module, fmt);
+//}
 static void disable_tiff_warnings_and_errors(void)
 {
 	TIFFSetWarningHandler(NULL);//suppress warnings
@@ -470,9 +527,9 @@ void tiff_octaves_init0(struct tiff_octaves *t, char *filepattern,
 			t->c[o][j] = 0;
 	}
 
-	// set up writing cache for setpixel
+	// set up writing cache for setpixel (just in case)
 	t->option_read = true;
-	t->option_write = true;
+	t->option_write = false;
 	t->changed = xmalloc(t->i->ntiles * sizeof*t->changed);
 	for (int i = 0; i < t->i->ntiles; i++)
 		t->changed[i] = false;
@@ -696,38 +753,13 @@ void tiff_octaves_setpixel_float(struct tiff_octaves *t, int i, int j, float *p)
 	tiff_octaves_setpixel(t, i, j, pix);
 }
 
-// shy versions of the previous two functions
-// (the shy functions avoid reading the disk)
-void *tiff_octaves_gettile_shy(struct tiff_octaves *t, int o, int i, int j)
-{
-	// sanitize input
-	o = bound(0, o, t->noctaves - 1);
-	i = bound(0, i, t->i[o].w - 1);
-	j = bound(0, j, t->i[o].h - 1);
-
-	// get valid tile index
-	int tidx = my_computetile(t->i + o, i, j);
-	if (tidx < 0) return NULL;
-
-	// if tile does not exist, return NULL
-	if (!t->c[o][tidx]) return NULL;
-
-	if (t->a[0])
-		notify_tile_access_octave(t, o, tidx);
-
-	return t->c[o][tidx];
-}
-
-void *tiff_octaves_getpixel_shy(struct tiff_octaves *t, int o, int i, int j)
-{
-	void *tile = tiff_octaves_gettile_shy(t, o, i, j);
-	if (!tile) return NULL;
-
-	// get pointer to requested pixel
-	struct tiff_info *ti = t->i + o;
-	int ii = i % ti->tw;
-	int jj = j % ti->th;
-	int pixel_index = jj * ti->tw + ii;
-	int pixel_position = pixel_index * ti->spp * (ti->bps / 8);
-	return pixel_position + (char*)tile;
-}
+//static int fmt_from_string(char *f)
+//{
+//	if (0 == strcmp(f, "uint")) return SAMPLEFORMAT_UINT;
+//	if (0 == strcmp(f, "int")) return SAMPLEFORMAT_INT;
+//	if (0 == strcmp(f, "ieeefp")) return SAMPLEFORMAT_IEEEFP;
+//	//if (0 == strcmp(f, "void")) return SAMPLEFORMAT_VOID;
+//	if (0 == strcmp(f, "complexint")) return SAMPLEFORMAT_COMPLEXINT;
+//	if (0 == strcmp(f, "complexieeefp")) return SAMPLEFORMAT_COMPLEXIEEEFP;
+//	return SAMPLEFORMAT_VOID;
+//}

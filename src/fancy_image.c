@@ -24,7 +24,11 @@ struct FI {
 	int max_octaves;
 	bool option_read;
 	bool option_write;
+	bool option_creat;
 	int option_verbose;
+	int option_w, option_h, option_tw, option_th, option_spp, option_bps;
+	int option_fmt; // SAMPLEFORMAT_UINT, etc.
+	int option_compressed;
 
 	// implementation details
 	bool tiffo;
@@ -131,8 +135,17 @@ static void set_default_options(struct FI *f)
 	f->megabytes = 100;
 	f->option_read = true;
 	f->option_write = false;
+	f->option_creat = false;
 	f->option_verbose = 0;
 	f->max_octaves = MAX_OCTAVES;
+	f->option_fmt = SAMPLEFORMAT_UINT;
+	f->option_w = 256;
+	f->option_h = 256;
+	f->option_th = 0;
+	f->option_tw = 0;
+	f->option_compressed = 0;
+	f->option_spp = 1;
+	f->option_bps = 8;
 }
 
 static void interpret_options(struct FI *f, char *options_arg)
@@ -153,16 +166,43 @@ static void interpret_options(struct FI *f, char *options_arg)
 		if (0 == strcmp(tok, "rw"  ))  f->option_write = true;
 		if (0 == strcmp(tok, "wr"  ))  f->option_write = true;
 		if (0 == strcmp(tok, "write")) f->option_write = true;
+		if (0 == strcmp(tok, "c"   ))  f->option_creat = true;
+		if (0 == strcmp(tok, "creat"   ))  f->option_creat = true;
 		double x;
-		if (1 == sscanf(tok, "megabytes=%lf", &x)) f->megabytes = x;
-		if (1 == sscanf(tok, "octaves=%lf", &x)) f->max_octaves = x;
-		if (1 == sscanf(tok, "verbose=%lf", &x)) f->option_verbose = x;
+		if (1 == sscanf(tok, "megabytes=%lf",&x)) f->megabytes      = x;
+		if (1 == sscanf(tok, "octaves=%lf", &x))  f->max_octaves    = x;
+		if (1 == sscanf(tok, "verbose=%lf", &x))  f->option_verbose = x;
+		if (1 == sscanf(tok, "width=%lf", &x))    f->option_w       = x;
+		if (1 == sscanf(tok, "height=%lf", &x))   f->option_h       = x;
+		if (1 == sscanf(tok, "w=%lf", &x))        f->option_w       = x;
+		if (1 == sscanf(tok, "h=%lf", &x))        f->option_h       = x;
+		if (1 == sscanf(tok, "tw=%lf", &x))       f->option_tw      = x;
+		if (1 == sscanf(tok, "th=%lf", &x))       f->option_th      = x;
+		if (1 == sscanf(tok, "spp=%lf", &x))      f->option_spp     = x;
+		if (1 == sscanf(tok, "pd=%lf", &x))       f->option_spp     = x;
+		if (1 == sscanf(tok, "bps=%lf", &x))      f->option_bps     = x;
+		if (1 == sscanf(tok, "fmt=%lf", &x))      f->option_fmt     = x;
 		tok = strtok(NULL, ",");
 	}
 
 	// pyramidal writing is complicated, so we disable it
 	if (f->option_write)
 		f->max_octaves = 1;
+
+	// when c, complete the missing options in a consistent way
+	if (f->option_creat)
+		f->option_write = 1;
+	
+
+}
+
+void create_iio_file(char *filename, int w, int h, int spp)
+{
+	int n = w * h * spp;
+	char *buf = xmalloc(n);
+	memset(buf, 0, n);
+	iio_save_image_uint8_vec(filename, buf, w, h, spp);
+	free(buf);
 }
 
 
@@ -176,6 +216,20 @@ struct fancy_image *fancy_image_open(char *filename, char *options)
 
 	// process options parameter
 	interpret_options(f, options);
+
+	// if "c", do create the file
+	if (f->option_creat) {
+		if (filename_corresponds_to_tiffo(filename) || f->option_tw > 0)
+			create_zero_tiff_file(filename,
+					f->option_w, f->option_h,
+					f->option_tw, f->option_th,
+					f->option_spp, f->option_bps,
+					f->option_fmt,
+					true, f->option_compressed);
+		else
+			create_iio_file(filename, f->option_w, f->option_h,
+					f->option_spp);
+	}
 
 	// read the image
 	if (filename_corresponds_to_tiffo(filename)) {
@@ -232,7 +286,7 @@ void fancy_image_close(struct fancy_image *fi)
 	if (f->tiffo)
 		tiff_octaves_free(f->t);
 	else {
-		if (f->option_write && f->x_changed)
+		if ((f->option_write && f->x_changed) || f->option_creat)
 			iio_save_image_float_vec(f->x_filename, f->x,
 					f->w, f->h, f->pd);
 		if (f->no > 1)
@@ -321,6 +375,20 @@ int fancy_image_setsample(struct fancy_image *fi, int i, int j, int l, float v)
 		f->x[idx] = v;
 		return f->x_changed = true;
 	}
+}
+
+int fancy_image_leak_tiff_info(int *tw, int *th, int *fmt, int *bps,
+		struct fancy_image *fi)
+{
+	struct FI *f = (void*)fi;
+	if (f->tiffo) {
+		*tw = f->t->i->tw;
+		*th = f->t->i->th;
+		*fmt = f->t->i->fmt;
+		*bps = f->t->i->bps;
+		return 1;
+	}
+	return 0;
 }
 
 void fancy_image_fill_rectangle_float_vec(
@@ -477,6 +545,8 @@ int main_times(int c, char *v[])
 	// exit
 	return 0;
 }
+
+
 
 
 
