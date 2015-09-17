@@ -74,6 +74,8 @@ float fancy_image_getsample(struct fancy_image *f, int i,int j, int l);
 // UTILITY API: functions that have a more comfortable interface
 // All these utility functions are defined in terms of the Basic Api above
 
+struct fancy_image *fancy_image_create(char *filename, char *fmt, ...);
+
 void fancy_image_fill_rectangle_float_vec(float *out, int w, int h,
 		struct fancy_image *f, int octave, int x0, int y0);
 

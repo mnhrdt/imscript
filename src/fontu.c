@@ -598,10 +598,16 @@ static void put_string_in_float_image(float *x, int w, int h, int pd,
 		int posx, int posy, float *color, int kerning,
 		struct bitmap_font *font, char *string)
 {
+	int posx0 = posx;
 	while (1)
 	{
 		int c = *string++;
 		if (!c) break;
+		if (c == '\n') {
+			posx = posx0;
+			posy += font->height;
+			continue;
+		}
 		if (c > 0 && c < font->number_of_glyphs)
 		{
 			//fprintf(stderr, "putting glyph \"%d\" '%c'\n", c, c);

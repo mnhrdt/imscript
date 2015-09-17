@@ -1,7 +1,9 @@
 #include <math.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "fancy_image.h"
@@ -182,6 +184,8 @@ static void interpret_options(struct FI *f, char *options_arg)
 		if (1 == sscanf(tok, "pd=%lf", &x))       f->option_spp     = x;
 		if (1 == sscanf(tok, "bps=%lf", &x))      f->option_bps     = x;
 		if (1 == sscanf(tok, "fmt=%lf", &x))      f->option_fmt     = x;
+		if (1 == sscanf(tok, "tilewidth=%lf", &x))f->option_tw      = x;
+		if (1 == sscanf(tok, "tileheight=%lf",&x))f->option_tw      = x;
 		tok = strtok(NULL, ",");
 	}
 
@@ -262,6 +266,20 @@ struct fancy_image *fancy_image_open(char *filename, char *options)
 
 	// return image struct
 	return r;
+}
+
+// call "fancy_image_open" with named options
+struct fancy_image *fancy_image_create(char *filename, char *fmt, ...)
+{
+	int blen = 2000;
+	char buf[blen];
+	buf[0] = 'c';
+	buf[1] = ',';
+	va_list argp;
+	va_start(argp, fmt);
+	vsnprintf(buf + 2, blen - 2, fmt, argp);
+	va_end(argp);
+	return fancy_image_open(filename, buf);
 }
 
 int fancy_image_width_octave(struct fancy_image *fi, int octave)
@@ -382,10 +400,10 @@ int fancy_image_leak_tiff_info(int *tw, int *th, int *fmt, int *bps,
 {
 	struct FI *f = (void*)fi;
 	if (f->tiffo) {
-		*tw = f->t->i->tw;
-		*th = f->t->i->th;
-		*fmt = f->t->i->fmt;
-		*bps = f->t->i->bps;
+		if (tw)  *tw = f->t->i->tw;
+		if (th)  *th = f->t->i->th;
+		if (fmt) *fmt = f->t->i->fmt;
+		if (bps) *bps = f->t->i->bps;
 		return 1;
 	}
 	return 0;

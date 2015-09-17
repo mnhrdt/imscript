@@ -69,7 +69,7 @@ static float perform_one_iteration(float *x, float *dat,
 
 		float l = laplacian(x, w, h, i, j);
 		float f = dat[idx];
-		float new = x[idx] + tstep * (l - f);;
+		float new = x[idx] + tstep * (l - f);
 
 		float update = fabs(x[idx] - new);
 		if (update > maxupdate)
