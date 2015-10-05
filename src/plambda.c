@@ -857,6 +857,7 @@ struct plambda_program {
 struct image_stats {
 	bool init_simple, init_vsimple, init_ordered, init_vordered;
 	float scalar_min, scalar_max, scalar_avg, scalar_med, scalar_sum;
+	float scalar_std;
 	//float vector_cmin[PLAMBDA_MAX_PIXELDIM];  // component-wise min
 	float vector_n1min[PLAMBDA_MAX_PIXELDIM]; // exemplar with min L1
 	float vector_n2min[PLAMBDA_MAX_PIXELDIM]; // exemplar with min L2
@@ -874,11 +875,12 @@ struct image_stats {
 	float component_avg[PLAMBDA_MAX_PIXELDIM];
 	float component_med[PLAMBDA_MAX_PIXELDIM];
 	float component_sum[PLAMBDA_MAX_PIXELDIM];
+	float component_std[PLAMBDA_MAX_PIXELDIM];
 	float *sorted_samples, *sorted_components[PLAMBDA_MAX_PIXELDIM];
 };
 
 struct linear_statistics {
-	float min, max, avg, avgnz, sum;
+	float min, max, avg, avgnz, sum, std;
 	int n, rns, rnz, nnan, ninf;
 };
 
@@ -887,7 +889,7 @@ static void compute_linstats(struct linear_statistics *s,
 {
 	int rns = 0, rnz = 0, nnan = 0, ninf = 0;
 	float min = INFINITY, max = -INFINITY;
-	long double avg = 0, avgnz = 0;
+	long double avg = 0, avgnz = 0, sumsq = 0;
 	for (int i = 0; i < n; i++) {
 		float y = x[i*stride + offset];
 		if (isnan(y)) {
@@ -906,6 +908,12 @@ static void compute_linstats(struct linear_statistics *s,
 	}
 	s->sum = avg;
 	avg /= rns; avgnz /= rnz;
+	for (int i = 0; i < n; i++) {
+		float y = x[i*stride + offset];
+		if (!isnan(y))
+			sumsq += (y - avg) * (y - avg);
+	}
+	s->std = sqrt(sumsq / rns);
 	s->min=min; s->max=max; s->avg=avg; s->avgnz=avgnz;
 	s->n=n; s->rns=rns; s->rnz=rnz; s->nnan=nnan; s->ninf=ninf;
 }
@@ -921,6 +929,7 @@ static void compute_simple_sample_stats(struct image_stats *s,
 	s->scalar_max = ls->max;
 	s->scalar_avg = ls->avg;
 	s->scalar_sum = ls->sum;
+	s->scalar_std = ls->std;
 }
 
 static void compute_simple_component_stats(struct image_stats *s,
@@ -935,6 +944,7 @@ static void compute_simple_component_stats(struct image_stats *s,
 		s->component_min[l] = ls->min;
 		s->component_max[l] = ls->max;
 		s->component_avg[l] = ls->avg;
+		s->component_std[l] = ls->std;
 	}
 }
 
@@ -1066,7 +1076,7 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 
 	struct image_stats *ti = t + img_index;
 
-	if (magic=='i' || magic=='a' || magic=='v' || magic=='s') {
+	if(magic=='i' || magic=='a' || magic=='v' || magic=='s' || magic=='r') {
 		if (comp < 0) { // use all samples
 			compute_simple_sample_stats(ti, x, w, h, pd);
 			switch(magic) {
@@ -1074,6 +1084,7 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 				case 'a': *out = ti->scalar_max; break;
 				case 'v': *out = ti->scalar_avg; break;
 				case 's': *out = ti->scalar_sum; break;
+				case 'r': *out = ti->scalar_std; break;
 				default: fail("this can not happen");
 			}
 			return 1;
@@ -1084,6 +1095,7 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 				case 'a': *out = ti->component_max[comp]; break;
 				case 'v': *out = ti->component_avg[comp]; break;
 				case 's': *out = ti->component_sum[comp]; break;
+				case 'r': *out = ti->component_std[comp]; break;
 				default: fail("this can not happen");
 			}
 			return 1;
@@ -1098,11 +1110,12 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 		default: fail("this can not happen");
 		}
 		return pd;
-	} else if (magic=='Y' || magic=='E') {
+	} else if (magic=='Y' || magic=='E' || magic=='R') {
 		compute_simple_component_stats(ti, x, w, h, pd);
 		switch(magic) {
 		case 'Y': FORI(pd) out[i] = ti->component_min[i]; break;
 		case 'E': FORI(pd) out[i] = ti->component_max[i]; break;
+		case 'R': FORI(pd) out[i] = ti->component_std[i]; break;
 		default: fail("this can not happen");
 		}
 		return pd;
@@ -1165,7 +1178,7 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 		}
 		return pd;
 	} else
-		fail("magic of kind '%c' is not yed implemented", magic);
+		fail("magic of kind '%c' is not yet implemented", magic);
 
 	return 0;
 }
