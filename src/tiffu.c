@@ -1843,7 +1843,7 @@ void *tiff_octaves_gettile(struct tiff_octaves *t, int o, int i, int j)
 		if (t->a[0] && t->curtiles == t->maxtiles)
 			free_oldest_tile_octave(t);
 
-		fprintf(stderr,"CACHE: LOADing tile %d of octave %d\n",tidx,o);
+		fprintf(stderr,"CACHE(%p %dx%d): LOADing tile %d of octave %d\n",(void*)t,t->i->w,t->i->h,tidx,o);
 		struct tiff_tile tmp[1];
 		read_tile_from_file(tmp, t->filename[o], tidx);
 		t->c[o][tidx] = tmp->data;

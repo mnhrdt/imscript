@@ -94,6 +94,7 @@ struct pan_state {
 	int force_exact;
 	int image_space;
 	int diff_mode;
+	int show_vertdir, vdx, vdy;
 	int interpolation_order;
 	int image_rotation_status;
 	int qauto;
@@ -165,7 +166,7 @@ static void init_view(struct pan_view *v,
 	tiff_octaves_init(v->tg, fgtif, megabytes);
 	if (fctif)
 		tiff_octaves_init(v->tc, fctif, megabytes);
-	else v->tc = NULL;
+	else fail("not fctif\n"); //v->tc = NULL;
 	v->w = v->tg->i->w;
 	v->h = v->tg->i->h;
 	v->rgbiox = v->rgbioy = 4; // normally untouched
@@ -196,7 +197,7 @@ static void setup_nominal_pixels_according_to_first_view(struct pan_state *e)
 	// XXX WARNING WRONG TODO FIXME : assumes North-South oriented image (!)
 	double lat_step = csouth[1] - center[1];
 	double latitude = center[1] * (M_PI/180);
-	double lonfactor = cos(latitude);
+	double lonfactor = 0.5*cos(latitude);
 	double lon_step = -lat_step / lonfactor;
 
 	// fill-in the fields
@@ -231,6 +232,7 @@ static void init_state(struct pan_state *e,
 	e->force_exact = 0;
 	e->image_space = 0;
 	e->diff_mode = 0;
+	e->show_vertdir = 0;
 	e->interpolation_order = 0;
 	e->image_rotation_status = 0;
 	e->qauto = 0;
@@ -338,6 +340,9 @@ static void apply_projection(double out[3], double P[8], double x[3])
 // 3. RASTER coordinates (x,y), floating point numbers in the range 0--40.000
 // representing an isotropic grid over the geographic site, at the nominal
 // pixel resolution.
+//
+// 4. WINDOW coordintes (i,j), integers representing the pixel position in the
+// display window
 
 static
 void window_to_raster(double xy[2], struct pan_state *e, double i, double j)
@@ -853,6 +858,31 @@ static void update_local_projection(struct pan_state *e,
 			raster_to_image_raw : raster_to_image_exh);
 }
 
+static void overlay_vertdir(struct FTR *f, int i, int j)
+{
+	struct pan_state *e = f->userdata;
+	struct pan_view *v = obtain_view(e);
+	fprintf(stderr, "vertdir %d %d\n", i, j);
+
+	for (double height = 0; height < 100; height += 1)
+	{
+		double pq[2], xy[2];
+		window_to_image_exh(pq, e, i, j, e->base_h + height);
+		image_to_window_ex(xy, e, pq[0], pq[1]);
+
+	//	double ij[2], IJ[2], xy[2];
+	//	window_to_image_ex(ij, e, x, y);
+	//	eval_rpc_pair(IJ, v->r, v->r, ij[0], ij[1], e->base_h + height);
+	//	image_to_window_ex(xy, e, IJ[0], IJ[1]);
+	//	fprintf(stderr, "%d %d => %g %g (%g %g => %g %g)\n", x, y, xy[0], xy[1], ij[0], ij[1], IJ[0], IJ[1]);
+		if (insideP(f->w, f->h, xy[0], xy[1])) {
+			f->rgb[3*(f->w*lrint(xy[1]) + lrint(xy[0])) + 0] = 255;
+			f->rgb[3*(f->w*lrint(xy[1]) + lrint(xy[0])) + 1] = 0;
+			f->rgb[3*(f->w*lrint(xy[1]) + lrint(xy[0])) + 2] = 0;
+		}
+	}
+}
+
 // dump the image acording to the state of the viewport
 static void pan_repaint(struct pan_state *e, int w, int h)
 {
@@ -943,6 +973,7 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 
 static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
+	fprintf(stderr, "\n\nexpose %d %d\n", b, m);
 	struct pan_state *e = f->userdata;
 	struct pan_view *v = obtain_view(e);
 
@@ -952,6 +983,10 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	assert(f->w == v->dw);
 	assert(f->h == v->dh);
 	memcpy(f->rgb, v->display, v->dw * v->dh * 3);
+
+	// overlay any requested lines
+	if (e->show_vertdir)
+		overlay_vertdir(f, e->vdx, e->vdy);
 }
 
 static void request_repaints(struct FTR *f)
@@ -1079,6 +1114,15 @@ static void action_toggle_diff_mode(struct FTR *f)
 	e->diff_mode = !e->diff_mode;
 
 	request_repaints(f);
+}
+
+static void action_toggle_vertdir(struct FTR *f, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+	e->show_vertdir = !e->show_vertdir;
+	e->vdx = x;
+	e->vdy = y;
+	f->changed = 1;
 }
 
 static void action_toggle_image_space(struct FTR *f, int x, int y)
@@ -1223,6 +1267,13 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 	if (m == FTR_BUTTON_LEFT) action_offset_viewport(f, x - ox, y - oy);
 	ox = x;
 	oy = y;
+
+	if (e->show_vertdir)
+	{
+		e->vdx = x;
+		e->vdy = y;
+		f->changed = 1;
+	}
 }
 
 // keyboard handler
@@ -1247,6 +1298,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'z') action_toggle_srtm4(f);
 	if (k == 'v') action_toggle_srtm4_base(f);
 	if (k == 'i') action_toggle_image_space(f, f->w/2, f->h/2);
+	if (k == 'p') action_toggle_vertdir(f, x, y);
 	if (k == '6') action_shift_so(f, -1);
 	if (k == '7') action_shift_so(f, +1);
 	if (k == 't') action_dump_view(f);

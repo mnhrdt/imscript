@@ -194,6 +194,7 @@ static void plot_segment_red(struct FTR *f,
 
 static void pan_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
 {
+	fprintf(stderr, "expose\n");
 	struct pan_state *e = f->userdata;
 
 	// check consistency
@@ -304,8 +305,7 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 		}
 		if (b == FTR_BUTTON_DOWN)
 		{
-			if (m & FTR_MASK_SHIFT)
-			{
+			if (m & FTR_MASK_SHIFT) {
 				if (e->dip_stride > 2)
 					e->dip_stride -= 1;
 			}
