@@ -377,12 +377,18 @@ static void zoom_out_by_factor_two(float *out, int ow, int oh,
 	for (int i = 0; i < ow; i++)
 	for (int l = 0; l < 3; l++)
 	{
-		float a[4];
+		float a[4], ax = 0;
 		a[0] = getsample_0(in, iw, ih, 2*i  , 2*j  , l);
 		a[1] = getsample_0(in, iw, ih, 2*i+1, 2*j  , l);
 		a[2] = getsample_0(in, iw, ih, 2*i  , 2*j+1, l);
 		a[3] = getsample_0(in, iw, ih, 2*i+1, 2*j+1, l);
-		out[3*(ow*j + i)+l] = (a[0] + a[1] + a[2] + a[3])/4;
+		int cx = 0;
+		for (int i = 0; i < 4; i++)
+			if (!isnan(a[i])) {
+				ax += a[i];
+				cx += 1;
+			}
+		out[3*(ow*j + i)+l] = cx ? ax/cx : NAN;//(a[0] + a[1] + a[2] + a[3])/4;
 	}
 }
 
