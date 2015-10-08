@@ -1,3 +1,4 @@
+// RPCFLIP(1)                  imscript                   RPCFLIP(1)        {{{1
 //
 // A "Nadir" viewer for pleiades images, based on vflip by Gabriele Facciolo
 //
@@ -11,8 +12,10 @@
 // 4. draw epipolar curves
 // 5. load an arbitrary DEM
 // 6. view the DEM (and the SRTM4)
+// 7. reorganize coordinate changes to simplify the code
 //
 
+// #includes {{{1
 #include <assert.h>
 #include <ctype.h>
 #include <math.h>
@@ -40,6 +43,9 @@ double egm96(double,double);
 #include "iio.h"
 #include "xmalloc.c"
 
+
+// #defines {{{1
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -48,6 +54,9 @@ double egm96(double,double);
 //#define WHEEL_FACTOR 1.259921049894873164767210607
 //#define WHEEL_FACTOR 1.189207115002721066717499971
 #define BAD_MIN(a,b) ((a)<(b)?(a):(b))
+
+
+// pan_view and pan_state {{{1
 
 // data for a single view
 struct pan_view {
@@ -82,9 +91,9 @@ struct pan_state {
 	struct pan_view view[MAX_VIEWS];
 
 	// 2. geographic coordinates (nominal pixel lon/lat resolution)
-	double base_h;
 	double lon_0, lon_d;
 	double lat_0, lat_d;
+	double base_h;
 
 	// 3. view port parameters
 	double a, b; // linear contrast change
@@ -104,6 +113,8 @@ struct pan_state {
 
 static int msoctaves_instead_of_preview;
 
+// generic utility functions {{{1
+
 static uint8_t float_to_uint8(float x)
 {
 	if (x < 1) return 0;
@@ -111,6 +122,13 @@ static uint8_t float_to_uint8(float x)
 	return x;
 }
 
+static int insideP(int w, int h, int x, int y)
+{
+	return x >= 0 && y >= 0 && x < w && y < h;
+}
+
+
+// small image I/O {{{1
 //static
 uint8_t *load_nice_preview(char *fg, char *fc, int *w, int *h)
 {
@@ -152,6 +170,7 @@ uint8_t *load_nice_preview(char *fg, char *fc, int *w, int *h)
 	return r;
 }
 
+// state initialization functions {{{1
 static void init_view(struct pan_view *v,
 		char *fgtif, char *fgpre, char *fgrpc, char *fctif, char *fcpre)
 {
@@ -242,6 +261,7 @@ static void init_state(struct pan_state *e,
 	msoctaves_instead_of_preview = e->view->tc->noctaves > 3;
 }
 
+// state query functions {{{1
 static struct pan_view *obtain_view(struct pan_state *e)
 {
 	assert(e->current_view >= 0);
@@ -274,6 +294,8 @@ static int obtain_octave(struct pan_state *e)
 	}
 }
 
+
+// affine approximation of the projection function {{{1
 static void window_to_image_exh(double*,struct pan_state*,double,double,double);
 
 static void raster_to_image_exh(double out[2], struct pan_state *e,
@@ -326,20 +348,39 @@ static void apply_projection(double out[3], double P[8], double x[3])
 	out[2] = x[2];
 }
 
+static void update_local_projection(struct pan_state *e,
+		double ix, double iy, double h)
+{
+	struct pan_view *v = obtain_view(e);
+
+	double xy[2];
+	window_to_raster(xy, e, ix, iy);
+	double x = xy[0];
+	double y = xy[1];
+
+	approximate_projection_gen(v->P, e, x, y, h, e->image_space ?
+			raster_to_image_raw : raster_to_image_exh);
+}
+
+
+
+// coordinate changes {{{1
+
 // There are four (!) coordinate systems used in this program.
 // (I believe that this is the simplest solution, however the code could be
 // shortened by identifying the "raster" and the "window" coordinates.)
 //
-// 1. IMAGE coordinates (p,q), integers in the range 0--40.000 representing the
+// 1. IMAGE coordinates (p,q), integers in the range [0,40.000] representing the
 // position of a pixel in the "P" image.
 //
 // 2. GEO coordinates (lon,lat), floating point numbers in degrees, e.g., in an
 // interval such as [ -137.4782 , -137.4779 ].  These coordinates are the
 // geographic position around the site of interest.
 //
-// 3. RASTER coordinates (x,y), floating point numbers in the range 0--40.000
-// representing an isotropic grid over the geographic site, at the nominal
-// pixel resolution.
+// 3. RASTER coordinates (x,y), floating point numbers in a small range
+// [-20.000, 20.000] representing an isotropic grid over the geographic site,
+// approximately at the nominal pixel resolution (may be rotated, scaled, or
+// something).
 //
 // 4. WINDOW coordintes (i,j), integers representing the pixel position in the
 // display window
@@ -516,6 +557,10 @@ void image_to_window_ex(double ij[2], struct pan_state *e, double p, double q)
 	raster_to_window(ij, e, xy[0], xy[1]);
 }
 
+
+// pixel interpolation {{{1
+
+// constant, bilinear, bicubic {{{2
 static float rgb_getsamplec(void *vx, int w, int h, int i, int j, int l)
 {
 	int pd = 3;
@@ -595,11 +640,7 @@ static void preview_at_bic(float *out, struct pan_view *v, double x, double y)
 	}
 }
 
-static int insideP(int w, int h, int x, int y)
-{
-	return x >= 0 && y >= 0 && x < w && y < h;
-}
-
+// RGBI and MS combination stuff {{{2
 static float getgreenf(float c[4])
 {
 	return c[1] * 0.6 + c[3] * 0.2;
@@ -752,6 +793,8 @@ static void pixel_from_pms(float *out, struct pan_view *v, double p, double q,
 	out[2] = c[2] * g / nc;
 }
 
+// generic "pixel" (includes all the previous cases) {{{2
+
 // evaluate the value a position (p,q) in image coordinates
 static
 void pixel(float *out, struct pan_view *v, double p, double q, int o, int i)
@@ -779,6 +822,9 @@ void pixel(float *out, struct pan_view *v, double p, double q, int o, int i)
 		else exit(fprintf(stderr,"ERROR: bad octave %d\n", o));
 	}
 }
+
+// contrast changes {{{1
+
 
 // auxiliary function: compute n%p correctly, even for huge and negative numbers
 static int good_modulus(int nn, int p)
@@ -844,44 +890,8 @@ static void inplace_rgb_span2(float *x, int w, int h, double a)
 		x[3*(j*w+i)+l] = 127 + a*(x[3*(j*w+i)+l] - avg[l])/sqrt(var[l]);
 }
 
-static void update_local_projection(struct pan_state *e,
-		double ix, double iy, double h)
-{
-	struct pan_view *v = obtain_view(e);
 
-	double xy[2];
-	window_to_raster(xy, e, ix, iy);
-	double x = xy[0];
-	double y = xy[1];
-
-	approximate_projection_gen(v->P, e, x, y, h, e->image_space ?
-			raster_to_image_raw : raster_to_image_exh);
-}
-
-static void overlay_vertdir(struct FTR *f, int i, int j)
-{
-	struct pan_state *e = f->userdata;
-	struct pan_view *v = obtain_view(e);
-	fprintf(stderr, "vertdir %d %d\n", i, j);
-
-	for (double height = 0; height < 100; height += 1)
-	{
-		double pq[2], xy[2];
-		window_to_image_exh(pq, e, i, j, e->base_h + height);
-		image_to_window_ex(xy, e, pq[0], pq[1]);
-
-	//	double ij[2], IJ[2], xy[2];
-	//	window_to_image_ex(ij, e, x, y);
-	//	eval_rpc_pair(IJ, v->r, v->r, ij[0], ij[1], e->base_h + height);
-	//	image_to_window_ex(xy, e, IJ[0], IJ[1]);
-	//	fprintf(stderr, "%d %d => %g %g (%g %g => %g %g)\n", x, y, xy[0], xy[1], ij[0], ij[1], IJ[0], IJ[1]);
-		if (insideP(f->w, f->h, xy[0], xy[1])) {
-			f->rgb[3*(f->w*lrint(xy[1]) + lrint(xy[0])) + 0] = 255;
-			f->rgb[3*(f->w*lrint(xy[1]) + lrint(xy[0])) + 1] = 0;
-			f->rgb[3*(f->w*lrint(xy[1]) + lrint(xy[0])) + 2] = 0;
-		}
-	}
-}
+// pan_repaint {{{1
 
 // dump the image acording to the state of the viewport
 static void pan_repaint(struct pan_state *e, int w, int h)
@@ -971,6 +981,28 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 		v->display[i] = float_to_uint8(v->fdisplay[i]);
 }
 
+// CALLBACK: pan_exposer {{{1
+
+static void overlay_vertdir(struct FTR *f, int i, int j)
+{
+	struct pan_state *e = f->userdata;
+	struct pan_view *v = obtain_view(e);
+	fprintf(stderr, "vertdir %d %d\n", i, j);
+
+	for (double height = 0; height < 100; height += 1)
+	{
+		double pq[2], xy[2];
+		window_to_image_exh(pq, e, i, j, e->base_h + height);
+		image_to_window_ex(xy, e, pq[0], pq[1]);
+
+		if (insideP(f->w, f->h, xy[0], xy[1])) {
+			f->rgb[3*(f->w*lrint(xy[1]) + lrint(xy[0])) + 0] = 255;
+			f->rgb[3*(f->w*lrint(xy[1]) + lrint(xy[0])) + 1] = 0;
+			f->rgb[3*(f->w*lrint(xy[1]) + lrint(xy[0])) + 2] = 0;
+		}
+	}
+}
+
 static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
 	fprintf(stderr, "\n\nexpose %d %d\n", b, m);
@@ -996,6 +1028,8 @@ static void request_repaints(struct FTR *f)
 		e->view[i].repaint = 1;
 	f->changed = 1;
 }
+
+// Actions {{{1
 
 // TODO: edit all actions so that they act directly on the "pan_state", not on
 // the "FTR".  This is necessary so that actions can be directly called even
@@ -1249,6 +1283,8 @@ static void action_cycle_view(struct FTR *f, int d, int x, int y)
 	action_select_view(f, new, x, y);
 }
 
+
+// CALLBACK: pan_button_handler {{{1
 static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 {
 	if (b == FTR_BUTTON_UP && m & FTR_MASK_CONTROL) {
@@ -1258,6 +1294,9 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 	if (b == FTR_BUTTON_DOWN)   action_increase_zoom(f, x, y);
 	if (b == FTR_BUTTON_UP  )   action_decrease_zoom(f, x, y);
 }
+
+
+// CALLBACK: pan_motion_handler {{{1
 
 // update offset variables by dragging
 static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
@@ -1276,7 +1315,7 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 	}
 }
 
-// keyboard handler
+// CALLBACK: pan_key_handler {{{1
 void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
 	if (k == '+' || k == '=') action_increase_zoom(f, f->w/2, f->h/2);
@@ -1337,13 +1376,13 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 		action_select_interpolator(f, k-'0');
 }
 
-// resize handler
+// CALLBACK: pan_resize {{{1
 static void pan_resize(struct FTR *f, int k, int m, int x, int y)
 {
 	request_repaints(f);
 }
 
-// non-interactive control of the model
+// non-interactive control of the model {{{1
 static int pan_non_interactive(struct pan_state *e, char *command_string)
 {
 	fprintf(stderr, "non-interactive rpcflip \"%s\"\n", command_string);
@@ -1414,6 +1453,7 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 	return 0;
 }
 
+// main {{{1
 int main_pan(int c, char *v[])
 {
 	TIFFSetWarningHandler(NULL);//suppress warnings
@@ -1541,3 +1581,5 @@ int main(int c, char *v[])
 {
 	return main_pan(c, v);
 }
+
+// vim:set foldmethod=marker:
