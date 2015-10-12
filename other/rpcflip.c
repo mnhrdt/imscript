@@ -51,8 +51,6 @@ double egm96(double,double);
 #endif
 #define EARTH_RADIUS 6378000.0
 #define WHEEL_FACTOR 2.0
-//#define WHEEL_FACTOR 1.259921049894873164767210607
-//#define WHEEL_FACTOR 1.189207115002721066717499971
 #define BAD_MIN(a,b) ((a)<(b)?(a):(b))
 
 
@@ -348,20 +346,6 @@ static void apply_projection(double out[3], double P[8], double x[3])
 	out[2] = x[2];
 }
 
-static void update_local_projection(struct pan_state *e,
-		double ix, double iy, double h)
-{
-	struct pan_view *v = obtain_view(e);
-
-	double xy[2];
-	window_to_raster(xy, e, ix, iy);
-	double x = xy[0];
-	double y = xy[1];
-
-	approximate_projection_gen(v->P, e, x, y, h, e->image_space ?
-			raster_to_image_raw : raster_to_image_exh);
-}
-
 
 
 // coordinate changes {{{1
@@ -641,10 +625,10 @@ static void preview_at_bic(float *out, struct pan_view *v, double x, double y)
 }
 
 // RGBI and MS combination stuff {{{2
-static float getgreenf(float c[4])
-{
-	return c[1] * 0.6 + c[3] * 0.2;
-}
+//static float getgreenf(float c[4])
+//{
+//	return c[1] * 0.6 + c[3] * 0.2;
+//}
 
 static void rgbi_to_rgb_inplace(float c[4])
 {
@@ -892,6 +876,21 @@ static void inplace_rgb_span2(float *x, int w, int h, double a)
 
 
 // pan_repaint {{{1
+//
+static void update_local_projection(struct pan_state *e,
+		double ix, double iy, double h)
+{
+	struct pan_view *v = obtain_view(e);
+
+	double xy[2];
+	window_to_raster(xy, e, ix, iy);
+	double x = xy[0];
+	double y = xy[1];
+
+	approximate_projection_gen(v->P, e, x, y, h, e->image_space ?
+			raster_to_image_raw : raster_to_image_exh);
+}
+
 
 // dump the image acording to the state of the viewport
 static void pan_repaint(struct pan_state *e, int w, int h)
@@ -986,7 +985,6 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 static void overlay_vertdir(struct FTR *f, int i, int j)
 {
 	struct pan_state *e = f->userdata;
-	struct pan_view *v = obtain_view(e);
 	fprintf(stderr, "vertdir %d %d\n", i, j);
 
 	for (double height = 0; height < 100; height += 1)
@@ -1003,8 +1001,9 @@ static void overlay_vertdir(struct FTR *f, int i, int j)
 	}
 }
 
-static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
+static void pan_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
 {
+	(void)unused_x; (void)unused_y;
 	fprintf(stderr, "\n\nexpose %d %d\n", b, m);
 	struct pan_state *e = f->userdata;
 	struct pan_view *v = obtain_view(e);
@@ -1299,8 +1298,9 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 // CALLBACK: pan_motion_handler {{{1
 
 // update offset variables by dragging
-static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
+static void pan_motion_handler(struct FTR *f, int unused_b, int m, int x, int y)
 {
+	(void)unused_b;
 	struct pan_state *e = f->userdata;
 	static double ox = 0, oy = 0;
 	if (m == FTR_BUTTON_LEFT) action_offset_viewport(f, x - ox, y - oy);
@@ -1496,64 +1496,6 @@ int main_pan(int c, char *v[])
 			filename_grpc,
 			filename_ctif,
 			filename_cpre,
-			n);
-
-	// if non-interactive, run the requested command string and exit
-	if (*command_string)
-		return pan_non_interactive(e, command_string);
-
-	// open window
-	struct FTR f = ftr_new_window(320, 320);
-	//struct FTR f = ftr_new_window(800, 600);
-	f.userdata = e;
-	f.changed = 1;
-	ftr_set_handler(&f, "key"   , pan_key_handler);
-	ftr_set_handler(&f, "button", pan_button_handler);
-	ftr_set_handler(&f, "motion", pan_motion_handler);
-	ftr_set_handler(&f, "expose", pan_exposer);
-	ftr_set_handler(&f, "resize", pan_resize);
-	int r = ftr_loop_run(&f);
-
-	// cleanup and exit (optional)
-	ftr_close(&f);
-	return r;
-}
-
-int main_pangray(int c, char *v[])
-{
-	TIFFSetWarningHandler(NULL);//suppress warnings
-
-	// process input arguments
-	char *command_string = pick_option(&c, &v, "c", "");
-	if (c < 3 || (c - 1) % 3 != 0) {
-		fprintf(stderr, "usage:\n\t"
-				"%s [P.TIF P.JPG P.RPC]+\n", *v);
-		//                0  1     2     3
-		return c;
-	}
-	int n = BAD_MIN((c - 1)/3,MAX_VIEWS);
-	fprintf(stderr, "we have %d views\n", n);
-	char *filename_gtif[n];
-	char *filename_gpre[n];
-	char *filename_grpc[n];
-	for (int i = 0; i < n; i++)
-	{
-		filename_gtif[i] = v[3*i+1];
-		filename_gpre[i] = v[3*i+2];
-		filename_grpc[i] = v[3*i+3];
-		fprintf(stderr, "view %d\n", i);
-		fprintf(stderr, "\tgtif %s\n", filename_gtif[i]);
-		fprintf(stderr, "\tgpre %s\n", filename_gpre[i]);
-		fprintf(stderr, "\tgrpc %s\n", filename_grpc[i]);
-	}
-
-	// start state
-	struct pan_state e[1];
-	init_state(e,
-			filename_gtif,
-			filename_gpre,
-			filename_grpc,
-			NULL, NULL,
 			n);
 
 	// if non-interactive, run the requested command string and exit
