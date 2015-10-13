@@ -30,12 +30,6 @@ struct pan_state {
 	double a, b;
 
 	// 3. silly options
-	bool infrared;
-	unsigned char *preview;
-	int pw, ph;
-	bool do_preview;
-	int preview_position_x;
-	int preview_position_y;
 };
 
 // change of coordinates: from window "int" pixels to image "double" point
@@ -107,13 +101,6 @@ static void pixel(float *out, struct pan_state *e, double p, double q)
 		//q = mod(q, e->t->i->h);
 	}
 
-	//double factor;// = 1.0 << e->octave;
-	//if (e->octave >= 0)
-	//	factor = 1 << e->octave;
-	//else
-	//	factor = 1.0 / ( 1 << - e->octave );
-	
-
 	int fmt = e->t->i->fmt;
 	int bps = e->t->i->bps;
 	int spp = e->t->i->spp;
@@ -126,15 +113,9 @@ static void pixel(float *out, struct pan_state *e, double p, double q)
 	char *pix = tiff_octaves_getpixel(e->t, o, p/factorx, q/factory);
 
 	out[0] = from_sample_to_double(pix, fmt, bps);
-	if (spp >= 3) {
-		out[1] = from_sample_to_double(pix + ss,   fmt, bps);
-		out[2] = from_sample_to_double(pix + 2*ss, fmt, bps);
-		if (spp == 4 && e->infrared) {
-			double o4 = from_sample_to_double(pix + 3*ss, fmt, bps);
-			out[1] = 0.9*out[1] + 0.1 * o4;
-		}
-	} else
-		out[1] = out[2] = out[0];
+	out[1] = out[2] = out[0];
+	if (spp >= 1)
+		fail("do not support pd = %d\n", spp);
 }
 
 static void action_print_value_under_cursor(struct FTR *f, int x, int y)
@@ -175,23 +156,6 @@ static void action_reset_zoom_and_position(struct FTR *f)
 	e->b = 0;
 	*/
 
-	if (e->preview) {
-		fail("preview unsupported");
-	}
-
-	f->changed = 1;
-}
-
-static void action_exit_preview(struct FTR *f, int x, int y)
-{
-	struct pan_state *e = f->userdata;
-
-	e->do_preview = false;
-	e->octave = 0;
-	e->offset_x = x*e->zoom_x - e->pw/2;
-	e->offset_y = y*e->zoom_y - e->ph/2;
-	e->zoom_x = 1;
-	e->zoom_y = 1;
 	f->changed = 1;
 }
 
@@ -330,44 +294,6 @@ static void action_decrease_octave(struct FTR *f, int x, int y)
 	fprintf(stderr, "decreased octave to %d\n", e->octave);
 }
 
-static void action_toggle_infrared(struct FTR *f)
-{
-	struct pan_state *e = f->userdata;
-
-	e->infrared = !e->infrared;
-
-	f->changed = 1;
-}
-
-static void dump_preview(struct FTR *f)
-{
-	struct pan_state *e = f->userdata;
-	if (!e->preview) return;
-
-	f->w = e->pw;
-	f->h = e->ph;
-	memcpy(f->rgb, e->preview, 3*e->pw*e->ph);
-
-	if (e->preview_position_x >= 0)
-	{
-		int icon_hw = (e->pw/e->zoom_x)/2;
-		int icon_hh = (e->ph/e->zoom_y)/2;
-		for (int jj = -icon_hh; jj <= icon_hh; jj++)
-		for (int ii = -icon_hw; ii <= icon_hw; ii++)
-		{
-			int i = ii + e->preview_position_x;
-			int j = jj + e->preview_position_y;
-			if (i >= 0 && j >= 0 && i < f->w && j < f->h)
-			{
-				int idx = j * f->w + i;
-				f->rgb[3*idx+2] = 255;
-			}
-		}
-	}
-
-	f->changed = 1;
-}
-
 static unsigned char float_to_byte(float x)
 {
 	if (x < 0) return 0;
@@ -386,11 +312,9 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
 	struct pan_state *e = f->userdata;
 
-	if (e->do_preview) {dump_preview(f); return;}
-
 	// for every pixel in the window
 	for (int j = 0; j < f->h; j++)
-	for (int i = 0; i < f->w; i++)
+	for (int i = 0; i < 361; i++)
 	{
 		// compute the position of this pixel in the image
 		double p[2];
@@ -412,12 +336,6 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 {
 	struct pan_state *e = f->userdata;
-	if (e->do_preview)
-	{
-		e->preview_position_x = x;
-		e->preview_position_y = y;
-		return;
-	}
 
 	static double ox = 0, oy = 0;
 
@@ -433,8 +351,6 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 {
 	struct pan_state *e = f->userdata;
-	if (e->do_preview && b == FTR_BUTTON_LEFT) {
-		action_exit_preview(f, x, y); return; }
 
 	//fprintf(stderr, "button b=%d m=%d\n", b, m);
 	if (b == FTR_BUTTON_UP && (m==FTR_MASK_SHIFT || m==FTR_MASK_CONTROL)) {
@@ -460,7 +376,6 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
 			k, isalpha(k)?k:' ', m, x, y);
 
-	if (k == 'i') action_toggle_infrared(f);
 	if (k == '+') action_decrease_octave(f, f->w/2, f->h/2);
 	if (k == '-') action_increase_octave(f, f->w/2, f->h/2);
 	if (k == '1') action_change_zoom_to_factor(f, x, y, 1, 1);
@@ -527,14 +442,6 @@ static unsigned char *read_image_uint8_rgb(char *fname, int *w, int *h)
 	return y;
 }
 
-static void add_preview(struct pan_state *e, char *filename)
-{
-	e->preview = read_image_uint8_rgb(filename, &e->pw, &e->ph);
-	e->w = e->pw;
-	e->h = e->ph;
-	e->do_preview = true;
-}
-
 
 #define BAD_MIN(a,b) a<b?a:b
 
@@ -543,7 +450,6 @@ int main_pan(int c, char *v[])
 	TIFFSetWarningHandler(NULL);//suppress warnings
 
 	// process input arguments
-	char *filename_preview = pick_option(&c, &v, "p", "");
 	if (c != 2) {
 		fprintf(stderr, "usage:\n\t%s pyrpattern\n", *v);
 		//                          0 1
@@ -557,19 +463,11 @@ int main_pan(int c, char *v[])
 	tiff_octaves_init(e->t, pyrpattern, megabytes);
 	e->w = 1200;
 	e->h = 800;
-	e->infrared = 4 == e->t->i->spp;
-	e->preview = NULL;
-	e->do_preview = false;
 	e->a = 1;
 	e->b = 0;
-	if (*filename_preview) add_preview(e, filename_preview);
 
 	// open window
-	struct FTR f;
-	if (e->preview)
-		f = ftr_new_window(e->pw, e->ph);
-	else
-		f = ftr_new_window(BAD_MIN(e->w,361), BAD_MIN(e->h,800));
+	struct FTR f = ftr_new_window(361+800, 800);
 	f.userdata = e;
 	action_reset_zoom_and_position(&f);
 	ftr_set_handler(&f, "key"   , pan_key_handler);
