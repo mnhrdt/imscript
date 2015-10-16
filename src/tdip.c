@@ -103,7 +103,7 @@ bool get_positive_gradient(double g[2], float *x, int w, int h, int i, int j)
 	double xIj = x[ (j + 0)*w + (i + 1) ];
 	double xiJ = x[ (j + 1)*w + (i + 0) ];
 	double xIJ = x[ (j + 1)*w + (i + 1) ];
-	if (xij <= 9 || xIj <= 9 || xiJ <= 9 || xIJ <= 9) return false;
+	//if (xij <= 9 || xIj <= 9 || xiJ <= 9 || xIJ <= 9) return false;
 	g[0] = 0.5 * (xIj - xij + xIJ - xiJ);
 	g[1] = 0.5 * (xiJ - xij + xIJ - xIj);
 	//g[0] = xIj - xij;
@@ -148,13 +148,15 @@ static void pixel_acc(int x, int y, void *ee)
 	}
 }
 
-
 static void accumulate_line(float *acc, int w, int h,
 		int from[2], int to[2], float v)
 {
 	struct accumulating_state e = {.w = w, .h = h, .v = v, .acc = acc};
 	traverse_segment(from[0], from[1], to[0], to[1], pixel_acc, &e);
 }
+
+#include "smapa.h"
+SMART_PARAMETER(GRADMIN,9)
 
 void tdip(float *transform, double arad, int tside, float *dip, int w, int h)
 {
@@ -177,7 +179,7 @@ void tdip(float *transform, double arad, int tside, float *dip, int w, int h)
 			if (fabs(g[1]) < 1e-2 ||  fabs(g[0]) < 1e-2)
 				continue;
 			double gn = hypot(g[0], g[1]);
-			if (gn < 9)
+			if (gn < GRADMIN())
 				continue;
 			tmp[w*j+i] = gn;
 
@@ -195,7 +197,7 @@ void tdip(float *transform, double arad, int tside, float *dip, int w, int h)
 				int ibb[2] = {alf*bb[0] + bet, alf*bb[1] + bet};
 				//fprintf(stderr, "i,j=%d,%d, g=%g,%g l=%g,%g,%g, aa=%d,%d bb=%d,%d\n", i, j, g[0], g[1], l[0], l[1], l[2], iaa[0], iaa[1], ibb[0], ibb[1]);
 				accumulate_line(transform, tside, tside,
-						iaa, ibb, gn);
+						iaa, ibb, 1*gn);
 			}
 #endif
 
@@ -217,8 +219,9 @@ void tdip(float *transform, double arad, int tside, float *dip, int w, int h)
 	free(tmp);
 }
 
-
+#ifndef OMIT_MAIN_TDIP
 #define MAIN_TDIP
+#endif//OMIT_MAIN_TDIP
 
 #ifdef MAIN_TDIP
 #include <stdio.h>

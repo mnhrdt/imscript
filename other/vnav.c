@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+#include <stdint.h>
+#include "iio.h" // (for debug only)
+
 #define TIFFU_OMIT_MAIN
 #include "tiffu.c"
 
@@ -15,13 +18,15 @@
 
 #define WHEEL_FACTOR 1.4
 
+#define STRIP_WIDTH 361
+#define TDIP_SIDE 512
+
 
 // data structure for the image viewer
 // this data goes into the "userdata" field of the FTR window structure
 struct pan_state {
 	// 1. image data
 	int w, h;
-	//float *frgb;
 	struct tiff_octaves t[1];
 
 	// 2. view port parameters
@@ -29,7 +34,13 @@ struct pan_state {
 	double zoom_x, zoom_y, offset_x, offset_y;
 	double a, b;
 
-	// 3. silly options
+	// 3. viewer state
+	int strip_w, strip_h;
+	int hough_w, hough_h;
+	float *strip, *hough;
+	double aradius;
+
+	// 4. silly options
 };
 
 // change of coordinates: from window "int" pixels to image "double" point
@@ -81,7 +92,7 @@ static int mod(int n, int p)
 }
 
 // evaluate the value a position (p,q) in image coordinates
-static void pixel(float *out, struct pan_state *e, double p, double q)
+static float pixel(struct pan_state *e, double p, double q)
 {
 	//if (p < 0 || q < 0 || p > e->t->i->w-1 || q > e->t->i->h-1) {
 	//	int ip = p-256;
@@ -94,10 +105,8 @@ static void pixel(float *out, struct pan_state *e, double p, double q)
 	//}
 	if (p < 0 || q < 0 || p > e->t->i->w-1 || q > e->t->i->h-1) {
 		p = mod(p, e->t->i->w);
-		if (q < 0 || q >= e->t->i->h) {
-			out[0] = out[1] = out[2] = 0;
-			return;
-		}
+		if (q < 0 || q >= e->t->i->h)
+			return NAN;
 		//q = mod(q, e->t->i->h);
 	}
 
@@ -112,10 +121,10 @@ static void pixel(float *out, struct pan_state *e, double p, double q)
 	if (o < 0) { o = 0; factorx = 1; factory = 1; }
 	char *pix = tiff_octaves_getpixel(e->t, o, p/factorx, q/factory);
 
-	out[0] = from_sample_to_double(pix, fmt, bps);
-	out[1] = out[2] = out[0];
-	if (spp >= 1)
+	if (spp > 1)
 		fail("do not support pd = %d\n", spp);
+
+	return from_sample_to_double(pix, fmt, bps);
 }
 
 static void action_print_value_under_cursor(struct FTR *f, int x, int y)
@@ -124,13 +133,26 @@ static void action_print_value_under_cursor(struct FTR *f, int x, int y)
 		struct pan_state *e = f->userdata;
 		double p[2];
 		window_to_image(p, e, x, y);
-		float v[3];
-		pixel(v, e, p[0], p[1]);
-		fprintf(stderr, "%g %g, value %g\n",p[0],p[1],v[0]);
+		float v = pixel(e, p[0], p[1]);
+		fprintf(stderr, "%g %g, value %g\n",p[0],p[1],v);
 		//float c[3];
 		//interpolate_at(c, e->frgb, e->w, e->h, p[0], p[1]);
 		//printf("%g\t%g\t: %g\t%g\t%g\n", p[0], p[1], c[0], c[1], c[2]);
 	}
+}
+
+
+#include<stdarg.h>
+static void img_debug(float *x, int w, int h, int pd, const char *fmt, ...)
+{
+	//return;
+	va_list ap;
+	char fname[FILENAME_MAX];
+	va_start(ap, fmt);
+	vsnprintf(fname, FILENAME_MAX, fmt, ap);
+	va_end(ap);
+	fprintf(stderr, "IMG_DEBUG(%dx%d,%d) \"%s\"\n", w, h, pd, fname);
+	iio_save_image_float_vec(fname, x, w, h, pd);
 }
 
 static void action_offset_viewport(struct FTR *f, int dx, int dy)
@@ -195,9 +217,8 @@ static void action_center_contrast_at_point(struct FTR *f, int x, int y)
 
 	double p[2];
 	window_to_image(p, e, x, y);
-	float c[3];
-	pixel(c, e, p[0], p[1]);
-	float C = (c[0] + c[1] + c[2])/3;
+	float C = pixel(e, p[0], p[1]);
+	if (!isfinite(C)) C = 0;
 
 	e->b = 127.5 - e->a * C;
 
@@ -210,9 +231,8 @@ static void action_base_contrast_at_point(struct FTR *f, int x, int y)
 
 	double p[2];
 	window_to_image(p, e, x, y);
-	float c[3];
-	pixel(c, e, p[0], p[1]);
-	float C = (c[0] + c[1] + c[2])/3;
+	float C = pixel(e, p[0], p[1]);
+	if (!isfinite(C)) C = 0;
 
 	e->b =  255 - e->a * C;
 
@@ -247,6 +267,93 @@ static void action_change_zoom_to_factor(struct FTR *f, int x, int y,
 	fprintf(stderr, "\t zoom changed to %g %g {%g %g}\n", e->zoom_x, e->zoom_y, e->offset_x, e->offset_y);
 
 	f->changed = 1;
+}
+
+#include "simpois.c"
+
+#define OMIT_BLUR_MAIN
+#include "blur.c"
+
+#define OMIT_MAIN_TDIP
+#include "tdip.c"
+
+
+static void action_compute_hough(struct FTR *f)
+{
+	fprintf(stderr, "compute hough\n");
+	struct pan_state *e = f->userdata;
+
+	// buffer for the image data (current strip)
+	int w = STRIP_WIDTH;
+	int h = f->h;
+	float *strip = xmalloc(w * h * sizeof*strip);
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		double p[2];
+		window_to_image(p, e, i, j);
+		float v = pixel(e, p[0], p[1]);
+		if (v > 2000) v = NAN;
+		strip[j*w+i] = v;
+	}
+	img_debug(strip, w, h, 1, "/tmp/strip_at_z%g_x%g_y%g.tiff",
+			e->zoom_y, e->offset_x, e->offset_y);
+
+	// buffer for the transform data
+	int tside = TDIP_SIDE;
+	float *hough = xmalloc(tside * tside * sizeof*hough);
+	for (int i = 0; i < tside * tside; i++)
+		hough[i] = 0;
+
+	// inpaint the "NAN" values of the image data
+	poisson_recursive(strip, strip, 0, w, h, 0.4, 10, 99);
+	img_debug(strip, w, h, 1, "/tmp/istrip_at_z%g_x%g_y%g.tiff",
+			e->zoom_y, e->offset_x, e->offset_y);
+
+	// blur the image
+	float sigma[1] = {2};
+	blur_2d(strip, strip, w, h, 1, "gaussian", sigma, 1.2);
+	img_debug(strip, w, h, 1, "/tmp/bistrip_at_z%g_x%g_y%g.tiff",
+			e->zoom_y, e->offset_x, e->offset_y);
+
+	// compute the dip picker transform
+	tdip(hough, 1.5, tside, strip, w, h);
+	img_debug(hough, tside, tside, 1, "/tmp/hbistrip_at_z%g_x%g_y%g.tiff",
+			e->zoom_y, e->offset_x, e->offset_y);
+
+	// compute statistics
+	float hmax = -INFINITY;
+	int xmax, ymax;
+	for (int j = 0; j < tside; j++)
+	for (int i = 0; i < tside; i++)
+	{
+		int ij = i + j * tside;
+		if (hough[ij] > hmax) {
+			hmax = hough[ij];
+			xmax = i;
+			ymax = j;
+		}
+	}
+
+	// dump the blurred image to the window
+	assert(f->w == tside + w);
+	assert(f->h == h);
+	for (int j = 0; j < w; j++)
+	for (int i = 0; i < h; i++)
+	for (int l = 0; l < 3; l++)
+		f->rgb[3*(i+j*f->w)+l] = strip[i+j*w];
+
+	// dump the transform to the window
+	assert(f->w == tside + w);
+	assert(f->h == tside);
+	for (int j = 0; j < tside; j++)
+	for (int i = 0; i < tside; i++)
+	for (int l = 0; l < 3; l++)
+		f->rgb[3*(i+w+j*f->w)+l] = 255 * hough[i+j*tside] / hmax;
+	f->changed = 1;
+
+	free(strip);
+	free(hough);
 }
 
 
@@ -314,20 +421,33 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 
 	// for every pixel in the window
 	for (int j = 0; j < f->h; j++)
-	for (int i = 0; i < 361; i++)
+	for (int i = 0; i < STRIP_WIDTH; i++)
 	{
 		// compute the position of this pixel in the image
 		double p[2];
 		window_to_image(p, e, i, j);
 
 		// evaluate the color value of the image at this position
-		float c[3];
-		pixel(c, e, p[0], p[1]);
+		float C = pixel(e, p[0], p[1]);
 
 		// transform the value into RGB using the contrast change (a,b)
+		float v = 0;
+		if (isfinite(C))
+			v = e->a * C + e->b;
 		unsigned char *dest = f->rgb + 3 * (j * f->w + i);
 		for (int l = 0; l < 3; l++)
-			dest[l] = float_to_byte(e->a * c[l] + e->b);
+			dest[l] = float_to_byte(v);
+	}
+
+	// draw grid lines on the hough space
+	assert(TDIP_SIDE == f->h);
+	assert(TDIP_SIDE + STRIP_WIDTH == f->w);
+	for (int i = 0; i < TDIP_SIDE; i++)
+	{
+		f->rgb[3*(f->w*i + STRIP_WIDTH + TDIP_SIDE/2)+1] /= 2;
+		f->rgb[3*(f->w*TDIP_SIDE/2 + STRIP_WIDTH + i)+1] /= 2;
+		f->rgb[3*(f->w*i + STRIP_WIDTH + TDIP_SIDE/2)+2] = 255;
+		f->rgb[3*(f->w*TDIP_SIDE/2 + STRIP_WIDTH + i)+2] = 255;
 	}
 	f->changed = 1;
 }
@@ -376,9 +496,11 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
 			k, isalpha(k)?k:' ', m, x, y);
 
-	if (k == '+') action_decrease_octave(f, f->w/2, f->h/2);
+	if (k == '+'||k=='=') action_decrease_octave(f, f->w/2, f->h/2);
 	if (k == '-') action_increase_octave(f, f->w/2, f->h/2);
 	if (k == '1') action_change_zoom_to_factor(f, x, y, 1, 1);
+
+	if (k == 'h') action_compute_hough(f);
 
 	//if (k == 'p') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1.1);
 	//if (k == 'm') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1/1.1);
@@ -461,13 +583,11 @@ int main_pan(int c, char *v[])
 	struct pan_state e[1];
 	int megabytes = 100;
 	tiff_octaves_init(e->t, pyrpattern, megabytes);
-	e->w = 1200;
-	e->h = 800;
 	e->a = 1;
 	e->b = 0;
 
 	// open window
-	struct FTR f = ftr_new_window(361+800, 800);
+	struct FTR f = ftr_new_window(STRIP_WIDTH+TDIP_SIDE, TDIP_SIDE);
 	f.userdata = e;
 	action_reset_zoom_and_position(&f);
 	ftr_set_handler(&f, "key"   , pan_key_handler);

@@ -1,4 +1,4 @@
-// gcc -std=c99 -O3 vdip.c iio.o -o vdip -lX11 -ltiff -lpng
+// gcc -std=c99 -g vdip.c iio.o -o vdip -lX11 -ltiff -lpng
 #include <assert.h>
 #include <ctype.h>
 #include <math.h>
