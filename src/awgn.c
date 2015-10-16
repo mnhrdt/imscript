@@ -24,7 +24,7 @@ int main(int c, char *v[])
 	xsrand(SRAND());
 	for (int i = 0; i < w*h*pd; i++)
 		x[i] += s * random_normal();
-	iio_save_image_float_vec(out, x, w, h, 3);
+	iio_save_image_float_vec(out, x, w, h, pd);
 
 	return EXIT_SUCCESS;
 }
