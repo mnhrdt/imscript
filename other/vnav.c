@@ -52,14 +52,10 @@
 
 #define WHEEL_FACTOR 1.4
 
-#define STRIP_WIDTH 361
-#define TDIP_SIDE 512
-
-
 // data structure for the image viewer
 // this data goes into the "userdata" field of the FTR window structure
 struct pan_state {
-	// 1. image data
+	// 1. inpyt image data
 	int w, h;
 	struct tiff_octaves t[1];
 
@@ -68,15 +64,16 @@ struct pan_state {
 	double zoom_x, zoom_y, offset_x, offset_y;
 	double a, b;
 
-	// 3. viewer state
+	// 3. buffers for both windows
+	bool has_hough;
 	int strip_w, strip_h;
 	int hough_w, hough_h;
 	float *strip, *hough;
-	double aradius;
+
+	// 4. transform parameters
+	double aradius, min_grad;
 	double pre_blur_sigma, post_blur_sigma;
 	char *pre_blur_type, *post_blur_type;
-
-	// 4. silly options
 };
 
 // change of coordinates: from window "int" pixels to image "double" point
@@ -197,6 +194,7 @@ static void action_offset_viewport(struct FTR *f, int dx, int dy)
 	e->offset_x -= dx/e->zoom_x;
 	e->offset_y -= dy/e->zoom_y;
 
+	e->has_hough = false;
 	f->changed = 1;
 }
 
@@ -214,6 +212,7 @@ static void action_reset_zoom_and_position(struct FTR *f)
 	e->b = 0;
 	*/
 
+	e->has_hough = false;
 	f->changed = 1;
 }
 
@@ -302,6 +301,7 @@ static void action_change_zoom_to_factor(struct FTR *f, int x, int y,
 	e->offset_y = c[1] - y/e->zoom_y;
 	fprintf(stderr, "\t zoom changed to %g %g {%g %g}\n", e->zoom_x, e->zoom_y, e->offset_x, e->offset_y);
 
+	e->has_hough = false;
 	f->changed = 1;
 }
 
@@ -320,9 +320,9 @@ static void action_compute_hough(struct FTR *f)
 	struct pan_state *e = f->userdata;
 
 	// buffer for the image data (current strip)
-	int w = STRIP_WIDTH;
+	int w = e->strip_w;//STRIP_WIDTH;
 	int h = f->h;
-	float *strip = xmalloc(w * h * sizeof*strip);
+	float *strip = e->strip;
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 	{
@@ -336,8 +336,8 @@ static void action_compute_hough(struct FTR *f)
 			e->zoom_y, e->offset_x, e->offset_y);
 
 	// buffer for the transform data
-	int tside = TDIP_SIDE;
-	float *hough = xmalloc(tside * tside * sizeof*hough);
+	int tside = e->hough_w;
+	float *hough = e->hough;
 	for (int i = 0; i < tside * tside; i++)
 		hough[i] = 0;
 
@@ -347,49 +347,62 @@ static void action_compute_hough(struct FTR *f)
 			e->zoom_y, e->offset_x, e->offset_y);
 
 	// blur the image
-	float sigma[1] = {2};
-	blur_2d(strip, strip, w, h, 1, "gaussian", sigma, 1.2);
+	float sigma[1] = {e->pre_blur_sigma};
+	blur_2d(strip, strip, w, h, 1, e->pre_blur_type, sigma, 1);
 	img_debug(strip, w, h, 1, "/tmp/bistrip_at_z%g_x%g_y%g.tiff",
 			e->zoom_y, e->offset_x, e->offset_y);
 
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		double p[2];
+		window_to_image(p, e, i, j);
+		float v = pixel(e, p[0], p[1]);
+		if (!isfinite(v) || v > 2000)
+			strip[j*w+i] = NAN;
+	}
+
 	// compute the dip picker transform
-	tdip(hough, 1.5, tside, strip, w, h);
+	tdip(hough, e->aradius, tside, strip, w, h);
 	img_debug(hough, tside, tside, 1, "/tmp/hbistrip_at_z%g_x%g_y%g.tiff",
 			e->zoom_y, e->offset_x, e->offset_y);
 
-	// compute statistics
-	float hmax = -INFINITY;
-	int xmax, ymax;
-	for (int j = 0; j < tside; j++)
-	for (int i = 0; i < tside; i++)
-	{
-		int ij = i + j * tside;
-		if (hough[ij] > hmax) {
-			hmax = hough[ij];
-			xmax = i;
-			ymax = j;
-		}
-	}
+	// blur the accumulator
+	sigma[0] = e->post_blur_sigma;
+	blur_2d(hough, hough, tside, tside, 1, e->post_blur_type, sigma, 1);
 
-	// dump the blurred image to the window
-	assert(f->w == tside + w);
-	assert(f->h == h);
-	for (int j = 0; j < w; j++)
-	for (int i = 0; i < h; i++)
-	for (int l = 0; l < 3; l++)
-		f->rgb[3*(i+j*f->w)+l] = strip[i+j*w];
+	//// compute statistics
+	//float hmax = -INFINITY;
+	//int xmax, ymax;
+	//for (int j = 0; j < tside; j++)
+	//for (int i = 0; i < tside; i++)
+	//{
+	//	int ij = i + j * tside;
+	//	if (hough[ij] > hmax) {
+	//		hmax = hough[ij];
+	//		xmax = i;
+	//		ymax = j;
+	//	}
+	//}
 
-	// dump the transform to the window
-	assert(f->w == tside + w);
-	assert(f->h == tside);
-	for (int j = 0; j < tside; j++)
-	for (int i = 0; i < tside; i++)
-	for (int l = 0; l < 3; l++)
-		f->rgb[3*(i+w+j*f->w)+l] = 255 * hough[i+j*tside] / hmax;
+	//// dump the blurred image to the window
+	//assert(f->w == tside + w);
+	//assert(f->h == h);
+	//for (int j = 0; j < w; j++)
+	//for (int i = 0; i < h; i++)
+	//for (int l = 0; l < 3; l++)
+	//	f->rgb[3*(i+j*f->w)+l] = strip[i+j*w];
+
+	//// dump the transform to the window
+	//assert(f->w == tside + w);
+	//assert(f->h == tside);
+	//for (int j = 0; j < tside; j++)
+	//for (int i = 0; i < tside; i++)
+	//for (int l = 0; l < 3; l++)
+	//	f->rgb[3*(i+w+j*f->w)+l] = 255 * hough[i+j*tside] / hmax;
+
+	e->has_hough = true;
 	f->changed = 1;
-
-	free(strip);
-	free(hough);
 }
 
 
@@ -457,14 +470,17 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 
 	// for every pixel in the window
 	for (int j = 0; j < f->h; j++)
-	for (int i = 0; i < STRIP_WIDTH; i++)
+	for (int i = 0; i < e->strip_w; i++)
 	{
-		// compute the position of this pixel in the image
-		double p[2];
-		window_to_image(p, e, i, j);
+		float C = e->strip[e->strip_w * j + i];
+		if (!e->has_hough) {
+			// compute the position of this pixel in the image
+			double p[2];
+			window_to_image(p, e, i, j);
 
-		// evaluate the color value of the image at this position
-		float C = pixel(e, p[0], p[1]);
+			// evaluate the color value of the image at this position
+			C = pixel(e, p[0], p[1]);
+		}
 
 		// transform the value into RGB using the contrast change (a,b)
 		float v = 0;
@@ -476,15 +492,52 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	}
 
 	// draw grid lines on the hough space
-	assert(TDIP_SIDE == f->h);
-	assert(TDIP_SIDE + STRIP_WIDTH == f->w);
-	for (int i = 0; i < TDIP_SIDE; i++)
-	{
-		f->rgb[3*(f->w*i + STRIP_WIDTH + TDIP_SIDE/2)+1] /= 2;
-		f->rgb[3*(f->w*TDIP_SIDE/2 + STRIP_WIDTH + i)+1] /= 2;
-		f->rgb[3*(f->w*i + STRIP_WIDTH + TDIP_SIDE/2)+2] = 255;
-		f->rgb[3*(f->w*TDIP_SIDE/2 + STRIP_WIDTH + i)+2] = 255;
+	assert(e->hough_w == f->h);
+	assert(e->hough_w + e->strip_w == f->w);
+	if (e->has_hough) {
+	//assert(f->w == tside + w);
+	//assert(f->h == tside);
+
+		int tside = e->hough_w;
+		// compute statistics
+		float hmax = -INFINITY;
+		int xmax, ymax;
+		for (int j = 0; j < tside; j++)
+		for (int i = 0; i < tside; i++)
+		{
+			int ij = i + j * tside;
+			if (e->hough[ij] > hmax) {
+				hmax = e->hough[ij];
+				xmax = i;
+				ymax = j;
+			}
+		}
+		for (int j = 0; j < e->hough_w; j++)
+		for (int i = 0; i < e->hough_w; i++)
+		for (int l = 0; l < 3; l++)
+			f->rgb[3*(i+e->strip_w+j*f->w)+l] = 255 * e->hough[i+j*e->hough_w] / hmax;
+		for (int dj = -20; dj <= 20; dj++)
+		for (int di = -20; di <= 20; di++)
+		{
+			int ii = xmax + di;
+			int jj = ymax + dj;
+			if (insideP(e->hough_w, e->hough_h, ii, jj) &&  hypot(di, dj) < 20) {
+				f->rgb[3*(ii+e->strip_w+jj*f->w)+0] *= 2;
+				f->rgb[3*(ii+e->strip_w+jj*f->w)+2] /= 2;
+			}
+		}
+		f->rgb[3*(xmax+e->strip_w+ymax*f->w)+0] = 255;
+		f->rgb[3*(xmax+e->strip_w+ymax*f->w)+1] = 0;
+		f->rgb[3*(xmax+e->strip_w+ymax*f->w)+2] = 0;
 	}
+	for (int i = 0; i < e->hough_w; i++)
+	{
+		f->rgb[3*(f->w*i + e->strip_w + e->hough_w/2)+1] /= 2;
+		f->rgb[3*(f->w*e->hough_w/2 + e->strip_w + i)+1] /= 2;
+		f->rgb[3*(f->w*i + e->strip_w + e->hough_w/2)+2] = 255;
+		f->rgb[3*(f->w*e->hough_w/2 + e->strip_w + i)+2] = 255;
+	}
+
 	f->changed = 1;
 }
 
@@ -601,8 +654,8 @@ static unsigned char *read_image_uint8_rgb(char *fname, int *w, int *h)
 }
 
 
-#define BAD_MIN(a,b) a<b?a:b
-
+#define STRIP_WIDTH 361
+#define HOUGH_SIDE 512
 int main_pan(int c, char *v[])
 {
 	TIFFSetWarningHandler(NULL);//suppress warnings
@@ -619,11 +672,29 @@ int main_pan(int c, char *v[])
 	struct pan_state e[1];
 	int megabytes = 100;
 	tiff_octaves_init(e->t, pyrpattern, megabytes);
+	if (e->t->i->w != STRIP_WIDTH)
+		fail("expected an image of width %d (got %d)\n",
+						e->t->i->w, STRIP_WIDTH);
+
+	// init state
 	e->a = 1;
 	e->b = 0;
+	e->strip_w = STRIP_WIDTH;
+	e->strip_h = HOUGH_SIDE;
+	e->hough_w = HOUGH_SIDE;
+	e->hough_h = HOUGH_SIDE; // (unused)
+	e->strip = xmalloc(e->strip_w * e->strip_h * sizeof*e->strip);
+	e->hough = xmalloc(e->hough_w * e->hough_w * sizeof*e->hough);
+	e->has_hough = false;
+
+	e->aradius = 1.5;
+	e->pre_blur_sigma = 1;
+	e->pre_blur_type = "gaussian";
+	e->post_blur_sigma = 1;
+	e->post_blur_type = "cauchy";
 
 	// open window
-	struct FTR f = ftr_new_window(STRIP_WIDTH+TDIP_SIDE, TDIP_SIDE);
+	struct FTR f = ftr_new_window(STRIP_WIDTH+HOUGH_SIDE, HOUGH_SIDE);
 	f.userdata = e;
 	action_reset_zoom_and_position(&f);
 	ftr_set_handler(&f, "key"   , pan_key_handler);

@@ -99,10 +99,10 @@ bool get_positive_gradient(double g[2], float *x, int w, int h, int i, int j)
 {
 	if (!insideP(w, h, i, j)) return false;
 	if (!insideP(w, h, i+1, j+1)) return false;
-	double xij = x[ (j + 0)*w + (i + 0) ];
-	double xIj = x[ (j + 0)*w + (i + 1) ];
-	double xiJ = x[ (j + 1)*w + (i + 0) ];
-	double xIJ = x[ (j + 1)*w + (i + 1) ];
+	double xij = x[ (j + 0)*w + (i + 0) ]; if(!isfinite(xij))return false;
+	double xIj = x[ (j + 0)*w + (i + 1) ]; if(!isfinite(xIj))return false;
+	double xiJ = x[ (j + 1)*w + (i + 0) ]; if(!isfinite(xiJ))return false;
+	double xIJ = x[ (j + 1)*w + (i + 1) ]; if(!isfinite(xIJ))return false;
 	//if (xij <= 9 || xIj <= 9 || xiJ <= 9 || xIJ <= 9) return false;
 	g[0] = 0.5 * (xIj - xij + xIJ - xiJ);
 	g[1] = 0.5 * (xiJ - xij + xIJ - xIj);
