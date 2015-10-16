@@ -1,4 +1,38 @@
 // gcc -std=c99 -g vnav.c iio.o -o vnav -lX11 -ltiff -lpng
+//
+// A program for visualizing borehole images of size 361xN, where N is huge.
+//
+// It displays the dip-picker transform on a side window, to aid the picking.
+//
+//
+//
+// TODO:
+//
+// 1. Use always the same buffers for the strip and the transform, instead
+// of allocating anew at each computation.  This will allow to recover them if
+// nothing has changed (e.g., for updating an overlay).
+//
+// 2. Add display of the max position (overlaid on the transform space)
+//
+// 3. Add display of the corresponding sinusoids as you hover through the
+// transform space.
+//
+// 4. Put all the parameters explicitly inside the state structure.
+//
+// 5. Add keyboard actions to change the values of these parameters.
+//
+// 6. Inversive parametrization (and other altenatives maybe).
+//
+// 7. ``Look inside the well'' warping
+//
+// 8. Detection by randomized sampling (possibly coupled to the idle process).
+//
+// 9. Print the numbers of current DEPTH, A, B, DIP, Azimuth
+//
+// 10. Several options for automatic local contrast changes on both sides
+//
+// 11. Zoom-in and out of the Hough space, with the mouse-wheel
+//
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -39,6 +73,8 @@ struct pan_state {
 	int hough_w, hough_h;
 	float *strip, *hough;
 	double aradius;
+	double pre_blur_sigma, post_blur_sigma;
+	char *pre_blur_type, *post_blur_type;
 
 	// 4. silly options
 };
