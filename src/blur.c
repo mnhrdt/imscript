@@ -363,6 +363,10 @@ void blur_2d(float *y, float *x, int w, int h, int pd,
 }
 
 #ifndef OMIT_BLUR_MAIN
+#define MAIN_BLUR
+#endif
+
+#ifdef MAIN_BLUR
 
 static int print_version(void)
 {
@@ -427,4 +431,4 @@ int main(int c, char *v[])
 	free(y);
 	return EXIT_SUCCESS;
 }
-#endif//OMIT_BLUR_MAIN
+#endif//MAIN_BLUR

@@ -215,7 +215,7 @@ void tdip(float *transform, double arad, int tside, float *dip, int w, int h)
 	}
 
 	// debug stuff
-	iio_save_image_float_vec("/tmp/gradmask.tiff", tmp, w, h, 1);
+	//iio_save_image_float_vec("/tmp/gradmask.tiff", tmp, w, h, 1);
 	free(tmp);
 }
 

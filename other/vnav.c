@@ -52,6 +52,26 @@
 
 #define WHEEL_FACTOR 1.4
 
+#define FONT_BDF_FILE "/home/coco/.fonts2/9x15.bdf"
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+#include "simpois.c"
+
+#define OMIT_BLUR_MAIN
+#include "blur.c"
+
+#define OMIT_MAIN_TDIP
+#include "tdip.c"
+
+#define OMIT_MAIN_FONTU
+#include "fontu.c"
+
+
+
+
 // data structure for the image viewer
 // this data goes into the "userdata" field of the FTR window structure
 struct pan_state {
@@ -66,6 +86,7 @@ struct pan_state {
 
 	// 3. buffers for both windows
 	bool has_hough;
+	bool show_dip_bundle;
 	int strip_w, strip_h;
 	int hough_w, hough_h;
 	float *strip, *hough;
@@ -74,6 +95,13 @@ struct pan_state {
 	double aradius, min_grad;
 	double pre_blur_sigma, post_blur_sigma;
 	char *pre_blur_type, *post_blur_type;
+
+	// 5. silly options
+	double dip_a, dip_b;
+	double dip_stride, dip_offset;
+	int contrast_mode; // 0=free, 1=minmax, 2=avgstd
+	bool head_up_display;
+	struct bitmap_font font;
 };
 
 // change of coordinates: from window "int" pixels to image "double" point
@@ -178,7 +206,7 @@ static void action_print_value_under_cursor(struct FTR *f, int x, int y)
 #include<stdarg.h>
 static void img_debug(float *x, int w, int h, int pd, const char *fmt, ...)
 {
-	//return;
+	return;
 	va_list ap;
 	char fname[FILENAME_MAX];
 	va_start(ap, fmt);
@@ -305,15 +333,6 @@ static void action_change_zoom_to_factor(struct FTR *f, int x, int y,
 	f->changed = 1;
 }
 
-#include "simpois.c"
-
-#define OMIT_BLUR_MAIN
-#include "blur.c"
-
-#define OMIT_MAIN_TDIP
-#include "tdip.c"
-
-
 static void action_compute_hough(struct FTR *f)
 {
 	fprintf(stderr, "compute hough\n");
@@ -363,7 +382,9 @@ static void action_compute_hough(struct FTR *f)
 	}
 
 	// compute the dip picker transform
-	tdip(hough, e->aradius, tside, strip, w, h);
+	float *c_strip = strip + w*h/4;
+	int c_h = 3*h/4;
+	tdip(hough, e->aradius, tside, c_strip, w, c_h);
 	img_debug(hough, tside, tside, 1, "/tmp/hbistrip_at_z%g_x%g_y%g.tiff",
 			e->zoom_y, e->offset_x, e->offset_y);
 
@@ -371,19 +392,30 @@ static void action_compute_hough(struct FTR *f)
 	sigma[0] = e->post_blur_sigma;
 	blur_2d(hough, hough, tside, tside, 1, e->post_blur_type, sigma, 1);
 
-	//// compute statistics
-	//float hmax = -INFINITY;
-	//int xmax, ymax;
-	//for (int j = 0; j < tside; j++)
-	//for (int i = 0; i < tside; i++)
-	//{
-	//	int ij = i + j * tside;
-	//	if (hough[ij] > hmax) {
-	//		hmax = hough[ij];
-	//		xmax = i;
-	//		ymax = j;
-	//	}
-	//}
+	// compute statistics
+	float hmax = -INFINITY;
+	int xmax, ymax;
+	for (int j = 0; j < tside; j++)
+	for (int i = 0; i < tside; i++)
+	{
+		int ij = i + j * tside;
+		if (hough[ij] > hmax) {
+			hmax = hough[ij];
+			xmax = i;
+			ymax = j;
+		}
+	}
+
+	{
+		int tside = e->hough_w;
+		double arad = e->aradius;
+		int ia = xmax;// - e->strip_w;
+		int ib = ymax;
+		e->dip_a = arad * (ia / (tside - 1.0) - 0.5);
+		e->dip_b = arad * (ib / (tside - 1.0) - 0.5);
+		e->show_dip_bundle = true;
+		f->changed = 1;
+	}
 
 	//// dump the blurred image to the window
 	//assert(f->w == tside + w);
@@ -416,6 +448,32 @@ static void action_compute_hough(struct FTR *f)
 //{
 //	action_change_zoom_by_factor(f, x, y, 1.0/WHEEL_FACTOR);
 //}
+
+static void action_change_presigma_by_factor(struct FTR *f, double factor)
+{
+	struct pan_state *e = f->userdata;
+	e->pre_blur_sigma *= factor;
+	fprintf(stderr, "pre_sigma changed to %g\n", e->pre_blur_sigma);
+	action_compute_hough(f);
+}
+
+static void action_change_postsigma_by_factor(struct FTR *f, double factor)
+{
+	struct pan_state *e = f->userdata;
+	e->post_blur_sigma *= factor;
+	fprintf(stderr, "post_sigma changed to %g\n", e->post_blur_sigma);
+	action_compute_hough(f);
+}
+
+static void action_change_aradius_by_factor(struct FTR *f, double factor)
+{
+	struct pan_state *e = f->userdata;
+	e->aradius *= factor;
+	fprintf(stderr, "aradius changed to %g\n", e->aradius);
+	action_compute_hough(f);
+}
+
+
 
 
 static void action_increase_octave(struct FTR *f, int x, int y)
@@ -450,6 +508,43 @@ static void action_decrease_octave(struct FTR *f, int x, int y)
 	fprintf(stderr, "decreased octave to %d\n", e->octave);
 }
 
+static void action_toggle_hud(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->head_up_display = !e->head_up_display;
+	f->changed = 1;
+}
+
+static void dump_hud(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+
+	// Data to put on HUD:
+	float first_row, last_row, dip_a, dip_b;
+	double p[2], q[2];
+	window_to_image(p, e, 0, 0);
+	window_to_image(q, e, 0, e->strip_h - 1);
+	first_row = p[1];
+	last_row = q[1];
+
+	uint8_t fg[3] = {0, 255, 0};
+	uint8_t bg[3] = {0, 0, 0};
+	char buf[0x100];
+
+	snprintf(buf, 0x100, "row: %d", (int)first_row);
+	put_string_in_rgb_image(f->rgb,f->w,f->h,0,0,fg,bg,0,&e->font, buf);
+
+	snprintf(buf, 0x100, "row: %d", (int)last_row);
+	put_string_in_rgb_image(f->rgb,f->w,f->h,0,
+			e->strip_h - e->font.height,
+			fg,bg,0,&e->font, buf);
+
+	snprintf(buf, 0x100, "a: %g    b: %g", e->dip_a, e->dip_b);
+	put_string_in_rgb_image(f->rgb,f->w,f->h,e->strip_w,0,fg,bg,0,
+			&e->font, buf);
+}
+
+
 static unsigned char float_to_byte(float x)
 {
 	if (x < 0) return 0;
@@ -469,6 +564,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	struct pan_state *e = f->userdata;
 
 	// for every pixel in the window
+	float cmin = INFINITY, cmax = -INFINITY;
 	for (int j = 0; j < f->h; j++)
 	for (int i = 0; i < e->strip_w; i++)
 	{
@@ -484,12 +580,19 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 
 		// transform the value into RGB using the contrast change (a,b)
 		float v = 0;
-		if (isfinite(C))
+		if (isfinite(C) && C < 2000)
+		{
+			if (C < cmin) cmin = C;
+			if (C > cmax) cmax = C;
 			v = e->a * C + e->b;
+		}
 		unsigned char *dest = f->rgb + 3 * (j * f->w + i);
 		for (int l = 0; l < 3; l++)
 			dest[l] = float_to_byte(v);
 	}
+	//e->a = 255 / (cmax - cmin);
+	//e->b = -255 * cmin / (cmax - cmin);
+	//fprintf(stderr, "cmin cmax a b = %g %g %g %g\n", cmin, cmax, e->a, e->b);
 
 	// draw grid lines on the hough space
 	assert(e->hough_w == f->h);
@@ -500,7 +603,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 
 		int tside = e->hough_w;
 		// compute statistics
-		float hmax = -INFINITY;
+		float hmax = -INFINITY, hmin = INFINITY;
 		int xmax, ymax;
 		for (int j = 0; j < tside; j++)
 		for (int i = 0; i < tside; i++)
@@ -511,11 +614,17 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 				xmax = i;
 				ymax = j;
 			}
+			if (e->hough[ij] < hmin)
+				hmin = e->hough[ij];
 		}
 		for (int j = 0; j < e->hough_w; j++)
 		for (int i = 0; i < e->hough_w; i++)
 		for (int l = 0; l < 3; l++)
-			f->rgb[3*(i+e->strip_w+j*f->w)+l] = 255 * e->hough[i+j*e->hough_w] / hmax;
+		{
+			float v = e->hough[i+j*e->hough_w];
+			float nv = 255 * (v - hmin) / (hmax - hmin);
+			f->rgb[3*(i+e->strip_w+j*f->w)+l] = nv;
+		}
 		for (int dj = -20; dj <= 20; dj++)
 		for (int di = -20; di <= 20; di++)
 		{
@@ -538,6 +647,44 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		f->rgb[3*(f->w*e->hough_w/2 + e->strip_w + i)+2] = 255;
 	}
 
+	if (e->show_dip_bundle)
+	{
+		for (int i_theta = 0; i_theta < e->strip_w; i_theta++)
+		{
+			int n_theta = e->strip_w;
+			int n_z = e->strip_h;
+			float theta = i_theta * 2 * M_PI / n_theta;
+			float z = e->dip_a * cos(theta) + e->dip_b * sin(theta);
+			float magic_factor = n_theta / M_PI;
+			int i_z = magic_factor * z;
+			for (int kk = -n_z/2 - 100;
+					kk <= n_z + 100; kk += e->dip_stride)
+			{
+				int k = kk + i_z + e->dip_offset;
+				if (insideP(f->w, f->h, i_theta, k) &&
+					insideP(f->w, f->h, i_theta, k+1)&&
+					insideP(f->w, f->h, i_theta, k-1))
+				{
+					int fidx = (k+1) * f->w + i_theta;
+					f->rgb[3*fidx+0] = 255;
+					f->rgb[3*fidx+1] /= 3;
+					f->rgb[3*fidx+2] /= 2;
+					fidx = (k+0) * f->w + i_theta;
+					f->rgb[3*fidx+0] = 255;
+					f->rgb[3*fidx+1] /= 3;
+					f->rgb[3*fidx+2] /= 2;
+					fidx = (k-1) * f->w + i_theta;
+					f->rgb[3*fidx+0] = 255;
+					f->rgb[3*fidx+1] /= 3;
+					f->rgb[3*fidx+2] /= 2;
+				}
+			}
+		}
+	}
+
+	if (e->head_up_display)
+		dump_hud(f);
+
 	f->changed = 1;
 }
 
@@ -547,6 +694,23 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 	struct pan_state *e = f->userdata;
 
 	static double ox = 0, oy = 0;
+
+	// right side: show sinusoids
+	if (m == 0 && x >= e->strip_w && x < f->w && y >= 0 && y < f->h)
+	{
+		int tside = e->hough_w;
+		double arad = e->aradius;
+		int ia = x - e->strip_w;
+		int ib = y;
+		e->dip_a = arad * (ia / (tside - 1.0) - 0.5);
+		e->dip_b = arad * (ib / (tside - 1.0) - 0.5);
+		e->show_dip_bundle = true;
+		fprintf(stderr, "show_dip %d %d (%g %g)\n", x, y, e->dip_a, e->dip_b);
+		f->changed = 1;
+	} else {
+		e->show_dip_bundle = false;
+		f->changed = 1;
+	}
 
 	if (m == FTR_BUTTON_LEFT)   action_offset_viewport(f, x - ox, y - oy);
 	if (m == FTR_BUTTON_MIDDLE) action_print_value_under_cursor(f, x, y);
@@ -585,11 +749,23 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
 			k, isalpha(k)?k:' ', m, x, y);
 
-	if (k == '+'||k=='=') action_decrease_octave(f, f->w/2, f->h/2);
-	if (k == '-') action_increase_octave(f, f->w/2, f->h/2);
-	if (k == '1') action_change_zoom_to_factor(f, x, y, 1, 1);
+	if (k == '+'||k=='=') {action_decrease_octave(f, f->w/2, f->h/2);
+		action_compute_hough(f);}
+	if (k == '-') {action_increase_octave(f, f->w/2, f->h/2);
+		action_compute_hough(f);}
+	if (k == '1') {action_change_zoom_to_factor(f, x, y, 1, 1);
+		action_compute_hough(f);}
 
 	if (k == 'h') action_compute_hough(f);
+
+	if (k == 'u') action_toggle_hud(f);
+
+	if (k == 'a') action_change_presigma_by_factor(f,  1.3);
+	if (k == 's') action_change_presigma_by_factor(f,  1/1.3);
+	if (k == 'd') action_change_postsigma_by_factor(f, 1.3);
+	if (k == 'f') action_change_postsigma_by_factor(f, 1/1.3);
+	if (k == 'w') action_change_aradius_by_factor(f,   1.3);
+	if (k == 'e') action_change_aradius_by_factor(f,   1/1.3);
 
 	//if (k == 'p') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1.1);
 	//if (k == 'm') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1/1.1);
@@ -621,6 +797,8 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 		if (k == FTR_KEY_PAGE_UP)   d[1] = +f->h/3;
 		if (k == FTR_KEY_PAGE_DOWN) d[1] = -f->h/3;
 		action_offset_viewport(f, d[0], d[1]);
+		if (hypot(d[0], d[1]) > 0)
+			action_compute_hough(f);
 	}
 }
 
@@ -686,15 +864,21 @@ int main_pan(int c, char *v[])
 	e->strip = xmalloc(e->strip_w * e->strip_h * sizeof*e->strip);
 	e->hough = xmalloc(e->hough_w * e->hough_w * sizeof*e->hough);
 	e->has_hough = false;
+	e->show_dip_bundle = false;
+	e->dip_stride = 30;
+	e->dip_offset = 0;
+	e->contrast_mode = 0;
+	e->head_up_display = false;
 
 	e->aradius = 1.5;
 	e->pre_blur_sigma = 1;
 	e->pre_blur_type = "gaussian";
 	e->post_blur_sigma = 1;
-	e->post_blur_type = "cauchy";
+	e->post_blur_type = "gaussian";
+	font_fill_from_bdf(&e->font, FONT_BDF_FILE);
 
 	// open window
-	struct FTR f = ftr_new_window(STRIP_WIDTH+HOUGH_SIDE, HOUGH_SIDE);
+	struct FTR f = ftr_new_window(e->strip_w + e->hough_w, e->hough_w);
 	f.userdata = e;
 	action_reset_zoom_and_position(&f);
 	ftr_set_handler(&f, "key"   , pan_key_handler);
@@ -705,6 +889,7 @@ int main_pan(int c, char *v[])
 
 	// cleanup and exit (optional)
 	ftr_close(&f);
+	free(e->font.data);
 	return r;
 }
 

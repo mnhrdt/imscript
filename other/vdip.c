@@ -452,7 +452,7 @@ int main_pan(int c, char *v[])
 	e->left_w = e->image_w;
 	e->right_w = e->hough_w;
 	e->show_dip_bundle = 0;
-	e->aradius = aradius;;
+	e->aradius = aradius;
 	e->dip_offset = 0;
 	e->dip_stride = 30;
 	f.changed = 1;

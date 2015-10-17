@@ -96,6 +96,9 @@ $(SRCDIR)/flow_ms.o: $(SRCDIR)/flow_ms.c
 $(SRCDIR)/flowarrows.o: $(SRCDIR)/flowarrows.c
 	$(CC) $(CFLAGS) $(OFLAGS) -DOMIT_MAIN -c $< -o $@
 
+#ifndef OMIT_BLUR_MAIN
+#define MAIN_BLUR
+#endif
 $(SRCDIR)/distance.o: $(SRCDIR)/distance.c
 	$(CC) $(CFLAGS) $(OFLAGS) -DOMIT_DISTANCE_MAIN -c $< -o $@
 
