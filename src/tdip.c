@@ -197,7 +197,7 @@ void tdip(float *transform, double arad, int tside, float *dip, int w, int h)
 				int ibb[2] = {alf*bb[0] + bet, alf*bb[1] + bet};
 				//fprintf(stderr, "i,j=%d,%d, g=%g,%g l=%g,%g,%g, aa=%d,%d bb=%d,%d\n", i, j, g[0], g[1], l[0], l[1], l[2], iaa[0], iaa[1], ibb[0], ibb[1]);
 				accumulate_line(transform, tside, tside,
-						iaa, ibb, 1*gn);
+						iaa, ibb, 1+0*gn);
 			}
 #endif
 

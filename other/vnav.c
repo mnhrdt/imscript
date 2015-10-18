@@ -222,6 +222,13 @@ static void action_offset_viewport(struct FTR *f, int dx, int dy)
 	e->offset_x -= dx/e->zoom_x;
 	e->offset_y -= dy/e->zoom_y;
 
+	f->changed = 1;
+}
+
+static void action_reset_phase(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->offset_x = 0;
 	e->has_hough = false;
 	f->changed = 1;
 }
@@ -435,6 +442,24 @@ static void action_compute_hough(struct FTR *f)
 
 	e->has_hough = true;
 	f->changed = 1;
+
+	// write dip line
+	{
+		double p[2];
+		window_to_image(p, e, 0, e->strip_h / 2);
+		char fname[FILENAME_MAX];
+		snprintf(fname, FILENAME_MAX, "/tmp/vdip_%d_%g_%g.txt",
+				e->octave, p[0], p[1]);
+		FILE *f = xfopen(fname, "w");
+		fprintf(f, "%g %g %g %g %g %g\n",
+				e->dip_a,
+				e->dip_b,
+				e->aradius,
+				e->min_grad,
+				e->pre_blur_sigma,
+				e->post_blur_sigma
+		       );
+	}
 }
 
 
@@ -471,6 +496,16 @@ static void action_change_aradius_by_factor(struct FTR *f, double factor)
 	e->aradius *= factor;
 	fprintf(stderr, "aradius changed to %g\n", e->aradius);
 	action_compute_hough(f);
+}
+
+static void action_save_shot(struct FTR *f)
+{
+	static int shot_counter = 1;
+	char fname[FILENAME_MAX];
+	snprintf(fname, FILENAME_MAX, "/tmp/vnav_shot_%d.png", shot_counter);
+	iio_save_image_uint8_vec(fname, f->rgb, f->w, f->h, 3);
+	fprintf(stderr, "saved shot \"%s\"\n", fname);
+	shot_counter += 1;
 }
 
 
@@ -625,6 +660,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 			float nv = 255 * (v - hmin) / (hmax - hmin);
 			f->rgb[3*(i+e->strip_w+j*f->w)+l] = nv;
 		}
+		// green disk around the maximum
 		for (int dj = -20; dj <= 20; dj++)
 		for (int di = -20; di <= 20; di++)
 		{
@@ -635,10 +671,12 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 				f->rgb[3*(ii+e->strip_w+jj*f->w)+2] /= 2;
 			}
 		}
+		// the maximum is a red pixel
 		f->rgb[3*(xmax+e->strip_w+ymax*f->w)+0] = 255;
 		f->rgb[3*(xmax+e->strip_w+ymax*f->w)+1] = 0;
 		f->rgb[3*(xmax+e->strip_w+ymax*f->w)+2] = 0;
 	}
+	// blue cross at the origin of coordinates
 	for (int i = 0; i < e->hough_w; i++)
 	{
 		f->rgb[3*(f->w*i + e->strip_w + e->hough_w/2)+1] /= 2;
@@ -767,6 +805,8 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'w') action_change_aradius_by_factor(f,   1.3);
 	if (k == 'e') action_change_aradius_by_factor(f,   1/1.3);
 
+	if (k == ';') action_save_shot(f);
+
 	//if (k == 'p') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1.1);
 	//if (k == 'm') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1/1.1);
 	//if (k == 'P') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1.006);
@@ -777,6 +817,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	//if (k == 'b') action_contrast_change(f, 1, 1);
 	//if (k == 'B') action_contrast_change(f, 1, -1);
 	if (k == 'n') action_qauto(f);
+	if (k == '0') action_reset_phase(f);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
