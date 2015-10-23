@@ -2,6 +2,7 @@
 
 
 
+#include <assert.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -142,7 +143,7 @@ static void compute_structure_tensor_field(float *out_st,
 // degrees
 //
 static void compute_structure_tensor_field_ultra_fancy(float *out_stf,
-		int x, int w, int h, int kside, double sigma)
+		float *x, int w, int h, int kside, double sigma)
 {
 	int wo[kside*kside][2]; fill_window_offsets(wo, kside);
 	float wv[kside*kside]; fill_window_values(wv, wo, kside, sigma);
@@ -174,21 +175,21 @@ static void compute_structure_tensor_field_ultra_fancy(float *out_stf,
 		double mu     = ( T - sqrt( T*T - 4*D ) ) / 2;
 		assert(lambda >= mu);
 		assert(mu >= 0);
-		double vx = 1, vy = 0; // default eigenvector
-		if (fabs(b) > fabs(c)) {
-			vx = b;
-			vy = lambda - a;
+		double ex, ey;
+		if (fabs(b) > 0) {
+			ex = b;
+			ey = lambda - a;
 		} else {
-			vx = lambda - d;
-			vy = c;
+			ex = 1;
+			ey = 0;
 		}
 		out_stf[7*i+0] = a;
 		out_stf[7*i+1] = b;
 		out_stf[7*i+2] = c;
 		out_stf[7*i+3] = lambda;
 		out_stf[7*i+4] = mu;
-		out_stf[7*i+5] = vx;
-		out_stf[7*i+6] = vy;
+		out_stf[7*i+5] = ex;
+		out_stf[7*i+6] = ey;
 
 	}
 	free(gx);
