@@ -95,6 +95,7 @@ struct pan_state {
 	double aradius, min_grad;
 	double pre_blur_sigma, post_blur_sigma;
 	char *pre_blur_type, *post_blur_type;
+	int randomized;
 
 	// 5. silly options
 	double dip_a, dip_b;
@@ -391,7 +392,14 @@ static void action_compute_hough(struct FTR *f)
 	// compute the dip picker transform
 	float *c_strip = strip + w*h/4;
 	int c_h = 3*h/4;
-	tdip(hough, e->aradius, tside, c_strip, w, c_h);
+	if (!e->randomized)
+		tdip(hough, e->aradius, tside, c_strip, w, c_h);
+	else {
+		for (int i = 0; i < tside*tside; i++)
+			hough[i] = 0;
+		tdipr_acc(hough, e->aradius, tside, c_strip, w, c_h,
+				e->randomized);
+	}
 	img_debug(hough, tside, tside, 1, "/tmp/hbistrip_at_z%g_x%g_y%g.tiff",
 			e->zoom_y, e->offset_x, e->offset_y);
 
@@ -495,6 +503,17 @@ static void action_change_aradius_by_factor(struct FTR *f, double factor)
 	struct pan_state *e = f->userdata;
 	e->aradius *= factor;
 	fprintf(stderr, "aradius changed to %g\n", e->aradius);
+	action_compute_hough(f);
+}
+
+static void action_toggle_randomized(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	if (e->randomized)
+		e->randomized = 0;
+	else if (!e->randomized)
+		e->randomized = 3000000;
+	fprintf(stderr, "randomized = %d\n", e->randomized);
 	action_compute_hough(f);
 }
 
@@ -785,7 +804,7 @@ void key_handler_print(struct FTR *f, int k, int m, int x, int y)
 void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
 	fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
-			k, isalpha(k)?k:' ', m, x, y);
+			k, isprint(k)?k:' ', m, x, y);
 
 	if (k == '+'||k=='=') {action_decrease_octave(f, f->w/2, f->h/2);
 		action_compute_hough(f);}
@@ -797,6 +816,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'h') action_compute_hough(f);
 
 	if (k == 'u') action_toggle_hud(f);
+	if (k == 'r') action_toggle_randomized(f);
 
 	if (k == 'a') action_change_presigma_by_factor(f,  1.3);
 	if (k == 's') action_change_presigma_by_factor(f,  1/1.3);
@@ -915,7 +935,8 @@ int main_pan(int c, char *v[])
 	e->pre_blur_sigma = 1;
 	e->pre_blur_type = "gaussian";
 	e->post_blur_sigma = 1;
-	e->post_blur_type = "gaussian";
+	e->post_blur_type = "cauchy";
+	e->randomized = 0;
 	font_fill_from_bdf(&e->font, FONT_BDF_FILE);
 
 	// open window
