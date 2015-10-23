@@ -29,7 +29,7 @@ static float extend_float_image_constant(float *x, int w, int h, int i, int j)
 	return x[j*w+i];
 }
 
-static double sqr(double x) { return x; }
+static double sqr(double x) { return x*x; }
 
 static void compute_structure_tensor_here(float tensor[3],
 		float *wv, int (*wo)[2], int kside,
@@ -50,6 +50,7 @@ static void compute_structure_tensor_here(float tensor[3],
 		tensor[1] += wvk * p(gx,w,h, ii, jj) * p(gy,w,h, ii, jj);
 		tensor[2] += wvk * sqr(p(gy, w, h, ii, jj));
 	}
+	fprintf(stderr, "tensor = %g %g %g\n", tensor[0], tensor[1], tensor[2]);
 }
 
 static void fill_window_offsets(int (*wo)[2], int kside)
@@ -169,6 +170,14 @@ static void compute_structure_tensor_field_ultra_fancy(float *out_stf,
 		double c = tt[3*i+2];
 		double T = a + c;
 		double D = a*c - b*b;
+		if (D < 0) {
+			fprintf(stderr, "i = %d\n", i);
+			fprintf(stderr, "a = %g\n", a);
+			fprintf(stderr, "b = %g\n", b);
+			fprintf(stderr, "c = %g\n", c);
+			fprintf(stderr, "T = %g\n", T);
+			fprintf(stderr, "D = %g\n", D);
+		}
 		assert(D >= 0);
 		assert(T*T - 4*D >= 0);
 		double lambda = ( T + sqrt( T*T - 4*D ) ) / 2;
