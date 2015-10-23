@@ -88,11 +88,34 @@ static bool cut_line_with_rectangle(double out_a[2], double out_b[2],
 	return false;
 }
 
+static void cut_two_lines(double out_p[2], double l[3], double m[3])
+{
+	// compute crossing point in projective coordinates
+	double p[3];
+	vector_product(p, l, m);
+
+	// recover affine coordinates
+	out_p[0] = p[0] / p[2];
+	out_p[1] = p[1] / p[2];
+}
+
 static int insideP(int w, int h, int i, int j)
 {
 	return i >= 0 && j >= 0 && i < w && j < h;
 }
 
+struct dip_state;
+typedef void local_orientation_t(double [2], struct dip_state *, int, int);
+
+// data structure to allow an uniform access to different orientation methods
+struct dip_state {
+	int w, h; // size of the input image
+	float *x; // image data
+	local_orientation_t *o;
+
+	// temporary data, used when necessary
+	float *structure_tensor;
+};
 
 static
 bool get_positive_gradient(double g[2], float *x, int w, int h, int i, int j)
@@ -110,6 +133,24 @@ bool get_positive_gradient(double g[2], float *x, int w, int h, int i, int j)
 	//g[1] = xiJ - xij;
 	return true;
 }
+
+static
+bool get_st_orientation(double g[2], float *x, int w, int h, int i, int j)
+{
+	if (!insideP(w, h, i, j)) return false;
+	if (!insideP(w, h, i+1, j+1)) return false;
+	double xij = x[ (j + 0)*w + (i + 0) ]; if(!isfinite(xij))return false;
+	double xIj = x[ (j + 0)*w + (i + 1) ]; if(!isfinite(xIj))return false;
+	double xiJ = x[ (j + 1)*w + (i + 0) ]; if(!isfinite(xiJ))return false;
+	double xIJ = x[ (j + 1)*w + (i + 1) ]; if(!isfinite(xIJ))return false;
+	//if (xij <= 9 || xIj <= 9 || xiJ <= 9 || xIJ <= 9) return false;
+	g[0] = 0.5 * (xIj - xij + xIJ - xiJ);
+	g[1] = 0.5 * (xiJ - xij + xIJ - xIj);
+	//g[0] = xIj - xij;
+	//g[1] = xiJ - xij;
+	return true;
+}
+
 
 // generic function to traverse a segment between two pixels
 void traverse_segment(int px, int py, int qx, int qy,
@@ -219,6 +260,59 @@ void tdip(float *transform, double arad, int tside, float *dip, int w, int h)
 	free(tmp);
 }
 
+#include "random.c"
+
+// accumulates some random samplings into the "transform" image
+void tdipr_acc(float *transform, double arad, int tside, float *dip,
+		int w, int h,
+		int npairs)
+{
+	int cx = 0;
+	// randomized traversal (independent pairs)
+	for (int k = 0; k < npairs; k++)
+	{
+		int p[2], q[2];
+		p[0] = randombounds(0, w-1);
+		p[1] = randombounds(0, h-1);
+		q[0] = randombounds(0, w-1);
+		q[1] = p[1];//randombounds(0, h-1);
+		double vp = dip[p[1]*w+p[0]];
+		double vq = dip[q[1]*w+q[0]];
+		if (fabs(vp - vq) > 5) continue;
+		double gp[2], gq[2];
+		if (get_positive_gradient(gp, dip, w, h, p[0], p[1])
+			&& get_positive_gradient(gq, dip, w, h, q[0], q[1]))
+		{
+			double ngp = hypot(gp[0], gp[1]);
+			double ngq = hypot(gq[0], gq[1]);
+			if (fabs(ngp - ngq) > 2) continue;
+			if (fabs(gp[1]) < 1e-2 ||  fabs(gp[0]) < 1e-2)
+				continue;
+			if (fabs(gq[1]) < 1e-2 ||  fabs(gq[0]) < 1e-2)
+				continue;
+			double gw = ngp * ngq; // multiplicative weight
+
+			double theta_p = p[0] * 2 * M_PI / w;
+			double theta_q = q[0] * 2 * M_PI / w;
+			double lp[3]={-sin(theta_p), cos(theta_p), gp[0]/gp[1]};
+			double lq[3]={-sin(theta_q), cos(theta_q), gq[0]/gq[1]};
+
+			double x[2];
+			cut_two_lines(x, lp, lq);
+			double alf = (tside - 1) / (2.0 * arad);
+			double bet = (tside - 1) / 2.0;
+			int ix[2] = {
+				lrint(alf * x[0] + bet),
+				lrint(alf * x[1] + bet)
+			};
+			if (insideP(tside, tside, ix[0], ix[1]))
+				transform[tside*ix[1] + ix[0]] += 1;//gw;
+		}
+		cx += 1;
+	}
+	fprintf(stderr, "cx = %d\n", cx);
+}
+
 #ifndef OMIT_MAIN_TDIP
 #define MAIN_TDIP
 #endif//OMIT_MAIN_TDIP
@@ -227,8 +321,12 @@ void tdip(float *transform, double arad, int tside, float *dip, int w, int h)
 #include <stdio.h>
 #include <stdlib.h>
 #include "iio.h"
+#include "pickopt.c"
 int main(int c, char *v[])
 {
+	bool randomized = pick_option(&c, &v, "r", NULL);
+	int nrand = atoi(pick_option(&c, &v, "n", "1000"));
+	int tensor = atoi(pick_option(&c, &v, "t", "0"));
 	// process input arguments
 	if (c != 3) {
 		fprintf(stderr, "usage:\n\t"
@@ -247,7 +345,13 @@ int main(int c, char *v[])
 	// compute transform
 	int tside = 1 + 2 * arbins;
 	float *transform = malloc(tside * tside * sizeof*transform);
-	tdip(transform, aradius, tside, dip, w, h);
+	for (int i = 0; i < tside*tside; i++)
+		transform[i] = 0;
+
+	if (randomized)
+		tdipr_acc(transform, aradius, tside, dip, w, h, nrand);
+	else
+		tdip(transform, aradius, tside, dip, w, h);
 
 	// save output image
 	iio_save_image_float_vec("-", transform, tside, tside, 1);
