@@ -50,7 +50,6 @@ static void compute_structure_tensor_here(float tensor[3],
 		tensor[1] += wvk * p(gx,w,h, ii, jj) * p(gy,w,h, ii, jj);
 		tensor[2] += wvk * sqr(p(gy, w, h, ii, jj));
 	}
-	fprintf(stderr, "tensor = %g %g %g\n", tensor[0], tensor[1], tensor[2]);
 }
 
 static void fill_window_offsets(int (*wo)[2], int kside)
