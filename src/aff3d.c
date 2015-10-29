@@ -14,9 +14,9 @@ static int getlinen(char *l, int n, FILE *f)
 
 static void apply_transform(double y[3], double A[12], double x[3])
 {
-	y[0] = A[0]*x[0] + A[1]*x[1] + A[2]*x[2] + A[3];
-	y[1] = A[4]*x[0] + A[5]*x[1] + A[6]*x[2] + A[7];
-	y[2] = A[8]*x[0] + A[9]*x[1] + A[10]*x[2] + A[11];
+	y[0] = (A[0]*x[0] + A[1]*x[1] + A[2]*x[2] )+ A[3];
+	y[1] = (A[4]*x[0] + A[5]*x[1] + A[6]*x[2] )+ A[7];
+	y[2] = (A[8]*x[0] + A[9]*x[1] + A[10]*x[2])+ A[11];
 }
 
 int main(int c, char *v[])
