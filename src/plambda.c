@@ -2130,13 +2130,14 @@ static int imageop_vector(float *out, float *img, int w, int h, int pd,
 			out[l] = ax + by;
 		}
 		return pd/2;
-	case IMAGEOP_SHADOW:
+	case IMAGEOP_SHADOW: {
 		if (pd != 1) fail("can not yet compute shadow of a vector");
 		float vdx[3]={1,0,apply_3x3_stencil(img, w,h,pd, ai,aj,0, sx)};
 		float vdy[3]={0,1,apply_3x3_stencil(img, w,h,pd, ai,aj,0, sy)};
 		float sun[3] = {-1, -1, 1}, nor[3];
 		vector_product(nor, vdx, vdy, 3, 3);
 		return scalar_product(out, nor, sun, 3, 3);
+		}
 	default: fail("unrecognized imageop %d\n", t->imageop_operator);
 	}
 }
