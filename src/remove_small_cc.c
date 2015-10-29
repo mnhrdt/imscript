@@ -1,10 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <vector>
 
 #include "abstract_dsf.c"
-
 
 // connected components of positive pixels of the image rep
 static void connected_component_filter(int *rep, int w, int h, float *in, float intensity_threshold)
@@ -35,82 +33,48 @@ static void connected_component_filter(int *rep, int w, int h, float *in, float 
 }
 
 
-struct pix{
-   int x;
-   int y;
-   float v;
-};
 
-
-
-// removes small connected components of non-nan values in the input 
-int remove_small_cc(int w, int h, float *in, float *out, int minarea, float intensity_threshold) 
+// removes small connected components of non-nan values in the input
+int remove_small_cc(int w, int h, float *in, float *out, int minarea, float intensity_threshold)
 {
-   // initialize the output 
-   for (int i=0;i<w*h;i++)
-      out[i] = in[i];
+	// initialize the output
+	for (int i = 0; i < w*h; i++)
+		out[i] = in[i];
 
-   // identify the connected components of non nan values
-   std::vector< int > rep(w*h); 
-   connected_component_filter(&(rep.front()), w, h, in, intensity_threshold);
+	// identify the connected components of non nan values
+	int *rep = malloc(w * h * sizeof*rep);
+	connected_component_filter(rep, w, h, in, intensity_threshold);
 
-   // count connected components
-   int n_cc = 0;
-   std::vector< int > cc_ids(w*h); 
-   for (int i=0;i<w*h;i++) {
-      if (rep[i] == i) {
-         cc_ids[n_cc] = i;
-         n_cc += 1;
-      }
-   }
+	// measure the area of connected components
+	int *area = malloc(w * h * sizeof*area);
+	for (int i = 0; i < w*h; i++)
+		area[i] = 0;
+	for (int i = 0; i < w*h; i++)
+		if (rep[i] >= 0)
+			area[rep[i]] += 1;
 
-   // store the cc_pixels in vectors of vectors
-   std::vector< std::vector< struct pix > > cc_pixels(w*h);
+	// set to NAN the pixels whose connected component is too small
+	for (int i = 0; i < w*h; i++)
+		if (rep[i] >= 0 && area[rep[i]] <= minarea)
+			out[i] = NAN;
 
-   for (int j = 0; j < h; j++)
-      for (int i = 0; i < w; i++)
-      {
-         int idx = j*w + i;
-         int cc = rep[idx];
-         if (cc >= 0) { // if it is a region 
-            struct pix pp;
-            pp.x=i;
-            pp.y=j;
-            pp.v=in[idx];
-            cc_pixels[cc].push_back(pp);
-         }
-      }
+	// count how many connected components have been kept
+	int remaining_cc = 0;
+	for (int i = 0; i < w*h; i++)
+		if (rep[i] >= i && area[rep[i]] > minarea)
+			remaining_cc += 1;
 
-   // for each connected component
-   int removed_cc = 0;
-   for(int t = 0;t < n_cc; t++) 
-   {
-      int cc = cc_ids[t];
-      std::vector< struct pix > pixels = cc_pixels[cc];
-      int area = pixels.size();
-
-      if (area <= minarea) {
-         removed_cc++;
-         for(int i = 0;i<pixels.size();i++) {
-            int idx = pixels[i].x + pixels[i].y*w;
-            out[idx] = NAN;
-         }
-      }
-   }
-   return n_cc - removed_cc;
-
+	// cleanup and exit
+	free(rep);
+	return remaining_cc;
 }
-
-
 
 
 #ifndef SKIP_MAIN
 
 
-extern "C"{
 #include "iio.h"
 #include "pickopt.c"
-}
 
 
 int main(int argc, char **argv)
@@ -132,10 +96,9 @@ int main(int argc, char **argv)
    int w,h,nch;
 
    float *img = iio_read_image_float_split(img_file, &w, &h, &nch);
-   float *out = (float*) calloc(w*h*nch, sizeof(*out));
-   
+   float *out = calloc(w*h*nch, sizeof(*out));
    int n_cc = remove_small_cc(w, h, img, out, area, intensity_threshold);
-   printf("remaining components %d\n", n_cc);
+   fprintf(stderr, "remaining components %d\n", n_cc);
 
 
 	/* write the results */
