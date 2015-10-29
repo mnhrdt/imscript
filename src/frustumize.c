@@ -60,7 +60,7 @@ static double matrix_inversion(double ia[9], double a[9])
 	return det;
 }
 
-static double matrix_times_vector(double y[3], double A[9], double x[3])
+static void matrix_times_vector(double y[3], double A[9], double x[3])
 {
 	// 0 1 2
 	// 3 4 5
