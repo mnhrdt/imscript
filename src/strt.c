@@ -170,17 +170,24 @@ static void compute_structure_tensor_field_ultra_fancy(float *out_stf,
 		double T = a + c;
 		double D = a*c - b*b;
 		if (D < 0) {
+			if (0) {
 			fprintf(stderr, "i = %d\n", i);
 			fprintf(stderr, "a = %g\n", a);
 			fprintf(stderr, "b = %g\n", b);
 			fprintf(stderr, "c = %g\n", c);
 			fprintf(stderr, "T = %g\n", T);
-			fprintf(stderr, "D = %g\n", D);
+			fprintf(stderr, "D = %g\n", D);}
+			D = 0;
 		}
+		if (!(D>=0)) fprintf(stderr, "D=%f\n",D);
 		assert(D >= 0);
 		assert(T*T - 4*D >= 0);
 		double lambda = ( T + sqrt( T*T - 4*D ) ) / 2;
 		double mu     = ( T - sqrt( T*T - 4*D ) ) / 2;
+		if (1) {
+			if (mu < 0) mu = 0;
+			if (lambda < mu) lambda = mu;
+		}
 		assert(lambda >= mu);
 		assert(mu >= 0);
 		double ex, ey;

@@ -157,11 +157,8 @@ static bool local_orientation_by_gradient(double g[2], struct tdip_state *e,
 	double xIj = x[ (j + 0)*w + (i + 1) ]; if(!isfinite(xIj))return false;
 	double xiJ = x[ (j + 1)*w + (i + 0) ]; if(!isfinite(xiJ))return false;
 	double xIJ = x[ (j + 1)*w + (i + 1) ]; if(!isfinite(xIJ))return false;
-	//if (xij <= 9 || xIj <= 9 || xiJ <= 9 || xIJ <= 9) return false;
 	g[0] = 0.5 * (xIj - xij + xIJ - xiJ);
 	g[1] = 0.5 * (xiJ - xij + xIJ - xIj);
-	//g[0] = xIj - xij;
-	//g[1] = xiJ - xij;
 	return true;
 }
 
@@ -277,66 +274,66 @@ void tdip_state_compute(struct tdip_state *e)
 	}
 }
 
-//void tdip(float *transform, double arad, int tside, float *dip, int w, int h)
-//{
-//	// gradient mask image (for debugging purposes)
-//	float *tmp = malloc(w * h * sizeof*tmp);
-//	for (int i = 0;  i < w*h; i++)
-//		tmp[i] = NAN;
-//
-//	// set accumulator to 0
-//	for (int i = 0; i < tside * tside; i++)
-//		transform[i] = 0;
-//
-//	// traverse input image and apply writing paradigm
-//	for (int j = 0; j < h; j++)
-//	for (int i = 0; i < w; i++)
-//	{
-//		double g[2] = {0, 0};
-//		if (get_positive_gradient(g, dip, w, h, i, j))
-//		{
-//			if (fabs(g[1]) < 1e-2 ||  fabs(g[0]) < 1e-2)
-//				continue;
-//			double gn = hypot(g[0], g[1]);
-//			if (gn < GRADMIN())
-//				continue;
-//			tmp[w*j+i] = gn;
-//
-//			double theta = i * 2 * M_PI / w;
-//			double l[3] = {-sin(theta), cos(theta), g[0]/g[1]};
-//
-//#if 1
-//			double rec[4] = {-arad, -arad, arad, arad};
-//			double aa[2], bb[2]; // (bad names)
-//			if (cut_line_with_rectangle(aa, bb, l, rec, rec+2))
-//			{
-//				double alf = (tside - 1) / (2.0 * arad);
-//				double bet = (tside - 1) / 2.0;
-//				int iaa[2] = {alf*aa[0] + bet, alf*aa[1] + bet};
-//				int ibb[2] = {alf*bb[0] + bet, alf*bb[1] + bet};
-//				//fprintf(stderr, "i,j=%d,%d, g=%g,%g l=%g,%g,%g, aa=%d,%d bb=%d,%d\n", i, j, g[0], g[1], l[0], l[1], l[2], iaa[0], iaa[1], ibb[0], ibb[1]);
-//				accumulate_line(transform, tside, tside,
-//						iaa, ibb, 1+0*gn);
-//			}
-//#endif
-//
-//#if 0
-//			double p[2] = {l[0]/l[2], l[1]/l[2]};
-//			int ip[2] = {500 + 40 * p[0], 500 + 40 * p[1]};
-//			//fprintf(stderr, "%g %g\t%d %d\n", p[0], p[1], ip[0], ip[1]);
-//			if (insideP(tside, tside, ip[0], ip[1]))
-//			{
-//				double gn = hypot(g[0], g[1]);
-//				transform[tside*ip[1] + ip[0]] += gn;
-//			}
-//#endif
-//		}
-//	}
-//
-//	// debug stuff
-//	//iio_save_image_float_vec("/tmp/gradmask.tiff", tmp, w, h, 1);
-//	free(tmp);
-//}
+void tdip(float *transform, double arad, int tside, float *dip, int w, int h)
+{
+	// gradient mask image (for debugging purposes)
+	float *tmp = malloc(w * h * sizeof*tmp);
+	for (int i = 0;  i < w*h; i++)
+		tmp[i] = NAN;
+
+	// set accumulator to 0
+	for (int i = 0; i < tside * tside; i++)
+		transform[i] = 0;
+
+	// traverse input image and apply writing paradigm
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		double g[2] = {0, 0};
+		if (get_positive_gradient(g, dip, w, h, i, j))
+		{
+			if (fabs(g[1]) < 1e-2 ||  fabs(g[0]) < 1e-2)
+				continue;
+			double gn = hypot(g[0], g[1]);
+			if (gn < GRADMIN())
+				continue;
+			tmp[w*j+i] = gn;
+
+			double theta = i * 2 * M_PI / w;
+			double l[3] = {-sin(theta), cos(theta), g[0]/g[1]};
+
+#if 1
+			double rec[4] = {-arad, -arad, arad, arad};
+			double aa[2], bb[2]; // (bad names)
+			if (cut_line_with_rectangle(aa, bb, l, rec, rec+2))
+			{
+				double alf = (tside - 1) / (2.0 * arad);
+				double bet = (tside - 1) / 2.0;
+				int iaa[2] = {alf*aa[0] + bet, alf*aa[1] + bet};
+				int ibb[2] = {alf*bb[0] + bet, alf*bb[1] + bet};
+				//fprintf(stderr, "i,j=%d,%d, g=%g,%g l=%g,%g,%g, aa=%d,%d bb=%d,%d\n", i, j, g[0], g[1], l[0], l[1], l[2], iaa[0], iaa[1], ibb[0], ibb[1]);
+				accumulate_line(transform, tside, tside,
+						iaa, ibb, 1+0*gn);
+			}
+#endif
+
+#if 0
+			double p[2] = {l[0]/l[2], l[1]/l[2]};
+			int ip[2] = {500 + 40 * p[0], 500 + 40 * p[1]};
+			//fprintf(stderr, "%g %g\t%d %d\n", p[0], p[1], ip[0], ip[1]);
+			if (insideP(tside, tside, ip[0], ip[1]))
+			{
+				double gn = hypot(g[0], g[1]);
+				transform[tside*ip[1] + ip[0]] += gn;
+			}
+#endif
+		}
+	}
+
+	// debug stuff
+	//iio_save_image_float_vec("/tmp/gradmask.tiff", tmp, w, h, 1);
+	free(tmp);
+}
 
 #include "random.c"
 
@@ -400,55 +397,68 @@ void tdip_state_compute_rand_acc(struct tdip_state *e)
 
 
 //// accumulates some random samplings into the "transform" image
-//void tdipr_acc(float *transform, double arad, int tside, float *dip,
-//		int w, int h,
-//		int npairs)
-//{
-//	int cx = 0;
-//	// randomized traversal (independent pairs)
-//	for (int k = 0; k < npairs; k++)
-//	{
-//		int p[2], q[2];
-//		p[0] = randombounds(0, w-1);
-//		p[1] = randombounds(0, h-1);
-//		q[0] = randombounds(0, w-1);
-//		q[1] = p[1];//randombounds(0, h-1);
-//		double vp = dip[p[1]*w+p[0]];
-//		double vq = dip[q[1]*w+q[0]];
-//		if (fabs(vp - vq) > 5) continue;
-//		double gp[2], gq[2];
-//		if (get_positive_gradient(gp, dip, w, h, p[0], p[1])
-//			&& get_positive_gradient(gq, dip, w, h, q[0], q[1]))
-//		{
-//			double ngp = hypot(gp[0], gp[1]);
-//			double ngq = hypot(gq[0], gq[1]);
-//			if (fabs(ngp - ngq) > 2) continue;
-//			if (fabs(gp[1]) < 1e-2 ||  fabs(gp[0]) < 1e-2)
-//				continue;
-//			if (fabs(gq[1]) < 1e-2 ||  fabs(gq[0]) < 1e-2)
-//				continue;
-//			double gw = ngp * ngq; // multiplicative weight
-//
-//			double theta_p = p[0] * 2 * M_PI / w;
-//			double theta_q = q[0] * 2 * M_PI / w;
-//			double lp[3]={-sin(theta_p), cos(theta_p), gp[0]/gp[1]};
-//			double lq[3]={-sin(theta_q), cos(theta_q), gq[0]/gq[1]};
-//
-//			double x[2];
-//			cut_two_lines(x, lp, lq);
-//			double alf = (tside - 1) / (2.0 * arad);
-//			double bet = (tside - 1) / 2.0;
-//			int ix[2] = {
-//				lrint(alf * x[0] + bet),
-//				lrint(alf * x[1] + bet)
-//			};
-//			if (insideP(tside, tside, ix[0], ix[1]))
-//				transform[tside*ix[1] + ix[0]] += 1;//gw;
-//		}
-//		cx += 1;
-//	}
-//	fprintf(stderr, "cx = %d\n", cx);
-//}
+void tdipr_acc(float *transform, double arad, int tside, float *dip,
+		int w, int h,
+		int npairs)
+{
+	int cx = 0;
+	// randomized traversal (independent pairs)
+	for (int k = 0; k < npairs; k++)
+	{
+		int p[2], q[2];
+		p[0] = randombounds(0, w-1);
+		p[1] = randombounds(0, h-1);
+		q[0] = randombounds(0, w-1);
+		q[1] = p[1];//randombounds(0, h-1);
+		double vp = dip[p[1]*w+p[0]];
+		double vq = dip[q[1]*w+q[0]];
+		if (fabs(vp - vq) > 5) continue;
+		double gp[2], gq[2];
+		if (get_positive_gradient(gp, dip, w, h, p[0], p[1])
+			&& get_positive_gradient(gq, dip, w, h, q[0], q[1]))
+		{
+			double ngp = hypot(gp[0], gp[1]);
+			double ngq = hypot(gq[0], gq[1]);
+			if (fabs(ngp - ngq) > 2) continue;
+			if (fabs(gp[1]) < 1e-2 ||  fabs(gp[0]) < 1e-2)
+				continue;
+			if (fabs(gq[1]) < 1e-2 ||  fabs(gq[0]) < 1e-2)
+				continue;
+			double gw = ngp * ngq; // multiplicative weight
+
+			double theta_p = p[0] * 2 * M_PI / w;
+			double theta_q = q[0] * 2 * M_PI / w;
+			double lp[3]={-sin(theta_p), cos(theta_p), gp[0]/gp[1]};
+			double lq[3]={-sin(theta_q), cos(theta_q), gq[0]/gq[1]};
+
+			double x[2];
+			cut_two_lines(x, lp, lq);
+			double alf = (tside - 1) / (2.0 * arad);
+			double bet = (tside - 1) / 2.0;
+			int ix[2] = {
+				lrint(alf * x[0] + bet),
+				lrint(alf * x[1] + bet)
+			};
+			if (insideP(tside, tside, ix[0], ix[1]))
+				transform[tside*ix[1] + ix[0]] += 1;//gw;
+		}
+		cx += 1;
+	}
+	fprintf(stderr, "cx = %d\n", cx);
+}
+
+void tdip_state_update_input(struct tdip_state *e, float *x)
+{
+	e->x = x;
+	if (e->ntensor > 0) {
+		compute_structure_tensor_field_ultra_fancy(e->structure_tensor,
+				e->x, e->w, e->h, e->ntensor, 100);
+		iio_save_image_float_vec("/tmp/debustr.tiff",
+				e->structure_tensor, e->w, e->h, 7);
+	}
+	for (int i = 0; i < e->tside * e->tside; i++)
+		e->transform[i] = 0;
+}
 
 void tdip_state_init(struct tdip_state *e, float *x, int w, int h,
 		int tside, double aradius, int nrand, int ntensor)
@@ -457,23 +467,44 @@ void tdip_state_init(struct tdip_state *e, float *x, int w, int h,
 	e->h = h;
 	e->ntensor = ntensor;
 	e->aradius = aradius;
+	e->nrandom = nrand;
 	e->tside = tside;
-	e->x = x;
 	if (e->ntensor > 0) {
 		fprintf(stderr, "ntensor = %d\n", e->ntensor);
 		e->o = local_orientation_by_tensor;
 		e->structure_tensor = malloc(7 * w * h * sizeof(float));
-		compute_structure_tensor_field_ultra_fancy(e->structure_tensor,
-				e->x, e->w, e->h, e->ntensor, 100);
-		iio_save_image_float_vec("/tmp/debustr.tiff",
-				e->structure_tensor, e->w, e->h, 7);
 	} else {
 		e->o = local_orientation_by_gradient;
 		e->structure_tensor = 0;
 	}
 	e->transform = malloc(e->tside * e->tside * sizeof*e->transform);
-	for (int i = 0; i < e->tside * e->tside; i++)
-		e->transform[i] = 0;
+	tdip_state_update_input(e, x);
+}
+
+void tdip_state_clear(struct tdip_state *e)
+{
+	free(e->transform);
+	if (e->ntensor > 0)
+		free(e->structure_tensor);
+}
+
+void blackbox_transform_general(float *transform, int tside,
+		float *x, int w, int h,
+		float aradius, int nrand, int ntensor)
+{
+	fprintf(stderr, "BTG aradius=%g nrand=%d ntensor=%d\n",
+			aradius, nrand, ntensor);
+	struct tdip_state e[1];
+	tdip_state_init(e, x, w, h, tside, aradius, nrand, ntensor);
+
+	if (!nrand)
+		tdip_state_compute(e);
+	else
+		tdip_state_compute_rand_acc(e);
+
+	for (int i = 0; i < tside * tside; i++)
+		transform[i] = e->transform[i];
+	tdip_state_clear(e);
 }
 
 #ifndef OMIT_MAIN_TDIP

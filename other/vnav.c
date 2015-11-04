@@ -1,4 +1,4 @@
-// gcc -std=c99 -g vnav.c iio.o -o vnav -lX11 -ltiff -lpng
+// gcc -std=c99 -g vnav.c iio.o -o vnav -lX11 -ltiff -lpng -lfftw3f
 //
 // A program for visualizing borehole images of size 361xN, where N is huge.
 //
@@ -95,14 +95,20 @@ struct pan_state {
 	double aradius, min_grad;
 	double pre_blur_sigma, post_blur_sigma;
 	char *pre_blur_type, *post_blur_type;
+	bool tensor; int ntensor;
 	int randomized;
+	struct tdip_state te[1];
 
 	// 5. silly options
 	double dip_a, dip_b;
 	double dip_stride, dip_offset;
 	int contrast_mode; // 0=free, 1=minmax, 2=avgstd
 	bool head_up_display;
+	bool autocontrast;
 	struct bitmap_font font;
+	bool inferno;
+	float infernal_a, infernal_b;
+	bool inpaint_strip;
 };
 
 // change of coordinates: from window "int" pixels to image "double" point
@@ -341,10 +347,31 @@ static void action_change_zoom_to_factor(struct FTR *f, int x, int y,
 	f->changed = 1;
 }
 
+static void getstrip(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	int w = e->strip_w;//STRIP_WIDTH;
+	int h = f->h;
+	float *strip = e->strip;
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		double p[2];
+		window_to_image(p, e, i, j);
+		float v = pixel(e, p[0], p[1]);
+		strip[j*w+i] = v;
+	}
+	if (e->inpaint_strip)
+		poisson_recursive(strip, strip, 0, w, h, 0.25, 10, 99);
+}
+
 static void action_compute_hough(struct FTR *f)
 {
-	fprintf(stderr, "compute hough\n");
 	struct pan_state *e = f->userdata;
+	if (e->inferno) return;
+	fprintf(stderr, "compute hough\n");
+	e->has_hough = true;
+	f->changed = 1;
 
 	// buffer for the image data (current strip)
 	int w = e->strip_w;//STRIP_WIDTH;
@@ -356,7 +383,6 @@ static void action_compute_hough(struct FTR *f)
 		double p[2];
 		window_to_image(p, e, i, j);
 		float v = pixel(e, p[0], p[1]);
-		if (v > 2000) v = NAN;
 		strip[j*w+i] = v;
 	}
 	img_debug(strip, w, h, 1, "/tmp/strip_at_z%g_x%g_y%g.tiff",
@@ -385,21 +411,23 @@ static void action_compute_hough(struct FTR *f)
 		double p[2];
 		window_to_image(p, e, i, j);
 		float v = pixel(e, p[0], p[1]);
-		if (!isfinite(v) || v > 2000)
-			strip[j*w+i] = NAN;
+		//if (!isfinite(v))
+		//	strip[j*w+i] = NAN;
 	}
 
 	// compute the dip picker transform
 	float *c_strip = strip + w*h/4;
 	int c_h = 3*h/4;
-	if (!e->randomized)
-		tdip(hough, e->aradius, tside, c_strip, w, c_h);
-	else {
-		for (int i = 0; i < tside*tside; i++)
-			hough[i] = 0;
-		tdipr_acc(hough, e->aradius, tside, c_strip, w, c_h,
-				e->randomized);
-	}
+	blackbox_transform_general(hough, tside, c_strip, w, c_h,
+			e->aradius, e->randomized, e->tensor?e->ntensor:0);
+	//if (!e->randomized)
+	//	tdip(hough, e->aradius, tside, c_strip, w, c_h);
+	//else {
+	//	for (int i = 0; i < tside*tside; i++)
+	//		hough[i] = 0;
+	//	tdipr_acc(hough, e->aradius, tside, c_strip, w, c_h,
+	//			e->randomized);
+	//}
 	img_debug(hough, tside, tside, 1, "/tmp/hbistrip_at_z%g_x%g_y%g.tiff",
 			e->zoom_y, e->offset_x, e->offset_y);
 
@@ -448,8 +476,6 @@ static void action_compute_hough(struct FTR *f)
 	//for (int l = 0; l < 3; l++)
 	//	f->rgb[3*(i+w+j*f->w)+l] = 255 * hough[i+j*tside] / hmax;
 
-	e->has_hough = true;
-	f->changed = 1;
 
 	// write dip line
 	{
@@ -485,8 +511,16 @@ static void action_compute_hough(struct FTR *f)
 static void action_change_presigma_by_factor(struct FTR *f, double factor)
 {
 	struct pan_state *e = f->userdata;
-	e->pre_blur_sigma *= factor;
-	fprintf(stderr, "pre_sigma changed to %g\n", e->pre_blur_sigma);
+	if (e->tensor) {
+		if (factor > 1)
+			e->ntensor += 1;
+		if (factor < 1 && e->ntensor > 1)
+			e->ntensor -= 1;
+		fprintf(stderr, "ntensor changed to %d\n", e->ntensor);
+	} else {
+		e->pre_blur_sigma *= factor;
+		fprintf(stderr, "pre_sigma changed to %g\n", e->pre_blur_sigma);
+	}
 	action_compute_hough(f);
 }
 
@@ -506,16 +540,46 @@ static void action_change_aradius_by_factor(struct FTR *f, double factor)
 	action_compute_hough(f);
 }
 
+static void action_change_nrandom_by_factor(struct FTR *f, double factor)
+{
+	struct pan_state *e = f->userdata;
+	e->randomized *= factor;
+	if (e->randomized < 1)
+		e->randomized = 1;
+	fprintf(stderr, "nrandom changed to %d\n", e->randomized);
+	action_compute_hough(f);
+}
+
 static void action_toggle_randomized(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
 	if (e->randomized)
 		e->randomized = 0;
 	else if (!e->randomized)
-		e->randomized = 3000000;
+		e->randomized = 1000000;
 	fprintf(stderr, "randomized = %d\n", e->randomized);
 	action_compute_hough(f);
 }
+
+static void action_toggle_tensor(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->tensor = !e->tensor;
+	action_compute_hough(f);
+}
+
+static void action_toggle_inferno(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->inferno = !e->inferno;
+}
+
+static void action_toggle_inpainting(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->inpaint_strip = !e->inpaint_strip;
+}
+
 
 static void action_save_shot(struct FTR *f)
 {
@@ -569,6 +633,62 @@ static void action_toggle_hud(struct FTR *f)
 	f->changed = 1;
 }
 
+static void action_toggle_autocontrast(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->autocontrast = !e->autocontrast;
+	f->changed = 1;
+}
+
+static unsigned char float_to_byte(float x)
+
+{
+	if (x < 0) return 0;
+	if (x > 255) return 255;
+	// set gamma=2
+	//float r = x * x / 255;
+	//
+	//float n = x / 255;
+	//float r = (n*n)*n;
+	//return r*255;
+	return x;
+}
+
+static void dump_inferno(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	if (!e->has_hough)
+		getstrip(f);
+	for (int j = 0; j < e->hough_h; j++)
+	for (int i = 0; i < e->hough_w; i++)
+	{
+		// red background
+		int dest_idx = j * f->w + i + e->strip_w;
+		f->rgb[3*dest_idx+0] = 255;
+		f->rgb[3*dest_idx+1] = 0;
+		f->rgb[3*dest_idx+2] = 0;
+
+		// coordinates
+		float x = i - e->hough_w/2.0;
+		float y = j - e->hough_h/2.0;
+		float r = hypot(x, y);
+		float t = atan2(y, x);
+		int ir = lrint(e->infernal_a + e->infernal_b / r);
+		int it = lrint(359*(M_PI + t)/(2 * M_PI));
+		if (insideP(e->strip_w, e->strip_h, it, ir))
+		{
+			float v = 0;
+			float C = e->strip[it+e->strip_w*ir];
+			if (isfinite(C))
+				v = e->a * C + e->b;
+			v = float_to_byte(v);
+			f->rgb[3*dest_idx+0] = v;
+			f->rgb[3*dest_idx+1] = v;
+			f->rgb[3*dest_idx+2] = v;
+		}
+	}
+}
+
 static void dump_hud(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
@@ -596,62 +716,74 @@ static void dump_hud(struct FTR *f)
 	snprintf(buf, 0x100, "a: %g    b: %g", e->dip_a, e->dip_b);
 	put_string_in_rgb_image(f->rgb,f->w,f->h,e->strip_w,0,fg,bg,0,
 			&e->font, buf);
+
+	if (e->octave) {
+		snprintf(buf, 0x100, "octave: %d", e->octave);
+		put_string_in_rgb_image(f->rgb,f->w,f->h,
+				e->strip_w/2,0,
+				fg,bg,0, &e->font, buf);
+	}
+
 }
 
 
-static unsigned char float_to_byte(float x)
-{
-	if (x < 0) return 0;
-	if (x > 255) return 255;
-	// set gamma=2
-	//float r = x * x / 255;
-	//
-	//float n = x / 255;
-	//float r = (n*n)*n;
-	//return r*255;
-	return x;
-}
 
 // dump the image acording to the state of the viewport
 static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
 	struct pan_state *e = f->userdata;
 
+	//for (int i = 0; i < f->w * f->h * 3; i++) f->rgb[i] = 0;
+
+	// TODO: a float display buffer
+	if (e->autocontrast) {
+		float cmin = INFINITY, cmax = -INFINITY;
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < e->strip_w; i++)
+		{
+			float C = e->strip[e->strip_w * j + i];
+			if (!e->has_hough) {
+				double p[2];
+				window_to_image(p, e, i, j);
+				C = pixel(e, p[0], p[1]);
+			}
+			if (C < cmin) cmin = C;
+			if (C > cmax) cmax = C;
+		}
+		e->a = 255 / (cmax - cmin);
+		e->b = - e->a * cmin;
+	}
+
+	if (!e->has_hough)
+		getstrip(f);
+
 	// for every pixel in the window
-	float cmin = INFINITY, cmax = -INFINITY;
 	for (int j = 0; j < f->h; j++)
 	for (int i = 0; i < e->strip_w; i++)
 	{
 		float C = e->strip[e->strip_w * j + i];
-		if (!e->has_hough) {
-			// compute the position of this pixel in the image
-			double p[2];
-			window_to_image(p, e, i, j);
+		//if (!e->has_hough) {
+		//	// compute the position of this pixel in the image
+		//	double p[2];
+		//	window_to_image(p, e, i, j);
 
-			// evaluate the color value of the image at this position
-			C = pixel(e, p[0], p[1]);
-		}
+		//	// evaluate the color value of the image at this position
+		//	C = pixel(e, p[0], p[1]);
+		//}
 
 		// transform the value into RGB using the contrast change (a,b)
 		float v = 0;
-		if (isfinite(C) && C < 2000)
-		{
-			if (C < cmin) cmin = C;
-			if (C > cmax) cmax = C;
+		if (isfinite(C))
 			v = e->a * C + e->b;
-		}
 		unsigned char *dest = f->rgb + 3 * (j * f->w + i);
 		for (int l = 0; l < 3; l++)
 			dest[l] = float_to_byte(v);
 	}
-	//e->a = 255 / (cmax - cmin);
-	//e->b = -255 * cmin / (cmax - cmin);
-	//fprintf(stderr, "cmin cmax a b = %g %g %g %g\n", cmin, cmax, e->a, e->b);
 
 	// draw grid lines on the hough space
 	assert(e->hough_w == f->h);
 	assert(e->hough_w + e->strip_w == f->w);
-	if (e->has_hough) {
+	if (e->has_hough && !e->inferno) {
 	//assert(f->w == tside + w);
 	//assert(f->h == tside);
 
@@ -704,7 +836,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		f->rgb[3*(f->w*e->hough_w/2 + e->strip_w + i)+2] = 255;
 	}
 
-	if (e->show_dip_bundle)
+	if (e->show_dip_bundle && !e->inferno)
 	{
 		for (int i_theta = 0; i_theta < e->strip_w; i_theta++)
 		{
@@ -738,6 +870,9 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 			}
 		}
 	}
+
+	if (e->inferno)
+		dump_inferno(f);
 
 	if (e->head_up_display)
 		dump_hud(f);
@@ -813,10 +948,18 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == '1') {action_change_zoom_to_factor(f, x, y, 1, 1);
 		action_compute_hough(f);}
 
-	if (k == 'h') action_compute_hough(f);
+	if (k == 'h') {
+		struct pan_state *e = f->userdata;
+		e->inferno = false;
+		action_compute_hough(f);
+	}
 
 	if (k == 'u') action_toggle_hud(f);
+	if (k == 'c') action_toggle_autocontrast(f);
 	if (k == 'r') action_toggle_randomized(f);
+	if (k == 't') action_toggle_tensor(f);
+	if (k == 'o') action_toggle_inferno(f);
+	if (k == 'y') action_toggle_inpainting(f);
 
 	if (k == 'a') action_change_presigma_by_factor(f,  1.3);
 	if (k == 's') action_change_presigma_by_factor(f,  1/1.3);
@@ -824,6 +967,8 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'f') action_change_postsigma_by_factor(f, 1/1.3);
 	if (k == 'w') action_change_aradius_by_factor(f,   1.3);
 	if (k == 'e') action_change_aradius_by_factor(f,   1/1.3);
+	if (k == 'z') action_change_nrandom_by_factor(f, 2);
+	if (k == 'x') action_change_nrandom_by_factor(f, 0.5);
 
 	if (k == ';') action_save_shot(f);
 
@@ -892,8 +1037,11 @@ static unsigned char *read_image_uint8_rgb(char *fname, int *w, int *h)
 	return y;
 }
 
+#include "smapa.h"
+SMART_PARAMETER(INFERNAL_A,-60)
+SMART_PARAMETER(INFERNAL_B,20000)
 
-#define STRIP_WIDTH 361
+#define STRIP_WIDTH 360
 #define HOUGH_SIDE 512
 int main_pan(int c, char *v[])
 {
@@ -913,7 +1061,7 @@ int main_pan(int c, char *v[])
 	tiff_octaves_init(e->t, pyrpattern, megabytes);
 	if (e->t->i->w != STRIP_WIDTH)
 		fail("expected an image of width %d (got %d)\n",
-						e->t->i->w, STRIP_WIDTH);
+						STRIP_WIDTH, e->t->i->w);
 
 	// init state
 	e->a = 1;
@@ -929,7 +1077,7 @@ int main_pan(int c, char *v[])
 	e->dip_stride = 30;
 	e->dip_offset = 0;
 	e->contrast_mode = 0;
-	e->head_up_display = false;
+	e->head_up_display = true;
 
 	e->aradius = 1.5;
 	e->pre_blur_sigma = 1;
@@ -937,7 +1085,14 @@ int main_pan(int c, char *v[])
 	e->post_blur_sigma = 1;
 	e->post_blur_type = "cauchy";
 	e->randomized = 0;
+	e->autocontrast = true;
 	font_fill_from_bdf(&e->font, FONT_BDF_FILE);
+	e->tensor = 0;
+	e->ntensor = 3;
+	e->inferno = true;
+	e->infernal_a = INFERNAL_A();
+	e->infernal_b = INFERNAL_B();
+	e->inpaint_strip = false;
 
 	// open window
 	struct FTR f = ftr_new_window(e->strip_w + e->hough_w, e->hough_w);
