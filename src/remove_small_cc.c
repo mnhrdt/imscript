@@ -11,7 +11,8 @@ static void connected_component_filter(int *rep, int w, int h, float *in, float 
 
    // remove from dsf pixels with NANs in input
    for (int i = 0; i < w*h; i++)
-      if (! isfinite(in[i])) rep[i] = -1;
+      if (isnan(in[i]))
+	      rep[i] = -1;
 
    for (int j = 0; j < h - 1; j++)
       for (int i = 0; i < w - 1; i++)
@@ -61,7 +62,7 @@ int remove_small_cc(int w, int h, float *in, float *out, int minarea, float inte
 	// count how many connected components have been kept
 	int remaining_cc = 0;
 	for (int i = 0; i < w*h; i++)
-		if (rep[i] >= i && area[rep[i]] > minarea)
+		if (rep[i] >= 0 && area[rep[i]] > minarea)
 			remaining_cc += 1;
 
 	// cleanup and exit
