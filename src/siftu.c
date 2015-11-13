@@ -285,6 +285,44 @@ int main_sifttriplets(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
+#include "parsenumbers.c"
+
+// compute pairs guided by a fundamental matrix (non-sym, explicit)
+static int main_siftcpairsfm(int c, char *v[])
+{
+	if (c != 7) {
+		fprintf(stderr,"usage:\n\t%s k1 k2 t fm eps pairs.txt\n",*v);
+		//                         0 1  2  3 4  5   6
+		return EXIT_FAILURE;
+	}
+	int na, nb;
+	struct sift_keypoint *a = read_raw_sifts_fname(v[1], &na);
+	struct sift_keypoint *b = read_raw_sifts_fname(v[2], &nb);
+	double tau = atof(v[3]);
+	double fm[9];
+	read_n_doubles_from_string(fm, v[4], 9);
+	double eps = atof(v[5]);
+	char *filename_out = v[6];
+
+	int np;
+	struct ann_pair *p = sift_fm_pairs(a, na, b, nb, tau, fm, eps, &np);
+
+	fprintf(stderr, "SIFTCPAIRSFM: produced %d pairs "
+			"(from %d and %d){%d}[%g%%]\n",
+			np, na, nb, na * nb, np*100.0/(na*nb));
+	FILE *f = xfopen(filename_out, "w");
+	FORI(np) {
+		struct sift_keypoint *ka = a + p[i].from;
+		struct sift_keypoint *kb = b + p[i].to;
+		fprintf(f, "%g %g %g %g\n",
+				ka->pos[0], ka->pos[1],
+				kb->pos[0], kb->pos[1]);
+	}
+	xfclose(f);
+	xfree(a); xfree(b); xfree(p);
+	return EXIT_SUCCESS;
+}
+
 // compute triplets using sift-nn
 int main_sifttripletsr(int c, char *v[])
 {
@@ -515,6 +553,7 @@ int main(int c, char *v[])
 	else if (0 == strcmp(v[1],"pairt"))  return main_siftcpairst(c-1, v+1);
 	else if (0 == strcmp(v[1],"pairR"))  return main_siftcpairsR(c-1, v+1);
 	else if (0 == strcmp(v[1],"pairR2")) return main_siftcpairsR2(c-1, v+1);
+	else if (0 == strcmp(v[1],"pairfm")) return main_siftcpairsfm(c-1, v+1);
 	else if (0 == strcmp(v[1],"trip"))   return main_sifttriplets(c-1, v+1);
 	else if (0 == strcmp(v[1],"tripr"))  return main_sifttripletsr(c-1,v+1);
 	else if (0 == strcmp(v[1],"aff"))    return main_siftaff(c-1, v+1);
