@@ -105,7 +105,7 @@ void ok_free(struct ok_list *l)
 // TODO: optimize this so that it skips the removed elements
 int ok_which_points(struct ok_list *l, int r)
 {
-	//DEBUG("going to list the points of region %d\n", r);
+	DEBUG("going to list the points of region %d\n", r);
 	assert(r >= 0);
 	if (r >= l->number_of_regions)
 		fail("caca");
@@ -122,7 +122,7 @@ int ok_which_points(struct ok_list *l, int r)
 				l->buf[cx++] = p;
 		}
 	}
-	//DEBUG("\tthere were %d of them\n", cx);
+	DEBUG("\tthere were %d of them\n", cx);
 	return cx;
 }
 

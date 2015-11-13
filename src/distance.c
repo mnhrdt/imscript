@@ -73,16 +73,17 @@ struct dist_state {
 // 	4. s'afegeien nous TRIAL adjacents
 
 // utility function that always returns a valid pointer to memory
-static void *xmalloc(size_t n)
-{
-	void *new = malloc(n);
-	if (!new)
-	{
-		fprintf(stderr, "xmalloc: can not malloc %zu bytes\n", n);
-		exit(1);
-	}
-	return new;
-}
+#include "xmalloc.c"
+//static void *xmalloc(size_t n)
+//{
+//	void *new = malloc(n);
+//	if (!new)
+//	{
+//		fprintf(stderr, "xmalloc: can not malloc %zu bytes\n", n);
+//		exit(1);
+//	}
+//	return new;
+//}
 
 static void start_heap(struct dist_state *e)
 {
