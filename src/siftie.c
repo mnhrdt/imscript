@@ -622,6 +622,7 @@ struct ann_pair *siftlike_get_accpairsrad(
 	return p;
 }
 
+//#define VERBOSE true
 #include "ok_list.c"
 #include "grid.c"
 
@@ -835,8 +836,12 @@ static bool cut_line_with_segment(double out[2], double line[3],
 
 // cut a line with a rectangle (returns true if they cut)
 static bool cut_line_with_rectangle(double out_a[2], double out_b[2],
-		double line[3], double rec_from[2], double rec_to[4])
+		double line[3], double rec_from[2], double rec_to[2])
 {
+	double nnn = hypot(line[0], line[1]);
+	//fprintf(stderr, "clwr (%g %g %g) (%g %g)-(%g %g)...",
+	//		line[0]/nnn, line[1]/nnn, line[2]/nnn,
+	//		rec_from[0], rec_from[1], rec_to[0], rec_to[1]);
 	// four vertices of the rectangle
 	double v[4][2] = {
 		{ rec_from[0], rec_from[1] },
@@ -863,8 +868,10 @@ static bool cut_line_with_rectangle(double out_a[2], double out_b[2],
 				out[1] = x[i][1];
 				cx += 1;
 			}
+		//fprintf(stderr, "cx=%d out=(%g %g)-(%g %g)\n",cx, out_a[0], out_a[1], out_b[0], out_b[1]);
 		return true;
 	}
+	//fprintf(stderr, "nothing\n");
 	return false;
 }
 
@@ -893,12 +900,15 @@ void traverse_segment(int px, int py, int qx, int qy,
 void traverse_segment_thick(int px, int py, int qx, int qy,
 		void (*f)(int,int,float,void*), void *e)
 {
-	if (qx + qy < px + py) // bad quadrants
+	if (px == qx && py == qy)
+		f(px, qx, 1, e);
+	else if (qx + qy < px + py) // bad quadrants
 		traverse_segment_thick(qx, qy, px, py, f, e);
 	else {
+		//fprintf(stderr, "tsthick (%d %d)-(%d %d)\n", px, py, qx, qy);
 		if (fabs(qx - px) > qy - py) { // horitzontal
 			float slope = (qy - py); slope /= (qx - px);
-			assert(px < qx);
+			assert(px <= qx);
 			assert(fabs(slope) <= 1);
 			for (int i = 0; i <= qx-px; i++) {
 				float exact = py + i*slope;
@@ -912,7 +922,7 @@ void traverse_segment_thick(int px, int py, int qx, int qy,
 		} else { // vertical
 			float slope = (qx - px); slope /= (qy - py);
 			assert(abs(qy - py) >= abs(qx - px));
-			assert(py < qy);
+			assert(py <= qy);
 			assert(fabs(slope) <= 1);
 			for (int j = 0; j <= qy-py; j++) {
 				float exact = px + j*slope;
@@ -940,6 +950,10 @@ void grille_traversal_function(int i, int j, float a, void *ee)
 	//fprintf(stderr, "GTF CALL\n");fflush(stderr);
 	//fprintf(stderr, "grille pos %d %d (%g)\n", i, j, a);
 
+	if (i < 0) i = 0;
+	if (j < 0) j = 0;
+	if (i >= e->grille_width ) i = e->grille_width  - 1;
+	if (j >= e->grille_height) j = e->grille_height - 1;
 	int ridx = j * e->grille_width + i;
 	int np = ok_which_points(e->o->l, ridx);
 	//fprintf(stderr, "\t%d points here\n", np);
@@ -956,13 +970,13 @@ struct ann_pair *sift_fm_pairs(
 		int *out_np)
 {
 	if (na == 0 || nb == 0) { *out_np=0; return NULL; }
-	struct ann_pair *p = xmalloc(na * sizeof * p);
+	struct ann_pair *p = xmalloc((na*nb) * sizeof * p);
 	int num_pairs = 0;
 
 	// compute bounding box of points on image B
 	double minxy[2], maxxy[2];
 	get_bbx(minxy, maxxy, kb, nb);
-	fprintf(stderr, "B's bbx = (%g %g)-(%g %g)\n", minxy[0], minxy[1], maxxy[0], maxxy[1]);
+	//fprintf(stderr, "B's bbx = (%g %g)-(%g %g)\n", minxy[0], minxy[1], maxxy[0], maxxy[1]);
 
 	// prepare occupancy list of image B
 	float dxy[2] = {eps, eps};
@@ -992,8 +1006,7 @@ struct ann_pair *sift_fm_pairs(
 	e->grille_width = qw;
 	e->grille_height = qh;
 
-	fprintf(stderr, "quadrille (%d %d) with eps=%g\n",
-			qw, qh, eps);
+	//fprintf(stderr, "quadrille (%d %d) with eps=%g\n", qw, qh, eps);
 
 	// for each A point, etc
 	assert(aff_a[0] == aff_a[1]);
@@ -1001,18 +1014,19 @@ struct ann_pair *sift_fm_pairs(
 	{
 		e->nbuf = 0;
 		double x[3] = { ka[i].pos[0], ka[i].pos[1], 1};
-		fprintf(stderr, "treating %dth A point (%g %g)\n",i,x[0],x[1]);
+		//fprintf(stderr, "treating %dth A point (%g %g)\n",i,x[0],x[1]);
 		double epix[3]; // epipolar line in right IMAGE coordinates
 		matrix_times_vector(epix, fm, x);
 		double epiX[3]; // epipolar line in right GRILLE coordinates
 		epiX[0] = epix[0];
 		epiX[1] = epix[1];
-		epiX[2] = epix[2] * aff_a[0] - aff_b[0] - aff_b[1];
-		fprintf(stderr, "epix = %g %g %g\n", epix[0], epix[1], epix[2]);
-		fprintf(stderr, "epiX = %g %g %g\n", epiX[0], epiX[1], epiX[2]);
+		epiX[2] = (epix[2] + aff_b[0] + aff_b[1]) * aff_a[0];
+		//fprintf(stderr, "epix = %g %g %g\n", epix[0], epix[1], epix[2]);
+		//fprintf(stderr, "epiX = %g %g %g\n", epiX[0], epiX[1], epiX[2]);
 		double gfrom[2] = {0, 0};
 		double gto[2] = {qw, qh};
 		double pa[2], pb[2];
+		cut_line_with_rectangle(pa, pb, epix, minxy, maxxy);
 		if (cut_line_with_rectangle(pa, pb, epiX, gfrom, gto))
 		{
 			int ipa[2] = {round(pa[0]), round(pa[1])};
@@ -1020,16 +1034,17 @@ struct ann_pair *sift_fm_pairs(
 			traverse_segment_thick(ipa[0], ipa[1], ipb[0], ipb[1],
 				grille_traversal_function, e);
 		}
-		fprintf(stderr, "enbuf = %d\n", e->nbuf);
+		//fprintf(stderr, "enbuf = %d\n", e->nbuf);
 		// now "e->buf" contains the list
 		// of the "e->nbuf" candidate keypoints (from image B)
 		// these keypoints must be compared to the keypoint "ka[i]"
 		// and the best one, if any, added to the list "p"
-		for (int k = 0; k < e->nbuf; k++)
-		{
-			int ki = e->buf[k];
-			assert(ki >= 0);
-			assert(ki < nb);
+		//for (int k = 0; k < e->nbuf; k++)
+		//{
+			//int ki = e->buf[k];
+			//assert(ki >= 0);
+
+			//assert(ki < nb);
 			float dist;
 			int cidx = find_closest_keypoint_idxs(ka + i,
 					kb, e->buf, e->nbuf,
@@ -1043,9 +1058,10 @@ struct ann_pair *sift_fm_pairs(
 				p[num_pairs].to = j;
 				p[num_pairs].v[0] = dist;
 				p[num_pairs].v[1] = NAN;
+				//fprintf(stderr, "added %dth pair {%d} [%d %d] (d=%g)\n", num_pairs, cidx, i, j, dist);
 				num_pairs += 1;
 			}
-		}
+		//}
 	}
 
 	sort_annpairs(p, num_pairs);

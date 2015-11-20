@@ -108,7 +108,7 @@ int ok_which_points(struct ok_list *l, int r)
 	DEBUG("going to list the points of region %d\n", r);
 	assert(r >= 0);
 	if (r >= l->number_of_regions)
-		fail("caca");
+		fail("ok_which_points (r=%d, num_of_regions=%d)", r, l->number_of_regions);
 	assert(r < l->number_of_regions);
 	int cx = 0, p = l->r[r];
 	if (p != INULL)
