@@ -1232,7 +1232,7 @@ struct ann_pair *sift_fm_pairs(
 			cidx = fancynearest_idx(ka + i,
 					kb, e->buf, e->nbuf,
 					&dist, &dsecond, 500);
-			if (dist > 200 || (dist / dsecond > -tau))
+			if (dist > 500 || (dist / dsecond > -tau))
 				cidx = -1;
 		}
 		else
