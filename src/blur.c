@@ -243,6 +243,15 @@ static float kernel_2d_cauchy(float x, float y, float *p)
 	return r;
 }
 
+static float kernel_2d_bicauchy(float x, float y, float *p)
+{
+	float sigma = p[1];
+
+	float a = (x*x + y*y)/(sigma*sigma);
+	float r = 1/(1+a*a);
+	return r;
+}
+
 static float kernel_2d_powerlaw2(float x, float y, float *p)
 {
 	float sigma = p[1];
@@ -340,6 +349,7 @@ void blur_2d(float *y, float *x, int w, int h, int pd,
 	case 'g': f = kernel_2d_gaussian; break;
 	case 'l': f = kernel_2d_laplace;  break;
 	case 'c': f = kernel_2d_cauchy;   break;
+	case 'k': f = kernel_2d_bicauchy;   break;
 	case 'd': f = kernel_2d_disk;     break;
 	case 's': f = kernel_2d_square;   break;
 	case 'p': f = kernel_2d_powerlaw2;   break;

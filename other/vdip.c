@@ -164,6 +164,18 @@ static void plot_pixel_red(int x, int y, void *e)
 	}
 }
 
+// auxiliary function for drawing a red pixel
+static void plot_pixel_red_aa(int x, int y, float a, void *e)
+{
+	struct FTR *f = e;
+	if (finsideP(f, x, y)) {
+		int idx = f->w * y + x;
+		f->rgb[3*idx+0] = f->rgb[3*idx+0] * (1-a) + 255 * a;
+		f->rgb[3*idx+1] = f->rgb[3*idx+1] * (1-a) + 0 * a;
+		f->rgb[3*idx+2] = f->rgb[3*idx+1] * (1-a) + 0 * a;
+	}
+}
+
 // generic function to traverse a segment between two pixels
 void traverse_segment(int px, int py, int qx, int qy,
 		void (*f)(int,int,void*), void *e)
@@ -185,11 +197,92 @@ void traverse_segment(int px, int py, int qx, int qy,
 	}
 }
 
+// draw a segment between two points (somewhat anti-aliased)
+void traverse_segment_aa(int px, int py, int qx, int qy,
+		void (*f)(int,int,float,void*), void *e)
+{
+	if (px == qx && py == qy)
+		f(px, py, 1.0, e);
+	else if (qx + qy < px + py) // bad quadrants
+		traverse_segment_aa(qx, qy, px, py, f, e);
+	else {
+		if (fabs(qx - px) > qy - py) { // horitzontal
+			float slope = (qy - py); slope /= (qx - px);
+			assert(px < qx);
+			assert(fabs(slope) <= 1);
+			for (int i = 0; i <= qx-px; i++) {
+				float exact = py + i*slope;
+				int whole = lrint(exact);
+				float part = fabs(whole - exact);
+				int owhole = (whole<exact)?whole+1:whole-1;
+				assert(part <= 0.5);
+				f(i+px, whole, 1-part, e);
+				f(i+px, owhole, part, e);
+			}
+		} else { // vertical
+			float slope = (qx - px); slope /= (qy - py);
+			assert(abs(qy - py) >= abs(qx - px));
+			assert(py < qy);
+			assert(fabs(slope) <= 1);
+			for (int j = 0; j <= qy-py; j++) {
+				float exact = px + j*slope;
+				int whole = lrint(exact);
+				float part = fabs(whole - exact);
+				int owhole = (whole<exact)?whole+1:whole-1;
+				assert(part <= 0.5);
+				f(whole, j+py, 1-part, e);
+				f(owhole, j+py, part, e);
+			}
+		}
+	}
+}
+
+// draw a segment between two points (somewhat anti-aliased)
+void traverse_segment_aa2(float px, float py, float qx, float qy,
+		void (*f)(int,int,float,void*), void *e)
+{
+	//if (px == qx && py == qy)
+	//	f(px, py, 1.0, e);
+	//else
+	if (qx + qy < px + py) // bad quadrants
+		traverse_segment_aa2(qx, qy, px, py, f, e);
+	else {
+		if (fabs(qx - px) > qy - py) { // horitzontal
+			float slope = (qy - py); slope /= (qx - px);
+			assert(px < qx);
+			assert(fabs(slope) <= 1);
+			for (int i = 0; i <= qx-px; i++) {
+				float exact = py + i*slope;
+				int whole = lrint(exact);
+				float part = fabs(whole - exact);
+				int owhole = (whole<exact)?whole+1:whole-1;
+				assert(part <= 0.5);
+				f(i+px, whole, 1-part, e);
+				f(i+px, owhole, part, e);
+			}
+		} else { // vertical
+			float slope = (qx - px); slope /= (qy - py);
+			assert(abs(qy - py) >= abs(qx - px));
+			assert(py < qy);
+			assert(fabs(slope) <= 1);
+			for (int j = 0; j <= qy-py; j++) {
+				float exact = px + j*slope;
+				int whole = lrint(exact);
+				float part = fabs(whole - exact);
+				int owhole = (whole<exact)?whole+1:whole-1;
+				assert(part <= 0.5);
+				f(whole, j+py, 1-part, e);
+				f(owhole, j+py, part, e);
+			}
+		}
+	}
+}
+
 // function to draw a red segment
 static void plot_segment_red(struct FTR *f,
 		double x0, double y0, double xf, double yf)
 {
-	traverse_segment(x0, y0, xf, yf, plot_pixel_red, f);
+	traverse_segment_aa(x0, y0, xf, yf, plot_pixel_red_aa, f);
 }
 
 static void pan_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)

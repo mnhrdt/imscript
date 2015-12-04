@@ -689,6 +689,9 @@ static void dump_inferno(struct FTR *f)
 	}
 }
 
+SMART_PARAMETER(BEGIN_FEET,NAN)
+SMART_PARAMETER(END_FEET,NAN)
+
 static void dump_hud(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
@@ -701,14 +704,24 @@ static void dump_hud(struct FTR *f)
 	first_row = p[1];
 	last_row = q[1];
 
+	double first_feet = NAN;
+	double last_feet = NAN;
+	if (isfinite(BEGIN_FEET()))
+	{
+		double BF = BEGIN_FEET();
+		double EF = END_FEET();
+		first_feet = BF + first_row * (EF - BF)/e->t->i->h;
+		last_feet = BF + last_row * (EF - BF)/e->t->i->h;
+	}
+
 	uint8_t fg[3] = {0, 255, 0};
 	uint8_t bg[3] = {0, 0, 0};
 	char buf[0x100];
 
-	snprintf(buf, 0x100, "row: %d", (int)first_row);
+	snprintf(buf, 0x100, "row: %d (%g ft)", (int)first_row, first_feet);
 	put_string_in_rgb_image(f->rgb,f->w,f->h,0,0,fg,bg,0,&e->font, buf);
 
-	snprintf(buf, 0x100, "row: %d", (int)last_row);
+	snprintf(buf, 0x100, "row: %d (%g ft)", (int)last_row, last_feet);
 	put_string_in_rgb_image(f->rgb,f->w,f->h,0,
 			e->strip_h - e->font.height,
 			fg,bg,0,&e->font, buf);
@@ -720,7 +733,7 @@ static void dump_hud(struct FTR *f)
 	if (e->octave) {
 		snprintf(buf, 0x100, "octave: %d", e->octave);
 		put_string_in_rgb_image(f->rgb,f->w,f->h,
-				e->strip_w/2,0,
+				2*e->strip_w/3,0,
 				fg,bg,0, &e->font, buf);
 	}
 
@@ -1041,7 +1054,7 @@ static unsigned char *read_image_uint8_rgb(char *fname, int *w, int *h)
 SMART_PARAMETER(INFERNAL_A,-60)
 SMART_PARAMETER(INFERNAL_B,20000)
 
-#define STRIP_WIDTH 360
+//#define STRIP_WIDTH 360
 #define HOUGH_SIDE 512
 int main_pan(int c, char *v[])
 {
@@ -1059,6 +1072,7 @@ int main_pan(int c, char *v[])
 	struct pan_state e[1];
 	int megabytes = 100;
 	tiff_octaves_init(e->t, pyrpattern, megabytes);
+	int STRIP_WIDTH = e->t->i->w;
 	if (e->t->i->w != STRIP_WIDTH)
 		fail("expected an image of width %d (got %d)\n",
 						STRIP_WIDTH, e->t->i->w);

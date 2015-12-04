@@ -413,11 +413,14 @@ static void zoom_out_by_factor_two_max(float *out, int ow, int oh,
 // type of a "zoom-out" function
 typedef void (*zoom_out_function_t)(float*,int,int,float*,int,int);
 
+#include "smapa.h"
+SMART_PARAMETER_SILENT(ZOMAX,0)
+
 static void create_pyramid(struct pan_state *e)
 {
-	zoom_out_function_t z;
-       	z = zoom_out_by_factor_two_max;
-       	z = zoom_out_by_factor_two;
+	zoom_out_function_t z = zoom_out_by_factor_two;
+	if (ZOMAX() > 0)
+		z = zoom_out_by_factor_two_max;
 	for (int s = 0; s < MAX_PYRAMID_LEVELS; s++)
 	{
 		int      lw   = s ? e->pyr_w  [s-1] : e->w   ;
