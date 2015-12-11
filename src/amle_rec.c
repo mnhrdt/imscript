@@ -64,7 +64,7 @@ static int (*build_mask(int *out_nmask, float *x, int w, int h))[2]
 }
 
 #include "smapa.h"
-SMART_PARAMETER(AMLE_NN,4)
+SMART_PARAMETER(AMLE_NN,8)
 
 // evaluate an image in a neighborhood
 static int get_nvals(float *v, float *wv2, float *x, int w, int h, int i, int j)
