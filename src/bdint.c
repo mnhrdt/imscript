@@ -6,7 +6,6 @@
 
 #include <assert.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <math.h>
 
 
@@ -87,7 +86,7 @@ void bdint_gen(float *x, int w, int h, accumulator_t *a)
 		int ij = j  * w + i;  // point just outside the hole
 		int IJ = jj * w + ii; // point just inside the hole
 		if (insideP(w, h, i, j) && insideP(w, h, ii, jj) &&
-				rep[ij]==-1 && rep[IJ]!=-1)
+				rep[ij] == -1 && rep[IJ] != -1)
 		{
 			int ridx = rep[IJ];   // representative of the hole
 			acc_v[ridx] = a(acc_v[ridx], x[ij]);
@@ -102,6 +101,8 @@ void bdint_gen(float *x, int w, int h, accumulator_t *a)
 
 	//cleanup
 	free(rep);
+	free(acc_v);
+	free(acc_n);
 }
 
 
@@ -112,13 +113,14 @@ void bdint_gen(float *x, int w, int h, accumulator_t *a)
 #ifdef USE_BDINT_MAIN
 #include <stdio.h>
 #include "iio.h"
-#include "smapa.h"
-SMART_PARAMETER_SILENT(BDACC,-1)
+#include "pickopt.c"
 int main(int c, char *v[])
 {
+	char *opt_a = pick_option(&c, &v, "a", "min");
 	if (c != 3) {
-		fprintf(stderr, "usage:\n\t%s in.tiff out.tiff\n", *v);
-		//                          0 1       2
+		fprintf(stderr, "usage:\n\t"
+				"%s [-a {min|max|avg}] in.tiff out.tiff\n", *v);
+		//                0                    1       2
 		return 1;
 	}
 	char *filename_in   = v[1];
@@ -128,8 +130,8 @@ int main(int c, char *v[])
 	float *x = iio_read_image_float(filename_in, &w, &h);
 
 	accumulator_t *a = fminf;
-	if (BDACC() == 0) a = sumf;
-	if (BDACC() == 1) a = fmaxf;
+	if (strstr(opt_a, "ma")) a = fmaxf;
+	if (strstr(opt_a, "me") || strstr(opt_a, "av") ) a = sumf;
 
 	bdint_gen(x, w, h, a);
 
