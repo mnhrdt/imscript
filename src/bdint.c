@@ -117,6 +117,7 @@ void bdint_gen(float *x, int w, int h, accumulator_t *a)
 int main(int c, char *v[])
 {
 	char *opt_a = pick_option(&c, &v, "a", "min");
+	char *filename_mask = pick_option(&c, &v, "m", "");
 	if (c != 3) {
 		fprintf(stderr, "usage:\n\t"
 				"%s [-a {min|max|avg}] in.tiff out.tiff\n", *v);
@@ -128,6 +129,15 @@ int main(int c, char *v[])
 
 	int w, h;
 	float *x = iio_read_image_float(filename_in, &w, &h);
+
+	if (*filename_mask) {
+		int mw, mh;
+		float *m = iio_read_image_float(filename_mask, &mw, &mh);
+		for (int i = 0; i < mw*mh; i++)
+			if (i < w*h && x[i])
+				x[i] = NAN;
+		free(m);
+	}
 
 	accumulator_t *a = fminf;
 	if (strstr(opt_a, "ma")) a = fmaxf;

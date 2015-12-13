@@ -256,8 +256,10 @@ void nnint(float *x, int w, int h)
 #ifdef USE_NNINT_MAIN
 #include <stdio.h>
 #include "iio.h"
+#include "pickopt.c"
 int main(int c, char *v[])
 {
+	char *filename_mask = pick_option(&c, &v, "m", "");
 	if (c != 3) {
 		fprintf(stderr, "usage:\n\t%s in.tiff out.tiff\n", *v);
 		//                          0 1       2
@@ -268,6 +270,15 @@ int main(int c, char *v[])
 
 	int w, h;
 	float *x = iio_read_image_float(filename_in, &w, &h);
+
+	if (*filename_mask) {
+		int mw, mh;
+		float *m = iio_read_image_float(filename_mask, &mw, &mh);
+		for (int i = 0; i < mw*mh; i++)
+			if (i < w*h && x[i])
+				x[i] = NAN;
+		free(m);
+	}
 
 	nnint(x, w, h);
 
