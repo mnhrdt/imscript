@@ -271,11 +271,11 @@ int main(int c, char *v[])
 	int w, h;
 	float *x = iio_read_image_float(filename_in, &w, &h);
 
-	if (*filename_mask) {
+	if (filename_mask && *filename_mask) {
 		int mw, mh;
 		float *m = iio_read_image_float(filename_mask, &mw, &mh);
 		for (int i = 0; i < mw*mh; i++)
-			if (i < w*h && x[i])
+			if (i < w*h && m[i])
 				x[i] = NAN;
 		free(m);
 	}
