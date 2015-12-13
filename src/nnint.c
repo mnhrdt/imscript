@@ -1,31 +1,8 @@
 // nearest neighbor interpolation
 
-
-
-void fill_distance_fast(float *distimage, int width, int height, float *points, int npoints);
-void fill_distance_slow(float *distimage, int width, int height, float *points, int npoints);
-
-
 #include <assert.h>
 #include <stdlib.h>
 #include <math.h>
-
-void fill_distance_slow(float *dist, int w, int h, float *p, int n)
-{
-	for (int j = 0; j < h; j++)
-	for (int i = 0; i < w; i++)
-	{
-		double od = INFINITY;
-		for (int k = 0; k < n; k++)
-		{
-			double nd = hypot(i - p[2*k+0], j - p[2*k+1]);
-			if (nd < od)
-				od = nd;
-		}
-		dist[j*w+i] = od;
-	}
-}
-
 
 enum tag {KNOWN, TRIAL, FAR};
 
@@ -282,7 +259,7 @@ void nnint(float *x, int w, int h)
 int main(int c, char *v[])
 {
 	if (c != 3) {
-		fprintf(stderr, "usage:\n\t%s in.tiff out.tiff]\n", *v);
+		fprintf(stderr, "usage:\n\t%s in.tiff out.tiff\n", *v);
 		//                          0 1       2
 		return 1;
 	}

@@ -1,4 +1,6 @@
 // lowest neighbor interpolation
+// optionally: highest-neighbor and average-neighbor
+// todo: IDW/shepard of all the neighbors
 
 
 
@@ -15,7 +17,24 @@ static int insideP(int w, int h, int i, int j)
 #define xmalloc malloc
 #include "abstract_dsf.c"
 
-void bdint(float *x, int w, int h)
+typedef float (accumulator_t)(float, float);
+
+static float accumulate_min(float x, float y)
+{
+	return fmin(x, y);
+}
+
+static float accumulate_max(float x, float y)
+{
+	return fmax(x, y);
+}
+
+static float counted_accumulator(float a, float x, int n)
+{
+	return (a*n+x)/(n+1);
+}
+
+void bdint(float *x, int w, int h, accumulator_t *a)
 {
 	// create the dsf
 	int *rep = xmalloc(w*h*sizeof*rep);
@@ -39,15 +58,15 @@ void bdint(float *x, int w, int h)
 			adsf_union(rep, w*h, p0, p2);
 	}
 
-	// canonicalize dsf
+	// canonicalize dsf (after this, the DSF is not changed anymore)
 	for (int i = 0; i < w*h; i++)
 		if (rep[i] >= 0)
 			rep[i] = adsf_find(rep, w*h, i);
 
 	// prepare table of optima
-	float *opt = xmalloc(w*h*sizeof*opt);
 	for (int i = 0; i < w*h; i++)
-		opt[i] = INFINITY;
+		if (rep[i] == i)
+			x[i] = -a(-INFINITY,INFINITY);
 
 	// for each valued point that has a neighboring nan, update the optimum
 	int n[4][2] = {{1,0}, {-1,0}, {0,1}, {0,-1}};
@@ -60,8 +79,8 @@ void bdint(float *x, int w, int h)
 		int idx0 = j  * w + i;
 		int idx1 = jj * w + ii;
 		if (insideP(w, h, i, j) && insideP(w, h, ii, jj) &&
-				!isnan(x[idx0]) && isnan(x[idx1]))
-			opt[rep[idx1]] = fmin(opt[rep[idx1]], x[idx0]);
+				rep[idx0]==-1 && rep[idx1]!=-1)
+			x[rep[idx1]] = a(x[rep[idx1]], x[idx0]);
 	}
 
 	// fill-in the computed optima
@@ -69,12 +88,11 @@ void bdint(float *x, int w, int h)
 	for (int i = 0; i < w; i++)
 	{
 		int ij = j  * w + i;
-		if (isnan(x[ij]))
-			x[ij] = opt[rep[ij]];
+		if (rep[ij]!=-1)
+			x[ij] = x[rep[ij]];
 	}
 
 	//cleanup
-	free(opt);
 	free(rep);
 }
 
@@ -86,10 +104,12 @@ void bdint(float *x, int w, int h)
 #ifdef USE_BDINT_MAIN
 #include <stdio.h>
 #include "iio.h"
+#include "smapa.h"
+SMART_PARAMETER_SILENT(BDMAX,0)
 int main(int c, char *v[])
 {
 	if (c != 3) {
-		fprintf(stderr, "usage:\n\t%s in.tiff out.tiff]\n", *v);
+		fprintf(stderr, "usage:\n\t%s in.tiff out.tiff\n", *v);
 		//                          0 1       2
 		return 1;
 	}
@@ -99,7 +119,7 @@ int main(int c, char *v[])
 	int w, h;
 	float *x = iio_read_image_float(filename_in, &w, &h);
 
-	bdint(x, w, h);
+	bdint(x, w, h, BDMAX()>0?fmaxf:fminf);
 
 	iio_save_image_float(filename_out, x, w, h);
 
