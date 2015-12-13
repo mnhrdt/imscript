@@ -6,38 +6,33 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
 
 
+#define xmalloc malloc
+#include "abstract_dsf.c"
+
+// check wether a pixel is inside the image domain
 static int insideP(int w, int h, int i, int j)
 {
 	return i >= 0 && j >= 0 && i < w && j < h;
 }
 
-#define xmalloc malloc
-#include "abstract_dsf.c"
-
+// type of an accumulator function (like fmin, fmax or sum)
 typedef float (accumulator_t)(float, float);
 
-static float accumulate_min(float x, float y)
+// the "sum" function (gives 0 for INFINITY-INFINITY)
+static float sumf(float x, float y)
 {
-	return fmin(x, y);
+	if (!isfinite(x) && !isfinite(y))
+		return 0;
+	return x + y;
 }
 
-static float accumulate_max(float x, float y)
+// build a DSF of the NAN holes from image x
+static void fill_nan_reps(int *rep, float *x, int w, int h)
 {
-	return fmax(x, y);
-}
-
-static float counted_accumulator(float a, float x, int n)
-{
-	return (a*n+x)/(n+1);
-}
-
-void bdint(float *x, int w, int h, accumulator_t *a)
-{
-	// create the dsf
-	int *rep = xmalloc(w*h*sizeof*rep);
 	adsf_begin(rep,w*h);
 
 	// remove from dsf pixels with known values in input
@@ -62,13 +57,26 @@ void bdint(float *x, int w, int h, accumulator_t *a)
 	for (int i = 0; i < w*h; i++)
 		if (rep[i] >= 0)
 			rep[i] = adsf_find(rep, w*h, i);
+}
 
-	// prepare table of optima
+// fill-in holes by accumulating values at the boundary of each hole
+void bdint_gen(float *x, int w, int h, accumulator_t *a)
+{
+	// create the dsf
+	int *rep = xmalloc(w*h*sizeof*rep);
+	fill_nan_reps(rep, x, w, h);
+
+	// initialize the accumulators
+	float *acc_v = xmalloc(w*h*sizeof*acc_v); // accumulator for values
+	float *acc_n = xmalloc(w*h*sizeof*acc_n); // value count
 	for (int i = 0; i < w*h; i++)
-		if (rep[i] == i)
-			x[i] = -a(-INFINITY,INFINITY);
+	if (rep[i] == i)
+	{
+		acc_v[i] = -a(INFINITY,-INFINITY);
+		acc_n[i] = 0;
+	}
 
-	// for each valued point that has a neighboring nan, update the optimum
+	// for each value that has a NAN neighbor, update the accumulators
 	int n[4][2] = {{1,0}, {-1,0}, {0,1}, {0,-1}};
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
@@ -76,21 +84,21 @@ void bdint(float *x, int w, int h, accumulator_t *a)
 	{
 		int ii = i + n[k][0];
 		int jj = j + n[k][1];
-		int idx0 = j  * w + i;
-		int idx1 = jj * w + ii;
+		int ij = j  * w + i;  // point just outside the hole
+		int IJ = jj * w + ii; // point just inside the hole
 		if (insideP(w, h, i, j) && insideP(w, h, ii, jj) &&
-				rep[idx0]==-1 && rep[idx1]!=-1)
-			x[rep[idx1]] = a(x[rep[idx1]], x[idx0]);
+				rep[ij]==-1 && rep[IJ]!=-1)
+		{
+			int ridx = rep[IJ];   // representative of the hole
+			acc_v[ridx] = a(acc_v[ridx], x[ij]);
+			acc_n[ridx] = acc_n[ridx] + 1;
+		}
 	}
 
-	// fill-in the computed optima
-	for (int j = 0; j < h; j++)
-	for (int i = 0; i < w; i++)
-	{
-		int ij = j  * w + i;
-		if (rep[ij]!=-1)
-			x[ij] = x[rep[ij]];
-	}
+	// fill-in using the computed value
+	for (int i = 0; i < w*h; i++)
+		if (rep[i] >= 0)
+			x[i] = acc_v[rep[i]] / (a==sumf?acc_n[rep[i]]:1);
 
 	//cleanup
 	free(rep);
@@ -105,7 +113,7 @@ void bdint(float *x, int w, int h, accumulator_t *a)
 #include <stdio.h>
 #include "iio.h"
 #include "smapa.h"
-SMART_PARAMETER_SILENT(BDMAX,0)
+SMART_PARAMETER_SILENT(BDACC,-1)
 int main(int c, char *v[])
 {
 	if (c != 3) {
@@ -119,7 +127,11 @@ int main(int c, char *v[])
 	int w, h;
 	float *x = iio_read_image_float(filename_in, &w, &h);
 
-	bdint(x, w, h, BDMAX()>0?fmaxf:fminf);
+	accumulator_t *a = fminf;
+	if (BDACC() == 0) a = sumf;
+	if (BDACC() == 1) a = fmaxf;
+
+	bdint_gen(x, w, h, a);
 
 	iio_save_image_float(filename_out, x, w, h);
 
