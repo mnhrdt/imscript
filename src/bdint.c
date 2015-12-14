@@ -105,6 +105,12 @@ void bdint_gen(float *x, int w, int h, accumulator_t *a)
 	free(acc_n);
 }
 
+void bdint_gen_split(float *x, int w, int h, int pd, accumulator_t *a)
+{
+	for (int l = 0; l < pd; l++)
+		bdint_gen(x + w*h*l, w, h, a);
+}
+
 
 #ifndef OMIT_BDINT_MAIN
 #define USE_BDINT_MAIN
@@ -118,24 +124,26 @@ int main(int c, char *v[])
 {
 	char *opt_a = pick_option(&c, &v, "a", "min");
 	char *filename_mask = pick_option(&c, &v, "m", "");
-	if (c != 3) {
+	int help_argument = (int)pick_option(&c, &v, "h", 0);
+	if (help_argument || (c != 1 && c != 2 && c != 3)) {
 		fprintf(stderr, "usage:\n\t"
-				"%s [-a {min|max|avg}] in.tiff out.tiff\n", *v);
-		//                0                    1       2
+			"%s [-a {min|max|avg}] [in.tiff [out.tiff]]\n", *v);
+		//        0                     1        2
 		return 1;
 	}
-	char *filename_in   = v[1];
-	char *filename_out  = v[2];
+	char *filename_in   = c > 1 ? v[1] : "-";
+	char *filename_out  = c > 2 ? v[2] : "-";
 
-	int w, h;
-	float *x = iio_read_image_float(filename_in, &w, &h);
+	int w, h, pd;
+	float *x = iio_read_image_float_split(filename_in, &w, &h, &pd);
 
 	if (filename_mask && *filename_mask) {
 		int mw, mh;
 		float *m = iio_read_image_float(filename_mask, &mw, &mh);
+		for (int l = 0; l < pd; l++)
 		for (int i = 0; i < mw*mh; i++)
 			if (i < w*h && m[i])
-				x[i] = NAN;
+				x[l*w*h+i] = NAN;
 		free(m);
 	}
 
@@ -143,9 +151,9 @@ int main(int c, char *v[])
 	if (strstr(opt_a, "ma")) a = fmaxf;
 	if (strstr(opt_a, "me") || strstr(opt_a, "av") ) a = sumf;
 
-	bdint_gen(x, w, h, a);
+	bdint_gen_split(x, w, h, pd, a);
 
-	iio_save_image_float(filename_out, x, w, h);
+	iio_save_image_float_split(filename_out, x, w, h, pd);
 
 	return 0;
 }

@@ -247,6 +247,12 @@ void nnint(float *x, int w, int h)
 	free_things(e);
 }
 
+void nnint_split(float *x, int w, int h, int pd)
+{
+	for (int l = 0; l < pd; l++)
+		nnint(x + w*h*l, w, h);
+}
+
 
 
 #ifndef OMIT_NNINT_MAIN
@@ -260,29 +266,31 @@ void nnint(float *x, int w, int h)
 int main(int c, char *v[])
 {
 	char *filename_mask = pick_option(&c, &v, "m", "");
-	if (c != 3) {
-		fprintf(stderr, "usage:\n\t%s in.tiff out.tiff\n", *v);
-		//                          0 1       2
+	int help_argument = (int)pick_option(&c, &v, "h", 0);
+	if (help_argument || (c != 1 && c != 2 && c != 3)) {
+		fprintf(stderr, "usage:\n\t%s [in.tiff [out.tiff]]\n", *v);
+		//                          0  1        2
 		return 1;
 	}
-	char *filename_in   = v[1];
-	char *filename_out  = v[2];
+	char *filename_in   = c > 1 ? v[1] : "-";
+	char *filename_out  = c > 2 ? v[2] : "-";
 
-	int w, h;
-	float *x = iio_read_image_float(filename_in, &w, &h);
+	int w, h, pd;
+	float *x = iio_read_image_float_split(filename_in, &w, &h, &pd);
 
 	if (filename_mask && *filename_mask) {
 		int mw, mh;
 		float *m = iio_read_image_float(filename_mask, &mw, &mh);
+		for (int l = 0; l < pd; l++)
 		for (int i = 0; i < mw*mh; i++)
 			if (i < w*h && m[i])
-				x[i] = NAN;
+				x[l*w*h+i] = NAN;
 		free(m);
 	}
 
-	nnint(x, w, h);
+	nnint_split(x, w, h, pd);
 
-	iio_save_image_float(filename_out, x, w, h);
+	iio_save_image_float_split(filename_out, x, w, h, pd);
 
 	return 0;
 }
