@@ -1384,6 +1384,7 @@ static void parse_imageop(const char *s, int *op, int *scheme)
 	else if (hassuffix(s, "b")) *scheme = SCHEME_BACKWARD;
 	else if (hassuffix(s, "c")) *scheme = SCHEME_CENTERED;
 	else if (hassuffix(s, "s")) *scheme = SCHEME_SOBEL;
+	else if (hassuffix(s, "p")) *scheme = SCHEME_PREWITT;
 }
 
 static void collection_of_varnames_init(struct collection_of_varnames *x)
@@ -2019,6 +2020,8 @@ static float stencil_3x3_dy_backward[9] = {0,-1,0, 0,1,0,  0,0,0};
 static float stencil_3x3_dy_centered[9] = {0,-H,0, 0,0,0,  0,H,0};
 static float stencil_3x3_dy_sobel[9] = {-O,-2*O,-O,  0,0,0, O,2*O,O};
 static float stencil_3x3_dx_sobel[9] = {-O,0,O,  -2*O,0,2*O, -O,0,O};
+static float stencil_3x3_dx_prewitt[9] =  {0,0,0,  0,-H,H, 0,-H,H};
+static float stencil_3x3_dy_prewitt[9] =  {0,0,0,  0,-H,-H, 0,H,H};
 static float stencil_3x3_laplace[9] =  {0,1,0,  1,-4,1, 0,1,0};
 static float stencil_3x3_dxx[9] =  {0,0,0,  1,-2,1, 0,0,0};
 static float stencil_3x3_dyy[9] =  {0,1,0,  0,-2,0, 0,1,0};
@@ -2045,6 +2048,7 @@ static float *get_stencil_3x3(int operator, int scheme)
 			case SCHEME_BACKWARD: return stencil_3x3_dx_backward;
 			case SCHEME_CENTERED: return stencil_3x3_dx_centered;
 			case SCHEME_SOBEL: return stencil_3x3_dx_sobel;
+			case SCHEME_PREWITT: return stencil_3x3_dx_prewitt;
 			default: fail("unrecognized stencil,x scheme %d");
 			}
 		}
@@ -2053,6 +2057,7 @@ static float *get_stencil_3x3(int operator, int scheme)
 			case SCHEME_BACKWARD: return stencil_3x3_dy_backward;
 			case SCHEME_CENTERED: return stencil_3x3_dy_centered;
 			case SCHEME_SOBEL: return stencil_3x3_dy_sobel;
+			case SCHEME_PREWITT: return stencil_3x3_dy_prewitt;
 			default: fail("unrecognized stencil,y scheme %d");
 			}
 		}
@@ -2101,6 +2106,10 @@ static float imageop_scalar(float *img, int w, int h, int pd,
 	return 0;
 }
 
+SMART_PARAMETER_SILENT(SHADOWX,1)
+SMART_PARAMETER_SILENT(SHADOWY,1)
+SMART_PARAMETER_SILENT(SHADOWZ,1)
+
 static int imageop_vector(float *out, float *img, int w, int h, int pd,
 		int ai, int aj, struct plambda_token *t)
 {
@@ -2134,7 +2143,8 @@ static int imageop_vector(float *out, float *img, int w, int h, int pd,
 		if (pd != 1) fail("can not yet compute shadow of a vector");
 		float vdx[3]={1,0,apply_3x3_stencil(img, w,h,pd, ai,aj,0, sx)};
 		float vdy[3]={0,1,apply_3x3_stencil(img, w,h,pd, ai,aj,0, sy)};
-		float sun[3] = {-1, -1, 1}, nor[3];
+		//float sun[3] = {-1, -1, 1}, nor[3];
+		float sun[3] = {-SHADOWX(), -SHADOWY(), SHADOWZ()}, nor[3];
 		vector_product(nor, vdx, vdy, 3, 3);
 		return scalar_product(out, nor, sun, 3, 3);
 		}
