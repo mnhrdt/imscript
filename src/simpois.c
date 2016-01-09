@@ -56,6 +56,17 @@ static float bilaplacian(float *x, int w, int h, int i, int j)
 	return r;
 }
 
+static float fourlaplacian(float *x, int w, int h, int i, int j)
+{
+	float r = -4 * bilaplacian(x, w, h, i  , j  )
+		     + bilaplacian(x, w, h, i+1, j  )
+		     + bilaplacian(x, w, h, i  , j+1)
+		     + bilaplacian(x, w, h, i-1, j  )
+		     + bilaplacian(x, w, h, i  , j-1);
+
+	return r;
+}
+
 // evaluate the laplacian of image I at point i, j
 // (alternative function, compatible with neumann boundaries)
 static float laplacian_neum(float *I, int w, int h, int i, int j)
@@ -84,7 +95,15 @@ static void gauss_seidel_iteration(float *I, float *f, int w, int h,
 {
 	getpixel_operator op = laplacian_neum;
 	if (tstep < 0)
+	{
 		op = bilaplacian;
+		if (tstep < -1000)
+		{
+			op = fourlaplacian;
+			tstep += 1000;
+			tstep *= -1;
+		}
+	}
 
 //#pragma omp parallel for
 	for (int p = 0; p < n_omega; p++)
