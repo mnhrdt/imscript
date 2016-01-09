@@ -23,6 +23,7 @@ void unshadow(float *xx, int w, int h)
 #include "pickopt.c"
 int main(int c, char *v[])
 {
+	char *filename_mask = pick_option(&c, &v, "m", "");
 	int help_argument = (int)pick_option(&c, &v, "h", 0);
 	if (help_argument || (c != 1 && c != 2 && c != 3)) {
 		fprintf(stderr, "usage:\n\t%s [in.tiff [out.tiff]]\n", *v);
@@ -34,6 +35,15 @@ int main(int c, char *v[])
 
 	int w, h;
 	float *x = iio_read_image_float(filename_in, &w, &h);
+
+	if (filename_mask && *filename_mask) {
+		int mw, mh;
+		float *m = iio_read_image_float(filename_mask, &mw, &mh);
+		for (int i = 0; i < mw*mh; i++)
+			if (i < w*h && m[i])
+				x[i] = NAN;
+	}
+
 
 	unshadow(x, w, h);
 
