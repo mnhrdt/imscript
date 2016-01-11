@@ -2378,8 +2378,12 @@ static int parse_raw_binary_image_explicit(struct iio_image *x,
 	iio_image_build_independent(x, 2, sizes, sample_type, pd);
 	size_t n = nsamples * ss;
 	memcpy(x->data, header_bytes + (char*)data, n);
-	if (endianness)
-		switch_4endianness(x->data, nsamples);
+	if (endianness) {
+      if (ss == 2)
+		   switch_2endianness(x->data, nsamples);
+      if (ss >= 4)
+		   switch_4endianness(x->data, nsamples);
+   }
 	return 0;
 }
 
