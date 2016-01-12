@@ -82,6 +82,7 @@ int gray_singularity(float a, float b, float c, float d)
 		return gray_singularity(d, b, c, a);
 	else
 		assert(0);
+	return SING_IMPOSSIBLE;
 }
 
 void gray_singularities(char *y, float *x, int w, int h)

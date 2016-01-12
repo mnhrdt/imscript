@@ -276,11 +276,11 @@ static void tv_extension_with_init(
 		for (int j = 0; j < h; j++)
 		for (int i = 0; i < w; i++)
 		{
-			float g[2];
-			gradient(g, d, w, h, i, j);
+			float G[2];
+			gradient(G, d, w, h, i, j);
 			float f = 1 + tau * hypot(g[0], g[1]);
-			p[(j*w+i)*2 + 0] = ( p[(j*w+i)*2 + 0] + tau * g[0] ) / f;
-			p[(j*w+i)*2 + 1] = ( p[(j*w+i)*2 + 1] + tau * g[1] ) / f;
+			p[(j*w+i)*2 + 0] = ( p[(j*w+i)*2 + 0] + tau * G[0] ) / f;
+			p[(j*w+i)*2 + 1] = ( p[(j*w+i)*2 + 1] + tau * G[1] ) / f;
 		}
 	}
 

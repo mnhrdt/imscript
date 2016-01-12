@@ -25,7 +25,7 @@
 
 #define EARTH_RADIUS 6378000.0
 
-static int tiff_cache_interpolate_float(float *result,
+static void tiff_cache_interpolate_float(float *result,
 		struct tiff_tile_cache *t,
 		float x, float y)
 {

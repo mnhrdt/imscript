@@ -163,7 +163,9 @@ static void random_search(float *cost, float *out_h, float *init_h,
 
 	float min_off = PM_MIN();
 	float max_off = PM_MAX();
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif//OPENMP
 	for (int j = 0; j < t->h; j++)
 	for (int i = 0; i < t->w; i++)
 	{
@@ -193,7 +195,9 @@ static void backward_propagation(float *cost, float *height,
 		fprintf(stderr, "bp_%d %p %p %d\n", k, t+k, t[k].r, t[k].w);
 
 	int neigs[4][2] = { {1,0}, {0,1}, {-1,0}, {0,-1}};
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif//OPENMP
 	for (int j = 0; j < t->h; j++)
 	for (int i = 0; i < t->w; i++)
 	{
@@ -221,7 +225,9 @@ static void backward_propagation2(float *cost, float *height,
 		fprintf(stderr, "bp2_%d %p %p %d\n", k, t+k, t[k].r, t[k].w);
 
 	int neigs[4][2] = { {1,0}, {0,1}, {-1,0}, {0,-1}};
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif//OPENMP
 	for (int i = t->w-1; i >= 0; i--)
 	for (int j = t->h-1; j >= 0; j--)
 	{

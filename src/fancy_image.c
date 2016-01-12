@@ -203,7 +203,7 @@ static void interpret_options(struct FI *f, char *options_arg)
 void create_iio_file(char *filename, int w, int h, int spp)
 {
 	int n = w * h * spp;
-	char *buf = xmalloc(n);
+	uint8_t *buf = xmalloc(n);
 	memset(buf, 0, n);
 	iio_save_image_uint8_vec(filename, buf, w, h, spp);
 	free(buf);

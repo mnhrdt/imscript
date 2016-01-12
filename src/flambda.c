@@ -2397,8 +2397,8 @@ static void run_program_vectorially_fancy(struct fancy_image *out,
 
 		for (int l = 0; l < r; l++)
 		{
-			int r = fancy_image_setsample(out, i, j, l, result[l]);
-			if (!r)
+			int R = fancy_image_setsample(out, i, j, l, result[l]);
+			if (!R)
 				fail("cannot set sample (%d,%d)[%d] to %g!\n",
 					i, j, l, result[l]);
 		}
