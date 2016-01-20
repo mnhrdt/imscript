@@ -2968,7 +2968,7 @@ static bool seekable_filenameP(const char *filename)
 		return false;
 #ifdef I_CAN_POSIX
 	FILE *f = xfopen(filename, "r");
-	int r = lseek(f, 0, SEEK_CUR);
+	int r = fseek(f, 0, SEEK_CUR);
 	xfclose(f);
 	return r != -1;
 #else
