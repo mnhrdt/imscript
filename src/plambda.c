@@ -1800,8 +1800,7 @@ static void vstack_apply_function(struct value_vstack *s,
 	float r[PLAMBDA_MAX_PIXELDIM];
 	FORI(f->nargs)
 		d[i] = vstack_pop_vector(v[i], s);
-	// the d[i] which are larger than one must be equal
-	FORI(f->nargs)
+	FORI(f->nargs) // the d[i] which are larger than one must be equal
 		if (d[i] > 1) {
 			if (rd > 1 && d[i] != rd)
 				fail("can not vectorize (%d %d)", rd, d[i]);

@@ -15,16 +15,28 @@ void cast_vertical_shadows(float *xx, int w, int h, float alpha)
 	float slope = tan(alpha * M_PI / 180);
 	fprintf(stderr, "casting shadows with slope %g\n", slope);
 
-	// process each column independently
-	for (int i = 0; i < w; i++)
-	{
-		int l = 0;
-		for (int j = 0; j < h; j++)
-			if (x[j][i] < slope * (j - l) + x[l][i])
-				x[j][i] = NAN;
-			else
-				l = j;
-	}
+	if (alpha <= 0)
+		// process each column independently
+		for (int i = 0; i < w; i++)
+		{
+			int l = 0;
+			for (int j = 0; j < h; j++)
+				if (x[j][i] < slope * (j - l) + x[l][i])
+					x[j][i] = NAN;
+				else
+					l = j;
+		}
+	else
+		for (int i = 0; i < w; i++)
+		{
+			float slop = tan((180-alpha)*M_PI/180);
+			int l = h-1;
+			for (int j = h-1; j >= 0; j--)
+				if (x[j][i] < slop * (l - j) + x[l][i])
+					x[j][i] = NAN;
+				else
+					l = j;
+		}
 }
 
 #define MAIN_VERTSHADOW
