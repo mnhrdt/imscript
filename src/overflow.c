@@ -1,9 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include "iio.h"
 #include "fail.c"
 #include "xmalloc.c"
 #include "xfopen.c"
+
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846264338328
+#endif
+
 
 static void setpixel(float *x, int w, int h, int pd, int i, int j, float *v)
 {
@@ -24,12 +31,22 @@ static void overlay_one_inplace(
 {
 	float (*px)[pw][pd] = (void*)ppx;
 	float dxy[2] = {dx, dy};
+	float sina = sin(angle*M_PI/180.0);
+	float cosa = cos(angle*M_PI/180.0);
 	for (int j = 0; j < ph; j++)
 	for (int i = 0; i < pw; i++)
 	{
-		setpixel(ox, w, h, pd, posx+i   , posy+j   , px[j][i]);
-		setpixel(oy, w, h, pd, posx+dx+i, posy+dy+j, px[j][i]);
-		setpixel(of, w, h, 2 , posx+i   , posy+j   , dxy);
+		float cij[2] = {i - pw/2.0, j - ph/2.0};
+		float ai = pw/2.0 + zoom * ( cosa * cij[0] + sina * cij[1]);
+		float aj = ph/2.0 + zoom * (-sina * cij[0] + cosa * cij[1]);
+		ai = round(ai);
+		aj = round(aj);
+		float adxy[2] = {dx + ai - i, dy + aj - j};
+		// TODO: correct re-sampling (!)
+
+		setpixel(ox,w,h,pd, posx + i      , posy + j      , px[j][i]);
+		setpixel(oy,w,h,pd, posx + dx + ai, posy + dy + aj, px[j][i]);
+		setpixel(of,w,h,2 , posx + i      , posy + j      , adxy);
 	}
 }
 
