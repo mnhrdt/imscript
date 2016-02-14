@@ -53,6 +53,7 @@ The conventions are the following:
 		* has a few arguments with long names explaining their purpose
 		* has many single-letter local variables
 		* does not do any actual computation, just passes stuff around
+	2.25. Every "file.c" contains an example "main", usable standalone
 
 
 2. Naming conventions
@@ -60,7 +61,7 @@ The conventions are the following:
 	3.1. All C symbols are 100% lowercase
 	3.2. All macros are 100% uppercase
 	3.3. Function names are very long and descriptive
-	3.4. Local variables are typically single letters
+	3.4. Local variables are preferably single letters
 	3.5. Struct tags have long and descriptive names
 	3.6. Struct fields have short names, often single letters
 	3.7. Global and static variables must have very long and obnoxious names
@@ -84,12 +85,12 @@ struct" is useless because it creates more problems than it solves.
 I contend that it is better to use raw C data.  Thus, an image is
 represented by three variables: a pointer to the RGB pixel values, an
 integer representing the width and an integer representing the
-height.  
+height.
 
 The typical reply that I receive is that this data is incomplete to
 describe an image: Are the pixels stored by rows or by columns?  Are
 the RGB values contiguous or separated into planes?  These problems
-are typically solved by creating an image "object", that hides them
+are often solved by creating an image "object", that hides them
 as implementation details and provides a well-defined interface.  I
 agree that this is a good solution, but not the only one.  A
 different solution, as proposed by NIPL, is to fix definite answers
