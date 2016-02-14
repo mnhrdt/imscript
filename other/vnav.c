@@ -591,6 +591,40 @@ static void action_save_shot(struct FTR *f)
 	shot_counter += 1;
 }
 
+static void action_save_fancy_shot(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	static int scx = 1;
+	char fname[FILENAME_MAX];
+	{ // screenshot
+		snprintf(fname, FILENAME_MAX, "/tmp/vnav_shot_%d.png", scx);
+		iio_save_image_uint8_vec(fname, f->rgb, f->w, f->h, 3);
+		fprintf(stderr, "saved shot \"%s\"\n", fname);
+	}
+	{ // data shot
+		snprintf(fname, FILENAME_MAX, "/tmp/vnav_dshot_%d.tiff", scx);
+		iio_save_image_float(fname, e->strip, e->strip_w, e->strip_h);
+	}
+	{ // gradient shot
+		snprintf(fname, FILENAME_MAX, "/tmp/vnav_gshot_%d.tiff", scx);
+		float *gg = xmalloc(e->strip_w * e->strip_h * 2 * sizeof*gg);
+		float (*g)[e->strip_w][2] = (void*)gg;
+		for (int j = 0; j < e->strip_h; j++)
+		for (int i = 0; i < e->strip_w; i++)
+		{
+			float theta = i * 2 * M_PI / e->strip_w;
+			float Z =-e->dip_a * sin(theta) + e->dip_b * cos(theta);
+			//float magic_factor = n_theta / M_PI;
+			//int i_z = magic_factor * z;
+			g[j][i][0] = Z/hypot(1, Z);
+			g[j][i][1] = -1/hypot(1, Z);
+		}
+		iio_save_image_float_vec(fname, gg, e->strip_w, e->strip_h, 2);
+		free(gg);
+	}
+	scx += 1;
+}
+
 
 
 
@@ -983,7 +1017,8 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'z') action_change_nrandom_by_factor(f, 2);
 	if (k == 'x') action_change_nrandom_by_factor(f, 0.5);
 
-	if (k == ';') action_save_shot(f);
+	if (k == ',') action_save_shot(f);
+	if (k == ';') action_save_fancy_shot(f);
 
 	//if (k == 'p') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1.1);
 	//if (k == 'm') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1/1.1);
