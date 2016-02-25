@@ -122,8 +122,8 @@ static void getmusigmamass(float musigmamass[3], float *l, int n)
 static void plot_cline2(float *l, int n)
 {
 	printf("set samples 1000\n");
-	printf("set logscale x\n");
-	printf("set logscale y\n");
+	//printf("set logscale x\n");
+	//printf("set logscale y\n");
 	printf("plot \"-\" w lines title \"data\"");
 	float musigmamass[3];
 	getmusigmamass(musigmamass, l, n);

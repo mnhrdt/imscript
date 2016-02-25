@@ -814,6 +814,9 @@ static float eval_colonvar(int w, int h, int i, int j, int c)
 	case 't': return atan2((2.0/(h-1))*j-1,(2.0/(w-1))*i-1);
 	case 'I': return symmetrize_index_inside(i,w);
 	case 'J': return symmetrize_index_inside(j,h);
+	case 'L': {double x = symmetrize_index_inside(i,w);
+		  double y = symmetrize_index_inside(j,h);
+		  return -(x*x+y*y);}
 	case 'W': return w/(2*M_PI);
 	case 'H': return h/(2*M_PI);
 	default: fail("unrecognized colonvar \":%c\"", c);
