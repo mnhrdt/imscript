@@ -122,6 +122,8 @@ static void getmusigmamass(float musigmamass[3], float *l, int n)
 static void plot_cline2(float *l, int n)
 {
 	printf("set samples 1000\n");
+	printf("set logscale x\n");
+	printf("set logscale y\n");
 	printf("plot \"-\" w lines title \"data\"");
 	float musigmamass[3];
 	getmusigmamass(musigmamass, l, n);
@@ -131,10 +133,10 @@ static void plot_cline2(float *l, int n)
 	float alpha_g = mass/(sigma*sqrt(2*3.1416));
 	float alpha_l = mass/(sigma*sqrt(2));
 	fprintf(stderr, "mass = %g\n", mass);
-	printf(",(%g)*exp(-(x-(%g))**2/(2*(%g)**2)) title \"normal\"",
-			alpha_g, mu, sigma);
-	printf(",(%g)*exp(-abs(x-(%g))*sqrt(2)/(%g)) title \"laplacian\"",
-			alpha_l, mu, sigma);
+	//printf(",(%g)*exp(-(x-(%g))**2/(2*(%g)**2)) title \"normal\"",
+	//		alpha_g, mu, sigma);
+	//printf(",(%g)*exp(-abs(x-(%g))*sqrt(2)/(%g)) title \"laplacian\"",
+	//		alpha_l, mu, sigma);
 	printf("\n");
 	for (int i = 0; i < n; i++)
 	{
