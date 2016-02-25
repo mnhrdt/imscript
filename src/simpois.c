@@ -311,6 +311,8 @@ int main(int argc, char *argv[])
 	char *filename_o = pick_option(&argc, &argv, "o", "-"); // stdout
 	char *filename_m = pick_option(&argc, &argv, "m", "");
 	char *filename_f = pick_option(&argc, &argv, "f", "");
+	if (!strcmp(filename_f, "-") && !strcmp(filename_i, "-"))
+		filename_i = "NAN";
 
 	// if any arguments are left, print a help message and quit
 	if (argc > 1) {
@@ -335,7 +337,7 @@ int main(int argc, char *argv[])
 	// read input image ("boundary")
 	int w, h, pd;
 	float *img_i = NULL;
-	if (*filename_i)
+	if (*filename_i && strcmp(filename_i, "NAN"))
 		img_i = iio_read_image_float_split(filename_i, &w, &h, &pd);
 
 	// if requested, read data image
