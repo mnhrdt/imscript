@@ -87,10 +87,10 @@ static int good_modulus(int nn, int p)
 static int positive_reflex(int n, int p)
 {
 	int r = good_modulus(n, 2*p);
-	if (r == p)
-		r -= 1;
+	if (r == p) r -= 1;
 	if (r > p)
 		r = 2*p - r;
+	if (n < 0 && p > 1) r += 1;
 	//assert(r >= 0);
 	//assert(r < p);
 	return r;
@@ -134,16 +134,17 @@ static getsample_operator get_sample_operator(getsample_operator o)
 	char *option = getenv("GETPIXEL"), *endptr;
 	if (!option) return o;
 #ifdef NAN
-	if (0 == strcmp(option, "nan"      )) return getsample_nan;
+	if (0 == strcmp(option, "nan"      ))  return getsample_nan;
 #endif//NAN
-	if (0 == strcmp(option, "segfault" )) return getsample_error;
-	if (0 == strcmp(option, "error"    )) return getsample_error;
-	if (0 == strcmp(option, "abort"    )) return getsample_abort;
-	if (0 == strcmp(option, "exit"    ))  return getsample_exit;
-	if (0 == strcmp(option, "periodic" )) return getsample_per;
-	if (0 == strcmp(option, "constant" )) return getsample_0;
-	if (0 == strcmp(option, "reflex"   )) return getsample_2;
-	if (0 == strcmp(option, "symmetric")) return getsample_2;
+	if (0 == strcmp(option, "segfault" ))  return getsample_error;
+	if (0 == strcmp(option, "error"    ))  return getsample_error;
+	if (0 == strcmp(option, "abort"    ))  return getsample_abort;
+	if (0 == strcmp(option, "exit"    ))   return getsample_exit;
+	if (0 == strcmp(option, "periodic" ))  return getsample_per;
+	if (0 == strcmp(option, "constant" ))  return getsample_0;
+	if (0 == strcmp(option, "nearest"   )) return getsample_1;
+	if (0 == strcmp(option, "reflex"   ))  return getsample_2;
+	if (0 == strcmp(option, "symmetric"))  return getsample_2;
 	float value = strtof(option, &endptr);
 	if (endptr != option) {
 		getsample_constant(&value, 0, 0, 0, 0, 0, 0);
