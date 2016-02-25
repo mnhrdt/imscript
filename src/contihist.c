@@ -341,41 +341,21 @@ void fill_continuous_histogram_simple(
 		o[i][0] = m + i * (M - m) / n;
 		o[i][1] = 0;
 	}
-	odump("/tmp/dch_simp_0.txt", o, n);
 
 	// compute 2nd derivative of histogram
 	for (int j = 0; j < h - 1; j++)
 	for (int i = 0; i < w - 1; i++)
 	{
-		float q[4];
+		float q[4]; // here we store the 4 values of the cell at (i,j)
 		copy_cell_values(q, x, w, h, i, j);
 		sort_four_values(q);
 		accumulate_jumps_for_one_cell(o, n, m, M, q);
 	}
-	odump("/tmp/dch_simp_1.txt", o, n);
 
 	// integrate twice
 	integrate_values(o, n);
-	odump("/tmp/dch_simp_2.txt", o, n);
 	integrate_values(o, n);
-	odump("/tmp/dch_simp_3.txt", o, n);
 }
-
-
-#if  0
-		// compute bins associated to this cell
-		int i_A = ifloatbin(nbins, min, max, A);
-		int i_B = ifloatbin(nbins, min, max, B);
-		int i_C = ifloatbin(nbins, min, max, C);
-		int i_D = ifloatbin(nbins, min, max, D);
-
-		// accumulate bins
-		bin[i_A][1] += 2 / (C + D - B - A) / (B - A);
-		bin[i_B][1] -= 2 / (C + D - B - A) / (B - A);
-		bin[i_A][1] += 2 / (C + D - B - A) / (D - C);
-		bin[i_B][1] -= 2 / (C + D - B - A) / (D - C);
-#endif
-
 
 void accumulate_histogram(long double (*h)[2], int n)
 {
