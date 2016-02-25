@@ -303,7 +303,7 @@ static float kernel_2d_ilogr(float x, float y, float *p)
 	float sigma = p[1];
 
 	float a = hypot(x, y) / sigma;
-	float r = a ? 1/log(1+a) : 1;
+	float r = a ? 1/log(1.1+a) : 1;
 	return r;
 }
 
