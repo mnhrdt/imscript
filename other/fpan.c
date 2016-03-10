@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #include "iio.h"
 
@@ -53,6 +54,7 @@ struct pan_state {
 	// 2. view port parameters
 	double zoom_factor, offset_x, offset_y;
 	double a, b;
+	double aaa[3], bbb[3];
 
 	// 3. image pyramid
 	float *pyr_rgb[MAX_PYRAMID_LEVELS];
@@ -267,6 +269,10 @@ static void action_center_contrast_at_point(struct FTR *f, int x, int y)
 	pixel(c, e, p[0], p[1]);
 	float C = (c[0] + c[1] + c[2])/3;
 
+	e->bbb[0] = 127.5 - e->a * c[0];
+	e->bbb[1] = 127.5 - e->a * c[1];
+	e->bbb[2] = 127.5 - e->a * c[2];
+
 	e->b = 127.5 - e->a * C;
 
 	f->changed = 1;
@@ -277,8 +283,11 @@ static void action_contrast_span(struct FTR *f, float factor)
 	struct pan_state *e = f->userdata;
 
 	float c = (127.5 - e->b)/ e->a;
+	float ccc[3];
+	for(int l=0;l<3;l++) ccc[l] = (127.5 - e->bbb[l]) / e->a;
 	e->a *= factor;
 	e->b = 127.5 - e->a * c;
+	for(int l=0;l<3;l++) e->bbb[l] = 127.5 - e->a * ccc[l];
 
 	f->changed = 1;
 }
@@ -335,7 +344,8 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 			if (!isfinite(c[l]))
 				cc[l] = 0;
 			else {
-				float g = e->a * c[l] + e->b;
+				//float g = e->a * c[l] + e->b;
+				float g = e->a * c[l] + e->bbb[l];
 				if      (g < 0)   cc[l] = 0  ;
 				else if (g > 255) cc[l] = 255;
 				else              cc[l] = g  ;
