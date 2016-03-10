@@ -1,46 +1,41 @@
-#include <math.h>
-#include <stdlib.h>
-#include <string.h>
+#include <math.h> // NAN
+#include <stdlib.h> // malloc, free
+#include <string.h> // memcpy
 
 // construct the symmetric boundary of an image
-// (assumes the color channels are split)
-static void construct_symmetric_boundary(float *xx, int w, int h, int pd)
+static void construct_symmetric_boundary(float *xx, int w, int h)
 {
-	float (*x)[h][w] = (void*)xx;
+	float (*x)[w] = (void*)xx;
 
 	// 4 corners
-	for (int l = 0; l < pd; l++)
 	{
-		float v = x[l][0][0]+x[l][h-1][0]+x[l][0][w-1]+x[l][h-1][w-1];
-		x[l][0][0] -= v / 4;
-		x[l][h-1][0] -= v / 4;
-		x[l][0][w-1] -= v / 4;
-		x[l][h-1][w-1] -= v/4;
+		float v = x[0][0] + x[h-1][0] + x[0][w-1] + x[h-1][w-1];
+		x[0][0]     -= v / 4;
+		x[h-1][0]   -= v / 4;
+		x[0][w-1]   -= v / 4;
+		x[h-1][w-1] -= v / 4;
 	}
 
 	// vertical sides
-	for (int l = 0; l < pd; l++)
 	for (int j = 1; j < h-1; j++)
 	{
-		float v = x[l][j][0] + x[l][j][w-1];
-		x[l][j][0]   -= v / 2;
-		x[l][j][w-1] -= v / 2;
+		float v = x[j][0] + x[j][w-1];
+		x[j][0]   -= v / 2;
+		x[j][w-1] -= v / 2;
 	}
 
 	// horizontal sides
-	for (int l = 0; l < pd; l++)
 	for (int i = 1; i < w-1; i++)
 	{
-		float v = x[l][0][i] + x[l][h-1][i];
-		x[l][0][i]   -= v / 2;
-		x[l][h-1][i] -= v / 2;
+		float v = x[0][i] + x[h-1][i];
+		x[0][i]   -= v / 2;
+		x[h-1][i] -= v / 2;
 	}
 
 	// interior
-	for (int l = 0; l < pd; l++)
 	for (int j = 1; j < h - 1; j++)
 	for (int i = 1; i < w - 1; i++)
-		x[l][j][i] = NAN;
+		x[j][i] = NAN;
 }
 
 // extrapolate by nearest value (useful for Neumann boundary conditions)
@@ -68,7 +63,8 @@ static void zoom_out_by_factor_two(float *out, int ow, int oh,
 		a[3] = getpixel(in, iw, ih, 2*i+1, 2*j+1);
 		int cx = 0;
 		for (int k = 0; k < 4; k++)
-			if (isfinite(a[k])) {
+			if (isfinite(a[k]))
+			{
 				m += a[k];
 				cx += 1;
 			}
@@ -115,7 +111,7 @@ static void zoom_in_by_factor_two(float *out, int ow, int oh,
 // inpaint the NAN values of an image
 void simplest_inpainting(float *x, int w, int h)
 {
-	float *init = malloc(w * h * sizeof*init);
+	float *y = malloc(w * h * sizeof*y);
 	if (w > 1 || h > 1)
 	{
 		int ws = ceil(w/2.0);
@@ -123,30 +119,30 @@ void simplest_inpainting(float *x, int w, int h)
 		float *xs  = malloc(ws * hs * sizeof*xs);
 		zoom_out_by_factor_two(xs, ws, hs, x, w, h);
 		simplest_inpainting(xs, ws, hs);
-		zoom_in_by_factor_two(init, w, h, xs, ws, hs);
+		zoom_in_by_factor_two(y, w, h, xs, ws, hs);
 		free(xs);
 	}
 	for (int i = 0; i < w*h; i++)
 		if (isnan(x[i]))
-			x[i] = init[i];
-	free(init);
-}
-
-// inpaint the NAN values of an image (with split channels)
-void simplest_inpainting_separate(float *in, int w, int h, int pd)
-{
-	for (int l = 0; l < pd; l++)
-		simplest_inpainting(in + w*h*l, w, h);
+			x[i] = y[i];
+	free(y);
 }
 
 // fill-in the periodic component of an image (with split channels)
-void ppsmooth(float *y, float *x, int w, int h, int pd)
+void ppsmooth(float *y, float *x, int w, int h)
 {
-	memcpy(y, x, w*h*pd*sizeof*x);
-	construct_symmetric_boundary(y, w, h, pd);
-	simplest_inpainting_separate(y, w, h, pd);
-	for (int i = 0; i < w*h*pd; i++)
+	memcpy(y, x, w*h*sizeof*x);
+	construct_symmetric_boundary(y, w, h);
+	simplest_inpainting(y, w, h);
+	for (int i = 0; i < w*h; i++)
 		y[i] = x[i] - y[i];
+}
+
+// call ppsmooth for all the images in an array
+void ppsmooth_split(float *y, float *x, int w, int h, int pd)
+{
+	for (int l = 0; l < pd; l++)
+		ppsmooth(y + l*w*h, x + l*w*h, w, h);
 }
 
 
@@ -168,7 +164,7 @@ int main(int c, char *v[])
 	float *x = iio_read_image_float_split(filename_i, &w, &h, &pd);
 	float *y = malloc(w*h*pd*sizeof*y);
 
-	ppsmooth(y, x, w, h, pd);
+	ppsmooth_split(y, x, w, h, pd);
 
 	iio_save_image_float_split(filename_o, y, w, h, pd);
 
