@@ -30,6 +30,10 @@ static void get_rminmax(float *rmin, float *rmax, float *x, int n, int rb)
 	free(tx);
 }
 
+
+#include "smapa.h"
+SMART_PARAMETER_SILENT(QAUTOR,0.5)
+
 int main(int c, char *v[])
 {
 	if (c != 3 && c != 2 && c != 1) {
@@ -44,7 +48,7 @@ int main(int c, char *v[])
 	float *x = iio_read_image_float_vec(in, &w, &h, &pd);
 
 	float rmin, rmax;
-	get_rminmax(&rmin, &rmax, x, w*h*pd, w*h*pd/200);
+	get_rminmax(&rmin, &rmax, x, w*h*pd, w*h*pd/(100/QAUTOR()));
 	fprintf(stderr, "qauto: rminmax = %g %g\n", rmin, rmax);
 
 	uint8_t *y = xmalloc(w*h*pd);
