@@ -1507,6 +1507,7 @@ static void process_token(struct plambda_program *p, const char *tokke)
 				t->colonvar = magic;
 			}
 			char *iopos = tok_end ? strchr(tok_end, ';') : 0;
+			if (!iopos && tok_end) iopos = strchr(tok_end, ',');
 			if (iopos) {
 				t->type = PLAMBDA_IMAGEOP; // comma operator
 				parse_imageop(1+iopos, &t->imageop_operator,
