@@ -7,7 +7,7 @@
 
 // The data structure.
 //
-// The fieds of this struct are intended to be read by the users.
+// The fields of this struct are intended to be read by the users.
 struct fancy_image {
 	int w;  // width
 	int h;  // height
@@ -30,13 +30,13 @@ struct fancy_image {
 // (the cache size is honored only for tiled tiffs)
 //
 // The default options are the following:
-// 	r,megabytes=100,octaves=0,verbose=0
+// 	"r,megabytes=100,octaves=0,verbose=0"
 //
 // Options for reading and writing an existing file
-// 	rw
+// 	"rw"
 //
 // Options for creating a new file
-// 	c,width=*,height=*,pd=*,type=*[,tw=*,th=*]
+// 	"c,width=*,height=*,pd=*,type=*[,tw=*,th=*]"
 //
 struct fancy_image *fancy_image_open(char *filename, char *options);
 
