@@ -804,6 +804,7 @@ static int symmetrize_index_inside(int i, int m)
 // the value of colon variables depends on the position within the image
 static float eval_colonvar(int w, int h, int i, int j, int c)
 {
+	double x, y;
 	switch(c) {
 	case 'i': return i;
 	case 'j': return j;
@@ -816,6 +817,12 @@ static float eval_colonvar(int w, int h, int i, int j, int c)
 	case 't': return atan2((2.0/(h-1))*j-1,(2.0/(w-1))*i-1);
 	case 'I': return symmetrize_index_inside(i,w);
 	case 'J': return symmetrize_index_inside(j,h);
+	case 'L': x = symmetrize_index_inside(i,w);
+		  y = symmetrize_index_inside(j,h);
+		  return -(x*x+y*y);
+	case 'R': x = symmetrize_index_inside(i,w);
+		  y = symmetrize_index_inside(j,h);
+		  return hypot(x, y);
 	case 'W': return w/(2*M_PI);
 	case 'H': return h/(2*M_PI);
 	default: fail("unrecognized colonvar \":%c\"", c);
@@ -1167,7 +1174,7 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 		}
 		return pd;
 	} else
-		fail("magic of kind '%c' is not yed implemented", magic);
+		fail("magic of kind '%c' is not yet implemented", magic);
 
 	return 0;
 }
@@ -1380,6 +1387,7 @@ static void parse_imageop(const char *s, int *op, int *scheme)
 	else if (hassuffix(s, "b")) *scheme = SCHEME_BACKWARD;
 	else if (hassuffix(s, "c")) *scheme = SCHEME_CENTERED;
 	else if (hassuffix(s, "s")) *scheme = SCHEME_SOBEL;
+	else if (hassuffix(s, "p")) *scheme = SCHEME_PREWITT;
 }
 
 static void collection_of_varnames_init(struct collection_of_varnames *x)
@@ -1495,6 +1503,7 @@ static void process_token(struct plambda_program *p, const char *tokke)
 				t->colonvar = magic;
 			}
 			char *iopos = tok_end ? strchr(tok_end, ';') : 0;
+			if (!iopos && tok_end) iopos = strchr(tok_end, ',');
 			if (iopos) {
 				t->type = PLAMBDA_IMAGEOP; // comma operator
 				parse_imageop(1+iopos, &t->imageop_operator,
@@ -2036,6 +2045,8 @@ static float stencil_3x3_dy_backward[9] = {0,-1,0, 0,1,0,  0,0,0};
 static float stencil_3x3_dy_centered[9] = {0,-H,0, 0,0,0,  0,H,0};
 static float stencil_3x3_dy_sobel[9] = {-O,-2*O,-O,  0,0,0, O,2*O,O};
 static float stencil_3x3_dx_sobel[9] = {-O,0,O,  -2*O,0,2*O, -O,0,O};
+static float stencil_3x3_dx_prewitt[9] =  {0,0,0,  0,-H,H, 0,-H,H};
+static float stencil_3x3_dy_prewitt[9] =  {0,0,0,  0,-H,-H, 0,H,H};
 static float stencil_3x3_laplace[9] =  {0,1,0,  1,-4,1, 0,1,0};
 static float stencil_3x3_dxx[9] =  {0,0,0,  1,-2,1, 0,0,0};
 static float stencil_3x3_dyy[9] =  {0,1,0,  0,-2,0, 0,1,0};
@@ -2062,6 +2073,7 @@ static float *get_stencil_3x3(int operator, int scheme)
 			case SCHEME_BACKWARD: return stencil_3x3_dx_backward;
 			case SCHEME_CENTERED: return stencil_3x3_dx_centered;
 			case SCHEME_SOBEL: return stencil_3x3_dx_sobel;
+			case SCHEME_PREWITT: return stencil_3x3_dx_prewitt;
 			default: fail("unrecognized stencil,x scheme %d");
 			}
 		}
@@ -2070,6 +2082,7 @@ static float *get_stencil_3x3(int operator, int scheme)
 			case SCHEME_BACKWARD: return stencil_3x3_dy_backward;
 			case SCHEME_CENTERED: return stencil_3x3_dy_centered;
 			case SCHEME_SOBEL: return stencil_3x3_dy_sobel;
+			case SCHEME_PREWITT: return stencil_3x3_dy_prewitt;
 			default: fail("unrecognized stencil,y scheme %d");
 			}
 		}
@@ -2129,6 +2142,10 @@ static float imageop_scalar(float *img, int w, int h, int pd,
 	return 0;
 }
 
+SMART_PARAMETER_SILENT(SHADOWX,1)
+SMART_PARAMETER_SILENT(SHADOWY,1)
+SMART_PARAMETER_SILENT(SHADOWZ,1)
+
 static float imageop_scalar_fancy(struct fancy_image *img,
 		int ai, int aj, int al, struct plambda_token *t)
 {
@@ -2185,7 +2202,8 @@ static int imageop_vector(float *out, float *img, int w, int h, int pd,
 		if (pd != 1) fail("can not yet compute shadow of a vector");
 		float vdx[3]={1,0,apply_3x3_stencil(img, w,h,pd, ai,aj,0, sx)};
 		float vdy[3]={0,1,apply_3x3_stencil(img, w,h,pd, ai,aj,0, sy)};
-		float sun[3] = {-1, -1, 1}, nor[3];
+		//float sun[3] = {-1, -1, 1}, nor[3];
+		float sun[3] = {-SHADOWX(), -SHADOWY(), SHADOWZ()}, nor[3];
 		vector_product(nor, vdx, vdy, 3, 3);
 		return scalar_product(out, nor, sun, 3, 3); }
 	default: fail("unrecognized imageop %d\n", t->imageop_operator);
@@ -2583,6 +2601,8 @@ verbosity>0?
 " :t\trelative angle from the center of the image\n"
 " :I\thorizontal coordinate of the pixel (centered)\n"
 " :J\tvertical coordinate of the pixel (centered)\n"
+" :R\tcentered distance to the center\n"
+" :L\tminus squared centered distance to the center\n"
 " :W\twidth of the image divided by 2*pi\n"
 " :H\theight of the image divided by 2*pi\n"
 "\n"
@@ -2594,6 +2614,23 @@ verbosity>0?
 " x[0]\t\tvalue of first component of pixel (i,j)\n"
 " x[1]\t\tvalue of second component of pixel (i,j)\n"
 " x(1,2)[3]\tvalue of fourth component of pixel (i+1,j+2)\n"
+"Comma modifiers (pre-defined local operators):\n"
+" a,x\tx-derivative of the image a\n"
+" a,y\ty-derivative\n"
+" a,xx\tsecond x-derivative\n"
+" a,yy\tsecond y-derivative\n"
+" a,xy\tcrossed second derivative\n"
+" a,l\tLaplacian\n"
+" a,g\tgradient\n"
+" a,n\tgradient norm\n"
+" a,d\tdivergence\n"
+" a,S\tshadow operator\n"
+" a,xf\tx-derivative, forward differences\n"
+" a,xb\tx-derivative, backward differences\n"
+" a,xc\tx-derivative, centered differences\n"
+" a,xs\tx-derivative, sobel\n"
+" a,xp\tx-derivative, prewitt\n"
+" etc\n"
 "\n"
 "Stack operators (allow direct manipulation of the stack):\n"
 " del\tremove the value at the top of the stack (ATTTOS)\n"
@@ -2685,15 +2722,6 @@ int main(int c, char **v)
 	if (c == 2 && 0 == strcmp(v[1], "--man")) return do_man();
 
 	return main_images(c, v);
-	//int (*f)(int, char**) = (**v=='c' || c==2) ? main_calc : main_images;
-	//if (f == main_images && c > 2 && 0 == strcmp(v[1], "-c"))
-	//{
-	//	for (int i = 1; i <= c; i++)
-	//		v[i] = v[i+1];
-	//	f = main_calc;
-	//	c -= 1;
-	//}
-	//return f(c,v);
 }
 
 // vim:set foldmethod=marker:

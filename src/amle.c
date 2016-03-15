@@ -162,42 +162,42 @@ static void amle_refine(float *a, float *b, int w, int h,
 	}
 }
 
-static int randombounds(int a, int b)
-{
-	if (b < a)
-		return randombounds(b, a);
-	if (b == a)
-		return b;
-	return a + rand()%(b - a + 1);
-}
+//static int randombounds(int a, int b)
+//{
+//	if (b < a)
+//		return randombounds(b, a);
+//	if (b == a)
+//		return b;
+//	return a + rand()%(b - a + 1);
+//}
 
-static void swap(void *a, void *b, size_t s)
-{
-#if 0
-#error "memcpy is way slower!"
-	char t[s];
-	memcpy(t, a, s);
-	memcpy(a, b, s);
-	memcpy(b, t, s);
-#else
-	char *x = a;
-	char *y = b;
-	for (unsigned int i = 0; i < s; i++, x++, y++)
-	{
-		char t = *x;
-		*x = *y;
-		*y = t;
-	}
-#endif
-}
+//static void swap(void *a, void *b, size_t s)
+//{
+//#if 0
+//#error "memcpy is way slower!"
+//	char t[s];
+//	memcpy(t, a, s);
+//	memcpy(a, b, s);
+//	memcpy(b, t, s);
+//#else
+//	char *x = a;
+//	char *y = b;
+//	for (unsigned int i = 0; i < s; i++, x++, y++)
+//	{
+//		char t = *x;
+//		*x = *y;
+//		*y = t;
+//	}
+//#endif
+//}
 
-static void shuffle(void *t, int n, size_t s)
-{
-	char *c = t;
-
-	for (int i = 0; i < n-1; i++)
-		swap(c + s*i, c + s*randombounds(i, n-1), s);
-}
+//static void shuffle(void *t, int n, size_t s)
+//{
+//	char *c = t;
+//
+//	for (int i = 0; i < n-1; i++)
+//		swap(c + s*i, c + s*randombounds(i, n-1), s);
+//}
 
 SMART_PARAMETER(AMLE_NITER,100)
 
@@ -232,8 +232,8 @@ void amle(float *y, float *x, int w, int h)
 				"iter %d, e = {%g %g}, eactus = {%g %g}\n",
 				iter, e, ea, actus_inf, actus_sup);
 
-		if (0 == iter % 33)
-			shuffle(mask, nmask, sizeof*mask);
+		//if (0 == iter % 33)
+		//	shuffle(mask, nmask, sizeof*mask);
 
 		//if (0 == iter % 10)
 		//	amle_refine(tinf, tsup, w, h, mask, nmask);
