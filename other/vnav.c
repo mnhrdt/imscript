@@ -38,6 +38,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <float.h>
 
 #include <stdint.h>
 #include "iio.h" // (for debug only)
@@ -57,6 +58,10 @@
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
+
+#ifndef M_LN10
+#define M_LN10 2.30258509299404568402
+#endif /* !M_LN10 */
 
 #include "simpois.c"
 
@@ -496,6 +501,305 @@ static void action_compute_hough(struct FTR *f)
 	}
 }
 
+static void compute_orientation(double ** ox, double ** oy,
+		float * img, int X, int Y)
+{
+  int i,x,y;
+
+  /* initialize orientations arrays */
+  *ox = (double *) xmalloc( X * Y * sizeof(double) );
+  *oy = (double *) xmalloc( X * Y * sizeof(double) );
+  for(i=0; i<X*Y; i++) (*ox)[i] = (*oy)[i] = 0.0;
+
+  for(x=1; x<(X-1); x++)
+    for(y=1; y<(Y-1); y++)
+      if( img[ (x+1) + y * X ] != 0.0 && img[ (x-1) + y * X ] != 0.0 &&
+          img[ x + (y+1) * X ] != 0.0 && img[ x + (y-1) * X ] != 0.0 )
+        {
+          double dx = 0.5 * (img[ (x+1) + y * X ] - img[ (x-1) + y * X ]);
+          double dy = 0.5 * (img[ x + (y+1) * X ] - img[ x + (y-1) * X ]);
+          double norm = sqrt( dx*dx + dy*dy );
+
+          if( norm > 20.0 )
+            {
+              (*ox)[x+y*X] = dx;
+              (*oy)[x+y*X] = dy;
+            }
+        }
+}
+
+/*----------------------------------------------------------------------------*/
+/** Compare doubles by relative error.
+
+    The resulting rounding error after floating point computations
+    depend on the specific operations done. The same number computed by
+    different algorithms could present different rounding errors. For a
+    useful comparison, an estimation of the relative rounding error
+    should be considered and compared to a factor times EPS. The factor
+    should be related to the cumulated rounding error in the chain of
+    computation. Here, as a simplification, a fixed factor is used.
+ */
+static int double_equal(double a, double b)
+{
+  double abs_diff,aa,bb,abs_max;
+
+  /* trivial case */
+  if( a == b ) return true;
+
+  abs_diff = fabs(a-b);
+  aa = fabs(a);
+  bb = fabs(b);
+  abs_max = aa > bb ? aa : bb;
+
+  /* DBL_MIN is the smallest normalized number, thus, the smallest
+     number whose relative error is bounded by DBL_EPSILON. For
+     smaller numbers, the same quantization steps as for DBL_MIN
+     are used. Then, for smaller numbers, a meaningful "relative"
+     error should be computed by dividing the difference by DBL_MIN. */
+  if( abs_max < DBL_MIN ) abs_max = DBL_MIN;
+
+  /* equal if relative error <= factor x eps */
+  double RELATIVE_ERROR_FACTOR = 100;
+  return (abs_diff / abs_max) <= (RELATIVE_ERROR_FACTOR * DBL_EPSILON);
+}
+
+/*----------------------------------------------------------------------------*/
+/** Computes the natural logarithm of the absolute value of
+    the gamma function of x using the Lanczos approximation.
+    See http://www.rskey.org/gamma.htm
+
+    The formula used is
+    @f[
+      \Gamma(x) = \frac{ \sum_{n=0}^{N} q_n x^n }{ \Pi_{n=0}^{N} (x+n) }
+                  (x+5.5)^{x+0.5} e^{-(x+5.5)}
+    @f]
+    so
+    @f[
+      \log\Gamma(x) = \log\left( \sum_{n=0}^{N} q_n x^n \right)
+                      + (x+0.5) \log(x+5.5) - (x+5.5) - \sum_{n=0}^{N} \log(x+n)
+    @f]
+    and
+      q0 = 75122.6331530,
+      q1 = 80916.6278952,
+      q2 = 36308.2951477,
+      q3 = 8687.24529705,
+      q4 = 1168.92649479,
+      q5 = 83.8676043424,
+      q6 = 2.50662827511.
+ */
+static double log_gamma_lanczos(double x)
+{
+  static double q[7] = { 75122.6331530, 80916.6278952, 36308.2951477,
+                         8687.24529705, 1168.92649479, 83.8676043424,
+                         2.50662827511 };
+  double a = (x+0.5) * log(x+5.5) - (x+5.5);
+  double b = 0.0;
+  int n;
+
+  for(n=0;n<7;n++)
+    {
+      a -= log( x + (double) n );
+      b += q[n] * pow( x, (double) n );
+    }
+  return a + log(b);
+}
+
+/*----------------------------------------------------------------------------*/
+/** Computes the natural logarithm of the absolute value of
+    the gamma function of x using Windschitl method.
+    See http://www.rskey.org/gamma.htm
+
+    The formula used is
+    @f[
+        \Gamma(x) = \sqrt{\frac{2\pi}{x}} \left( \frac{x}{e}
+                    \sqrt{ x\sinh(1/x) + \frac{1}{810x^6} } \right)^x
+    @f]
+    so
+    @f[
+        \log\Gamma(x) = 0.5\log(2\pi) + (x-0.5)\log(x) - x
+                      + 0.5x\log\left( x\sinh(1/x) + \frac{1}{810x^6} \right).
+    @f]
+    This formula is a good approximation when x > 15.
+ */
+static double log_gamma_windschitl(double x)
+{
+  return 0.918938533204673 + (x-0.5)*log(x) - x
+         + 0.5*x*log( x*sinh(1/x) + 1/(810.0*pow(x,6.0)) );
+}
+
+/*----------------------------------------------------------------------------*/
+/** Computes the natural logarithm of the absolute value of
+    the gamma function of x. When x>15 use log_gamma_windschitl(),
+    otherwise use log_gamma_lanczos().
+ */
+#define log_gamma(x) ((x)>15.0?log_gamma_windschitl(x):log_gamma_lanczos(x))
+
+#define TABSIZE 100000
+static double nfa(int n, int k, double p, double logNT)
+{
+  static double inv[TABSIZE];   /* table to keep computed inverse values */
+  double tolerance = 0.1;       /* an error of 10% in the result is accepted */
+  double log1term,term,bin_term,mult_term,bin_tail,err,p_term;
+  int i;
+
+  /* check parameters */
+  if( n<0 || k<0 || k>n || p<=0.0 || p>=1.0 )
+    fail("nfa: wrong n, k or p values.");
+
+  /* trivial cases */
+  if( n==0 || k==0 ) return logNT;
+  if( n==k ) return logNT + (double) n * log10(p);
+
+  /* probability term */
+  p_term = p / (1.0-p);
+
+  /* compute the first term of the series */
+  /*
+     binomial_tail(n,k,p) = sum_{i=k}^n bincoef(n,i) * p^i * (1-p)^{n-i}
+     where bincoef(n,i) are the binomial coefficients.
+     But
+       bincoef(n,k) = gamma(n+1) / ( gamma(k+1) * gamma(n-k+1) ).
+     We use this to compute the first term. Actually the log of it.
+   */
+  log1term = log_gamma( (double) n + 1.0 ) - log_gamma( (double) k + 1.0 )
+           - log_gamma( (double) (n-k) + 1.0 )
+           + (double) k * log(p) + (double) (n-k) * log(1.0-p);
+  term = exp(log1term);
+
+  /* in some cases no more computations are needed */
+  if( double_equal(term,0.0) )              /* the first term is almost zero */
+    {
+      if( (double) k > (double) n * p )     /* at begin or end of the tail?  */
+        return log1term / M_LN10 + logNT;   /* end: use just the first term  */
+      else
+        return logNT;                       /* begin: the tail is roughly 1  */
+    }
+
+  /* compute more terms if needed */
+  bin_tail = term;
+  for(i=k+1;i<=n;i++)
+    {
+      /*
+         As
+           term_i = bincoef(n,i) * p^i * (1-p)^(n-i)
+         and
+           bincoef(n,i)/bincoef(n,i-1) = n-1+1 / i,
+         then,
+           term_i / term_i-1 = (n-i+1)/i * p/(1-p)
+         and
+           term_i = term_i-1 * (n-i+1)/i * p/(1-p).
+         1/i is stored in a table as they are computed,
+         because divisions are expensive.
+         p/(1-p) is computed only once and stored in 'p_term'.
+       */
+      bin_term = (double) (n-i+1) * ( i<TABSIZE ?
+                   ( inv[i]!=0.0 ? inv[i] : ( inv[i] = 1.0 / (double) i ) ) :
+                   1.0 / (double) i );
+
+      mult_term = bin_term * p_term;
+      term *= mult_term;
+      bin_tail += term;
+      if(bin_term<1.0)
+        {
+          /* When bin_term<1 then mult_term_j<mult_term_i for j>i.
+             Then, the error on the binomial tail when truncated at
+             the i term can be bounded by a geometric series of form
+             term_i * sum mult_term_i^j.                            */
+          err = term * ( ( 1.0 - pow( mult_term, (double) (n-i+1) ) ) /
+                         (1.0-mult_term) - 1.0 );
+
+          /* One wants an error at most of tolerance*final_result, or:
+             tolerance * abs(-log10(bin_tail)-logNT).
+             Now, the error that can be accepted on bin_tail is
+             given by tolerance*final_result divided by the derivative
+             of -log10(x) when x=bin_tail. that is:
+             tolerance * abs(-log10(bin_tail)-logNT) / (1/bin_tail)
+             Finally, we truncate the tail if the error is less than:
+             tolerance * abs(-log10(bin_tail)-logNT) * bin_tail        */
+          if( err < tolerance * fabs(-log10(bin_tail)-logNT) * bin_tail ) break;
+        }
+    }
+  return log10(bin_tail) + logNT;
+}
+
+
+/*----------------------------------------------------------------------------*/
+/* Normalized angle difference between 'a' and the symmetric of 'b'
+   relative to a vertical axis. */
+static double norm_angle_diff(double a, double b)
+{
+  a -= b;
+  while( a <= -0.5*M_PI ) a += M_PI;
+  while( a >   0.5*M_PI ) a -= M_PI;
+
+  return fabs(a) * 2.0 / M_PI;
+}
+
+/*----------------------------------------------------------------------------*/
+static double sin_nfa(double a, double b, double c, double * ox, double * oy,
+               int X, int Y, double p, double logNT)
+{
+  double logNFA;
+  int n = 0;
+  int k = 0;
+  int x,y;
+
+  for(x=0; x<X; x++)
+    {
+      /* compute y coordinate in the sinusoid */
+      y = lrint(360/M_PI*(a*cos(2*M_PI*x/(X-1)) + b*sin(2*M_PI*x/(X-1))) + c);
+
+      /* valid orientation */
+      if( x >= 0 && x < X && y >= 0 && y < Y && (ox[x+y*X] * ox[x+y*X]) != 0.0 )
+        {
+          double deriv = 720/(X-1) * ( -a*sin(2*M_PI*x/(X-1))
+                                      + b*cos(2*M_PI*x/(X-1)) );
+          double norm_angle = atan2(1.0,-deriv);
+          double theta = atan2(oy[x+y*X], ox[x+y*X]);
+
+          ++n; /* a valid point */
+          if( norm_angle_diff(norm_angle,theta) <= p ) ++k; /* aligned point */
+        }
+    }
+
+  /* compute NFA */
+  logNFA = nfa(n,k,p,logNT);
+
+  return logNFA;
+}
+
+
+static void action_nfa(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	double A = e->dip_a;// * pow(2, -e->octave);
+	double B = e->dip_b;// * pow(2, -e->octave);
+	fprintf(stderr, "NFAs(%g,%g)\n", e->dip_a, e->dip_b);
+
+	// the image is (e->strip, e->strip_w, e->strip_h)
+	double *ox, *oy;
+	compute_orientation(&ox, &oy, e->strip, e->strip_w, e->strip_h);
+	double logNT = 10 * log10(e->strip_w * e->strip_h);
+	for (int c = 0; c < e->strip_h; c++)
+	{
+		double NFA = sin_nfa(A, B, c, ox, oy,
+				e->strip_w, e->strip_h, 0.05, logNT);
+		if (NFA < 0 || c == e->strip_h/2)
+		{
+			fprintf(stderr, "\tc = %d\n", c);
+			for (int i = 0; i < e->strip_w; i++)
+		{
+			float a = 2 * M_PI * i / (e->strip_w - 1);
+			float y = 360/M_PI*(A*cos(a) + B*sin(a)) + c;
+			int j = round(y);
+			if (j >= 0 && j < e->strip_h)
+				e->strip[j*e->strip_w+i] = 100000*((i+j)%2);
+		}
+		}
+	}
+	free(ox);
+	free(oy);
+}
 
 
 //static void action_increase_zoom(struct FTR *f, int x, int y)
@@ -1000,6 +1304,8 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 		e->inferno = false;
 		action_compute_hough(f);
 	}
+
+	if (k == 'v') action_nfa(f);
 
 	if (k == 'u') action_toggle_hud(f);
 	if (k == 'c') action_toggle_autocontrast(f);
