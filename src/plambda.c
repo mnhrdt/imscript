@@ -227,6 +227,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <complex.h>
 #include <math.h>
 
 #include "smapa.h"
@@ -375,6 +376,14 @@ static void complex_product(float *xy, float *x, float *y)
 {
 	xy[0] = x[0]*y[0] - x[1]*y[1];
 	xy[1] = x[0]*y[1] + x[1]*y[0];
+}
+
+static void complex_exp(float *y, float *x)
+{
+	complex float xx = x[0] + I * x[1];
+	complex float yy = cexp(xx);
+	y[0] = creal(yy);
+	y[1] = cimag(yy);
 }
 
 static void matrix_product_clean(
@@ -734,6 +743,7 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(random_raw,"rand",-1),
 	REGISTER_FUNCTIONN(from_cartesian_to_polar,"topolar", -2),
 	REGISTER_FUNCTIONN(from_polar_to_cartesian,"frompolar", -2),
+	REGISTER_FUNCTIONN(complex_exp,"cexp", -2),
 	REGISTER_FUNCTIONN(complex_product,"cprod", -3),
 	REGISTER_FUNCTIONN(matrix_product,"mprod",-5),
 	REGISTER_FUNCTIONN(vector_product,"vprod",-5),
@@ -815,6 +825,8 @@ static float eval_colonvar(int w, int h, int i, int j, int c)
 	case 't': return atan2((2.0/(h-1))*j-1,(2.0/(w-1))*i-1);
 	case 'I': return symmetrize_index_inside(i,w);
 	case 'J': return symmetrize_index_inside(j,h);
+	case 'P': return symmetrize_index_inside(i,w)*2*M_PI/w;
+	case 'Q': return symmetrize_index_inside(j,h)*2*M_PI/h;
 	case 'L': x = symmetrize_index_inside(i,w);
 		  y = symmetrize_index_inside(j,h);
 		  return -(x*x+y*y);
@@ -2357,7 +2369,7 @@ int main_calc(int c, char **v)
 		fprintf(stderr, "calculator correspondence \"%s\" = \"%s\"\n",
 				p->var->t[i], v[i+1]);
 
-	xsrand(SRAND());
+	xsrand(100+SRAND());
 
 	float out[pdmax];
 	int od = run_program_vectorially_at(out, p, x, NULL, NULL, pd, 0, 0);
@@ -2437,7 +2449,7 @@ int main_images(int c, char **v)
 		fprintf(stderr, "plambda correspondence \"%s\" = \"%s\"\n",
 				p->var->t[i], v[i+1]);
 
-	xsrand(SRAND());
+	xsrand(100+SRAND());
 
 	//print_compiled_program(p);
 	int pdreal = eval_dim(p, x, pd);
