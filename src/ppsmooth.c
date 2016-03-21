@@ -2,6 +2,7 @@
 #include <stdlib.h> // malloc, free
 #include <string.h> // memcpy
 
+
 // construct the symmetric boundary of an image
 static void construct_symmetric_boundary(float *xx, int w, int h)
 {
@@ -105,7 +106,7 @@ static void zoom_in_by_factor_two(float *out, int ow, int oh,
 	for (int j = 0; j < oh; j++)
 	for (int i = 0; i < ow; i++)
 		out[ow*j+i] = bilinear_interpolation(in, iw, ih,
-						(i-0.5)/2, (j-0.5)/2);
+				(i-0.5)/2, (j-0.5)/2);
 }
 
 // inpaint the NAN values of an image
@@ -152,6 +153,7 @@ void ppsmooth_split(float *y, float *x, int w, int h, int pd)
 #include "pickopt.c"
 int main(int c, char *v[])
 {
+	char *filename_m = pick_option(&c, &v, "m", "");
 	if ((c != 1 && c != 2 && c != 3) || (c>1 && !strcmp(v[1], "-h"))) {
 		fprintf(stderr, "usage:\n\t%s [in [out]]\n", *v);
 		//                          0  1   2
@@ -167,6 +169,12 @@ int main(int c, char *v[])
 	ppsmooth_split(y, x, w, h, pd);
 
 	iio_save_image_float_split(filename_o, y, w, h, pd);
+
+	if (*filename_m) {
+		for (int i = 0; i < w*h*pd; i++)
+			y[i] = x[i] - y[i];
+		iio_save_image_float_split(filename_m, y, w, h, pd);
+	}
 
 	return 0;
 }
