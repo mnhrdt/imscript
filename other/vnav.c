@@ -784,7 +784,7 @@ static void action_nfa(struct FTR *f)
 	{
 		double NFA = sin_nfa(A, B, c, ox, oy,
 				e->strip_w, e->strip_h, 0.05, logNT);
-		if (NFA < 0 || c == e->strip_h/2)
+		if (NFA < 0)// || c == e->strip_h/2)
 		{
 			fprintf(stderr, "\tc = %d\n", c);
 			for (int i = 0; i < e->strip_w; i++)
@@ -1442,8 +1442,8 @@ int main_pan(int c, char *v[])
 	e->randomized = 0;
 	e->autocontrast = true;
 	font_fill_from_bdf(&e->font, FONT_BDF_FILE);
-	e->tensor = 0;
-	e->ntensor = 3;
+	e->tensor = 1;
+	e->ntensor = 5;
 	e->inferno = true;
 	e->infernal_a = INFERNAL_A();
 	e->infernal_b = INFERNAL_B();
