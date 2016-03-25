@@ -255,6 +255,9 @@ static void action_qauto(struct FTR *f)
 
 	e->a = 255 / ( M - m );
 	e->b = 255 * m / ( m - M );
+	e->bbb[0] = e->b;
+	e->bbb[1] = e->b;
+	e->bbb[2] = e->b;
 
 	f->changed = 1;
 }

@@ -9,8 +9,8 @@ WFLAGS=
 CFLAGS = $(WFLAGS)
 CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE -fopenmp
 CFLAGS = $(WFLAGS) -O3
-CFLAGS = $(WFLAGS) -g
 CFLAGS = $(WFLAGS) -O3 -DNDEBUG
+CFLAGS = $(WFLAGS) -g
 
 SRCDIR = src
 BINDIR = bin
@@ -61,7 +61,7 @@ endif
 
 
 SRC = $(SRCIIO) $(SRCFFT) $(SRCGSL)
-PROGRAMS = $(addprefix $(BINDIR)/,$(SRC) flow_ms rgfield rgfields rgfieldst elap2 flambda fancy_zoomout fancy_downsa)
+PROGRAMS = $(addprefix $(BINDIR)/,$(SRC) flow_ms rgfield rgfields rgfieldst elap2 flambda fancy_zoomout fancy_downsa fancy_crop)
 
 
 .PHONY: default
@@ -125,6 +125,9 @@ $(BINDIR)/fancy_zoomout: $(addprefix $(SRCDIR)/,fancy_zoomout.c fancy_image.o ii
 	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS)
 
 $(BINDIR)/fancy_downsa: $(addprefix $(SRCDIR)/,fancy_downsa.c fancy_image.o iio.o)
+	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS)
+
+$(BINDIR)/fancy_crop: $(addprefix $(SRCDIR)/,fancy_crop.c fancy_image.o iio.o)
 	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS)
 
 .PHONY: clean
