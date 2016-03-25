@@ -2639,8 +2639,13 @@ verbosity>0?
 
 static int do_man(void)
 {
+#ifdef __OpenBSD__
+#define MANPIPE "|mandoc -a"
+#else
+#define MANPIPE "|man -l -"
+#endif
 	return system("help2man -N -S imscript -n \"evaluate an expression "
-				"with images as variables\" plambda|man -l -");
+				"with images as variables\" plambda" MANPIPE);
 }
 
 int main(int c, char **v)
