@@ -252,7 +252,9 @@ static enum font_data_format packing_unstring(char *s)
 static struct bitmap_font reformat_font(struct bitmap_font f,
 		enum font_data_format fmt)
 {
-	uint8_t *(*transform)(uint8_t *t, int, int*);
+	fprintf(stderr, "reformat_font(%s -> %s)\n",
+			packing_string(f.packing), packing_string(fmt));
+	uint8_t *(*transform)(uint8_t *t, int, int*) = NULL;
 
 	if (fmt == f.packing) {
 		return f;
@@ -265,6 +267,14 @@ static struct bitmap_font reformat_font(struct bitmap_font f,
 		transform = alloc_and_transform_from_BIT_to_RLE1;
 	} else if (f.packing == RLE && fmt == UNPACKED) {
 		transform = alloc_and_transform_from_RLE1_to_BIT;
+	} else if (f.packing == PCXX85 && fmt == UNPACKED) {
+		// PCXX85 -x85toraw-> PCX -pcxtoraw-> PACKED -rawtobit-> UNPACKED
+	// TODO arrays of transforms (turn this function from code to data)
+	f.data = alloc_and_transform_from_X85_to_RAW(f.data, f.ndata, &f.ndata);
+	f.data = alloc_and_transform_from_RLE8_to_RAW(f.data, f.ndata, &f.ndata);
+	f.data = alloc_and_transform_from_RAW_to_BIT(f.data, f.ndata, &f.ndata);
+	f.packing = UNPACKED;
+	return f;
 	} else if (fmt == DIFF) {
 		f = reformat_font(f, PACKED);
 		transform = alloc_and_transform_diff;
@@ -307,9 +317,11 @@ static struct bitmap_font reformat_font(struct bitmap_font f,
 				f.number_of_glyphs);
 		transform = alloc_and_transform_from_BIT_to_RLE1;
 	} else
-		fail("unimplemented conversion \"%s\"\n", packing_string(fmt));
+		fail("unimplemented conversion \"%s\"=>\"%s\"\n",
+				packing_string(f.packing), packing_string(fmt));
 
-	f.data = transform(f.data, f.ndata, &f.ndata);
+	if (transform)
+		f.data = transform(f.data, f.ndata, &f.ndata);
 	f.packing = fmt;
 	return f;
 
