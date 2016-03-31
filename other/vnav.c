@@ -53,8 +53,6 @@
 
 #define WHEEL_FACTOR 1.4
 
-#define FONT_BDF_FILE "/home/coco/.fonts2/9x15.bdf"
-
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -73,6 +71,8 @@
 
 #define OMIT_MAIN_FONTU
 #include "fontu.c"
+#define FONT_BDF_FILE "/home/coco/.fonts2/9x15.bdf"
+#include "xfont9x15.c"
 
 
 
@@ -1441,7 +1441,8 @@ int main_pan(int c, char *v[])
 	e->post_blur_type = "cauchy";
 	e->randomized = 0;
 	e->autocontrast = true;
-	font_fill_from_bdf(&e->font, FONT_BDF_FILE);
+	//font_fill_from_bdf(&e->font, FONT_BDF_FILE);
+	e->font = *xfont9x15;
 	e->tensor = 1;
 	e->ntensor = 5;
 	e->inferno = true;
