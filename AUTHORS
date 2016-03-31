@@ -6,6 +6,7 @@ Carlo de Franchis (patches, features)
 Nicolas Limare (first makefile)
 Nicola Pierazzo (patches)
 Thibaud Briand (patches)
+Rafael Grompone von Gioi (nfa algorithms)
 
 
 
@@ -14,3 +15,19 @@ ACKNOWLEDGEMENTS (testing, corrections and bug reports)
 Roberto Pablo Pérez Palomares
 Martin Etchart
 Juan Cardelino
+
+
+CODE STOLEN FROM:
+
+David Tschumperlé (X11 interfacing)
+Julien Pilet (cmphomod)
+Lionel Moisan, Pascal Monasse (fundamental matrices, splines)
+Javier Sánchez (optical flow)
+Daniel Atkinson (linear algebra, ccmath)
+Linas Vepstas (vvector.h)
+
+
+
+NOTE: If I have forgotten some names, this is an involuntary error and I am
+ashamed of it.  Please tell me as soon as possible and I will add the missing
+names. --enric
