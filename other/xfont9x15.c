@@ -41,4 +41,4 @@ unsigned char xfont9x15_data[] =
 "8?VG]_7(<y-K(+,3V-lddo1|]{oRRwV]Qr.6F3ZJJl(=3W1((LU4<XSn((W}YmV31m^.[}CH3UFRn"
 "-4U(U=u0Px==Xvz(yD(a2Tv3z=uC7I==Xvz(<mpf(/>T/=uC:ReOPqI-ldX_-PD+q-B_f}gEyTdRS"
 "3aF=uC:R==P.X<XQbNO:))zH5n8_(CH7V2@@;b-AioQ*gaTn)qQ2n(+9e4";
-struct bitmap_font xfont9x15[1] = {{256, 9, 15, PCXX85, 0, "xfont9x15", xfont9x15_data}};
+struct bitmap_font xfont9x15[1] = {{256, 9, 15, PCXX85, 3215, "xfont9x15", xfont9x15_data}};

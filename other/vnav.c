@@ -1443,6 +1443,7 @@ int main_pan(int c, char *v[])
 	e->autocontrast = true;
 	//font_fill_from_bdf(&e->font, FONT_BDF_FILE);
 	e->font = *xfont9x15;
+	e->font = reformat_font(e->font, UNPACKED);
 	e->tensor = 1;
 	e->ntensor = 5;
 	e->inferno = true;
