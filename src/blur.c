@@ -285,7 +285,9 @@ static float kernel_2d_invr(float x, float y, float *p)
 	float sigma = p[1];
 
 	float a = hypot(x, y) / sigma;
+	//float a = hypot(x, y);
 	float r = a ? 1/a : 1;
+	//float r = a ? 1/a : 0;
 	return r;
 }
 
@@ -298,13 +300,23 @@ static float kernel_2d_ynvr(float x, float y, float *p)
 	return r;
 }
 
+SMART_PARAMETER_SILENT(LOGDESP,1.1)
+
 static float kernel_2d_ilogr(float x, float y, float *p)
 {
 	float sigma = p[1];
 
 	float a = hypot(x, y) / sigma;
-	float r = a ? 1/log(1.1+a) : 1;
+	float r = a ? 1/log(LOGDESP()+a) : 1;
 	return r;
+}
+
+static float kernel_2d_logr(float x, float y, float *p)
+{
+	float sigma = p[1];
+	float r = hypot(x, y);
+	float v = r ? -log(r) : sigma;
+	return v;
 }
 
 
@@ -414,6 +426,7 @@ void blur_2d(float *y, float *x, int w, int h, int pd,
 	case 'y': f = kernel_2d_ynvr;   break;
 	case 'z': f = kernel_2d_ilogr;   break;
 	case 't': f = kernel_2d_r2logr;   break;
+	case 'o': f = kernel_2d_logr;   break;
 	default: fail("unrecognized kernel name \"%s\"", kernel_id);
 	}
 

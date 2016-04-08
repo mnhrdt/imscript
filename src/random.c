@@ -130,4 +130,32 @@ static double random_pareto(void)
 	return exp(random_exponential());
 }
 
+// This function samples a stable variable of parameters (alpha,beta)
+//
+// The algorithm is copied verbatim from formulas (2.3) and (2.4) in
+//     Chambers, J. M.; Mallows, C. L.; Stuck, B. W. (1976).
+//     "A Method for Simulating Stable Random Variables".
+//     Journal of the American Statistical Association 71 (354): 340–344.
+//     doi:10.1080/01621459.1976.10480344.
+//
+// Observation: the algorithm is numerically imprecise when alpha approaches 1.
+// TODO: implement appropriate rearrangements as suggested in the article.
+static double random_stable(double alpha, double beta)
+{
+	double U = (random_uniform() - 0.5) * M_PI;
+	double W = random_exponential();
+	double z = -beta * tan(M_PI * alpha / 2);
+	double x = alpha == 1 ? M_PI/2 : atan(-z) / alpha;
+	if (alpha == 0) {
+		double a = (M_PI/2 + beta * U) * tan(U);
+		double b = log(((M_PI/2) * W * cos(U)) / ((M_PI/2) + beta * U));
+		return (a - beta * b) / x;
+	} else {
+		double a = pow(1 + z * z, 1 / (2*alpha));
+		double b = sin(alpha * (U + x)) / pow(cos(U), 1/alpha);
+		double c = pow(cos(U - alpha*(U + x)) / W, (1 - alpha) / alpha);
+		return a * b * c;
+	}
+}
+
 #endif//_RANDOM_C
