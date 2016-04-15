@@ -146,16 +146,22 @@ static double random_stable(double alpha, double beta)
 	double W = random_exponential();
 	double z = -beta * tan(M_PI * alpha / 2);
 	double x = alpha == 1 ? M_PI/2 : atan(-z) / alpha;
-	if (alpha == 0) {
+	//fprintf(stderr, "U=%g W=%g z=%g x=%g\t\t", U, W, z, x);
+	double r = NAN;
+	if (alpha == 1) {
 		double a = (M_PI/2 + beta * U) * tan(U);
 		double b = log(((M_PI/2) * W * cos(U)) / ((M_PI/2) + beta * U));
-		return (a - beta * b) / x;
+		//fprintf(stderr, "a=%g b=%g\n", a, b);
+		r = (a - beta * b) / x;
 	} else {
 		double a = pow(1 + z * z, 1 / (2*alpha));
 		double b = sin(alpha * (U + x)) / pow(cos(U), 1/alpha);
 		double c = pow(cos(U - alpha*(U + x)) / W, (1 - alpha) / alpha);
-		return a * b * c;
+		//fprintf(stderr, "a=%g b=%g c=%g\n", a, b, c);
+		r = a * b * c;
 	}
+	//fprintf(stderr, "s(%g,%g) = %g\n", alpha, beta, r);
+	return r;
 }
 
 #endif//_RANDOM_C
