@@ -1293,7 +1293,7 @@ void metatiler(char *command, char **fname_in, int n_in,
 	{
 		struct tiff_info *ta = tinfo_in + 0;
 		struct tiff_info *tb = tinfo_in + i;
-		if (ta->w != tb->w || ta->h != ta->h)
+		if (ta->w != tb->w || ta->h != tb->h)
 			fail("image \"%s\" size mismatch (%dx%d != %dx%d)\n",
 				fname_in[i], ta->w, ta->h, tb->w, tb->h);
 		if (ta->ntiles != tb->ntiles)
