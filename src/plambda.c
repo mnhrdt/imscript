@@ -772,6 +772,7 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(random_exponential,"rande",-1),
 	REGISTER_FUNCTIONN(random_pareto,"randp",-1),
 	REGISTER_FUNCTIONN(random_raw,"rand",-1),
+	REGISTER_FUNCTIONN(random_stable,"rands",2),
 	REGISTER_FUNCTIONN(from_cartesian_to_polar,"topolar", -2),
 	REGISTER_FUNCTIONN(from_polar_to_cartesian,"frompolar", -2),
 	REGISTER_FUNCTIONN(complex_exp,"cexp", -2),

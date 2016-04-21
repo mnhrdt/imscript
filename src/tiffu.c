@@ -1090,6 +1090,7 @@ static void create_zero_tiff_file(char *filename, int w, int h,
 		int tw, int th, int spp, int bps, char *fmt, bool incomplete,
 		bool compressed)
 {
+	//fprintf(stderr, "cztf\"%s\" w=%d h=%d tw=%d th=%d spp=%d bps=%d fmt=%s i=%d c=%d\n", filename, w, h, tw, th, spp, bps, fmt, incomplete, compressed);
 	//if (bps != 8 && bps != 16 && bps == 32 && bps != 64
 	//		&& bps != 128 && bps != 92)
 	//	fail("bad bps=%d", bps);
