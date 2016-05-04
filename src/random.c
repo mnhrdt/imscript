@@ -1,48 +1,44 @@
 #ifndef _RANDOM_C
 #define _RANDOM_C
 
-
-
-
-#ifdef RNG_SPECIFIC_WELL1024
-#include "well1024.c"
-#else
+#include <math.h>
 #include <stdlib.h>
-#endif
+#include <limits.h>
+#include <stdint.h>
 
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846264338328
-#endif
+// Why write a simple random number generator here?
+// It is the easiest way to fullfill the following requirements
+// 	1. very fast, negligible memory usage
+// 	2. generates the same sequence on any architecture
+// 	3. do not have annoying warnings (e.g. unsafe rand() in openbsd).
+// Strong non-requirements:
+// 	1. cryptographicaly secure
+// 	2. pass fancy statistical tests
+
+static uint64_t lcg_knuth_seed = 0;
+
+void lcg_knuth_srand(unsigned int x)
+{
+	lcg_knuth_seed = x;
+}
+
+unsigned int lcg_knuth_rand(void)
+{
+	lcg_knuth_seed *= 6364136223846793005;
+	lcg_knuth_seed += 1442695040888963407;
+	return lcg_knuth_seed;
+}
 
 
 static void xsrand(unsigned int seed)
 {
-#ifdef RNG_SPECIFIC_WELL1024
-	well1024_seed(seed);
-#else
-#  ifndef __OpenBSD__
-	srand(seed);
-#  endif
-#endif
+	lcg_knuth_srand(seed);
 }
 
 static int xrand(void)
 {
-#ifdef RNG_SPECIFIC_WELL1024
-	int r;
-# ifdef _OPENMP
-# pragma omp critical
-# endif
-	r = RAND_MAX * well1024();
-	return r;
-#else
-#ifdef __OpenBSD__
-	return arc4random();
-#else
-	return rand();
-#endif
-#endif
+	return lcg_knuth_rand();
 }
 
 static double random_raw(void)
@@ -52,20 +48,7 @@ static double random_raw(void)
 
 static double random_uniform(void)
 {
-#ifdef RNG_SPECIFIC_WELL1024
-	double r;
-# ifdef _OPENMP
-# pragma omp critical
-# endif
-	r = well1024();
-	return r;
-#else
-#ifdef __OpenBSD__
-	return arc4random_uniform(RAND_MAX)/(0.0+RAND_MAX);
-#else
-	return rand()/(1.0+RAND_MAX);
-#endif
-#endif
+	return lcg_knuth_rand()/(0.0+UINT_MAX);
 }
 
 static double random_ramp(void)
@@ -76,6 +59,10 @@ static double random_ramp(void)
 	double y = fmax(x1, x2);
 	return y;
 }
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846264338328
+#endif
 
 static double random_normal(void)
 {
@@ -92,11 +79,7 @@ int randombounds(int a, int b)
 		return randombounds(b, a);
 	if (b == a)
 		return b;
-#ifdef __OpenBSD__
-	return a + arc4random_uniform(b - a + 1);
-#else
-	return a + rand()%(b - a + 1);
-#endif
+	return a + lcg_knuth_rand() % (b - a + 1);
 }
 
 static double random_laplace(void)
