@@ -174,6 +174,7 @@ static int x_keycode_to_keysym(struct _FTR *f, int keycode)
 static int keycode_to_ftr(struct _FTR *f, int keycode, int keystate)
 {
 	int key = x_keycode_to_keysym(f, keycode);
+	//fprintf(stderr, "keycode to keysym : %d => %d\n", keycode, key);
 
 	if (keycode == 9)   return 27;    // ascii ESC
 	if (keycode == 119) return 127;   // ascii DEL
@@ -336,8 +337,10 @@ static void process_next_event(struct FTR *ff)
 		XKeyEvent e = event.xkey;
 		//f->handle_key(ff, e.keycode, e.state, e.x, e.y);
 		//int keysym = XKeycodeToKeysym(f->display, e.keycode, e.state);
+		if (e.keycode != 77) {
 		int key = keycode_to_ftr(f, e.keycode, e.state);
 		f->handle_key(ff, key, e.state, e.x, e.y);
+		}
 	}
 }
 
