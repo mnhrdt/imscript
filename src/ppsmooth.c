@@ -4,7 +4,7 @@
 
 
 // construct the symmetric boundary of an image
-static void construct_symmetric_boundary(float *xx, int w, int h)
+static void construct_symmetric_boundary_old(float *xx, int w, int h)
 {
 	float (*x)[w] = (void*)xx;
 
@@ -37,6 +37,21 @@ static void construct_symmetric_boundary(float *xx, int w, int h)
 	for (int j = 1; j < h - 1; j++)
 	for (int i = 1; i < w - 1; i++)
 		x[j][i] = NAN;
+}
+
+static void construct_symmetric_boundary(float *x, int w, int h)
+{
+	long double sum = 0;
+	for (int i = 0; i < w*h; i++)
+		sum += x[i];
+	float avg = sum / (w*h);
+
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+		if (i == 0 || j == 0 || i == w-1 || j == h-1)
+			x[j*w+i] -= avg;
+		else
+			x[j*w+i] = NAN;
 }
 
 // extrapolate by nearest value (useful for Neumann boundary conditions)
