@@ -48,10 +48,14 @@ struct pan_state {
 
 	// 4. local state
 	int scroll_domain;
+	int f_changed;
+	int show_bundle;
+	double dip_a, dip_b, dip_phi;
 
 	// 5. visualization details
 	int contrast_mode;
 	int head_up_display;
+
 };
 
 // change of coordinates: from window "int" pixels to image "double" point
@@ -68,40 +72,18 @@ static void window_to_frequency(double p[2], struct pan_state *e, int i, int j)
 	p[1] = e->f_offset[1] + j / e->f_zoom;
 }
 
+static int gmod(int x, int m)
+{
+	int r = x % m;
+	return r < 0 ? r + m : r;
+}
+
 static float getsample_0(float *x, int w, int h, int pd, int i, int j, int l)
 {
 	if (i < 0 || i >= w) return 0;
 	if (j < 0 || j >= h) return 0;
 	return x[pd*(j*w+i)+l];
 }
-
-//static void interpolate_at(float *out, float *x, int w, int h, float p, float q)
-//{
-//	out[0] = getsample_0(x, w, h, (int)p, (int)q, 0);
-//	out[1] = getsample_0(x, w, h, (int)p, (int)q, 1);
-//	out[2] = getsample_0(x, w, h, (int)p, (int)q, 2);
-//}
-
-static int mod(int n, int p)
-{
-	if (p < 1)
-		fail("bad modulus %d\n", p);
-
-	int r;
-	if (n >= 0)
-		r = n % p;
-	else {
-		r = p - (-n) % p;
-		if (r == p)
-			r = 0;
-	}
-	if (r < 0 || r >= p)
-		fprintf(stderr, "mod(%d,%d)=%d\n",n,p,r);
-	assert(r >= 0);
-	assert(r < p);
-	return r;
-}
-
 
 #include<stdarg.h>
 static void img_debug(float *x, int w, int h, int pd, const char *fmt, ...)
@@ -131,7 +113,7 @@ static void action_offset_viewportf(struct FTR *f, int dx, int dy)
 	e->f_offset[0] -= dx/e->f_zoom;
 	e->f_offset[1] -= dy/e->f_zoom;
 
-	f->changed = 1;
+	e->f_changed = 1;
 }
 
 static void action_reset_zoom_and_position(struct FTR *f)
@@ -141,9 +123,109 @@ static void action_reset_zoom_and_position(struct FTR *f)
 	e->x_octave = e->f_octave = 0;
 	e->x_zoom = e->f_zoom = 1;
 	e->x_offset[0] = e->x_offset[1] = e->f_offset[0] = e->f_offset[1] = 0;
+	e->f_changed = 1;
 
 	f->changed = 1;
 }
+
+static void action_change_zoom_to_factor(struct FTR *f, int x, int y, double F)
+{
+	struct pan_state *e = f->userdata;
+
+	if (F == 1) e->x_octave = 0;
+
+	double c[2];
+	window_to_image(c, e, x, y);
+
+	e->x_zoom = 1/F;
+	e->x_offset[0] = c[0] - x/e->x_zoom;
+	e->x_offset[1] = c[1] - y/e->x_zoom;
+	//fprintf(stderr, "\t zoom changed to %g %g {%g %g}\n", e->zoom_x, e->zoom_y, e->offset_x, e->offset_y);
+
+	f->changed = 1;
+}
+
+static void action_change_fzoom_to_factor(struct FTR *f, int x, int y, double F)
+{
+	struct pan_state *e = f->userdata;
+
+	if (F == 1) e->f_octave = 0;
+
+	double c[2];
+	window_to_frequency(c, e, x, y);
+
+	e->f_zoom = 1/F;
+	e->f_offset[0] = c[0] - x/e->f_zoom;
+	e->f_offset[1] = c[1] - y/e->f_zoom;
+
+	f->changed = 1;
+}
+
+
+static void action_increase_octave(struct FTR *f, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+
+	if (e->x_octave < 10) {
+		e->x_octave += 1;
+		double fac = 1 << e->x_octave;
+		if (e->x_octave < 0) fac = 1.0/(1<<-e->x_octave);
+		action_change_zoom_to_factor(f, x, y, fac);
+	}
+
+	fprintf(stderr, "increased octave to %d\n", e->x_octave);
+}
+
+static void action_decrease_octave(struct FTR *f, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+
+	if (e->x_octave > 0) {
+		e->x_octave -= 1;
+		double fac = 1 << e->x_octave;
+		action_change_zoom_to_factor(f, x, y, fac);
+	}
+	else if (e->x_octave <= 0) {
+		e->x_octave -= 1;
+		double fac = 1.0/(1 << -e->x_octave);
+		action_change_zoom_to_factor(f, x, y, fac);
+	}
+
+	fprintf(stderr, "decreased octave to %d\n", e->x_octave);
+}
+
+static void action_increase_foctave(struct FTR *f, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+
+	if (e->f_octave < 10) {
+		e->f_octave += 1;
+		double fac = 1 << e->f_octave;
+		if (e->f_octave < 0) fac = 1.0/(1<<-e->f_octave);
+		action_change_fzoom_to_factor(f, x, y, fac);
+	}
+
+	fprintf(stderr, "increased foctave to %d\n", e->f_octave);
+}
+
+static void action_decrease_foctave(struct FTR *f, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+
+	if (e->f_octave > 0) {
+		e->f_octave -= 1;
+		double fac = 1 << e->f_octave;
+		action_change_fzoom_to_factor(f, x, y, fac);
+	}
+	else if (e->f_octave <= 0) {
+		e->f_octave -= 1;
+		double fac = 1.0/(1 << -e->f_octave);
+		action_change_fzoom_to_factor(f, x, y, fac);
+	}
+
+	fprintf(stderr, "decreased foctave to %d\n", e->f_octave);
+}
+
 
 static void action_contrast_change(struct FTR *f, float afac, float bshift)
 {
@@ -263,43 +345,85 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	}
 
 	// render frequency domain
+	if (e->f_changed)
 	for (int j = 0; j < f->h; j++)
 	for (int i = 0; i < e->f_w; i++)
 	{
 		double p[2];
 		window_to_frequency(p, e, i, j);
+		p[0] = gmod(p[0], e->w);
+		p[1] = gmod(p[1], e->h);
 		unsigned char *dest = f->rgb + 3 * (j * f->w + i + e->x_w);
 		for (int l = 0; l < 3; l++)
 		{
 			float v = getsample_0(e->f, e->w, e->h, 2*e->pd,
 					p[0], p[1], l);
-			dest[l] = float_to_byte(v);
+			dest[l] = float_to_byte(15*log(fabs(v)));
 		}
 	}
+	else e->f_changed = 0;
+
+	// render sinusoids
+	if (e->show_bundle)
+	for (int j = 0; j < f->h; j++)
+	for (int i = 0; i < e->x_w; i++)
+	{
+		double p[2];
+		window_to_image(p, e, i, j);
+		unsigned char *dest = f->rgb + 3 * (j * f->w + i);
+		double v = sin(p[0] * e->dip_a + p[1] * e->dip_b + e->dip_phi);
+		//double b= getsample_0(e->x, e->w, e->h, e->pd, p[0], p[1], 0);
+		//dest[0] = float_to_byte(127.5 + b*v);
+		//dest[1] = dest[2] = dest[0];
+		//
+		//dest[0] = 0;
+		dest[0] = float_to_byte(255 * (1+v)/2);
+		//dest[1] = dest[2] = dest[0];
+	}
+
 
 	f->changed = 1;
 }
 
+static int symmetrize_index_inside(int i, int m)
+{
+	i = gmod(i, m);
+	assert( i >= 0 && i < m);
+	int r = 0;
+	if (i >= m/2) r = i-m;
+	if (i < m/2) r = i;
+	return r;
+}
+
+
 // update offset variables by dragging
 static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 {
+	//fprintf(stderr, "b=%d, m=%d, x=%d, y=%d\n", b, m, x, y);
 	struct pan_state *e = f->userdata;
 
 	static double ox = 0, oy = 0;
 
 	// right side: show sinusoids
-	if (m == 0 && m >= e->x_w && x < f->w && y >= 0 && y < f->h)
+	if (m == 0 && x >= e->x_w && x < f->w && y >= 0 && y < f->h)
 	{
-		//double arad = e->aradius;
-		//int ia = x - e->strip_w;
-		//int ib = y;
-		//e->dip_a = arad * (ia / (tside - 1.0) - 0.5);
-		//e->dip_b = arad * (ib / (tside - 1.0) - 0.5);
-		//e->show_dip_bundle = true;
+		double p[2], v[2];
+		window_to_frequency(p, e, x - e->x_w, y);
+		v[0] = getsample_0(e->f, e->w, e->h, 2*e->pd, p[0], p[1], 0);
+		v[1] = getsample_0(e->f, e->w, e->h, 2*e->pd, p[0], p[1], 1);
+		double alpha = p[0];
+		double beta = p[1];
+		double phase = atan2(v[1], v[0]);
+		double norma = hypot(v[0], v[1]);
+		fprintf(stderr, "f(%g %g) = %g %g : %g %g\n", p[0], p[1], v[0], v[1], phase, norma);
+		e->dip_a = symmetrize_index_inside(p[0], e->w) * 2*M_PI / e->w;
+		e->dip_b = symmetrize_index_inside(p[1], e->h) * 2*M_PI / e->h;
+		e->dip_phi = phase;
+		e->show_bundle = true;
 		//fprintf(stderr, "show_dip %d %d (%g %g)\n", x, y, e->dip_a, e->dip_b);
 		f->changed = 1;
 	} else {
-		//e->show_dip_bundle = false;
+		e->show_bundle = false;
 		f->changed = 1;
 	}
 
@@ -326,9 +450,14 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 	if (b == FTR_BUTTON_DOWN && ((m==FTR_MASK_SHIFT)||m==FTR_MASK_CONTROL)){
 		action_contrast_span(f, 1.3); return; }
 	//if (b == FTR_BUTTON_MIDDLE) action_print_value_under_cursor(f, x, y);
-	//if (b == FTR_BUTTON_DOWN)   action_increase_octave(f, x, y);
-	//if (b == FTR_BUTTON_UP  )   action_decrease_octave(f, x, y);
-	//if (b == FTR_BUTTON_RIGHT)  action_reset_zoom_and_position(f);
+	if (x < e->x_w) {
+		if (b == FTR_BUTTON_DOWN) action_increase_octave(f, x, y);
+		if (b == FTR_BUTTON_UP  ) action_decrease_octave(f, x, y);
+	} else {
+		if (b == FTR_BUTTON_DOWN) action_increase_foctave(f, x-e->w, y);
+		if (b == FTR_BUTTON_UP  ) action_decrease_foctave(f, x-e->w, y);
+	}
+	if (b == FTR_BUTTON_RIGHT)  action_reset_zoom_and_position(f);
 	if (b == FTR_BUTTON_LEFT) e->scroll_domain = x >= e->x_w;
 }
 
@@ -343,8 +472,8 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
 			k, isprint(k)?k:' ', m, x, y);
 
-	//if (k == '+' || k == '=') action_decrease_octave(f, f->w/2, f->h/2);
-	//if (k == '-') action_increase_octave(f, f->w/2, f->h/2);
+	if (k == '+' || k == '=') action_decrease_octave(f, f->w/2, f->h/2);
+	if (k == '-') action_increase_octave(f, f->w/2, f->h/2);
 
 	if (k == 'u') action_toggle_hud(f);
 
@@ -406,6 +535,8 @@ int main_pan(int c, char *v[])
 	e->contrast_mode = 0;
 	e->head_up_display = true;
 	e->scroll_domain = -1;
+	e->show_bundle = 0;
+	e->f_changed = 0;
 	e->xf_h = BAD_BOUND(200, e->h, 800);
 	e->x_w = e->f_w = BAD_BOUND(200, e->w, 1000);
 
