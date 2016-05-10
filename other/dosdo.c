@@ -51,11 +51,12 @@ struct pan_state {
 	int f_changed;
 	int show_bundle;
 	double dip_a, dip_b, dip_phi;
+	double dip_alpha, dip_beta, dip_val;
 
 	// 5. visualization details
 	int contrast_mode;
 	int head_up_display;
-
+	struct bitmap_font font;
 };
 
 // change of coordinates: from window "int" pixels to image "double" point
@@ -80,6 +81,7 @@ static int gmod(int x, int m)
 
 static float getsample_0(float *x, int w, int h, int pd, int i, int j, int l)
 {
+	if (l >= pd) l = pd - 1;
 	if (i < 0 || i >= w) return 0;
 	if (j < 0 || j >= h) return 0;
 	return x[pd*(j*w+i)+l];
@@ -306,20 +308,12 @@ static void dump_hud(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
 
-	// Data to put on HUD:
-	float first_row, last_row, dip_a, dip_b;
-	double p[2], q[2];
-	window_to_image(p, e, 0, 0);
-	window_to_image(q, e, 0, e->xf_h - 1);
-	first_row = p[1];
-	last_row = q[1];
-
 	uint8_t fg[3] = {0, 255, 0};
 	uint8_t bg[3] = {0, 0, 0};
 	char buf[0x100];
 
-	snprintf(buf, 0x100, "row: %d", (int)first_row);
-	//put_string_in_rgb_image(f->rgb,f->w,f->h,0,0,fg,bg,0,&e->font, buf);
+	snprintf(buf, 0x100, "%g %g : %lf %lf", e->w*e->dip_a/(2*M_PI), e->h*e->dip_b/(2*M_PI), e->dip_val, e->dip_phi);
+	put_string_in_rgb_image(f->rgb,f->w,f->h,e->x_w,0,fg,bg,0,&e->font,buf);
 }
 
 // dump the image acording to the state of the viewport
@@ -354,12 +348,12 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		p[0] = gmod(p[0], e->w);
 		p[1] = gmod(p[1], e->h);
 		unsigned char *dest = f->rgb + 3 * (j * f->w + i + e->x_w);
-		for (int l = 0; l < 3; l++)
-		{
-			float v = getsample_0(e->f, e->w, e->h, 2*e->pd,
-					p[0], p[1], l);
-			dest[l] = float_to_byte(15*log(fabs(v)));
-		}
+		//for (int l = 0; l < 3; l++)
+		//{
+		float v = getsample_0(e->f, e->w, e->h, 2*e->pd, p[0], p[1], 0);
+		dest[0] = float_to_byte(15*log(fabs(v)));
+		dest[1] = dest[2] = dest[0];
+		//}
 	}
 	else e->f_changed = 0;
 
@@ -371,16 +365,16 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		double p[2];
 		window_to_image(p, e, i, j);
 		unsigned char *dest = f->rgb + 3 * (j * f->w + i);
-		double v = sin(p[0] * e->dip_a + p[1] * e->dip_b + e->dip_phi);
+		double v = cos(p[0] * e->dip_a + p[1] * e->dip_b + e->dip_phi);
 		//double b= getsample_0(e->x, e->w, e->h, e->pd, p[0], p[1], 0);
 		//dest[0] = float_to_byte(127.5 + b*v);
 		//dest[1] = dest[2] = dest[0];
 		//
-		//dest[0] = 0;
 		dest[0] = float_to_byte(255 * (1+v)/2);
-		//dest[1] = dest[2] = dest[0];
 	}
 
+	if (e->show_bundle && e->head_up_display)
+		dump_hud(f);
 
 	f->changed = 1;
 }
@@ -411,14 +405,17 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 		window_to_frequency(p, e, x - e->x_w, y);
 		v[0] = getsample_0(e->f, e->w, e->h, 2*e->pd, p[0], p[1], 0);
 		v[1] = getsample_0(e->f, e->w, e->h, 2*e->pd, p[0], p[1], 1);
-		double alpha = p[0];
-		double beta = p[1];
 		double phase = atan2(v[1], v[0]);
 		double norma = hypot(v[0], v[1]);
 		fprintf(stderr, "f(%g %g) = %g %g : %g %g\n", p[0], p[1], v[0], v[1], phase, norma);
 		e->dip_a = symmetrize_index_inside(p[0], e->w) * 2*M_PI / e->w;
 		e->dip_b = symmetrize_index_inside(p[1], e->h) * 2*M_PI / e->h;
 		e->dip_phi = phase;
+		{ // only for HUD
+			e->dip_val = norma;
+			e->dip_alpha = p[0];
+			e->dip_beta = p[1];
+		}
 		e->show_bundle = true;
 		//fprintf(stderr, "show_dip %d %d (%g %g)\n", x, y, e->dip_a, e->dip_b);
 		f->changed = 1;
@@ -505,6 +502,13 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 
 #define BAD_BOUND(a,x,b) ((a)<(x)?((x)<(b)?(x):(b)):(a))
 
+void pan_resize(struct FTR *f, int k, int m, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+	e->xf_h = f->h;
+	e->x_w = e->f_w = f->w/2;
+}
+
 int main_pan(int c, char *v[])
 {
 
@@ -532,13 +536,15 @@ int main_pan(int c, char *v[])
 	e->f_a = 10;
 	e->f_b = 0;
 	e->f_log = 1;
-	e->contrast_mode = 0;
-	e->head_up_display = true;
 	e->scroll_domain = -1;
 	e->show_bundle = 0;
 	e->f_changed = 0;
 	e->xf_h = BAD_BOUND(200, e->h, 800);
-	e->x_w = e->f_w = BAD_BOUND(200, e->w, 1000);
+	e->x_w = e->f_w = BAD_BOUND(100, e->w, 700);
+	e->contrast_mode = 0;
+	e->head_up_display = true;
+	e->font = *xfont9x15;
+	e->font = reformat_font(e->font, UNPACKED);
 
 	// open window
 	struct FTR f = ftr_new_window(e->x_w + e->f_w, e->xf_h);
@@ -548,6 +554,7 @@ int main_pan(int c, char *v[])
 	ftr_set_handler(&f, "button", pan_button_handler);
 	ftr_set_handler(&f, "motion", pan_motion_handler);
 	ftr_set_handler(&f, "expose", pan_exposer);
+	ftr_set_handler(&f, "resize", pan_resize);
 	int r = ftr_loop_run(&f);
 
 	// cleanup and exit (optional)
