@@ -54,6 +54,9 @@ static void construct_symmetric_boundary(float *x, int w, int h)
 			x[j*w+i] = NAN;
 }
 
+static void (*global_boundary_function)(float*,int,int)
+	= construct_symmetric_boundary;
+
 // extrapolate by nearest value (useful for Neumann boundary conditions)
 static float getpixel(float *x, int w, int h, int i, int j)
 {
@@ -148,7 +151,7 @@ void simplest_inpainting(float *x, int w, int h)
 void ppsmooth(float *y, float *x, int w, int h)
 {
 	memcpy(y, x, w*h*sizeof*x);
-	construct_symmetric_boundary(y, w, h);
+	global_boundary_function(y, w, h);
 	simplest_inpainting(y, w, h);
 	for (int i = 0; i < w*h; i++)
 		y[i] = x[i] - y[i];
@@ -169,6 +172,7 @@ void ppsmooth_split(float *y, float *x, int w, int h, int pd)
 int main(int c, char *v[])
 {
 	char *filename_m = pick_option(&c, &v, "m", "");
+	bool old_boundary = pick_option(&c, &v, "o", NULL);
 	if ((c != 1 && c != 2 && c != 3) || (c>1 && !strcmp(v[1], "-h"))) {
 		fprintf(stderr, "usage:\n\t%s [in [out]]\n", *v);
 		//                          0  1   2
@@ -176,6 +180,11 @@ int main(int c, char *v[])
 	}
 	char *filename_i = c > 1 ? v[1] : "-";
 	char *filename_o = c > 2 ? v[2] : "-";
+	if (old_boundary)
+	{
+		fprintf(stderr, "using old boundary\n");
+		global_boundary_function = construct_symmetric_boundary_old;
+	}
 
 	int w, h, pd;
 	float *x = iio_read_image_float_split(filename_i, &w, &h, &pd);
