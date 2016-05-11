@@ -1310,7 +1310,7 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 
 	//fprintf(stderr, "TIFFOpen \"%s\"\n", filename);
 	TIFF *tif = tiffopen_fancy(filename, "r");
-	if (!tif) fail("could not open TIFF file \"%s\"", filename);
+	if (!tif) fail("could not open(r) TIFF file \"%s\"", filename);
 	uint32_t w, h;
 	uint16_t spp, bps, fmt;
 	int r = 0, fmt_iio=-1;
@@ -2630,7 +2630,7 @@ static void iio_save_image_as_tiff(const char *filename, struct iio_image *x)
 	if (x->dimension != 2)
 		fail("only 2d images can be saved as TIFFs");
 	TIFF *tif = TIFFOpen(filename, "w");
-	if (!tif) fail("could not open TIFF file \"%s\"", filename);
+	if (!tif) fail("could not open(w) TIFF file \"%s\"", filename);
 
 	int ss = iio_image_sample_size(x);
 	int sls = x->sizes[0]*x->pixel_dimension*ss;

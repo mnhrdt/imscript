@@ -94,19 +94,19 @@ static void *matrix_build(int w, int h, size_t n)
 	return r;
 }
 
-static double random_uniform(void)
-{
-	return rand()/(RAND_MAX+1.0);
-}
-
-static double random_normal(void)
-{
-	double x1 = random_uniform();
-	double x2 = random_uniform();
-	double y1 = sqrt(-2*log(x1)) * cos(2*M_PI*x2);
-	//double y2 = sqrt(-2*log(x1)) * sin(2*M_PI*x2);
-	return y1;
-}
+//static double random_uniform(void)
+//{
+//	return rand()/(RAND_MAX+1.0);
+//}
+//
+//static double random_normal(void)
+//{
+//	double x1 = random_uniform();
+//	double x2 = random_uniform();
+//	double y1 = sqrt(-2*log(x1)) * cos(2*M_PI*x2);
+//	//double y2 = sqrt(-2*log(x1)) * sin(2*M_PI*x2);
+//	return y1;
+//}
 
 #include <math.h>
 #include <stdbool.h>

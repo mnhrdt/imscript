@@ -667,6 +667,9 @@ static int parse_flow_name(int *vp, int *hidden_id, char *model_name)
 	//return 0;
 }
 
+#include "smapa.h"
+SMART_PARAMETER_SILENT(SYNFLOW_VERBOSE,0)
+
 //static void invert_combi2(double H[15], 
 
 // "API"
@@ -727,9 +730,11 @@ static void produce_flow_model(struct flow_model *f,
 	//	FORI(15) f->iH[i] = invH[i];
 	} else error("flow model \"%s\" not yet implemented", name);
 
-	//FORI(np) fprintf(stderr, "pfm p[%d] = %g\n", i, f->p[i]);
-	//FORI(f->nh) fprintf(stderr, "H[%d] = %g\n", i, f->H[i]);
-	//FORI(f->nh) fprintf(stderr, "invH[%d] = %g\n", i, f->iH[i]);
+	if (SYNFLOW_VERBOSE()) {
+		FORI(np) fprintf(stderr, "pfm p[%d] = %g\n", i, f->p[i]);
+		FORI(f->nh) fprintf(stderr, "H[%d] = %g\n", i, f->H[i]);
+		FORI(f->nh) fprintf(stderr, "invH[%d] = %g\n", i, f->iH[i]);
+	}
 }
 
 static void apply_flowmodel_affine(float y[2], float x[2], double A[6])

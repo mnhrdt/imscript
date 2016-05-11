@@ -84,6 +84,12 @@ static int good_modulus(int nn, int p)
 	return r;
 }
 
+static int gmod(int x, int m)
+{
+	int r = x % m;
+	return r < 0 ? r + m : r;
+}
+
 static int positive_reflex(int n, int p)
 {
 	int r = good_modulus(n, 2*p);
@@ -109,8 +115,8 @@ static float getsample_2(float *x, int w, int h, int pd, int i, int j, int l)
 inline
 static float getsample_per(float *x, int w, int h, int pd, int i, int j, int l)
 {
-	i = good_modulus(i, w);
-	j = good_modulus(j, h);
+	i = gmod(i, w);
+	j = gmod(j, h);
 	return getsample_abort(x, w, h, pd, i, j, l);
 }
 

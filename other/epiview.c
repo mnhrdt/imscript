@@ -91,11 +91,6 @@ static void image_to_window(int ij[2], struct pan_state *e, int idx,
 	ij[1] = lrint(e->zoom[idx] * (y - e->offset[idx][1]));
 	if (idx == 1)
 		ij[0] += e->win_half;
-	if (idx == 0)
-		fprintf(stderr, "itow_[%g %g]{%g}(%g %g) = %d %d\n",
-				e->offset[0][0], e->offset[0][1],
-				e->zoom[0],
-				x, y, ij[0], ij[1]);
 }
 
 static void matrix_transpose(double At[9], double A[9])
@@ -211,31 +206,12 @@ void traverse_segment(int px, int py, int qx, int qy,
 	}
 }
 
-static int gmod(int x, int m)
-{
-	int r = x % m;
-	return r < 0 ? r + m : r;
-}
-
 static float getsample_0(float *x, int w, int h, int pd, int i, int j, int l)
 {
 	if (l >= pd) l = pd - 1;
 	if (i < 0 || i >= w) return 0;
 	if (j < 0 || j >= h) return 0;
 	return x[pd*(j*w+i)+l];
-}
-
-#include<stdarg.h>
-static void img_debug(float *x, int w, int h, int pd, const char *fmt, ...)
-{
-	return;
-	va_list ap;
-	char fname[FILENAME_MAX];
-	va_start(ap, fmt);
-	vsnprintf(fname, FILENAME_MAX, fmt, ap);
-	va_end(ap);
-	fprintf(stderr, "IMG_DEBUG(%dx%d,%d) \"%s\"\n", w, h, pd, fname);
-	iio_save_image_float_vec(fname, x, w, h, pd);
 }
 
 static void action_offset_viewport(struct FTR *f, int dx, int dy)
@@ -279,7 +255,6 @@ static void action_change_zoom_to_factor(struct FTR *f, int x, int y, double F)
 	e->zoom[idx] = 1/F;
 	e->offset[idx][0] = p[0] - x/e->zoom[idx];
 	e->offset[idx][1] = p[1] - y/e->zoom[idx];
-	//fprintf(stderr, "\t zoom changed to %g %g {%g %g}\n", e->zoom_x, e->zoom_y, e->offset_x, e->offset_y);
 
 	f->changed = 1;
 }
@@ -297,8 +272,6 @@ static void action_increase_octave(struct FTR *f, int x, int y)
 		if (e->octave[idx] < 0) fac = 1.0/(1<<-e->octave[idx]);
 		action_change_zoom_to_factor(f, x, y, fac);
 	}
-
-	fprintf(stderr, "increased octave(%d) to %d\n", idx, e->octave[idx]);
 }
 
 static void action_decrease_octave(struct FTR *f, int x, int y)
@@ -318,8 +291,6 @@ static void action_decrease_octave(struct FTR *f, int x, int y)
 		double fac = 1.0/(1 << -e->octave[idx]);
 		action_change_zoom_to_factor(f, x, y, fac);
 	}
-
-	fprintf(stderr, "decreased octave(%idx) to %d\n", idx, e->octave[idx]);
 }
 
 static void action_qauto(struct FTR *f)
@@ -341,7 +312,6 @@ static void action_qauto(struct FTR *f)
 
 static void action_center_contrast_at_point(struct FTR *f, int x, int y)
 {
-	fprintf(stderr, "center contrast at %d %d\n", x, y);
 	struct pan_state *e = f->userdata;
 
 	double p[2], c[3];
@@ -358,7 +328,6 @@ static void action_center_contrast_at_point(struct FTR *f, int x, int y)
 
 static void action_contrast_span(struct FTR *f, int idx, float factor)
 {
-	fprintf(stderr, "contrast span(%d) %g\n", idx, factor);
 	struct pan_state *e = f->userdata;
 
 	for (int l = 0; l < 3; l++)
@@ -395,15 +364,8 @@ static unsigned char float_to_byte(float x)
 	if (isnan(x)) return 0;
 	if (x < 0) return 0;
 	if (x > 255) return 255;
-	// set gamma=2
-	//float r = x * x / 255;
-	//
-	//float n = x / 255;
-	//float r = (n*n)*n;
-	//return r*255;
 	return x;
 }
-
 
 static void dump_hud(struct FTR *f)
 {
@@ -413,9 +375,8 @@ static void dump_hud(struct FTR *f)
 	uint8_t bg[3] = {0, 0, 0};
 	char buf[0x100];
 
-	//snprintf(buf, 0x100, "%g %g : %lf %lf", e->w*e->dip_a/(2*M_PI), e->h*e->dip_b/(2*M_PI), e->dip_val, e->dip_phi);
 	snprintf(buf, 0x100, "abc");
-	put_string_in_rgb_image(f->rgb,f->w,f->h,e->win_half,0,fg,bg,1,&e->font,buf);
+	put_string_in_rgb_image(f->rgb,f->w,f->h,e->win_half,0,fg,bg,0,&e->font,buf);
 }
 
 static void fplot_red(int i, int j, void *ee)
@@ -455,43 +416,18 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	// render epipolars
 	if (e->show_lines && isfinite(e->dip_abc[0]))
 	{
-		if (e->dip_idx == 0) { // point left, line right
-			double from[2], to[2], aa[2], bb[2], *line = e->dip_abc;
-			window_to_image(from, e, e->win_half, 0);
-			window_to_image(to,   e, f->w - 1   , f->h - 1);
-			if (cut_line_with_rectangle(aa, bb, line, from, to)) {
-				int iaa[2], ibb[2];
-				image_to_window(iaa, e, 1, aa[0], aa[1]);
-				image_to_window(ibb, e, 1, bb[0], bb[1]);
-				fprintf(stderr, "li %g %g %g\n",
-						line[0], line[1], line[2]);
-				fprintf(stderr, "\tli (%g %g)-(%g %g)\n",
-						aa[0], aa[1], bb[0], bb[1]);
-				fprintf(stderr, "\tli (%d %d)-(%d %d)\n",
-						iaa[0], iaa[1], ibb[0], ibb[1]);
-				traverse_segment(iaa[0], iaa[1], ibb[0], ibb[1],
-						fplot_red, f);
-			}
-		}
-		if (e->dip_idx == 1) { // point right, line left
-			double from[2], to[2], aa[2], bb[2], *line = e->dip_abc;
-			fprintf(stderr, "li %g %g %g\n",
-					line[0], line[1], line[2]);
-			window_to_image(from, e, 0, 0);
-			window_to_image(to,   e, e->win_half - 1, f->h - 1);
-			fprintf(stderr, "from = %g %g      to = %g %g\n",
-					from[0], from[1], to[0], to[1]);
-			if (cut_line_with_rectangle(aa, bb, line, from, to)) {
-				int iaa[2], ibb[2];
-				image_to_window(iaa, e, 0, aa[0], aa[1]);
-				image_to_window(ibb, e, 0, bb[0], bb[1]);
-				fprintf(stderr, "\tli (%g %g)-(%g %g)\n",
-						aa[0], aa[1], bb[0], bb[1]);
-				fprintf(stderr, "\tli (%d %d)-(%d %d)\n",
-						iaa[0], iaa[1], ibb[0], ibb[1]);
-				traverse_segment(iaa[0], iaa[1], ibb[0], ibb[1],
-						fplot_red, f);
-			}
+		int idx = e->dip_idx;
+		// idx = 0 : dip left, line right
+		// idx = 1 : dip right, line left
+		double from[2], to[2], aa[2], bb[2];
+		window_to_image(from, e, idx ? 0 : e->win_half, 0);
+		window_to_image(to, e, idx ? e->win_half - 1 : f->w, f->h - 1);
+		if (cut_line_with_rectangle(aa, bb, e->dip_abc, from, to)) {
+			int iaa[2], ibb[2];
+			image_to_window(iaa, e, !idx, aa[0], aa[1]);
+			image_to_window(ibb, e, !idx, bb[0], bb[1]);
+			traverse_segment(iaa[0], iaa[1], ibb[0], ibb[1],
+					fplot_red, f);
 		}
 	}
 
@@ -502,21 +438,10 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	f->changed = 1;
 }
 
-static int symmetrize_index_inside(int i, int m)
-{
-	i = gmod(i, m);
-	assert( i >= 0 && i < m);
-	int r = 0;
-	if (i >= m/2) r = i-m;
-	if (i < m/2) r = i;
-	return r;
-}
-
 
 // update offset variables by dragging
 static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 {
-	//fprintf(stderr, "b=%d, m=%d, x=%d, y=%d\n", b, m, x, y);
 	struct pan_state *e = f->userdata;
 
 	static double ox = 0, oy = 0;
@@ -531,9 +456,6 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 			matrix_times_vector(e->dip_abc, e->fmtr, e->dip_pq);
 		if (e->dip_idx == 1) // point is on the right, line on the left
 			matrix_times_vector(e->dip_abc, e->fm, e->dip_pq);
-		fprintf(stderr, "dip(%d){%g %g} = %g %g %g\n", e->dip_idx,
-				e->dip_pq[0], e->dip_pq[1],
-				e->dip_abc[0], e->dip_abc[1], e->dip_abc[2]);
 		f->changed = true;
 	} else e->dip_abc[0] = NAN;
 
@@ -555,7 +477,6 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 	int idx = subwindow(e, xy, xy+1);
 
 	fprintf(stderr, "button b=%d m=%d\n", b, m);
-	//if (b == FTR_BUTTON_MIDDLE) action_print_value_under_cursor(f, x, y);
 	if (b == FTR_BUTTON_UP && (m==FTR_MASK_SHIFT || m==FTR_MASK_CONTROL)) {
 		action_contrast_span(f, idx, 1/1.3); return; }
 	if (b == FTR_BUTTON_DOWN && ((m==FTR_MASK_SHIFT)||m==FTR_MASK_CONTROL)){
@@ -564,12 +485,6 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 	if (b == FTR_BUTTON_UP  ) action_increase_octave(f, x, y);
 	if (b == FTR_BUTTON_RIGHT)  action_reset_zoom_and_position(f);
 	if (b == FTR_BUTTON_LEFT) e->scroll_domain = idx;
-}
-
-void key_handler_print(struct FTR *f, int k, int m, int x, int y)
-{
-	fprintf(stderr, "key pressed %d '%c' (%d) at %d %d\n",
-			k, isalpha(k)?k:' ', m, x, y);
 }
 
 void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
@@ -638,8 +553,6 @@ int main_pan(int c, char *v[])
 	matrix_transpose(e->fmtr, e->fm);
 	for (int i = 0; i < 9; i++)
 		fprintf(stderr, "fm[%d] = %g\n", i, e->fm[i]);
-	for (int i = 0; i < 9; i++)
-		fprintf(stderr, "fmtr[%d] = %g\n", i, e->fmtr[i]);
 
 	// init state
 	e->scroll_domain = 0;

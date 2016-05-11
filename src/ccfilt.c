@@ -1,3 +1,20 @@
+// connected components stuff
+// --------------------------
+//
+//
+// Command line interface:
+//
+// ccfilt count img # print number of connected components of different values
+// ccfilt ids img ids # create an image with consecutive integer indices
+//
+// with the -b option, images are assumed to be binary
+//
+//
+// C interface:
+//
+// 
+//
+//
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -71,3 +88,4 @@ int main(int c, char *v[])
 	free(m);
 	return 0;
 }
+
