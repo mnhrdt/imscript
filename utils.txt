@@ -13,14 +13,17 @@ CORE: generic tools for image processing
 	upsa:     zoom in
 	ntiply:   replicate pixels
 	crop:     extract a region of interest
-	fft/iif:  fourier transform of an image, and its inverse
-	dct:      cosine transform of an image (self-inverse)
+	fft/iif:  discrete fourier transform of an image, and its inverse
+	dct:      discrete cosine transform of an image (self-inverse)
+	dht:      discrete hartley transform of an image (self-inverse)
 	imprintf: print info and statistics of an image
+	fontu:    overlay a text in an image
 	veco:     accumulate values over a list of gray images
 	vecov:    accumulate values over a list of multispectral images
 	imgerr:   compare two images with a single number
 	iion:     copy (useful for converting format)
 	morsi:    elementary gray-level morphological operations
+	simpois:  poisson and bilaplacian iterative solvers
 
 
 NO-CORE: more specific tasks
@@ -33,6 +36,9 @@ NO-CORE: more specific tasks
 	amle:     infinity-laplacian equation
 	siftu:    various mini-utils for dealing with sift points
 	srmatch:  successive multi-scale matching of sift keypoints
+	tiffu:    various mini-utils for dealing with TIFF files
+	nnint:    nearest-neighbor interpolation
+	bdint:    boundary aggregation interpolation
 
 
 FLOW: utils for producing or transforming vector fields
@@ -63,6 +69,21 @@ WANTED: not yet implemented/ported from qnm
 	ccdist:    distance transform
 	cctree:    compute upper/lower/shape tree of a given image
 	ccreco:    reconstruct an image from its tree
+
+GUI: utils with an interactive user interface
+
+	fpan:      visualize an image, with interactive panning and contrast
+	fpantiff:  visualize a huge TIFF image in realtime
+	icrop2:    pipeable interactive crop
+	powerkill: paint in black in the frequency domain
+	rpcflip:   visualize satellite images and their RPC
+	viho:      interactive deformation of an image by an homography
+	vnav:      navigate a borehole image and apply the dip picker transform
+	vhough:    explore the hough transform space side-by-side
+	dosdo:     explore the frequency domain side-by-side
+	epiview:   visualize epipolar lines of a fundamental matrix
+
+
 
 
 
