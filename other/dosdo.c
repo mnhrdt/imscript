@@ -154,7 +154,8 @@ static void action_change_fzoom_to_factor(struct FTR *f, int x, int y, double F)
 	if (F == 1) e->f_octave = 0;
 
 	double c[2];
-	window_to_frequency(c, e, x - e->w, y);
+	x -= e->w;
+	window_to_frequency(c, e, x, y);
 
 	e->f_zoom = 1/F;
 	e->f_offset[0] = c[0] - x/e->f_zoom;
@@ -207,6 +208,7 @@ static void action_increase_foctave(struct FTR *f, int x, int y)
 		action_change_fzoom_to_factor(f, x, y, fac);
 	}
 
+	e->f_changed = 1;
 	fprintf(stderr, "increased foctave to %d\n", e->f_octave);
 }
 
@@ -225,6 +227,7 @@ static void action_decrease_foctave(struct FTR *f, int x, int y)
 		action_change_fzoom_to_factor(f, x, y, fac);
 	}
 
+	e->f_changed = 1;
 	fprintf(stderr, "decreased foctave to %d\n", e->f_octave);
 }
 
@@ -499,15 +502,15 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 			action_contrast_span(f, 1/1.3); return; }
 		if (b == FTR_BUTTON_DOWN && ((m==FTR_MASK_SHIFT)||m==FTR_MASK_CONTROL)){
 			action_contrast_span(f, 1.3); return; }
-		if (b == FTR_BUTTON_DOWN) action_increase_octave(f, x, y);
-		if (b == FTR_BUTTON_UP  ) action_decrease_octave(f, x, y);
+		if (b == FTR_BUTTON_DOWN) action_decrease_octave(f, x, y);
+		if (b == FTR_BUTTON_UP  ) action_increase_octave(f, x, y);
 	} else {
 		if (b == FTR_BUTTON_UP && (m==FTR_MASK_SHIFT || m==FTR_MASK_CONTROL)) {
 			action_contrast_fspan(f, 1/1.3); return; }
 		if (b == FTR_BUTTON_DOWN && ((m==FTR_MASK_SHIFT)||m==FTR_MASK_CONTROL)){
 			action_contrast_fspan(f, 1.3); return; }
-		if (b == FTR_BUTTON_DOWN) action_increase_foctave(f, x-e->w, y);
-		if (b == FTR_BUTTON_UP  ) action_decrease_foctave(f, x-e->w, y);
+		if (b == FTR_BUTTON_DOWN) action_decrease_foctave(f, x, y);
+		if (b == FTR_BUTTON_UP  ) action_increase_foctave(f, x, y);
 	}
 	if (b == FTR_BUTTON_RIGHT)  action_reset_zoom_and_position(f);
 	if (b == FTR_BUTTON_LEFT) e->scroll_domain = x >= e->x_w;
@@ -593,7 +596,7 @@ int main_pan(int c, char *v[])
 	e->f_log = 1;
 	e->scroll_domain = -1;
 	e->show_bundle = 0;
-	e->f_changed = 0;
+	e->f_changed = 1;
 	e->xf_h = BAD_BOUND(200, e->h, 800);
 	e->x_w = e->f_w = BAD_BOUND(100, e->w, 700);
 	e->contrast_mode = 0;
