@@ -38,7 +38,7 @@ struct pan_state {
 	// 1. input image pair and fundamental matrix
 	int w[2], h[2], pd[2];
 	float *x[2];
-	double fm[9];
+	double fm[9], fmtr[9];
 
 	// 2. view port parameters
 	int octave[2];
@@ -51,7 +51,8 @@ struct pan_state {
 	// 4. local state
 	int show_lines;
 	int scroll_domain;
-	double dip_abc[3];
+	double dip_abc[3], dip_pq[3];
+	int dip_idx, dip_xy[2];
 	int lock_transform;
 
 	// 5. visualization details
@@ -81,6 +82,133 @@ static int window_to_image(double p[2], struct pan_state *e, int i, int j)
 	p[0] = e->offset[idx][0] + i / e->zoom[idx];
 	p[1] = e->offset[idx][1] + j / e->zoom[idx];
 	return idx;
+}
+
+static void image_to_window(int ij[2], struct pan_state *e, int idx,
+		double x, double y)
+{
+	ij[0] = lrint(e->zoom[idx] * (x - e->offset[idx][0]));
+	ij[1] = lrint(e->zoom[idx] * (y - e->offset[idx][1]));
+	if (idx == 1)
+		ij[0] += e->win_half;
+	if (idx == 0)
+		fprintf(stderr, "itow_[%g %g]{%g}(%g %g) = %d %d\n",
+				e->offset[0][0], e->offset[0][1],
+				e->zoom[0],
+				x, y, ij[0], ij[1]);
+}
+
+static void matrix_transpose(double At[9], double A[9])
+{
+	for (int j = 0; j < 3; j++)
+	for (int i = 0; i < 3; i++)
+		At[i*3+j] = A[j*3+i];
+}
+
+static void matrix_times_vector(double Ax[3], double A[9], double x[3])
+{
+	Ax[0] = A[0]*x[0] + A[1]*x[1] + A[2]*x[2];
+	Ax[1] = A[3]*x[0] + A[4]*x[1] + A[5]*x[2];
+	Ax[2] = A[6]*x[0] + A[7]*x[1] + A[8]*x[2];
+}
+
+// compute the vector product of two vectors
+static void vector_product(double axb[3], double a[3], double b[3])
+{
+	// a0 a1 a2
+	// b0 b1 b2
+	axb[0] = a[1] * b[2] - a[2] * b[1];
+	axb[1] = a[2] * b[0] - a[0] * b[2];
+	axb[2] = a[0] * b[1] - a[1] * b[0];
+}
+
+// compute the scalar product of two vectors
+static double scalar_product(double a[3], double b[3])
+{
+	return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+
+// cut a line with a segment (returns true if they cut)
+static bool cut_line_with_segment(double out[2], double line[3],
+		double p[2], double q[2])
+{
+	// points in "oriented" projective coordinates
+	double pp[3] = {p[0], p[1], 1};
+	double qq[3] = {q[0], q[1], 1};
+
+	// sign of each point (says on which side of the line each point is)
+	double sp = scalar_product(pp, line);
+	double sq = scalar_product(qq, line);
+
+	// if signs are different, the line crosses the segment
+	if (sp * sq < 0) {
+		// line trough points p and q
+		double pq[3]; vector_product(pq, pp, qq);
+
+		// intersection of "line" and "pq"
+		double ii[3]; vector_product(ii, pq, line);
+
+		// recover affine coordinates
+		out[0] = ii[0] / ii[2];
+		out[1] = ii[1] / ii[2];
+		return true;
+	}
+	return false;
+}
+
+static bool cut_line_with_rectangle(double out_a[2], double out_b[2],
+		double line[3], double rec_from[2], double rec_to[4])
+{
+	// four vertices of the rectangle
+	double v[4][2] = {
+		{ rec_from[0], rec_from[1] },
+		{ rec_to[0]  , rec_from[1] },
+		{ rec_to[0]  , rec_to[1]   },
+		{ rec_from[0], rec_to[1]   }
+	};
+
+	// intersections with each of the edges
+	bool xP[4]; // whether it intersects
+	double x[4][2]; // where it intersects
+	for (int i = 0; i < 4; i++)
+		xP[i] = cut_line_with_segment(x[i], line, v[i], v[ (i+1)%4 ] );
+
+	// write output
+	int n_intersections = xP[0] + xP[1] + xP[2] + xP[3];
+	if (n_intersections == 2) { // generic case: 2 intersections
+		int cx = 0;
+		for (int i = 0; i < 4; i++)
+			if (xP[i])
+			{
+				double *out = cx ? out_b : out_a;
+				out[0] = x[i][0];
+				out[1] = x[i][1];
+				cx += 1;
+			}
+		return true;
+	}
+	return false;
+}
+
+// generic function to traverse a segment between two pixels
+void traverse_segment(int px, int py, int qx, int qy,
+		void (*f)(int,int,void*), void *e)
+{
+	if (px == qx && py == qy)
+		f(px, py, e);
+	else if (qx + qy < px + py) // bad quadrants
+		traverse_segment(qx, qy, px, py, f, e);
+	else {
+		if (qx - px > qy - py || px - qx > qy - py) { // horizontal
+			float slope = (qy - py)/(float)(qx - px);
+			for (int i = 0; i < qx-px; i++)
+				f(i+px, lrint(py + i*slope), e);
+		} else { // vertical
+			float slope = (qx - px)/(float)(qy - py);
+			for (int j = 0; j <= qy-py; j++)
+				f(lrint(px + j*slope), j+py, e);
+		}
+	}
 }
 
 static int gmod(int x, int m)
@@ -162,8 +290,6 @@ static void action_increase_octave(struct FTR *f, int x, int y)
 
 	int xy[2] = {x, y};
 	int idx = subwindow(e, xy, xy+1);
-
-	fprintf(stderr, "increasing octave around %d %d (%d)\n", x, y, idx);
 
 	if (e->octave[idx] < 10) {
 		e->octave[idx] += 1;
@@ -292,6 +418,17 @@ static void dump_hud(struct FTR *f)
 	put_string_in_rgb_image(f->rgb,f->w,f->h,e->win_half,0,fg,bg,1,&e->font,buf);
 }
 
+static void fplot_red(int i, int j, void *ee)
+{
+	struct FTR *f = ee;
+	if (i > 0 && j > 0 && i < f->w && j < f->h)
+	{
+		f->rgb[3*(j*f->w+i)+0] = 255;
+		f->rgb[3*(j*f->w+i)+1] = 0;
+		f->rgb[3*(j*f->w+i)+2] = 0;
+	}
+}
+
 // dump the image acording to the state of the viewport
 static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
@@ -316,9 +453,46 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	}
 
 	// render epipolars
-	if (e->show_lines)
+	if (e->show_lines && isfinite(e->dip_abc[0]))
 	{
-		;
+		if (e->dip_idx == 0) { // point left, line right
+			double from[2], to[2], aa[2], bb[2], *line = e->dip_abc;
+			window_to_image(from, e, e->win_half, 0);
+			window_to_image(to,   e, f->w - 1   , f->h - 1);
+			if (cut_line_with_rectangle(aa, bb, line, from, to)) {
+				int iaa[2], ibb[2];
+				image_to_window(iaa, e, 1, aa[0], aa[1]);
+				image_to_window(ibb, e, 1, bb[0], bb[1]);
+				fprintf(stderr, "li %g %g %g\n",
+						line[0], line[1], line[2]);
+				fprintf(stderr, "\tli (%g %g)-(%g %g)\n",
+						aa[0], aa[1], bb[0], bb[1]);
+				fprintf(stderr, "\tli (%d %d)-(%d %d)\n",
+						iaa[0], iaa[1], ibb[0], ibb[1]);
+				traverse_segment(iaa[0], iaa[1], ibb[0], ibb[1],
+						fplot_red, f);
+			}
+		}
+		if (e->dip_idx == 1) { // point right, line left
+			double from[2], to[2], aa[2], bb[2], *line = e->dip_abc;
+			fprintf(stderr, "li %g %g %g\n",
+					line[0], line[1], line[2]);
+			window_to_image(from, e, 0, 0);
+			window_to_image(to,   e, e->win_half - 1, f->h - 1);
+			fprintf(stderr, "from = %g %g      to = %g %g\n",
+					from[0], from[1], to[0], to[1]);
+			if (cut_line_with_rectangle(aa, bb, line, from, to)) {
+				int iaa[2], ibb[2];
+				image_to_window(iaa, e, 0, aa[0], aa[1]);
+				image_to_window(ibb, e, 0, bb[0], bb[1]);
+				fprintf(stderr, "\tli (%g %g)-(%g %g)\n",
+						aa[0], aa[1], bb[0], bb[1]);
+				fprintf(stderr, "\tli (%d %d)-(%d %d)\n",
+						iaa[0], iaa[1], ibb[0], ibb[1]);
+				traverse_segment(iaa[0], iaa[1], ibb[0], ibb[1],
+						fplot_red, f);
+			}
+		}
 	}
 
 	// render hud
@@ -347,31 +521,21 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 
 	static double ox = 0, oy = 0;
 
-	//// right side: show sinusoids
-	//if (m == 0 && x >= e->x_w && x < f->w && y >= 0 && y < f->h)
-	//{
-	//	double p[2], v[2];
-	//	window_to_frequency(p, e, x - e->x_w, y);
-	//	v[0] = getsample_0(e->f, e->w, e->h, 2*e->pd, p[0], p[1], 0);
-	//	v[1] = getsample_0(e->f, e->w, e->h, 2*e->pd, p[0], p[1], 1);
-	//	double phase = atan2(v[1], v[0]);
-	//	double norma = hypot(v[0], v[1]);
-	//	fprintf(stderr, "f(%g %g) = %g %g : %g %g\n", p[0], p[1], v[0], v[1], phase, norma);
-	//	e->dip_a = symmetrize_index_inside(p[0], e->w) * 2*M_PI / e->w;
-	//	e->dip_b = symmetrize_index_inside(p[1], e->h) * 2*M_PI / e->h;
-	//	e->dip_phi = phase;
-	//	{ // only for HUD
-	//		e->dip_val = norma;
-	//		e->dip_alpha = p[0];
-	//		e->dip_beta = p[1];
-	//	}
-	//	e->show_lines = true;
-	//	//fprintf(stderr, "show_dip %d %d (%g %g)\n", x, y, e->dip_a, e->dip_b);
-	//	f->changed = 1;
-	//} else {
-	//	e->show_lines = false;
-	//	f->changed = 1;
-	//}
+	if (e->show_lines && m == 0)
+	{
+		e->dip_xy[0] = x;
+		e->dip_xy[1] = y;
+		e->dip_pq[2] = 1;
+		e->dip_idx = window_to_image(e->dip_pq, e, x, y);
+		if (e->dip_idx == 0) // point is on the left, line on the right
+			matrix_times_vector(e->dip_abc, e->fmtr, e->dip_pq);
+		if (e->dip_idx == 1) // point is on the right, line on the left
+			matrix_times_vector(e->dip_abc, e->fm, e->dip_pq);
+		fprintf(stderr, "dip(%d){%g %g} = %g %g %g\n", e->dip_idx,
+				e->dip_pq[0], e->dip_pq[1],
+				e->dip_abc[0], e->dip_abc[1], e->dip_abc[2]);
+		f->changed = true;
+	} else e->dip_abc[0] = NAN;
 
 	if (m == FTR_BUTTON_LEFT)
 		action_offset_viewport(f, x - ox, y - oy);
@@ -471,6 +635,11 @@ int main_pan(int c, char *v[])
 	e->x[0] = iio_read_image_float_vec(filename_x, 0+e->w, 0+e->h, 0+e->pd);
 	e->x[1] = iio_read_image_float_vec(filename_y, 1+e->w, 1+e->h, 1+e->pd);
 	read_n_doubles_from_string(e->fm, matrix_str, 9);
+	matrix_transpose(e->fmtr, e->fm);
+	for (int i = 0; i < 9; i++)
+		fprintf(stderr, "fm[%d] = %g\n", i, e->fm[i]);
+	for (int i = 0; i < 9; i++)
+		fprintf(stderr, "fmtr[%d] = %g\n", i, e->fmtr[i]);
 
 	// init state
 	e->scroll_domain = 0;
