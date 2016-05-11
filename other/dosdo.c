@@ -154,7 +154,7 @@ static void action_change_fzoom_to_factor(struct FTR *f, int x, int y, double F)
 	if (F == 1) e->f_octave = 0;
 
 	double c[2];
-	window_to_frequency(c, e, x, y);
+	window_to_frequency(c, e, x - e->w, y);
 
 	e->f_zoom = 1/F;
 	e->f_offset[0] = c[0] - x/e->f_zoom;
@@ -229,16 +229,6 @@ static void action_decrease_foctave(struct FTR *f, int x, int y)
 }
 
 
-static void action_contrast_change(struct FTR *f, float afac, float bshift)
-{
-	struct pan_state *e = f->userdata;
-
-	e->x_a *= afac;
-	e->x_b += bshift;
-
-	f->changed = 1;
-}
-
 static void action_qauto(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
@@ -259,8 +249,49 @@ static void action_qauto(struct FTR *f)
 	f->changed = 1;
 }
 
+static void action_center_contrast_at_point(struct FTR *f, int x, int y)
+{
+	fprintf(stderr, "center contrast at %d %d\n", x, y);
+	struct pan_state *e = f->userdata;
+
+	double p[2];
+	window_to_image(p, e, x, y);
+	float c[3];
+	c[0] = getsample_0(e->x, e->w, e->h, e->pd, p[0], p[1], 0);
+	c[1] = getsample_0(e->x, e->w, e->h, e->pd, p[0], p[1], 1);
+	c[2] = getsample_0(e->x, e->w, e->h, e->pd, p[0], p[1], 2);
+	float C = (c[0] + c[1] + c[2])/3;
+
+	e->x_b = 127.5 - e->x_a * C;
+
+	f->changed = 1;
+}
+
+static void action_center_contrast_at_fpoint(struct FTR *f, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+
+	double p[2];
+	window_to_frequency(p, e, x - e->x_w, y);
+	float c[3];
+	c[0] = getsample_0(e->f, e->w, e->h, 2*e->pd, p[0], p[1], 0);
+	c[1] = getsample_0(e->f, e->w, e->h, 2*e->pd, p[0], p[1], 1);
+	float C = hypot(c[0], c[1]);
+	if (e->f_log)
+		C = log(C);
+
+	fprintf(stderr, "center fcontrast at %d %d (C = %g)\n", x, y, C);
+
+	e->f_b = 127.5 - e->f_a * C;
+
+	e->f_changed = 1;
+	f->changed = 1;
+}
+
+
 static void action_contrast_span(struct FTR *f, float factor)
 {
+	fprintf(stderr, "contrast span %g\n", factor);
 	struct pan_state *e = f->userdata;
 
 	float c = (127.5 - e->x_b)/ e->x_a;
@@ -269,6 +300,20 @@ static void action_contrast_span(struct FTR *f, float factor)
 
 	f->changed = 1;
 }
+
+static void action_contrast_fspan(struct FTR *f, float factor)
+{
+	fprintf(stderr, "contrast span %g\n", factor);
+	struct pan_state *e = f->userdata;
+
+	float c = (127.5 - e->f_b)/ e->f_a;
+	e->f_a *= factor;
+	e->f_b = 127.5 - e->f_a * c;
+
+	e->f_changed = 1;
+	f->changed = 1;
+}
+
 
 static void action_save_shot(struct FTR *f)
 {
@@ -321,7 +366,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
 	struct pan_state *e = f->userdata;
 
-	for (int i = 0; i < f->w * f->h * 3; i++) f->rgb[i] = 0;
+	//for (int i = 0; i < f->w * f->h * 3; i++) f->rgb[i] = 0;
 
 	// render spatial domain
 	for (int j = 0; j < f->h; j++)
@@ -334,7 +379,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		{
 			float v = getsample_0(e->x, e->w, e->h, e->pd,
 					p[0], p[1], l);
-			dest[l] = float_to_byte(v);
+			dest[l] = float_to_byte(e->x_a * v + e->x_b);
 		}
 	}
 
@@ -343,19 +388,21 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	for (int j = 0; j < f->h; j++)
 	for (int i = 0; i < e->f_w; i++)
 	{
-		double p[2];
+		double p[2], w[6];
 		window_to_frequency(p, e, i, j);
 		p[0] = gmod(p[0], e->w);
 		p[1] = gmod(p[1], e->h);
 		unsigned char *dest = f->rgb + 3 * (j * f->w + i + e->x_w);
-		//for (int l = 0; l < 3; l++)
-		//{
-		float v = getsample_0(e->f, e->w, e->h, 2*e->pd, p[0], p[1], 0);
-		dest[0] = float_to_byte(15*log(fabs(v)));
+		w[0] = getsample_0(e->f, e->w, e->h, 2*e->pd, p[0], p[1], 0);
+		w[1] = getsample_0(e->f, e->w, e->h, 2*e->pd, p[0], p[1], 1);
+		double v = hypot(w[0], w[1]);
+		if (e->f_log)
+			dest[0] = float_to_byte(e->f_a * log(v) + e->f_b);
+		else
+			dest[0] = float_to_byte(e->f_a * v + e->f_b);
 		dest[1] = dest[2] = dest[0];
-		//}
 	}
-	else e->f_changed = 0;
+	e->f_changed = 0;
 
 	// render sinusoids
 	if (e->show_bundle)
@@ -432,6 +479,10 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 			action_offset_viewportf(f, x - ox, y - oy);
 	}
 
+	if (m == FTR_MASK_SHIFT  && x < e->x_w)
+		action_center_contrast_at_point(f, x, y);
+	if (m == FTR_MASK_SHIFT  && x >= e->x_w)
+		action_center_contrast_at_fpoint(f, x, y);
 
 	ox = x;
 	oy = y;
@@ -442,15 +493,19 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 	struct pan_state *e = f->userdata;
 
 	fprintf(stderr, "button b=%d m=%d\n", b, m);
-	if (b == FTR_BUTTON_UP && (m==FTR_MASK_SHIFT || m==FTR_MASK_CONTROL)) {
-		action_contrast_span(f, 1/1.3); return; }
-	if (b == FTR_BUTTON_DOWN && ((m==FTR_MASK_SHIFT)||m==FTR_MASK_CONTROL)){
-		action_contrast_span(f, 1.3); return; }
 	//if (b == FTR_BUTTON_MIDDLE) action_print_value_under_cursor(f, x, y);
 	if (x < e->x_w) {
+		if (b == FTR_BUTTON_UP && (m==FTR_MASK_SHIFT || m==FTR_MASK_CONTROL)) {
+			action_contrast_span(f, 1/1.3); return; }
+		if (b == FTR_BUTTON_DOWN && ((m==FTR_MASK_SHIFT)||m==FTR_MASK_CONTROL)){
+			action_contrast_span(f, 1.3); return; }
 		if (b == FTR_BUTTON_DOWN) action_increase_octave(f, x, y);
 		if (b == FTR_BUTTON_UP  ) action_decrease_octave(f, x, y);
 	} else {
+		if (b == FTR_BUTTON_UP && (m==FTR_MASK_SHIFT || m==FTR_MASK_CONTROL)) {
+			action_contrast_fspan(f, 1/1.3); return; }
+		if (b == FTR_BUTTON_DOWN && ((m==FTR_MASK_SHIFT)||m==FTR_MASK_CONTROL)){
+			action_contrast_fspan(f, 1.3); return; }
 		if (b == FTR_BUTTON_DOWN) action_increase_foctave(f, x-e->w, y);
 		if (b == FTR_BUTTON_UP  ) action_decrease_foctave(f, x-e->w, y);
 	}
@@ -533,7 +588,7 @@ int main_pan(int c, char *v[])
 	// init state
 	e->x_a = 1;
 	e->x_b = 0;
-	e->f_a = 10;
+	e->f_a = 15;
 	e->f_b = 0;
 	e->f_log = 1;
 	e->scroll_domain = -1;
