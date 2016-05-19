@@ -8,37 +8,37 @@ This file gives a list of the relevant programs.
 CORE: generic tools for image processing
 
 	plambda:  apply an expression with images as variables
-	blur:     positive parametric linear convolution
+	blur:     convolution by a positive kernel
 	downsa:   zoom out
 	upsa:     zoom in
 	ntiply:   replicate pixels
-	crop:     extract a region of interest
-	fft/iif:  discrete fourier transform of an image, and its inverse
+	crop:     extract a sub-image
+	fft/iift: discrete fourier transform of an image, and its inverse
 	dct:      discrete cosine transform of an image (self-inverse)
 	dht:      discrete hartley transform of an image (self-inverse)
 	imprintf: print info and statistics of an image
 	fontu:    overlay a text in an image
 	veco:     accumulate values over a list of gray images
 	vecov:    accumulate values over a list of multispectral images
-	imgerr:   compare two images with a single number
-	iion:     copy (useful for converting format)
 	morsi:    elementary gray-level morphological operations
 	simpois:  poisson and bilaplacian iterative solvers
+	imgerr:   compare two images (obsoleted by plambda+imprintf)
+	iion:     copy (useful for converting between formats)
 
 
 NO-CORE: more specific tasks
 
-	deframe:  projective crop (defined by 4 points in the image)
-	cdeint:   deinterlace a video frame
-	distance: image of distances to a set of points
-	ransac:   compute robust models from data points
-	elap:     laplace equation with irregular boundary condition
-	amle:     infinity-laplacian equation
-	siftu:    various mini-utils for dealing with sift points
-	srmatch:  successive multi-scale matching of sift keypoints
 	tiffu:    various mini-utils for dealing with TIFF files
+	siftu:    various mini-utils for dealing with sift points
+	ransac:   compute robust models from data points
+	srmatch:  successive multi-scale matching of sift keypoints
+	amle:     infinity-laplacian equation
 	nnint:    nearest-neighbor interpolation
 	bdint:    boundary aggregation interpolation
+	elap:     laplace interpolation (mostly obsoleted by simpois)
+	distance: image of distances to a set of points
+	deframe:  projective crop (defined by 4 points in the image)
+	cdeint:   deinterlace a video frame
 
 
 FLOW: utils for producing or transforming vector fields
