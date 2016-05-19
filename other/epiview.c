@@ -264,6 +264,7 @@ static void action_change_zoom_to_factor(struct FTR *f, int x, int y, double F)
 
 	if (e->lock_transform) {
 		idx = !idx;
+		x += (idx ? -0.5 : 0.5) * e->win_half;
 		if (F == 1) e->octave[idx] = 0;
 		e->zoom[idx] = 1/F;
 		e->offset[idx][0] = p[0] - x/e->zoom[idx];
