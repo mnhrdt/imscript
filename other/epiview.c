@@ -218,8 +218,15 @@ static void action_offset_viewport(struct FTR *f, int dx, int dy)
 {
 	struct pan_state *e = f->userdata;
 	int idx = e->scroll_domain;
+
 	e->offset[idx][0] -= dx/e->zoom[idx];
 	e->offset[idx][1] -= dy/e->zoom[idx];
+
+	if (e->lock_transform) {
+		idx = !idx;
+		e->offset[idx][0] -= dx/e->zoom[idx];
+		e->offset[idx][1] -= dy/e->zoom[idx];
+	}
 
 	f->changed = 1;
 }
@@ -251,10 +258,17 @@ static void action_change_zoom_to_factor(struct FTR *f, int x, int y, double F)
 	int idx = subwindow(e, &x, &y);
 
 	if (F == 1) e->octave[idx] = 0;
-
 	e->zoom[idx] = 1/F;
 	e->offset[idx][0] = p[0] - x/e->zoom[idx];
 	e->offset[idx][1] = p[1] - y/e->zoom[idx];
+
+	if (e->lock_transform) {
+		idx = !idx;
+		if (F == 1) e->octave[idx] = 0;
+		e->zoom[idx] = 1/F;
+		e->offset[idx][0] = p[0] - x/e->zoom[idx];
+		e->offset[idx][1] = p[1] - y/e->zoom[idx];
+	}
 
 	f->changed = 1;
 }
@@ -356,6 +370,12 @@ static void action_toggle_hud(struct FTR *f)
 	struct pan_state *e = f->userdata;
 	e->head_up_display = !e->head_up_display;
 	f->changed = 1;
+}
+
+static void action_toggle_lock(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->lock_transform = !e->lock_transform;
 }
 
 static unsigned char float_to_byte(float x)
@@ -496,6 +516,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == '-') action_increase_octave(f, 3*f->w/4, f->h/2);
 
 	if (k == 'u') action_toggle_hud(f);
+	if (k == 'l') action_toggle_lock(f);
 
 	if (k == ',') action_save_shot(f);
 
@@ -558,6 +579,7 @@ int main_pan(int c, char *v[])
 	e->scroll_domain = 0;
 	e->dip_abc[0] = NAN;
 	e->head_up_display = false;
+	e->lock_transform = false;
 	e->font = *xfont9x15;
 	e->font = reformat_font(e->font, UNPACKED);
 
