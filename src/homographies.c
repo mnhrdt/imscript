@@ -46,6 +46,12 @@ static void compose_homographies(double C[3][3], double A[3][3], double B[3][3])
 static void homography_from_four_points(double H[3][3],
 		double x[2], double w[2], double z[2], double y[2])
 {
+	// We have to compute the following 9 coefficients of H:
+	//
+	//     a b p
+	//     c d q
+	//     r s t
+
 	// fix the degree of freedom (assuming the four points are finite)
 	double t = 1;
 
