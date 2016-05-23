@@ -6,8 +6,6 @@
 #include "xmalloc.c"
 #include "xfopen.c"
 
-#include "cmphomod.c"
-
 // generic function
 // evaluate the error of a datapoint according to a model
 // (implementing this function is necessary for each ransac case)

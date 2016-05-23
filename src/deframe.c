@@ -11,8 +11,6 @@
 #include "xmalloc.c"
 #include "getpixel.c"
 
-#include "cmphomod.c"
-
 static int quadrant_signature(float midx, float midy, float p[4][2])
 {
 	int q[4];
@@ -130,6 +128,8 @@ static void compute_rectangular_fit(float np[4][2], float p[4][2])
 }
 
 
+#include "homographies.c"
+
 // compute the homography given by the images of four points
 static void compute_homography_from_point_pairs(double H[3][3],
 		float from[4][2], float to[4][2])
@@ -141,12 +141,12 @@ static void compute_homography_from_point_pairs(double H[3][3],
 			t[i][j] = to[i][j];
 		}
 
-	homography_from_4corresp(f[0], f[1], f[2], f[3],
-	                         t[0], t[1], t[2], t[3], H);
+	homography_from_eight_points(H, f[0], f[1], f[2], f[3],
+	                         t[0], t[1], t[2], t[3]);
 }
 
 // apply an homography to a point
-static void apply_homography(float y[2], float x[2], double *H)
+static void apply_homography9(float y[2], float x[2], double *H)
 {
 	float z[3];
 	z[0] = H[0]*x[0] + H[1]*x[1] + H[2];
@@ -163,7 +163,7 @@ static void fill_homographic_flow_field(float *ff, int w, int h, double H[3][3])
 	for (int j = 0; j < h; j++)
 		for (int i = 0; i < w; i++) {
 			float p[2] = {i, j}, q[2];
-			apply_homography(q, p, H[0]);
+			apply_homography9(q, p, H[0]);
 			for (int l = 0; l < 2; l++)
 				f[j][i][l] = q[l] - p[l];
 		}

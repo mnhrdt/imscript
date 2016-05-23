@@ -249,7 +249,7 @@ static void affinity_from_3corresp(double a[2], double b[2], double c[2],
 
 #include "vvector.h"
 
-static void invert_homography(double invH[9], double H[9])
+static void invert_homography9(double invH[9], double H[9])
 {
 	double h[3][3] = { {H[0], H[1], H[2]},
 			{H[3], H[4], H[5]},
@@ -259,7 +259,7 @@ static void invert_homography(double invH[9], double H[9])
 	FORI(9) invH[i] = ih[i/3][i%3];
 }
 
-#include "cmphomod.c"
+#include "homographies.c"
 
 static double produce_homography(double H[9], int w, int h,
 		char *homtype, double *v)
@@ -267,9 +267,9 @@ static double produce_homography(double H[9], int w, int h,
 	if (0 == strcmp(homtype, "hom")) { // actual parameters
 		FORI(9) H[i] = v[i];
 	} else if (0 == strcmp(homtype, "homi")) {
-		invert_homography(H, v);
+		invert_homography9(H, v);
 	} else if (0 == strcmp(homtype, "shomi")) {
-		invert_homography(H, 1+v);
+		invert_homography9(H, 1+v);
 		H[2] *= *v;
 		H[5] *= *v;
 		H[6] /= *v;
@@ -284,9 +284,9 @@ static double produce_homography(double H[9], int w, int h,
 			{w + v[6], h + v[7]}
 		};
 		double R[3][3];
-		homography_from_4corresp(
+		homography_from_eight_points(R,
 				corner[0], corner[1], corner[2], corner[3],
-				other[0], other[1], other[2], other[3], R);
+				other[0], other[1], other[2], other[3]);
 		FORI(9) H[i] = R[i/3][i%3];
 	} else if (0 == strcmp(homtype, "hom4pr")) {
 		// absolute displacement of the image corners
@@ -298,9 +298,9 @@ static double produce_homography(double H[9], int w, int h,
 			{w + w*v[6], h + h*v[7]}
 		};
 		double R[3][3];
-		homography_from_4corresp(
+		homography_from_eight_points(R,
 				corner[0], corner[1], corner[2], corner[3],
-				other[0], other[1], other[2], other[3], R);
+				other[0], other[1], other[2], other[3]);
 		FORI(9) H[i] = R[i/3][i%3];
 	} else if (0 == strcmp(homtype, "hom4prc")) {
 		// percentual relative displacement of the image corners
@@ -312,9 +312,9 @@ static double produce_homography(double H[9], int w, int h,
 			{w + w*v[6]/100, h + h*v[7]/100}
 		};
 		double R[3][3];
-		homography_from_4corresp(
+		homography_from_eight_points(R,
 				corner[0], corner[1], corner[2], corner[3],
-				other[0], other[1], other[2], other[3], R);
+				other[0], other[1], other[2], other[3]);
 		FORI(9) H[i] = R[i/3][i%3];
 	} else if (0 == strcmp(homtype, "hom16")) {
 		// absolute coordinates of 4 point pairs
@@ -325,8 +325,8 @@ static double produce_homography(double H[9], int w, int h,
 			{v[8],v[9]},{v[10],v[11]},{v[12],v[13]},{v[14],v[15]}
 		};
 		double R[3][3];
-		homography_from_4corresp( a[0], a[1], a[2], a[3],
-				b[0], b[1], b[2], b[3], R);
+		homography_from_eight_points(R, a[0], a[1], a[2], a[3],
+				b[0], b[1], b[2], b[3]);
 		FORI(9) H[i] = R[i/3][i%3];
 	} else if (0 == strcmp(homtype, "hom16r")) {
 		// relative coordinates of 4 point pairs
@@ -343,8 +343,8 @@ static double produce_homography(double H[9], int w, int h,
 			{w*v[14],h*v[15]}
 		};
 		double R[3][3];
-		homography_from_4corresp( a[0], a[1], a[2], a[3],
-				b[0], b[1], b[2], b[3], R);
+		homography_from_eight_points(R, a[0], a[1], a[2], a[3],
+				b[0], b[1], b[2], b[3]);
 		FORI(9) H[i] = R[i/3][i%3];
 	} else if (0 == strcmp(homtype, "hom16rc")) {
 		// percentual relative coordinates of 4 point pairs
@@ -361,8 +361,8 @@ static double produce_homography(double H[9], int w, int h,
 			{w*v[14]/100,h*v[15]/100}
 		};
 		double R[3][3];
-		homography_from_4corresp( a[0], a[1], a[2], a[3],
-				b[0], b[1], b[2], b[3], R);
+		homography_from_eight_points(R, a[0], a[1], a[2], a[3],
+				b[0], b[1], b[2], b[3]);
 		FORI(9) H[i] = R[i/3][i%3];
 	} else error("unrecognized homography type \"%s\"", homtype);
 	return 0;
@@ -556,9 +556,9 @@ static double produce_combi2_model(double H[15], int w, int h,
 			{w + w*v[9]/100, h + h*v[10]/100}
 		};
 		double R[3][3];
-		homography_from_4corresp(
+		homography_from_eight_points(R,
 				corner[0], corner[1], corner[2], corner[3],
-				other[0], other[1], other[2], other[3], R);
+				other[0], other[1], other[2], other[3]);
 		FORI(2) H[i] = c[0][i];
 		H[2] = a[0];
 		FORI(9) H[i+3] = R[i/3][i%3];
@@ -693,7 +693,7 @@ static void produce_flow_model(struct flow_model *f,
 		assert(f->nh == 9);
 		double H[9], invH[9];
 		produce_homography(H, w, h, f->model_name, f->p);
-		invert_homography(invH, H);
+		invert_homography9(invH, H);
 		FORI(9) f->H[i] = H[i];
 		FORI(9) f->iH[i] = invH[i];
 	} else if (f->hidden_id == FLOWMODEL_HIDDEN_AFFINE) {
@@ -719,7 +719,7 @@ static void produce_flow_model(struct flow_model *f,
 		assert(f->nh == 15);
 		double H[15], invH[9];
 		produce_combi2_model(H, w, h, f->model_name, f->p);
-		invert_homography(invH, H+3);
+		invert_homography9(invH, H+3);
 		FORI(15) f->H[i] = H[i];
 		FORI(9) f->iH[i] = invH[i];
 	//} else if (f->hidden_id == FLOWMODEL_HIDDEN_ICOMBI2) {

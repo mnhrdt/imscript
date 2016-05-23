@@ -20,7 +20,6 @@ Juan Cardelino
 CODE STOLEN FROM:
 
 David Tschumperlé (X11 interfacing)
-Julien Pilet (cmphomod)
 Lionel Moisan, Pascal Monasse (fundamental matrices, splines)
 Javier Sánchez (optical flow)
 Daniel Atkinson (linear algebra, ccmath)
