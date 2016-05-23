@@ -120,7 +120,7 @@ void interpolate_at_s(float *out, float *x, int w, int h, float p, float q)
 }
 
 // evaluate the value a position (p,q) in image coordinates
-static inline void pixel(float *out, struct pan_state *e, double p, double q)
+static void pixel(float *out, struct pan_state *e, double p, double q)
 {
 	if (e->zoom_factor > 0.9999)
 		interpolate_at(out, e->frgb, e->w, e->h, p, q);
@@ -142,37 +142,10 @@ static inline void pixel(float *out, struct pan_state *e, double p, double q)
 		float *rgb = e->pyr_rgb[s];
 		interpolate_at(out, rgb, w, h, p/sfac, q/sfac);
 	}
-	//else {
-	//	if(p<0||q<0){out[0]=out[1]=out[2]=0;return;}
-	//	int s1 = -0 - log(e->zoom_factor) / log(2);
-	//	int s2 = s1 - 1;
-
-	//	if (s2 < 0) s2 = 0;
-	//	if (s2 >= MAX_PYRAMID_LEVELS) s2 = MAX_PYRAMID_LEVELS-1;
-	//	if (s1 < 0) s1 = 0;
-	//	if (s1 >= MAX_PYRAMID_LEVELS) s1 = MAX_PYRAMID_LEVELS-1;
-
-	//	s1 = 1;
-
-	//	int sfac[2] = {1<<(s1+1), 1<<(s2+1)};
-	//	int w[2] = {e->pyr_w[s1], e->pyr_w[s2]};
-	//	int h[2] = {e->pyr_h[s1], e->pyr_h[s2]};
-	//	float *rgb1 = e->pyr_rgb[s1];
-	//	float *rgb2 = e->pyr_rgb[s2];
-	//	float out1[3], out2[3];
-	//	interpolate_at(out1, e->frgb, e->w, e->h, p/sfac[0], q/sfac[0]);
-	//	interpolate_at(out2, rgb2, w[1], h[1], p/sfac[1], q/sfac[1]);
-
-	//	float f = s1-log(e->zoom_factor)/log(2);
-	//	f = 0;
-	//	for (int i = 0; i < 3; i++)
-	//		out[i] = out1[i];
-	//		//out[i] = (1 - f) * out1[i] + f * out2[i];
-	//}
 }
 
 // pixel shadow
-static inline void pixel_s(float *out, struct pan_state *e, double p, double q)
+static void pixel_s(float *out, struct pan_state *e, double p, double q)
 {
 	if (e->zoom_factor > 0.9999)
 		interpolate_at_s(out, e->frgb, e->w, e->h, p, q);

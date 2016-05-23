@@ -39,3 +39,17 @@ float rip_curve_energy(float *g, int w, int h, float *x, int n);
 //	return value: index of the cell at point "out_x"
 int rip_next_snell(float *g, int w, int h, int c, float x[2], float v[2],
 		float out_x[2], float out_v[2]);
+
+// exponential map
+//	g: image of size 3*w*h containing the metric tensor
+//	w: image width
+//	h: image heigth
+//	c: index of the cell at point x
+//	x: base point
+//	v: speed from x
+int rip_exponential(float *g, int w, int h, int c, float x[2], float v[2],
+		float 
+		);
+
+float rip_logarithm(float *g, int w, int h, int c, float p[2], float q[2],
+		float out_v[2]);
