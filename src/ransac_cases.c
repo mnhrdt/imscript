@@ -215,8 +215,7 @@ static float homographic_match_error(float *hom, float *pair, void *usr)
 	double Hp[2];
 	apply_homography(Hp, H, p);
 	double r = hypot(Hp[0] - q[0], Hp[1] - q[1]);
-
-	return isfinite(r) ? r : INFINITY;
+	return r;
 }
 
 

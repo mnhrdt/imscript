@@ -25,7 +25,7 @@
 #include "ransac_cases.c"
 
 #include "vvector.h"
-static void invert_homography(float invH[9], float H[9])
+static void invert_homographyf(float invH[9], float H[9])
 {
 	float h[3][3] = { {H[0], H[1], H[2]},
 			{H[3], H[4], H[5]},
@@ -118,7 +118,7 @@ static struct ann_pair *srmatch(
 	fprintf(stderr, "nr0 = %d\n", nr0);
 
 	// map back all the points of the second image by this homography
-	invert_homography(ih0, h0);
+	invert_homographyf(ih0, h0);
 	struct sift_keypoint *hkb = xmalloc(nb*sizeof*hkb);
 	memcpy(hkb, kb, nb*sizeof*hkb);
 	sifthom(hkb, nb, ih0);
