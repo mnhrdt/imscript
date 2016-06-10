@@ -74,6 +74,7 @@
 #define FONT_BDF_FILE "/home/coco/.fonts2/9x15.bdf"
 #include "xfont9x15.c"
 
+static uint8_t global_dirt[256][3];
 
 // arbitrary number, must be higher than the height of the window
 #define MAX_MEANINGFUL_SINUSOIDS 10000 
@@ -122,6 +123,9 @@ struct pan_state {
 	int nb_meaningful_sinusoids;
 	int meaningful_sinusoid[MAX_MEANINGFUL_SINUSOIDS];
 	bool show_meaningful_sinusoids;
+	double nfa_param_th_modgrad;
+	double nfa_param_p;
+	double nfa_param_lepsilon;
 };
 
 // change of coordinates: from window "int" pixels to image "double" point
@@ -267,6 +271,14 @@ static void action_reset_zoom_and_position(struct FTR *f)
 	e->b = 0;
 	*/
 
+	e->has_hough = false;
+	f->changed = 1;
+}
+
+static void action_reset_rotation(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->offset_x = 0;
 	e->has_hough = false;
 	f->changed = 1;
 }
@@ -513,7 +525,8 @@ static void action_compute_hough(struct FTR *f)
 	}
 }
 
-static void compute_orientation(double ** ox, double ** oy,
+static void compute_orientation(struct pan_state *e,
+		double ** ox, double ** oy,
 		float * img, int X, int Y)
 {
   int i,x,y;
@@ -534,7 +547,7 @@ static void compute_orientation(double ** ox, double ** oy,
 
 	  // TODO: change this "20.0" to the current gradient strength
 	  // parameter
-          if( norm > 20.0 )
+          if( norm > e->nfa_param_th_modgrad )
             {
               (*ox)[x+y*X] = dx;
               (*oy)[x+y*X] = dy;
@@ -797,13 +810,18 @@ static void action_nfa(struct FTR *f)
 	// TODO: instead of calling compute_orientation, use the same
 	// orientation field of the dip (requires changing the "tdip" function
 	// interface)
-	compute_orientation(&ox, &oy, e->strip, e->strip_w, e->strip_h);
+	compute_orientation(e, &ox, &oy, e->strip, e->strip_w, e->strip_h);
 	double logNT = 10 * log10(e->strip_w * e->strip_h);
 	e->nb_meaningful_sinusoids = 0;
 	e->show_meaningful_sinusoids = true;
 	// TODO: this loop must only traverse the heights that are inside the
 	// ROI
-	for (int c = 0; c < e->strip_h; c++)
+	float amplitude = hypot(A, B) * 360 / M_PI;
+	int c_from = 10 + amplitude;
+	int c_to = e->strip_h - amplitude - 10;
+	assert(0 <= c_from);
+	assert(c_to < e->strip_h);
+	for (int c = c_from; c < c_to; c++)
 	{
 		// TODO: allow changing this 0.05 (angle threshold) as a
 		// user-interface parameter
@@ -815,11 +833,9 @@ static void action_nfa(struct FTR *f)
 		// returns "thick" sinusoids (that will be computed todos a la
 		// vez)
 		double NFA = sin_nfa(A, B, c, ox, oy,
-				e->strip_w, e->strip_h, 0.05, logNT);
-		// TODO: allow changing this thresold as a user-interface
-		// paramter
-		//if (NFA < e->nfa_epsilon)// || c == e->strip_h/2)
-		if (NFA < 0)
+				e->strip_w, e->strip_h,
+			       	e->nfa_param_p, logNT);
+		if (NFA < e->nfa_param_lepsilon)
 			e->meaningful_sinusoid[e->nb_meaningful_sinusoids++]=c;
 	}
 	fprintf(stderr, "got %d dips\n", e->nb_meaningful_sinusoids);
@@ -1122,7 +1138,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 
 	//for (int i = 0; i < f->w * f->h * 3; i++) f->rgb[i] = 0;
 
-	// no TODO: a float display buffer
+	// TODO: a float display buffer
 	if (e->autocontrast) {
 		float cmin = INFINITY, cmax = -INFINITY;
 		for (int j = 0; j < f->h; j++)
@@ -1289,6 +1305,34 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		}
 	}
 
+	if (true) // right-hand side raw image
+	{
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < e->strip_w; i++)
+		{
+			// compute the position of this pixel in the image
+			double p[2];
+			window_to_image(p, e, i, j);
+
+			// evaluate the color value of the image at this point
+			float C = pixel(e, p[0], p[1]);
+
+			// transform the value into RGB using (a,b)
+			float v = 0;
+			int ox = e->strip_w + e->hough_w;
+			unsigned char *dest = f->rgb + 3 * (j * f->w + i + ox);
+			if (isfinite(C)) {
+				v = e->a * C + e->b;
+				uint8_t vv = float_to_byte(v);
+				for (int l = 0; l < 3; l++)
+					dest[l] = global_dirt[vv][l];
+			}
+			else {
+				dest[0] = dest[1] = dest[2] = 0;
+			}
+		}
+	}
+
 	if (e->inferno)
 		dump_inferno(f);
 
@@ -1346,7 +1390,7 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 	if (b == FTR_BUTTON_MIDDLE) action_print_value_under_cursor(f, x, y);
 	if (b == FTR_BUTTON_DOWN)   action_increase_octave(f, x, y);
 	if (b == FTR_BUTTON_UP  )   action_decrease_octave(f, x, y);
-	if (b == FTR_BUTTON_RIGHT)  action_reset_zoom_and_position(f);
+	if (b == FTR_BUTTON_RIGHT)  action_reset_rotation(f);
 }
 
 void key_handler_print(struct FTR *f, int k, int m, int x, int y)
@@ -1395,15 +1439,6 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == ',') action_save_shot(f);
 	if (k == ';') action_save_fancy_shot(f);
 
-	//if (k == 'p') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1.1);
-	//if (k == 'm') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1/1.1);
-	//if (k == 'P') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1.006);
-	//if (k == 'M') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1/1.006);
-
-	//if (k == 'a') action_contrast_change(f, 1.3, 0);
-	//if (k == 'A') action_contrast_change(f, 1/1.3, 0);
-	//if (k == 'b') action_contrast_change(f, 1, 1);
-	//if (k == 'B') action_contrast_change(f, 1, -1);
 	if (k == 'n') action_qauto(f);
 	if (k == '0') action_reset_phase(f);
 
@@ -1460,6 +1495,16 @@ static unsigned char *read_image_uint8_rgb(char *fname, int *w, int *h)
 	return y;
 }
 
+static void fill_global_dirt(void)
+{
+	for (int i = 0; i < 256; i++)
+	{
+		global_dirt[i][1] = 255 - i;
+		global_dirt[i][0] = i > 127 ? 510 - 2*i : 255;
+		global_dirt[i][2] = i > 127 ? 0 : 255 - 2*i;
+	}
+}
+
 #include "smapa.h"
 SMART_PARAMETER(INFERNAL_A,-60)
 SMART_PARAMETER(INFERNAL_B,20000)
@@ -1504,6 +1549,9 @@ int main_pan(int c, char *v[])
 	e->head_up_display = true;
 	e->nb_meaningful_sinusoids = 0;
 	e->show_meaningful_sinusoids = false;
+	e->nfa_param_th_modgrad = 20;
+	e->nfa_param_p = 0.05;
+	e->nfa_param_lepsilon = 0;
 
 	e->aradius = 1.5;
 	e->pre_blur_sigma = 1;
@@ -1521,9 +1569,10 @@ int main_pan(int c, char *v[])
 	e->infernal_a = INFERNAL_A();
 	e->infernal_b = INFERNAL_B();
 	e->inpaint_strip = false;
+	fill_global_dirt();
 
 	// open window
-	struct FTR f = ftr_new_window(e->strip_w + e->hough_w, e->hough_w);
+	struct FTR f = ftr_new_window(2*e->strip_w + e->hough_w, e->hough_w);
 	f.userdata = e;
 	action_reset_zoom_and_position(&f);
 	ftr_set_handler(&f, "key"   , pan_key_handler);
