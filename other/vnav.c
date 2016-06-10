@@ -75,6 +75,9 @@
 #include "xfont9x15.c"
 
 
+// arbitrary number, must be higher than the height of the window
+#define MAX_MEANINGFUL_SINUSOIDS 10000 
+
 
 
 // data structure for the image viewer
@@ -114,6 +117,11 @@ struct pan_state {
 	bool inferno;
 	float infernal_a, infernal_b;
 	bool inpaint_strip;
+
+	// 6. nfa options
+	int nb_meaningful_sinusoids;
+	int meaningful_sinusoid[MAX_MEANINGFUL_SINUSOIDS];
+	bool show_meaningful_sinusoids;
 };
 
 // change of coordinates: from window "int" pixels to image "double" point
@@ -370,11 +378,14 @@ static void getstrip(struct FTR *f)
 		poisson_recursive(strip, strip, 0, w, h, 0.25, 10, 99);
 }
 
+static void action_nfa(struct FTR*);
+
 static void action_compute_hough(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
 	if (e->inferno) return;
 	fprintf(stderr, "compute hough\n");
+	e->nb_meaningful_sinusoids = 0;
 	e->has_hough = true;
 	f->changed = 1;
 
@@ -422,7 +433,7 @@ static void action_compute_hough(struct FTR *f)
 
 	// compute the dip picker transform
 	float *c_strip = strip + w*h/4;
-	int c_h = 3*h/4;
+	int c_h = 3*h/4; // central window of the strip
 	blackbox_transform_general(hough, tside, c_strip, w, c_h,
 			e->aradius, e->randomized, e->tensor?e->ntensor:0);
 	//if (!e->randomized)
@@ -481,6 +492,7 @@ static void action_compute_hough(struct FTR *f)
 	//for (int l = 0; l < 3; l++)
 	//	f->rgb[3*(i+w+j*f->w)+l] = 255 * hough[i+j*tside] / hmax;
 
+	action_nfa(f);
 
 	// write dip line
 	{
@@ -520,6 +532,8 @@ static void compute_orientation(double ** ox, double ** oy,
           double dy = 0.5 * (img[ x + (y+1) * X ] - img[ x + (y-1) * X ]);
           double norm = sqrt( dx*dx + dy*dy );
 
+	  // TODO: change this "20.0" to the current gradient strength
+	  // parameter
           if( norm > 20.0 )
             {
               (*ox)[x+y*X] = dx;
@@ -747,11 +761,13 @@ static double sin_nfa(double a, double b, double c, double * ox, double * oy,
   for(x=0; x<X; x++)
     {
       /* compute y coordinate in the sinusoid */
+      // TODO: use the image width instead of 360 here
       y = lrint(360/M_PI*(a*cos(2*M_PI*x/(X-1)) + b*sin(2*M_PI*x/(X-1))) + c);
 
       /* valid orientation */
       if( x >= 0 && x < X && y >= 0 && y < Y && (ox[x+y*X] * ox[x+y*X]) != 0.0 )
         {
+      // TODO: use 2*the image width instead of 720 here
           double deriv = 720/(X-1) * ( -a*sin(2*M_PI*x/(X-1))
                                       + b*cos(2*M_PI*x/(X-1)) );
           double norm_angle = atan2(1.0,-deriv);
@@ -778,25 +794,35 @@ static void action_nfa(struct FTR *f)
 
 	// the image is (e->strip, e->strip_w, e->strip_h)
 	double *ox, *oy;
+	// TODO: instead of calling compute_orientation, use the same
+	// orientation field of the dip (requires changing the "tdip" function
+	// interface)
 	compute_orientation(&ox, &oy, e->strip, e->strip_w, e->strip_h);
 	double logNT = 10 * log10(e->strip_w * e->strip_h);
+	e->nb_meaningful_sinusoids = 0;
+	e->show_meaningful_sinusoids = true;
+	// TODO: this loop must only traverse the heights that are inside the
+	// ROI
 	for (int c = 0; c < e->strip_h; c++)
 	{
+		// TODO: allow changing this 0.05 (angle threshold) as a
+		// user-interface parameter
+		//
+		// NOTE: in the future, we may have a "continuous" version of
+		// sin_nfa that does not have this parameter.
+		//
+		// NOTE2: also, we may have an alternative interface that
+		// returns "thick" sinusoids (that will be computed todos a la
+		// vez)
 		double NFA = sin_nfa(A, B, c, ox, oy,
 				e->strip_w, e->strip_h, 0.05, logNT);
-		if (NFA < 0)// || c == e->strip_h/2)
-		{
-			fprintf(stderr, "\tc = %d\n", c);
-			for (int i = 0; i < e->strip_w; i++)
-		{
-			float a = 2 * M_PI * i / (e->strip_w - 1);
-			float y = 360/M_PI*(A*cos(a) + B*sin(a)) + c;
-			int j = round(y);
-			if (j >= 0 && j < e->strip_h)
-				e->strip[j*e->strip_w+i] = 100000*((i+j)%2);
-		}
-		}
+		// TODO: allow changing this thresold as a user-interface
+		// paramter
+		//if (NFA < e->nfa_epsilon)// || c == e->strip_h/2)
+		if (NFA < 0)
+			e->meaningful_sinusoid[e->nb_meaningful_sinusoids++]=c;
 	}
+	fprintf(stderr, "got %d dips\n", e->nb_meaningful_sinusoids);
 	free(ox);
 	free(oy);
 }
@@ -971,6 +997,16 @@ static void action_toggle_hud(struct FTR *f)
 	f->changed = 1;
 }
 
+static void action_toggle_meaningful_sinusoids(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->show_meaningful_sinusoids = !e->show_meaningful_sinusoids;
+	fprintf(stderr, "toggle meaningul sinusoids to %d (%d)\n",
+			e->show_meaningful_sinusoids,
+			e->nb_meaningful_sinusoids);
+	f->changed = 1;
+}
+
 static void action_toggle_autocontrast(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
@@ -1086,7 +1122,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 
 	//for (int i = 0; i < f->w * f->h * 3; i++) f->rgb[i] = 0;
 
-	// TODO: a float display buffer
+	// no TODO: a float display buffer
 	if (e->autocontrast) {
 		float cmin = INFINITY, cmax = -INFINITY;
 		for (int j = 0; j < f->h; j++)
@@ -1187,7 +1223,38 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		f->rgb[3*(f->w*e->hough_w/2 + e->strip_w + i)+2] = 255;
 	}
 
-	if (e->show_dip_bundle && !e->inferno)
+	// TODO: allow toggling between "detection" view and "original image"
+	// view
+
+	// TODO: show the detected nfa-sinusoids in green, if they are
+	// available
+	if (e->show_meaningful_sinusoids)
+	{
+		for (int i_theta = 0; i_theta < e->strip_w; i_theta++)
+		{
+			int n_theta = e->strip_w;
+			int n_z = e->strip_h;
+			float theta = i_theta * 2 * M_PI / n_theta;
+			float z = e->dip_a * cos(theta) + e->dip_b * sin(theta);
+			float magic_factor = n_theta / M_PI;
+			int i_z = magic_factor * z;
+			for (int i = 0; i < e->nb_meaningful_sinusoids; i++)
+			{
+				int k = i_z + e->meaningful_sinusoid[i];
+				if (insideP(f->w, f->h, i_theta, k) &&
+					insideP(f->w, f->h, i_theta, k+1)&&
+					insideP(f->w, f->h, i_theta, k-1))
+				{
+					int fidx = (k+1) * f->w + i_theta;
+					f->rgb[3*fidx+0] /= 2;
+					//f->rgb[3*fidx+1] = 255;
+					f->rgb[3*fidx+2] = 255;
+				}
+			}
+		}
+	}
+
+	if (e->show_dip_bundle && !e->inferno && !e->show_meaningful_sinusoids)
 	{
 		for (int i_theta = 0; i_theta < e->strip_w; i_theta++)
 		{
@@ -1248,6 +1315,7 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 		e->dip_a = arad * (ia / (tside - 1.0) - 0.5);
 		e->dip_b = arad * (ib / (tside - 1.0) - 0.5);
 		e->show_dip_bundle = true;
+		e->nb_meaningful_sinusoids = 0;
 		fprintf(stderr, "show_dip %d %d (%g %g)\n", x, y, e->dip_a, e->dip_b);
 		f->changed = 1;
 	} else {
@@ -1313,6 +1381,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 't') action_toggle_tensor(f);
 	if (k == 'o') action_toggle_inferno(f);
 	if (k == 'y') action_toggle_inpainting(f);
+	if (k == '4') action_toggle_meaningful_sinusoids(f);
 
 	if (k == 'a') action_change_presigma_by_factor(f,  1.3);
 	if (k == 's') action_change_presigma_by_factor(f,  1/1.3);
@@ -1433,6 +1502,8 @@ int main_pan(int c, char *v[])
 	e->dip_offset = 0;
 	e->contrast_mode = 0;
 	e->head_up_display = true;
+	e->nb_meaningful_sinusoids = 0;
+	e->show_meaningful_sinusoids = false;
 
 	e->aradius = 1.5;
 	e->pre_blur_sigma = 1;
