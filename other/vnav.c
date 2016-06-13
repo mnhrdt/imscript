@@ -52,6 +52,10 @@
 #include "ftr.c"
 
 #define WHEEL_FACTOR 1.4
+#define STEP_NFA_MODGRAD 1.25
+#define STEP_NFA_P 1.25
+#define STEP_NFA_L 1
+
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -123,9 +127,10 @@ struct pan_state {
 	int nb_meaningful_sinusoids;
 	int meaningful_sinusoid[MAX_MEANINGFUL_SINUSOIDS];
 	bool show_meaningful_sinusoids;
-	double nfa_param_th_modgrad;
-	double nfa_param_p;
-	double nfa_param_lepsilon;
+	double nfa_param_th_modgrad; // "g" 20 (offset = 1)
+	double nfa_param_p; // "p" 0.05 (factor = 0.7)
+	double nfa_param_lepsilon; // "l" 0 (offset = 1)
+	bool validatronics_mode;
 };
 
 // change of coordinates: from window "int" pixels to image "double" point
@@ -798,6 +803,7 @@ static double sin_nfa(double a, double b, double c, double * ox, double * oy,
 }
 
 
+// fill-in the nfa detection using the current dip e->dip_{a,b}
 static void action_nfa(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
@@ -841,6 +847,7 @@ static void action_nfa(struct FTR *f)
 	fprintf(stderr, "got %d dips\n", e->nb_meaningful_sinusoids);
 	free(ox);
 	free(oy);
+	f->changed = 1;
 }
 
 
@@ -895,6 +902,50 @@ static void action_change_nrandom_by_factor(struct FTR *f, double factor)
 	fprintf(stderr, "nrandom changed to %d\n", e->randomized);
 	action_compute_hough(f);
 }
+
+//static void action_change_nfa_modgrad(struct FTR *f, int increase)
+//{
+//	struct pan_state *e = f->userdata;
+//	double factor = increase ? 1 : -1;
+//	e->nfa_param_th_modgrad += factor * STEP_NFA_MODGRAD;
+//	fprintf(stderr, "nfa_modgrad = %g\n", e->nfa_param_th_modgrad);
+//	action_nfa(f);
+//}
+
+static void action_change_nfa_modgrad(struct FTR *f, int increase)
+{
+	struct pan_state *e = f->userdata;
+	double factor = increase ? 1 : -1;
+	if (increase)
+		e->nfa_param_th_modgrad *= STEP_NFA_MODGRAD;
+	else
+		e->nfa_param_th_modgrad /= STEP_NFA_MODGRAD;
+	fprintf(stderr, "nfa_th_modgrad = %g\n", e->nfa_param_th_modgrad);
+	action_nfa(f);
+}
+
+static void action_change_nfa_p(struct FTR *f, int increase)
+{
+	struct pan_state *e = f->userdata;
+	double factor = increase ? 1 : -1;
+	if (increase)
+		e->nfa_param_p *= STEP_NFA_P;
+	else
+		e->nfa_param_p /= STEP_NFA_P;
+	e->nfa_param_p = fmin(e->nfa_param_p, 1 - 1e-8);
+	fprintf(stderr, "nfa_p = %g\n", e->nfa_param_p);
+	action_nfa(f);
+}
+
+static void action_change_nfa_lepsilon(struct FTR *f, int increase)
+{
+	struct pan_state *e = f->userdata;
+	double factor = increase ? 1 : -1;
+	e->nfa_param_lepsilon += factor * STEP_NFA_L;
+	fprintf(stderr, "nfa_l = %g\n", e->nfa_param_lepsilon);
+	action_nfa(f);
+}
+
 
 static void action_toggle_randomized(struct FTR *f)
 {
@@ -1020,6 +1071,15 @@ static void action_toggle_meaningful_sinusoids(struct FTR *f)
 	fprintf(stderr, "toggle meaningul sinusoids to %d (%d)\n",
 			e->show_meaningful_sinusoids,
 			e->nb_meaningful_sinusoids);
+	f->changed = 1;
+}
+
+static void action_toggle_validatronics_mode(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->validatronics_mode = !e->validatronics_mode;
+	fprintf(stderr, "toggle validatronics mode to %d\n",
+			e->validatronics_mode);
 	f->changed = 1;
 }
 
@@ -1262,9 +1322,9 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 					insideP(f->w, f->h, i_theta, k-1))
 				{
 					int fidx = (k+1) * f->w + i_theta;
-					f->rgb[3*fidx+0] /= 2;
+					f->rgb[3*fidx+0] = 255;
 					//f->rgb[3*fidx+1] = 255;
-					f->rgb[3*fidx+2] = 255;
+					f->rgb[3*fidx+2] /= 2;
 				}
 			}
 		}
@@ -1289,17 +1349,17 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 					insideP(f->w, f->h, i_theta, k-1))
 				{
 					int fidx = (k+1) * f->w + i_theta;
-					f->rgb[3*fidx+0] = 255;
-					f->rgb[3*fidx+1] /= 3;
-					f->rgb[3*fidx+2] /= 2;
+					f->rgb[3*fidx+0] /= 2;
+					//f->rgb[3*fidx+1] /= 3;
+					f->rgb[3*fidx+2] = 255;
 					fidx = (k+0) * f->w + i_theta;
-					f->rgb[3*fidx+0] = 255;
-					f->rgb[3*fidx+1] /= 3;
-					f->rgb[3*fidx+2] /= 2;
+					f->rgb[3*fidx+0] /= 2;
+					//f->rgb[3*fidx+1] /= 3;
+					f->rgb[3*fidx+2] = 255;
 					fidx = (k-1) * f->w + i_theta;
-					f->rgb[3*fidx+0] = 255;
-					f->rgb[3*fidx+1] /= 3;
-					f->rgb[3*fidx+2] /= 2;
+					f->rgb[3*fidx+0] /= 2;
+					//f->rgb[3*fidx+1] /= 3;
+					f->rgb[3*fidx+2] = 255;
 				}
 			}
 		}
@@ -1349,7 +1409,9 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 
 	static double ox = 0, oy = 0;
 
-	// right side: show sinusoids
+	e->nb_meaningful_sinusoids = 0;
+
+	// central side: show sinusoids
 	if (m == 0 && x >= e->strip_w && x < f->w && y >= 0 && y < f->h)
 	{
 		int tside = e->hough_w;
@@ -1360,6 +1422,8 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 		e->dip_b = arad * (ib / (tside - 1.0) - 0.5);
 		e->show_dip_bundle = true;
 		e->nb_meaningful_sinusoids = 0;
+		if (e->validatronics_mode)
+			action_nfa(f);
 		fprintf(stderr, "show_dip %d %d (%g %g)\n", x, y, e->dip_a, e->dip_b);
 		f->changed = 1;
 	} else {
@@ -1401,6 +1465,7 @@ void key_handler_print(struct FTR *f, int k, int m, int x, int y)
 
 void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
+	if (m & FTR_MASK_SHIFT && isalpha(k)) k = toupper(k);
 	fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
 			k, isprint(k)?k:' ', m, x, y);
 
@@ -1426,6 +1491,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'o') action_toggle_inferno(f);
 	if (k == 'y') action_toggle_inpainting(f);
 	if (k == '4') action_toggle_meaningful_sinusoids(f);
+	if (k == '5') action_toggle_validatronics_mode(f);
 
 	if (k == 'a') action_change_presigma_by_factor(f,  1.3);
 	if (k == 's') action_change_presigma_by_factor(f,  1/1.3);
@@ -1435,6 +1501,10 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'e') action_change_aradius_by_factor(f,   1/1.3);
 	if (k == 'z') action_change_nrandom_by_factor(f, 2);
 	if (k == 'x') action_change_nrandom_by_factor(f, 0.5);
+
+	if (tolower(k) == 'g') action_change_nfa_modgrad (f, isupper(k));
+	if (tolower(k) == 'p') action_change_nfa_p       (f, isupper(k));
+	if (tolower(k) == 'l') action_change_nfa_lepsilon(f, isupper(k));
 
 	if (k == ',') action_save_shot(f);
 	if (k == ';') action_save_fancy_shot(f);
@@ -1549,14 +1619,15 @@ int main_pan(int c, char *v[])
 	e->head_up_display = true;
 	e->nb_meaningful_sinusoids = 0;
 	e->show_meaningful_sinusoids = false;
-	e->nfa_param_th_modgrad = 20;
-	e->nfa_param_p = 0.05;
+	e->nfa_param_th_modgrad = 300;
+	e->nfa_param_p = 0.03125;
 	e->nfa_param_lepsilon = 0;
+	e->validatronics_mode = true;
 
 	e->aradius = 1.5;
-	e->pre_blur_sigma = 1;
+	e->pre_blur_sigma = 2;
 	e->pre_blur_type = "gaussian";
-	e->post_blur_sigma = 1;
+	e->post_blur_sigma = 4;
 	e->post_blur_type = "cauchy";
 	e->randomized = 0;
 	e->autocontrast = true;
@@ -1564,7 +1635,7 @@ int main_pan(int c, char *v[])
 	e->font = *xfont9x15;
 	e->font = reformat_font(e->font, UNPACKED);
 	e->tensor = 1;
-	e->ntensor = 5;
+	e->ntensor = 9;
 	e->inferno = true;
 	e->infernal_a = INFERNAL_A();
 	e->infernal_b = INFERNAL_B();
