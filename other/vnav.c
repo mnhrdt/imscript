@@ -527,6 +527,7 @@ static void action_compute_hough(struct FTR *f)
 				e->pre_blur_sigma,
 				e->post_blur_sigma
 		       );
+		xfclose(f);
 	}
 }
 
