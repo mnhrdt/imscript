@@ -86,6 +86,49 @@ static void construct_symmetric_boundary_fancy(float *xx, int w, int h)
 		x[j][i] = NAN;
 }
 
+// construct the "Fancy" boundary
+static void construct_symmetric_boundary_Fancy(float *xx, int w, int h)
+{
+	float (*x)[w] = (void*)xx;
+
+	// global average
+	long double sum = 0;
+	for (int i = 0; i < w*h; i++)
+		sum += xx[i];
+	float avg = sum / (w*h);
+
+	// 4 corners
+	{
+		x[0][0]     -= avg;
+		x[h-1][0]   -= avg;
+		x[0][w-1]   -= avg;
+		x[h-1][w-1] -= avg;
+	}
+
+	// vertical sides
+	for (int j = 1; j < h-1; j++)
+	{
+		float v = x[j][0] + x[j][w-1];
+		float a = 4.0 * j * (h - 1 - j) / ((h-1)*(h-1));
+		x[j][0]   -= a * v / 2  +  (1-a) * avg;
+		x[j][w-1] -= a * v / 2  +  (1-a) * avg;
+	}
+
+	// horizontal sides
+	for (int i = 1; i < w-1; i++)
+	{
+		float v = x[0][i] + x[h-1][i];
+		float a = 4.0 * i * (w - 1 - i) / ((w-1)*(w-1));
+		x[0][i]   -= a * v / 2  +  (1-a) * avg;
+		x[h-1][i] -= a * v / 2  +  (1-a) * avg;
+	}
+
+	// interior
+	for (int j = 1; j < h - 1; j++)
+	for (int i = 1; i < w - 1; i++)
+		x[j][i] = NAN;
+}
+
 static float global_parameter_p = NAN;
 
 // construct the symmetric boundary of an image
@@ -266,6 +309,7 @@ int main(int c, char *v[])
 	char *filename_m = pick_option(&c, &v, "m", "");
 	bool old_boundary = pick_option(&c, &v, "o", NULL);
 	bool fan_boundary = pick_option(&c, &v, "f", NULL);
+	bool Fan_boundary = pick_option(&c, &v, "F", NULL);
 	global_parameter_p = atof(pick_option(&c, &v, "p", "NAN"));
 	if ((c != 1 && c != 2 && c != 3) || (c>1 && !strcmp(v[1], "-h"))) {
 		fprintf(stderr, "usage:\n\t%s [in [out]]\n", *v);
@@ -283,6 +327,11 @@ int main(int c, char *v[])
 	{
 		fprintf(stderr, "using fancy boundary\n");
 		global_boundary_function = construct_symmetric_boundary_fancy;
+	}
+	if (Fan_boundary)
+	{
+		fprintf(stderr, "using Fancy boundary\n");
+		global_boundary_function = construct_symmetric_boundary_Fancy;
 	}
 	if (isfinite(global_parameter_p))
 	{
