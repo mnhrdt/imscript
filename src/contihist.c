@@ -301,16 +301,20 @@ static void accumulate_jumps_for_one_cell(long double (*o)[2],
 	int i_B = bin(n, m, M, B);
 	int i_C = bin(n, m, M, C);
 	int i_D = bin(n, m, M, D);
+	A = i_A;
+	B = i_B;
+	C = i_C;
+	D = i_D;
 
 	if (i_A == i_B || i_B == i_C || i_C == i_D) return;
-	fprintf(stderr, "simp cell (%g %g %g %g)[%d %d %d %d]\n",
-			A, B, C, D, i_A, i_B, i_C, i_D);
+	//fprintf(stderr, "simp cell (%g %g %g %g)[%d %d %d %d]\n",
+	//		A, B, C, D, i_A, i_B, i_C, i_D);
 
 	assert(i_A < i_B);
 	assert(i_B < i_C);
 	assert(i_C < i_D);
 
-	double fac = 33333;
+	double fac = 1;//33333;
 
 	// accumulate jumps
 	o[ i_A ][1] += fac * 2 / (C + D - B - A) / (B - A);
@@ -318,10 +322,10 @@ static void accumulate_jumps_for_one_cell(long double (*o)[2],
 	o[ i_C ][1] -= fac * 2 / (C + D - B - A) / (D - C);
 	o[ i_D ][1] += fac * 2 / (C + D - B - A) / (D - C);
 
-	fprintf(stderr, "\tacc %d %lf\n", i_A, + fac*2/(C + D - B - A)/(B - A));
-	fprintf(stderr, "\tacc %d %lf\n", i_B, - fac*2/(C + D - B - A)/(B - A));
-	fprintf(stderr, "\tacc %d %lf\n", i_C, - fac*2/(C + D - B - A)/(D - C));
-	fprintf(stderr, "\tacc %d %lf\n", i_D, + fac*2/(C + D - B - A)/(D - C));
+	//fprintf(stderr, "\tacc %d %lf\n", i_A, + fac*2/(C + D - B - A)/(B - A));
+	//fprintf(stderr, "\tacc %d %lf\n", i_B, - fac*2/(C + D - B - A)/(B - A));
+	//fprintf(stderr, "\tacc %d %lf\n", i_C, - fac*2/(C + D - B - A)/(D - C));
+	//fprintf(stderr, "\tacc %d %lf\n", i_D, + fac*2/(C + D - B - A)/(D - C));
 }
 
 
