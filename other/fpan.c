@@ -317,15 +317,15 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		unsigned char *cc = f->rgb + 3 * (j * f->w + i);
 		for (int l = 0; l < 3; l++)
 		{
-			if (!isfinite(c[l]))
-				cc[l] = 0;
-			else {
+			//if (!isfinite(c[l]))
+			//	cc[l] = 0;
+			//else {
 				//float g = e->a * c[l] + e->b;
 				float g = e->a * c[l] + e->bbb[l];
 				if      (g < 0)   cc[l] = 0  ;
 				else if (g > 255) cc[l] = 255;
 				else              cc[l] = g  ;
-			}
+			//}
 		}
 	}
 	f->changed = 1;
