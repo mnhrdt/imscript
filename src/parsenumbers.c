@@ -48,6 +48,15 @@ static double *read_ascii_doubles(FILE *f, int *no)
 	return t;
 }
 
+static double *read_ascii_doubles_fn(const char *fname, int *no)
+{
+	FILE *f = fopen(fname, "r");
+	if (!f) { *no = 0; return NULL; }
+	double *r = read_ascii_doubles(f, no);
+	fclose(f);
+	return r;
+}
+
 //// utility function: parse a matrix of doubles from a text file
 //// returns a pointer to a malloc'ed array of the parsed doubles
 //// fills *nc with the number of cols and *nr with the number of rows

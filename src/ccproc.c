@@ -16,9 +16,11 @@ int floatnan_equality(float a, float b)
 {
 	if (isnan(a) && isnan(b)) return true;
 	return a == b;
-//	uint32_t *aa = (void*)&a;
-//	uint32_t *bb = (void*)&b;
-//	return aa == bb;
+}
+
+int float_eq_isnan(float a, float b)
+{
+	return isnan(a) == isnan(b);
 }
 
 static int compare_pair(const void *aa, const void *bb)
@@ -78,7 +80,7 @@ int ccproc(
 {
 	// pre-setup
 	if (!eq)
-		eq = float_equality;
+		eq = floatnan_equality;
 
 	// create table of representatives
 	int *rep = xmalloc(w * h * sizeof*rep);
@@ -143,15 +145,13 @@ int ccproc(
 	}
 
 	// fill-in table of sizes
-	if (out_size)
-		for (int i = 0; i < r; i++)
-			out_size[i] = pair[2*i + 0];
+	for (int i = 0; i < r; i++)
+		out_size[i] = pair[2*i + 0];
 
 
 	// fill-in image of representatives
-	if (out_idx)
-		for (int i = 0; i < w*h; i++)
-			out_idx[i] = tmpi[rep[i]];
+	for (int i = 0; i < w*h; i++)
+		out_idx[i] = tmpi[rep[i]];
 
 	// reverse indexes
 	int *ipair = xmalloc(2 * w * h * sizeof*ipair);
@@ -170,8 +170,6 @@ int ccproc(
 	for (int i = 1; i < w*h; i++)
 		if (rep[out_all[i-1]] != rep[out_all[i]])
 			out_first[rcx++] = i;
-	fprintf(stderr, "rcx = %d\n", rcx);
-	fprintf(stderr, "r = %d\n", r);
 	assert(rcx == r);
 
 	// verify consistence
@@ -180,29 +178,31 @@ int ccproc(
 		assert(out_idx[out_all[out_first[i] + j]] == i);
 
 	// reorder out_all so that boundarying points come first
-	for (int i = 0; i < r; i++)
-	{
-		int *ti = out_all + out_first[i];
-		int topo = 0;
-		for (int j = 0; j < out_size[i]; j++)
-		{
-			int idx = ti[j];
-			if (!boundaryingP(out_idx, w, h, idx))
-			{
-				swapi(ti, topo, j);
-				topo += 1;
-			}
-		}
-		out_bdsize[i] = topo;
-	}
+//	for (int i = 0; i < r; i++)
+//	{
+//		int *ti = out_all + out_first[i];
+//		int topo = 0;
+//		for (int j = 0; j < out_size[i]; j++)
+//		{
+//			int idx = ti[j];
+//			if (!boundaryingP(out_idx, w, h, idx))
+//			{
+//				swapi(ti, topo, j);
+//				topo += 1;
+//			}
+//		}
+//		out_bdsize[i] = topo;
+//	}
 
 	// cleanup and exit
+	free(ipair);
 	free(pair);
 	free(rep);
 	free(tmpi);
 	return r;
 }
 
+#ifdef MAIN_CCPROC
 #include "iio.h"
 int main(int c, char *v[])
 {
@@ -220,7 +220,10 @@ int main(int c, char *v[])
 	int *out_idx = xmalloc(w*h*sizeof*out_size);
 
 	int r = ccproc(out_size, out_bdsize, out_all, out_first, out_idx,
-			x, w, h, floatnan_equality);
+			x, w, h,
+			//float_eq_isnan
+			floatnan_equality
+			);
 
 	fprintf(stderr, "ccproc returned %d\n", r);
 	for (int i = 0; i < r; i++)
@@ -231,11 +234,14 @@ int main(int c, char *v[])
 	}
 
 	// verify consistence
+	int totsize = 0;
 	for (int i = 0; i < r; i++)
 	{
 		for (int j = 0; j < out_size[i]; j++)
 			x[out_all[out_first[i] + j]] = i;
+		totsize += out_size[i];
 	}
+	assert(totsize == w*h);
 
 	iio_save_image_int("ccproc_idx.tiff", out_idx, w, h);
 	iio_save_image_int("ccproc_all.tiff", out_all, w, h);
@@ -251,5 +257,12 @@ int main(int c, char *v[])
 	iio_save_image_float("ccproc_yyy.tiff", x, w, h);
 
 
+	free(out_size);
+	free(out_bdsize);
+	free(out_all);
+	free(out_first);
+	free(out_idx);
+	free(x);
 	return 0;
 }
+#endif
