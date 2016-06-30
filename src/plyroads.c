@@ -59,8 +59,8 @@ static void render_roads(FILE *f, double *e, double *n, double *h,
 		double v[4][3] = {
 			{ p[0] - w * u[0], p[1] - w * u[1], p[2] },
 			{ p[0] + w * u[0], p[1] + w * u[1], p[2] },
-			{ q[0] - w * u[0], q[1] - w * u[1], p[2] },
-			{ q[0] + w * u[0], q[1] + w * u[1], p[2] }
+			{ q[0] - w * u[0], q[1] - w * u[1], q[2] },
+			{ q[0] + w * u[0], q[1] + w * u[1], q[2] }
 		};
 
 		// dump
