@@ -2290,12 +2290,10 @@ static int insideP(int w, int h, int i, int j)
 
 static int xml_get_numeric_attr(int *out, char *line, char *tag, char *attr)
 {
-	//IIO_DEBUG("XML gna line=\"%s\" attr=\"%s\"\n", line, attr);
 	if (!strstr(line, tag)) return 0;
 	line = strstr(line, attr);
 	if (!line) return 0;
 	*out = atoi(line + 2 + strlen(attr));
-	//IIO_DEBUG("\t\tout=%d\n", *out);
 	return 1;
 }
 
@@ -2304,11 +2302,9 @@ static int xml_get_tag_content(char *out, char *line, char *tag)
 	int n = strlen(line);
 	char fmt[n], tmp[n];
 	snprintf(fmt, n, " <%s %%*[^>]>%%[^<]s</%s>", tag, tag);
-	//IIO_DEBUG("XML GET TAG CONTENT fmt=%s\n", fmt);
 	int r = sscanf(line, fmt, tmp);
 	if (r != 1) return 0;
 	memcpy(out, tmp, 1+strlen(tmp));
-	IIO_DEBUG("GOTFILENAME = '%s'\n", out);
 	return 1;
 }
 
@@ -2317,7 +2313,6 @@ static int read_beheaded_vrt(struct iio_image *x,
 {
 	int n = FILENAME_MAX + 0x200, cx = 0, w, h;
 	char fname[n], line[n], *sl = fgets(line, n, fin);
-	IIO_DEBUG("VRT line=%s\n", line);
 	if (!sl) return 1;
 	cx += xml_get_numeric_attr(&w, line, "Dataset", "rasterXSize");
 	cx += xml_get_numeric_attr(&h, line, "Dataset", "rasterYSize");
@@ -2335,9 +2330,6 @@ static int read_beheaded_vrt(struct iio_image *x,
 	while (1) {
 		sl = fgets(line, n, fin);
 		if (!sl) break;
-		assert(sl[strlen(sl)-1] == '\n');
-		sl[strlen(sl)-1] = '\0';
-		IIO_DEBUG("VRT LINE = '%s'\n", sl);
 		pos_cx += xml_get_numeric_attr(pos+0, line, "DstRect", "xOff");
 		pos_cx += xml_get_numeric_attr(pos+1, line, "DstRect", "yOff");
 		pos_cx += xml_get_numeric_attr(pos+2, line, "DstRect", "xSize");
