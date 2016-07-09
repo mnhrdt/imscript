@@ -108,6 +108,7 @@
 #define IIO_FORMAT_RAW 25
 #define IIO_FORMAT_RWA 26
 #define IIO_FORMAT_CSV 27
+#define IIO_FORMAT_VRT 28
 #define IIO_FORMAT_UNRECOGNIZED (-1)
 
 //
@@ -532,7 +533,7 @@ static const char *iio_strfmt(int format)
 	M(TIFF); M(RIM); M(BMP); M(EXR); M(JP2);
 	M(VTK); M(CIMG); M(PAU); M(DICOM); M(PFM); M(NIFTI);
 	M(PCX); M(GIF); M(XPM); M(RAFA); M(FLO); M(LUM); M(JUV);
-	M(PCM); M(ASC); M(RAW); M(RWA); M(PDS); M(CSV);
+	M(PCM); M(ASC); M(RAW); M(RWA); M(PDS); M(CSV); M(VRT);
 	M(UNRECOGNIZED);
 	default: fail("caca de la grossa (%d)", format);
 	}
@@ -1310,7 +1311,7 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 
 	//fprintf(stderr, "TIFFOpen \"%s\"\n", filename);
 	TIFF *tif = tiffopen_fancy(filename, "r");
-	if (!tif) fail("could not open(r) TIFF file \"%s\"", filename);
+	if (!tif) fail("could not open TIFF file \"%s\"", filename);
 	uint32_t w, h;
 	uint16_t spp, bps, fmt;
 	int r = 0, fmt_iio=-1;
@@ -2001,7 +2002,7 @@ static int read_beheaded_bmp(struct iio_image *x,
 #include <ImfCRgbaFile.h>
 // EXTERNALIZED TO :  read_exr_float.cpp
 
-static int read_whole_exr(struct iio_image *x, char *filename)
+static int read_whole_exr(struct iio_image *x, const char *filename)
 {
 	struct ImfInputFile *f = ImfOpenInputFile(filename);
 	if (!f) fail("could not read exr from %s", filename);
@@ -2272,6 +2273,92 @@ static int read_beheaded_csv(struct iio_image *x,
 
 	// cleanup and exit
 	free(filedata);
+	return 0;
+}
+
+// VRT reader                                                               {{{2
+//
+// VRT = GDAL Virtual images are a text file describing the relative
+// position of several tiles, specified by their filenames.  The idea is neat
+// but the format itself is an abomination based on wrong misconceptions.
+// Here we provide a minimal implementation for some common cases.
+
+static int insideP(int w, int h, int i, int j)
+{
+	return i>=0 && j>=0 && i<w && j<h;
+}
+
+static int xml_get_numeric_attr(int *out, char *line, char *tag, char *attr)
+{
+	//IIO_DEBUG("XML gna line=\"%s\" attr=\"%s\"\n", line, attr);
+	if (!strstr(line, tag)) return 0;
+	line = strstr(line, attr);
+	if (!line) return 0;
+	*out = atoi(line + 2 + strlen(attr));
+	//IIO_DEBUG("\t\tout=%d\n", *out);
+	return 1;
+}
+
+static int xml_get_tag_content(char *out, char *line, char *tag)
+{
+	int n = strlen(line);
+	char fmt[n], tmp[n];
+	snprintf(fmt, n, " <%s %%*[^>]>%%[^<]s</%s>", tag, tag);
+	//IIO_DEBUG("XML GET TAG CONTENT fmt=%s\n", fmt);
+	int r = sscanf(line, fmt, tmp);
+	if (r != 1) return 0;
+	memcpy(out, tmp, 1+strlen(tmp));
+	IIO_DEBUG("GOTFILENAME = '%s'\n", out);
+	return 1;
+}
+
+static int read_beheaded_vrt(struct iio_image *x,
+		FILE *fin, char *header, int nheader)
+{
+	int n = FILENAME_MAX + 0x200, cx = 0, w, h;
+	char fname[n], line[n], *sl = fgets(line, n, fin);
+	IIO_DEBUG("VRT line=%s\n", line);
+	if (!sl) return 1;
+	cx += xml_get_numeric_attr(&w, line, "Dataset", "rasterXSize");
+	cx += xml_get_numeric_attr(&h, line, "Dataset", "rasterYSize");
+	if (!w*h) return 2;
+	if (cx != 2) return 3;
+	x->dimension = 2;
+	x->sizes[0] = w;
+	x->sizes[1] = h;
+	x->pixel_dimension = 1;
+	x->type = IIO_TYPE_FLOAT;
+	x->contiguous_data = false;
+	x->data = xmalloc(w * h * sizeof(float));
+	float (*xx)[w] = x->data;
+	int pos[4], pos_cx = 0, has_fname = 0;
+	while (1) {
+		sl = fgets(line, n, fin);
+		if (!sl) break;
+		assert(sl[strlen(sl)-1] == '\n');
+		sl[strlen(sl)-1] = '\0';
+		IIO_DEBUG("VRT LINE = '%s'\n", sl);
+		pos_cx += xml_get_numeric_attr(pos+0, line, "DstRect", "xOff");
+		pos_cx += xml_get_numeric_attr(pos+1, line, "DstRect", "yOff");
+		pos_cx += xml_get_numeric_attr(pos+2, line, "DstRect", "xSize");
+		pos_cx += xml_get_numeric_attr(pos+3, line, "DstRect", "ySize");
+		has_fname += xml_get_tag_content(fname, line, "SourceFilename");
+		if (pos_cx == 4 && has_fname == 1)
+		{
+			pos_cx = has_fname = 0;
+			int wt, ht;
+			float *xt = iio_read_image_float(fname, &wt, &ht);
+			for (int j = 0; j < pos[3]; j++)
+			for (int i = 0; i < pos[2]; i++)
+			{
+				int ii = i + pos[0];
+				int jj = j + pos[1];
+				if (insideP(w,h, ii,jj) && insideP(wt,ht, i,j))
+					xx[jj][ii] = xt[j*wt+i];
+			}
+			xfree(xt);
+		}
+	}
 	return 0;
 }
 
@@ -2563,6 +2650,15 @@ static int read_beheaded_whatever(struct iio_image *x,
 	return r;
 }
 
+
+// RAW PHOTO reader                                                               {{{2
+
+#ifdef I_USE_LIBRAW
+int try_reading_file_with_libraw(const char *fname, struct iio_image *x);
+int try_reading_file_with_libraw_4channels(const char *fname, struct iio_image *x);
+#endif
+
+
 // individual format writers                                                {{{1
 // PNG writer                                                               {{{2
 
@@ -2630,7 +2726,7 @@ static void iio_save_image_as_tiff(const char *filename, struct iio_image *x)
 	if (x->dimension != 2)
 		fail("only 2d images can be saved as TIFFs");
 	TIFF *tif = TIFFOpen(filename, "w");
-	if (!tif) fail("could not open(w) TIFF file \"%s\"", filename);
+	if (!tif) fail("could not open TIFF file \"%s\"", filename);
 
 	int ss = iio_image_sample_size(x);
 	int sls = x->sizes[0]*x->pixel_dimension*ss;
@@ -2911,6 +3007,9 @@ static int guess_format(FILE *f, char *buf, int *nbuf, int bufmax)
 	if (b[0]=='P' && b[1]=='D' && b[2]=='S' && b[3]=='_')
 		return IIO_FORMAT_PDS;
 
+	if (b[0]=='<' && b[1]=='V' && b[2]=='R' && b[3]=='T')
+		return IIO_FORMAT_VRT;
+
 	b[4] = add_to_header_buffer(f, b, nbuf, bufmax);
 	b[5] = add_to_header_buffer(f, b, nbuf, bufmax);
 	b[6] = add_to_header_buffer(f, b, nbuf, bufmax);
@@ -3025,6 +3124,7 @@ int read_beheaded_image(struct iio_image *x, FILE *f, char *h, int hn, int fmt)
 	case IIO_FORMAT_PDS:   return read_beheaded_pds (x, f, h, hn);
 	case IIO_FORMAT_RAW:   return read_beheaded_raw (x, f, h, hn);
 	case IIO_FORMAT_CSV:   return read_beheaded_csv (x, f, h, hn);
+	case IIO_FORMAT_VRT:   return read_beheaded_vrt (x, f, h, hn);
 
 #ifdef I_CAN_HAS_LIBPNG
 	case IIO_FORMAT_PNG:   return read_beheaded_png (x, f, h, hn);
@@ -3159,6 +3259,9 @@ static int read_image(struct iio_image *x, const char *fname)
 	} else if (comma_named_tiff(fname)) {
 		r = read_whole_tiff(x, fname);
 #endif//I_CAN_HAS_LIBTIFF
+#ifdef I_USE_LIBRAW
+	} else if (try_reading_file_with_libraw(fname, x)) {
+#endif//I_USE_LIBRAW
 	} else if (raw_prefix(fname)) {
 		r = read_raw_named_image(x, fname);
 	//} else if (rwa_prefix(fname)) {
