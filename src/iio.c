@@ -2325,6 +2325,8 @@ static int read_beheaded_vrt(struct iio_image *x,
 	x->type = IIO_TYPE_FLOAT;
 	x->contiguous_data = false;
 	x->data = xmalloc(w * h * sizeof(float));
+	for (int i = 0; i < w*h; i++)
+		((float*)x->data)[i] = NAN;
 	float (*xx)[w] = x->data;
 	int pos[4], pos_cx = 0, has_fname = 0;
 	while (1) {

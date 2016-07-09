@@ -241,26 +241,26 @@ int homography_from_four(float *hom, float *pairs, void *usr)
 	return r;
 }
 
-// instance of "ransac_model_accepting_function"
-bool homography_is_resaonable(float *hom, void *usr)
-{
-	// 0 1 2     a b p
-	// 3 4 5     c d q
-	// 6 7 8     r s t
-	if (fabs(t) < 1e-15) return false;
-	float a = hom[0];
-	float b = aff[1];
-	float c = aff[3];
-	float d = aff[4];
-	float det = a*d - b*c;
-	if (det < 0) return false;
-	if (fabs(det) > 100) return false;
-	if (fabs(det) < 0.01) return false;
-	double n = a*a + b*b + c*c + d*d;
-	if (n > 10) return false;
-	if (n < 0.1) return false;
-	return true;
-}
+//// instance of "ransac_model_accepting_function"
+//bool homography_is_resaonable(float *hom, void *usr)
+//{
+//	// 0 1 2     a b p
+//	// 3 4 5     c d q
+//	// 6 7 8     r s t
+//	if (fabs(t) < 1e-15) return false;
+//	float a = hom[0];
+//	float b = aff[1];
+//	float c = aff[3];
+//	float d = aff[4];
+//	float det = a*d - b*c;
+//	if (det < 0) return false;
+//	if (fabs(det) > 100) return false;
+//	if (fabs(det) < 0.01) return false;
+//	double n = a*a + b*b + c*c + d*d;
+//	if (n > 10) return false;
+//	if (n < 0.1) return false;
+//	return true;
+//}
 
 
 // ************************************
