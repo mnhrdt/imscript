@@ -30,7 +30,7 @@
 #include "srtm4o.c"
 
 #define DONT_USE_TEST_MAIN
-#include "rpc.c"
+#include "rpc2.c"
 
 //double srtm4o(double,double,int);
 double egm96(double,double);
@@ -81,7 +81,7 @@ struct pan_view {
 	int repaint;
 };
 
-#define MAX_VIEWS 30
+#define MAX_VIEWS 60
 struct pan_state {
 	// 1. data for each view
 	int nviews;
@@ -177,13 +177,14 @@ static void init_view(struct pan_view *v,
 	v->preview = NULL;
 	v->pfg = fgpre;
 	v->pfc = fcpre;
+	v->gray_only = 0;
 
 	// load P and MS
 	int megabytes = 400;
 	tiff_octaves_init(v->tg, fgtif, megabytes);
 	if (fctif)
 		tiff_octaves_init(v->tc, fctif, megabytes);
-	else fail("not fctif\n"); //v->tc = NULL;
+	else v->gray_only = 1;//fail("not fctif\n"); //v->tc = NULL;
 	v->w = v->tg->i->w;
 	v->h = v->tg->i->h;
 	v->rgbiox = v->rgbioy = 4; // normally untouched
@@ -232,7 +233,12 @@ static void init_state(struct pan_state *e,
 	e->nviews = n;
 	e->current_view = 0;
 	for (int i = 0; i < n; i++)
-		init_view(e->view + i, gi[i], gp[i], gr[i], ci[i], cp[i]);
+		init_view(e->view + i,
+				gi[i],
+				gp?gp[i]:NULL,
+				gr[i],
+				ci?ci[i]:NULL,
+				cp?cp[i]:NULL);
 
 	// set geography
 	e->base_h = 0;
@@ -256,7 +262,8 @@ static void init_state(struct pan_state *e,
 	e->show_srtm4 = 0;
 	e->so = 0;
 	e->srtm4_base = 0;
-	msoctaves_instead_of_preview = e->view->tc->noctaves > 3;
+	msoctaves_instead_of_preview = e->view->tg->noctaves > 4 ||
+		(ci && e->view->tc->noctaves > 3);
 }
 
 // state query functions {{{1
@@ -758,6 +765,19 @@ static void pixel_from_mso(float *out, struct pan_view *v, double p, double q,
 	out[2] = c[2] * g / nc;
 }
 
+static void pixel_from_go(float *out, struct pan_view *v, double p, double q,
+		int i, int o)
+{
+	int ofac = 1 << (o);
+	float c[4];
+	float ipc = p / ofac;
+	float iqc = q / ofac;
+	if (i == 2)      tiffo_getpixel_float_bilinear(c, v->tg, o, ipc, iqc);
+	else if (i == 3) tiffo_getpixel_float_bicubic(c, v->tg, o, ipc, iqc);
+	else             tiffo_getpixel_float_1(c, v->tg, o, ipc, iqc);
+	out[0] = out[1] = out[2] = c[0];
+}
+
 static void pixel_from_pms(float *out, struct pan_view *v, double p, double q,
 		int i)
 {
@@ -792,7 +812,9 @@ void pixel(float *out, struct pan_view *v, double p, double q, int o, int i)
 		out[2] = 100;
 		return;
 	}
-	if (msoctaves_instead_of_preview) { // ms-octaves case
+	if (v->gray_only)
+		pixel_from_go(out, v, p, q, i, o);
+	else if (msoctaves_instead_of_preview) { // ms-octaves case
 		if (o == 0 || o == 1)
 			pixel_from_pms (out, v, p, q, i);
 		else if (o == 2)
@@ -1004,7 +1026,7 @@ static void overlay_vertdir(struct FTR *f, int i, int j)
 static void pan_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
 {
 	(void)unused_x; (void)unused_y;
-	fprintf(stderr, "\n\nexpose %d %d\n", b, m);
+	//fprintf(stderr, "\n\nexpose %d %d\n", b, m);
 	struct pan_state *e = f->userdata;
 	struct pan_view *v = obtain_view(e);
 
@@ -1519,9 +1541,62 @@ int main_pan(int c, char *v[])
 	return r;
 }
 
+int main_gray(int c, char *v[])
+{
+	TIFFSetWarningHandler(NULL);//suppress warnings
+
+	// process input arguments
+	char *command_string = pick_option(&c, &v, "c", "");
+	if (c < 2 || (c - 1) % 2 != 0) {
+		fprintf(stderr, "usage:\n\t"
+				"%s [P.TIF P.RPC]+\n", *v);
+		//                0  1     2
+		return c;
+	}
+	int n = BAD_MIN((c - 1)/2,MAX_VIEWS);
+	fprintf(stderr, "we have %d views\n", n);
+	char *filename_gtif[n];
+	char *filename_grpc[n];
+	for (int i = 0; i < n; i++)
+	{
+		filename_gtif[i] = v[2*i+1];
+		filename_grpc[i] = v[2*i+2];
+		fprintf(stderr, "view %d\n", i);
+		fprintf(stderr, "\tgtif %s\n", filename_gtif[i]);
+		fprintf(stderr, "\tgrpc %s\n", filename_grpc[i]);
+	}
+
+	// start state
+	struct pan_state e[1];
+	init_state(e, filename_gtif, NULL, filename_grpc, NULL, NULL, n);
+
+	// if non-interactive, run the requested command string and exit
+	if (*command_string)
+		return pan_non_interactive(e, command_string);
+
+	// open window
+	struct FTR f = ftr_new_window(320, 320);
+	//struct FTR f = ftr_new_window(800, 600);
+	f.userdata = e;
+	f.changed = 1;
+	ftr_set_handler(&f, "key"   , pan_key_handler);
+	ftr_set_handler(&f, "button", pan_button_handler);
+	ftr_set_handler(&f, "motion", pan_motion_handler);
+	ftr_set_handler(&f, "expose", pan_exposer);
+	ftr_set_handler(&f, "resize", pan_resize);
+	int r = ftr_loop_run(&f);
+
+	// cleanup and exit (optional)
+	ftr_close(&f);
+	return r;
+}
+
 int main(int c, char *v[])
 {
-	return main_pan(c, v);
+	if (c > 1 && 0 == strcmp(v[1], "-g"))
+		return main_gray(c - 1, v + 1);
+	else
+		return main_pan(c, v);
 }
 
 // vim:set foldmethod=marker:
