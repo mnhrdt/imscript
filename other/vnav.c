@@ -89,7 +89,7 @@ static uint8_t global_dirt[256][3];
 // this data goes into the "userdata" field of the FTR window structure
 struct pan_state {
 	// 1. inpyt image data
-	int w, h;
+	//int w, h;
 	struct tiff_octaves t[1];
 
 	// 2. view port parameters
@@ -124,9 +124,13 @@ struct pan_state {
 	bool inpaint_strip;
 
 	// 6. nfa options
-	int nb_meaningful_sinusoids;
+	int nb_meaningful_sinusoids, nb_refined_sinusoids;
 	int meaningful_sinusoid[MAX_MEANINGFUL_SINUSOIDS];
+	double sinusoid_nfa[MAX_MEANINGFUL_SINUSOIDS];
+	double sinusoid_abc[3*MAX_MEANINGFUL_SINUSOIDS];
 	bool show_meaningful_sinusoids;
+	double *acontrario_orientations_x;
+	double *acontrario_orientations_y;
 	double nfa_param_th_modgrad; // "g" 20 (offset = 1)
 	double nfa_param_p; // "p" 0.05 (factor = 0.7)
 	double nfa_param_lepsilon; // "l" 0 (offset = 1)
@@ -396,6 +400,7 @@ static void getstrip(struct FTR *f)
 }
 
 static void action_nfa(struct FTR*);
+static void action_nfa_with_refinement(struct FTR*);
 
 static void action_compute_hough(struct FTR *f)
 {
@@ -509,7 +514,7 @@ static void action_compute_hough(struct FTR *f)
 	//for (int l = 0; l < 3; l++)
 	//	f->rgb[3*(i+w+j*f->w)+l] = 255 * hough[i+j*tside] / hmax;
 
-	action_nfa(f);
+	action_nfa_with_refinement(f);
 
 	// write dip line
 	{
@@ -532,15 +537,13 @@ static void action_compute_hough(struct FTR *f)
 }
 
 static void compute_orientation(struct pan_state *e,
-		double ** ox, double ** oy,
-		float * img, int X, int Y)
+		double *ox, double *oy,
+		float *img, int X, int Y)
 {
   int i,x,y;
 
   /* initialize orientations arrays */
-  *ox = (double *) xmalloc( X * Y * sizeof(double) );
-  *oy = (double *) xmalloc( X * Y * sizeof(double) );
-  for(i=0; i<X*Y; i++) (*ox)[i] = (*oy)[i] = 0.0;
+  for(i=0; i<X*Y; i++) ox[i] = oy[i] = 0.0;
 
   for(x=1; x<(X-1); x++)
     for(y=1; y<(Y-1); y++)
@@ -555,8 +558,8 @@ static void compute_orientation(struct pan_state *e,
 	  // parameter
           if( norm > e->nfa_param_th_modgrad )
             {
-              (*ox)[x+y*X] = dx;
-              (*oy)[x+y*X] = dy;
+              ox[x+y*X] = dx;
+              oy[x+y*X] = dy;
             }
         }
 }
@@ -768,10 +771,55 @@ static double norm_angle_diff(double a, double b)
   return fabs(a) * 2.0 / M_PI;
 }
 
+double sin_nfac(double a, double b, double c, double * ox, double * oy,
+                int X, int Y, double logNT)
+{
+  double sum_e = 0.0;
+  int num_e = 0;
+  double logNFAC;
+  int i;
+
+  for(i=0; i<X; i++)
+    {
+      int x = i;
+      double yy = 360/M_PI*(a*cos(2*M_PI*x/(X-1)) + b*sin(2*M_PI*x/(X-1))) + c;
+      int y = lrint(yy);
+
+      if( x >= 0 && x < X && y >= 0 && y < Y && (ox[x+y*X] * ox[x+y*X]) != 0.0 )
+        {
+          double deriv = 720/(X-1) * ( -a*sin(2*M_PI*x/(X-1))
+                                      + b*cos(2*M_PI*x/(X-1)) );
+          double norm_angle = atan2(1.0,-deriv);
+          double theta = atan2(oy[x+y*X],ox[x+y*X]);
+
+          /* compute angle error */
+          double e = norm_angle_diff(norm_angle,theta);
+          sum_e += e;
+          ++num_e;
+        }
+    }
+
+  /* NFAC = NT * k^n / n!
+     log(n!) is bounded by Stirling's approximation:
+       n! >= sqrt(2pi) * n^(n+0.5) * exp(-n)
+     then, log10(NFA) <= log10(NT) + n*log10(k) - log10(latter expansion)
+
+     in our case, k is sum_e and n is num_e */
+  logNFAC = logNT + num_e * log10(sum_e)
+          - 0.5 * log10(2.0 * M_PI) - (num_e+0.5) * log10(num_e)
+          + num_e * log10(exp(1.0));
+
+  //fprintf(stderr, "%g %g %g : %g %g\n", a, b, c, logNT, logNFAC);
+  return logNFAC;
+}
+
+
 /*----------------------------------------------------------------------------*/
 static double sin_nfa(double a, double b, double c, double * ox, double * oy,
                int X, int Y, double p, double logNT)
 {
+  if (!p) return sin_nfac(a, b, c, ox, oy, X, Y, logNT);
+
   double logNFA;
   int n = 0;
   int k = 0;
@@ -813,12 +861,14 @@ static void action_nfa(struct FTR *f)
 	fprintf(stderr, "NFAs(%g,%g)\n", e->dip_a, e->dip_b);
 
 	// the image is (e->strip, e->strip_w, e->strip_h)
-	double *ox, *oy;
+	double *ox = e->acontrario_orientations_x;
+	double *oy = e->acontrario_orientations_y;
 	// TODO: instead of calling compute_orientation, use the same
 	// orientation field of the dip (requires changing the "tdip" function
 	// interface)
-	compute_orientation(e, &ox, &oy, e->strip, e->strip_w, e->strip_h);
-	double logNT = 10 * log10(e->strip_w * e->strip_h);
+	compute_orientation(e, ox, oy, e->strip, e->strip_w, e->strip_h);
+	//double logNT = 10 * log10(e->strip_w * e->strip_h );
+	double logNT = 10 * log10(e->hough_w * e->hough_h);
 	e->nb_meaningful_sinusoids = 0;
 	e->show_meaningful_sinusoids = true;
 	// TODO: this loop must only traverse the heights that are inside the
@@ -843,12 +893,118 @@ static void action_nfa(struct FTR *f)
 				e->strip_w, e->strip_h,
 			       	e->nfa_param_p, logNT);
 		if (NFA < e->nfa_param_lepsilon)
-			e->meaningful_sinusoid[e->nb_meaningful_sinusoids++]=c;
+		{
+			e->meaningful_sinusoid[e->nb_meaningful_sinusoids] = c;
+			e->sinusoid_nfa[e->nb_meaningful_sinusoids] = NFA;
+			e->nb_meaningful_sinusoids += 1;
+		}
 	}
 	fprintf(stderr, "got %d dips\n", e->nb_meaningful_sinusoids);
-	free(ox);
-	free(oy);
 	f->changed = 1;
+}
+
+static double eval_this_nfa(struct pan_state *e, double abc[3])
+{
+	double logNT = 10 * log10(e->hough_w * e->hough_h);
+	double r = sin_nfa(abc[0], abc[1], abc[2],
+		e->acontrario_orientations_x, e->acontrario_orientations_y,
+		e->strip_w, e->strip_h, 0*e->nfa_param_p, logNT);
+	return r;
+}
+
+static
+void refine_this_sinusoid(struct pan_state *e, double abc[3])
+{
+	int nn = 20;
+	int n[][3] = {
+		{1,0,0}, {-1,0,0},
+		{0,1,0}, {0,-1,0},
+		{0,0,1}, {0,0,-1},//6
+		{2,0,0}, {-2,0,0},
+		{0,2,0}, {0,-2,0},
+		{0,0,2}, {0,0,-2},//12
+		{5,0,0}, {-5,0,0},
+		{0,5,0}, {0,-5,0},//16
+		{10,0,0}, {-10,0,0},
+		{0,10,0}, {0,-10,0},//20
+		{0,0,0}
+	};
+
+	double step[] = {
+		2*e->aradius/e->hough_w,
+		2*e->aradius/e->hough_w,
+		1
+	};
+
+	double best_nfa = eval_this_nfa(e, abc);
+	int best_idx;
+	//fprintf(stderr, "before do nfa = %g [%g %g %g]\n", best_nfa,
+	//		abc[0], abc[1], abc[2]);
+	do {
+		//fprintf(stderr, "iteration (nfa=%g)\n", best_nfa);
+		best_idx = -1;
+		for (int i = 0; i < nn; i++)
+		{
+			double tmp[3] = {
+				abc[0] + step[0] * n[i][0],
+				abc[1] + step[1] * n[i][1],
+				abc[2] + step[2] * n[i][2]
+			};
+			double NFA = eval_this_nfa(e, tmp);
+			if (NFA < best_nfa)
+			{
+				best_idx = i;
+				best_nfa = NFA;
+			}
+		}
+		if (best_idx >= 0)
+		{
+			abc[0] = abc[0] + step[0] * n[best_idx][0];
+			abc[1] = abc[1] + step[1] * n[best_idx][1];
+			abc[2] = abc[2] + step[2] * n[best_idx][2];
+		}
+	} while (best_idx >= 0);
+	//fprintf(stderr, "after while (nfa=%g) %g %g %g\n", best_nfa,
+	//		abc[0], abc[1], abc[2]);
+}
+
+// refine the nfa detection
+static void action_nfa_with_refinement(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	if (!e->nb_meaningful_sinusoids)
+		action_nfa(f);
+	e->nb_refined_sinusoids = e->nb_meaningful_sinusoids;
+
+	for (int i = 0; i < e->nb_meaningful_sinusoids; i++)
+	{
+		e->sinusoid_abc[3*i+0] = e->dip_a;
+		e->sinusoid_abc[3*i+1] = e->dip_b;
+		e->sinusoid_abc[3*i+2] = e->meaningful_sinusoid[i];
+
+		refine_this_sinusoid(e, e->sinusoid_abc + 3*i);
+	}
+
+	//int best_idx = -1;
+	//double best_nfa = INFINITY;
+	//for (int i = 0; i < e->nb_meaningful_sinusoids; i++)
+	//	if (e->sinusoid_nfa[i] < best_nfa)
+	//	{
+	//		best_idx = i;
+	//		best_nfa = e->sinusoid_nfa[i];
+	//	}
+
+	//if (best_idx >= 0)
+	//{
+	//	e->sinusoid_abc[3*0+0] = e->dip_a;
+	//	e->sinusoid_abc[3*0+1] = e->dip_b;
+	//	e->sinusoid_abc[3*0+2] = e->meaningful_sinusoid[best_idx];
+
+	//	refine_this_sinusoid(e, e->sinusoid_abc + 3*0);
+
+	//	e->nb_refined_sinusoids += 1;
+	//	f->changed = 1;
+	//}
 }
 
 
@@ -922,7 +1078,7 @@ static void action_change_nfa_modgrad(struct FTR *f, int increase)
 	else
 		e->nfa_param_th_modgrad /= STEP_NFA_MODGRAD;
 	fprintf(stderr, "nfa_th_modgrad = %g\n", e->nfa_param_th_modgrad);
-	action_nfa(f);
+	action_nfa_with_refinement(f);
 }
 
 static void action_change_nfa_p(struct FTR *f, int increase)
@@ -935,7 +1091,7 @@ static void action_change_nfa_p(struct FTR *f, int increase)
 		e->nfa_param_p /= STEP_NFA_P;
 	e->nfa_param_p = fmin(e->nfa_param_p, 1 - 1e-8);
 	fprintf(stderr, "nfa_p = %g\n", e->nfa_param_p);
-	action_nfa(f);
+	action_nfa_with_refinement(f);
 }
 
 static void action_change_nfa_lepsilon(struct FTR *f, int increase)
@@ -944,7 +1100,7 @@ static void action_change_nfa_lepsilon(struct FTR *f, int increase)
 	double factor = increase ? 1 : -1;
 	e->nfa_param_lepsilon += factor * STEP_NFA_L;
 	fprintf(stderr, "nfa_l = %g\n", e->nfa_param_lepsilon);
-	action_nfa(f);
+	action_nfa_with_refinement(f);
 }
 
 
@@ -1246,7 +1402,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 
 	// draw grid lines on the hough space
 	assert(e->hough_w == f->h);
-	assert(e->hough_w + e->strip_w == f->w);
+	//assert(e->hough_w + e->strip_w == f->w);
 	if (e->has_hough && !e->inferno) {
 	//assert(f->w == tside + w);
 	//assert(f->h == tside);
@@ -1305,7 +1461,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 
 	// TODO: show the detected nfa-sinusoids in green, if they are
 	// available
-	if (e->show_meaningful_sinusoids)
+	if (0 && e->show_meaningful_sinusoids)
 	{
 		for (int i_theta = 0; i_theta < e->strip_w; i_theta++)
 		{
@@ -1326,6 +1482,34 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 					f->rgb[3*fidx+0] = 255;
 					//f->rgb[3*fidx+1] = 255;
 					f->rgb[3*fidx+2] /= 2;
+				}
+			}
+		}
+	}
+	if (e->show_meaningful_sinusoids && e->nb_refined_sinusoids > 0)
+	{
+		for (int i = 0; i < e->nb_refined_sinusoids; i++)
+		{
+			for (int i_theta = 0; i_theta < e->strip_w; i_theta++)
+			{
+				double A = e->sinusoid_abc[3*i+0];
+				double B = e->sinusoid_abc[3*i+1];
+				double C = e->sinusoid_abc[3*i+2];
+				int n_theta = e->strip_w;
+				int n_z = e->strip_h;
+				float theta = i_theta * 2 * M_PI / n_theta;
+				float z = A * cos(theta) + B * sin(theta);
+				float magic_factor = n_theta / M_PI;
+				int i_z = magic_factor * z;
+				int k = i_z + C;
+				if (insideP(f->w, f->h, i_theta, k) &&
+					insideP(f->w, f->h, i_theta, k+1)&&
+					insideP(f->w, f->h, i_theta, k-1))
+				{
+					int fidx = (k+1) * f->w + i_theta;
+					f->rgb[3*fidx+0] = 0;
+					f->rgb[3*fidx+1] = 255;
+					f->rgb[3*fidx+2] = 0;
 				}
 			}
 		}
@@ -1411,6 +1595,7 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 	static double ox = 0, oy = 0;
 
 	e->nb_meaningful_sinusoids = 0;
+	e->nb_refined_sinusoids = 0;
 
 	// central side: show sinusoids
 	if (m == 0 && x >= e->strip_w && x < f->w && y >= 0 && y < f->h)
@@ -1422,9 +1607,8 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 		e->dip_a = arad * (ia / (tside - 1.0) - 0.5);
 		e->dip_b = arad * (ib / (tside - 1.0) - 0.5);
 		e->show_dip_bundle = true;
-		e->nb_meaningful_sinusoids = 0;
 		if (e->validatronics_mode)
-			action_nfa(f);
+			action_nfa_with_refinement(f);
 		fprintf(stderr, "show_dip %d %d (%g %g)\n", x, y, e->dip_a, e->dip_b);
 		f->changed = 1;
 	} else {
@@ -1483,7 +1667,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 		action_compute_hough(f);
 	}
 
-	if (k == 'v') action_nfa(f);
+	if (k == 'v') action_nfa_with_refinement(f);
 
 	if (k == 'u') action_toggle_hud(f);
 	if (k == 'c') action_toggle_autocontrast(f);
@@ -1619,11 +1803,14 @@ int main_pan(int c, char *v[])
 	e->contrast_mode = 0;
 	e->head_up_display = true;
 	e->nb_meaningful_sinusoids = 0;
+	e->nb_refined_sinusoids = 0;
 	e->show_meaningful_sinusoids = false;
 	e->nfa_param_th_modgrad = 300;
-	e->nfa_param_p = 0.03125;
+	e->nfa_param_p = 0;//.03125;
 	e->nfa_param_lepsilon = 0;
 	e->validatronics_mode = true;
+	e->acontrario_orientations_x = xmalloc(e->strip_w * e->strip_h * sizeof*e->acontrario_orientations_x);
+	e->acontrario_orientations_y = xmalloc(e->strip_w * e->strip_h * sizeof*e->acontrario_orientations_y);
 
 	e->aradius = 1.5;
 	e->pre_blur_sigma = 2;
