@@ -293,8 +293,8 @@ void print_rpc(FILE *f, struct rpc *p, char *n)
 double eval_pol20(double c[20], double x, double y, double z)
 {
 	// XXX WARNING: inversion here!
-	double col = y;
 	double lig = x;
+	double col = y;
 	double alt = z;
 	double m[20] = {1, lig, col, alt, lig*col,
 		lig*alt, col*alt, lig*lig, col*col, alt*alt,

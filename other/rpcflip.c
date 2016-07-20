@@ -180,13 +180,13 @@ static void init_view(struct pan_view *v,
 	v->gray_only = 0;
 
 	// load P and MS
-	int megabytes = 400;
-	tiff_octaves_init(v->tg, fgtif, megabytes);
+	int megabytes = 100;
+	tiff_octaves_init_implicit(v->tg, fgtif, megabytes);
 	if (fctif)
-		tiff_octaves_init(v->tc, fctif, megabytes);
+		tiff_octaves_init_implicit(v->tc, fctif, megabytes);
 	else v->gray_only = 1;//fail("not fctif\n"); //v->tc = NULL;
-	v->w = v->tg->i->w;
-	v->h = v->tg->i->h;
+	v->w = -1;//v->tg->i->w;
+	v->h = -1;//v->tg->i->h;
 	v->rgbiox = v->rgbioy = 4; // normally untouched
 
 	// load P's RPC
@@ -198,9 +198,19 @@ static void init_view(struct pan_view *v,
 	v->repaint = 1;
 }
 
+static void init_view_sizes(struct pan_view *v)
+{
+	void *p = tiff_octaves_getpixel(v->tg, 0, 1, 1);
+	if (!p) fail("could not load view %p", (void*)v);
+	v->w = v->tg->i->w;
+	v->h = v->tg->i->h;
+}
+
 static void setup_nominal_pixels_according_to_first_view(struct pan_state *e)
 {
 	struct pan_view *v = e->view + 0;
+
+	init_view_sizes(v);
 
 	// center of the image in image coordinates
 	double cx = v->w / 2;
@@ -215,7 +225,7 @@ static void setup_nominal_pixels_according_to_first_view(struct pan_state *e)
 	// XXX WARNING WRONG TODO FIXME : assumes North-South oriented image (!)
 	double lat_step = csouth[1] - center[1];
 	double latitude = center[1] * (M_PI/180);
-	double lonfactor = 0.5*cos(latitude);
+	double lonfactor = 1.0*cos(latitude);
 	double lon_step = -lat_step / lonfactor;
 
 	// fill-in the fields
@@ -1272,6 +1282,7 @@ static void action_select_view(struct FTR *f, int i, int x, int y)
 	if (i >= 0 && i < e->nviews)
 	{
 		fprintf(stderr, "selecting view %d\n", i);
+		init_view_sizes(e->view + i);
 		if (e->image_space)
 			reposition_in_image_space(f, e->current_view, i, x, y);
 		e->current_view = i;
