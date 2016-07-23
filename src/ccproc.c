@@ -148,7 +148,6 @@ int ccproc(
 	for (int i = 0; i < r; i++)
 		out_size[i] = pair[2*i + 0];
 
-
 	// fill-in image of representatives
 	for (int i = 0; i < w*h; i++)
 		out_idx[i] = tmpi[rep[i]];
@@ -178,21 +177,21 @@ int ccproc(
 		assert(out_idx[out_all[out_first[i] + j]] == i);
 
 	// reorder out_all so that boundarying points come first
-//	for (int i = 0; i < r; i++)
-//	{
-//		int *ti = out_all + out_first[i];
-//		int topo = 0;
-//		for (int j = 0; j < out_size[i]; j++)
-//		{
-//			int idx = ti[j];
-//			if (!boundaryingP(out_idx, w, h, idx))
-//			{
-//				swapi(ti, topo, j);
-//				topo += 1;
-//			}
-//		}
-//		out_bdsize[i] = topo;
-//	}
+	for (int i = 0; i < r; i++)
+	{
+		int *ti = out_all + out_first[i];
+		int topo = 0;
+		for (int j = 0; j < out_size[i]; j++)
+		{
+			int idx = ti[j];
+			if (!boundaryingP(out_idx, w, h, idx))
+			{
+				swapi(ti, topo, j);
+				topo += 1;
+			}
+		}
+		out_bdsize[i] = topo;
+	}
 
 	// cleanup and exit
 	free(ipair);
@@ -202,6 +201,7 @@ int ccproc(
 	return r;
 }
 
+//#define MAIN_CCPROC
 #ifdef MAIN_CCPROC
 #include "iio.h"
 int main(int c, char *v[])
@@ -221,8 +221,8 @@ int main(int c, char *v[])
 
 	int r = ccproc(out_size, out_bdsize, out_all, out_first, out_idx,
 			x, w, h,
-			//float_eq_isnan
-			floatnan_equality
+			float_eq_isnan
+			//floatnan_equality
 			);
 
 	fprintf(stderr, "ccproc returned %d\n", r);
@@ -266,3 +266,4 @@ int main(int c, char *v[])
 	return 0;
 }
 #endif
+

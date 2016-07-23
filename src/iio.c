@@ -2308,11 +2308,22 @@ static int xml_get_tag_content(char *out, char *line, char *tag)
 	return 1;
 }
 
+char *gnu_dirname(char *path)
+{
+   char *base = strrchr(path, '/');
+   if (base) {
+      *base = '\0';
+   } else {
+      *path = '.'; *(path+1) = '\0';
+   }
+   return path;
+}
+
 static int read_beheaded_vrt(struct iio_image *x,
 		FILE *fin, char *header, int nheader)
 {
 	int n = FILENAME_MAX + 0x200, cx = 0, w, h;
-	char fname[n], line[n], *sl = fgets(line, n, fin);
+	char fname[n], dirvrt[n], fullfname[n], line[n], *sl = fgets(line, n, fin);
 	if (!sl) return 1;
 	cx += xml_get_numeric_attr(&w, line, "Dataset", "rasterXSize");
 	cx += xml_get_numeric_attr(&h, line, "Dataset", "rasterYSize");
@@ -2325,10 +2336,13 @@ static int read_beheaded_vrt(struct iio_image *x,
 	x->type = IIO_TYPE_FLOAT;
 	x->contiguous_data = false;
 	x->data = xmalloc(w * h * sizeof(float));
-	for (int i = 0; i < w*h; i++)
-		((float*)x->data)[i] = NAN;
 	float (*xx)[w] = x->data;
 	int pos[4], pos_cx = 0, has_fname = 0;
+   
+   // obtain the path where the vrt file is located
+   strncpy(dirvrt, global_variable_containing_the_name_of_the_last_opened_file, n);
+   gnu_dirname(dirvrt);
+
 	while (1) {
 		sl = fgets(line, n, fin);
 		if (!sl) break;
@@ -2341,7 +2355,8 @@ static int read_beheaded_vrt(struct iio_image *x,
 		{
 			pos_cx = has_fname = 0;
 			int wt, ht;
-			float *xt = iio_read_image_float(fname, &wt, &ht);
+         sprintf(fullfname, "%s/%s", dirvrt, fname);
+			float *xt = iio_read_image_float(fullfname, &wt, &ht);
 			for (int j = 0; j < pos[3]; j++)
 			for (int i = 0; i < pos[2]; i++)
 			{
@@ -3255,6 +3270,7 @@ static int read_image(struct iio_image *x, const char *fname)
 #endif//I_CAN_HAS_LIBTIFF
 #ifdef I_USE_LIBRAW
 	} else if (try_reading_file_with_libraw(fname, x)) {
+		r=0;
 #endif//I_USE_LIBRAW
 	} else if (raw_prefix(fname)) {
 		r = read_raw_named_image(x, fname);
