@@ -5,6 +5,9 @@
 #include "abstract_dsf.c"
 #include "xmalloc.c"
 
+//static void img_debug(float *x, int w, int h, int pd, const char *fmt, ...);
+//static void img_debug_int(int *x, int w, int h, int pd, const char *fmt, ...);
+
 typedef int (*float_equivalence_relation_t)(float,float);
 
 int float_equality(float a, float b)
@@ -43,23 +46,24 @@ static bool boundaryingP(int *idxs, int w, int h, int idx)
 	int j = idx / w;
 	assert(j*w+i == idx);
 	int my_idx = idxs[idx];
-	if (i-1 >= 0 && my_idx != idxs[(j+0)*w + i-1]) return false;
-	if (i+1 <  w && my_idx != idxs[(j+0)*w + i+1]) return false;
-	if (j-1 >= 0 && my_idx != idxs[(j-1)*w + i+0]) return false;
-	if (j+1 <  h && my_idx != idxs[(j+1)*w + i+0]) return false;
-	return true;
+	if (i-1 >= 0 && my_idx != idxs[(j+0)*w + i-1]) return true;
+	if (i+1 <  w && my_idx != idxs[(j+0)*w + i+1]) return true;
+	if (j-1 >= 0 && my_idx != idxs[(j-1)*w + i+0]) return true;
+	if (j+1 <  h && my_idx != idxs[(j+1)*w + i+0]) return true;
+	return false;
 }
 
 static void swapi(int *t, int i, int j)
 {
 	int tmp = t[i];
 	t[i] = t[j];
-	t[j] = t[i];
+	t[j] = tmp;
 }
 
-// compute the number of connected components of equivalent pixels in an image
-// if any of the "out_*" parameters is non-null, it is filled-in
-// the connected components are ordered by size
+// Compute the number of connected components of equivalent pixels in an image.
+// If any of the "out_*" parameters is non-null, it is filled-in.
+// The connected components are ordered by size.
+// Note: connexity means 4-connexity.
 //
 // return value: N = the number of connected components
 // out_size[i] = area of ith cc (0<=i<N)
@@ -89,19 +93,20 @@ int ccproc(
 	adsf_begin(rep, w*h);
 
 	// join equivalent neighbors (neighbors == 4-neighbors ALWAYS)
-	for (int j = 0; j < h - 1; j++)
-	for (int i = 0; i < w - 1; i++)
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
 	{
 		int p0 = j*w + i;
 		int p1 = j*w + i+1;
 		int p2  = (j+1)*w + i;
-		if (eq(x[p0], x[p1])) adsf_union(rep, w*h, p0, p1);
-		if (eq(x[p0], x[p2])) adsf_union(rep, w*h, p0, p2);
+		if (i+1 < w && eq(x[p0], x[p1])) adsf_union(rep, w*h, p0, p1);
+		if (j+1 < h && eq(x[p0], x[p2])) adsf_union(rep, w*h, p0, p2);
 	}
 
 	// canonicalize dsf (after this, the DSF is not changed anymore)
 	for (int i = 0; i < w*h; i++)
 		rep[i] = adsf_find(rep, w*h, i);
+	//img_debug_int(rep, w, h, 1, "ccproc_rep.tiff");
 
 	// count connected components
 	int r = 0;
@@ -180,14 +185,15 @@ int ccproc(
 	for (int i = 0; i < r; i++)
 	{
 		int *ti = out_all + out_first[i];
-		int topo = 0;
+		int topo = out_size[i]; // index of top non-boundary element
 		for (int j = 0; j < out_size[i]; j++)
 		{
 			int idx = ti[j];
 			if (!boundaryingP(out_idx, w, h, idx))
 			{
+				if (j == topo) break;
+				topo -= 1;
 				swapi(ti, topo, j);
-				topo += 1;
 			}
 		}
 		out_bdsize[i] = topo;
