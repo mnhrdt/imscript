@@ -368,10 +368,10 @@ void tdip_state_compute_rand_acc(struct tdip_state *e)
 			double ngp = hypot(gp[0], gp[1]);
 			double ngq = hypot(gq[0], gq[1]);
 			//if (fabs(ngp - ngq) > 2) continue;
-			if (fabs(gp[1]) < 1e-2 ||  fabs(gp[0]) < 1e-2)
-				continue;
-			if (fabs(gq[1]) < 1e-2 ||  fabs(gq[0]) < 1e-2)
-				continue;
+			//if (fabs(gp[1]) < 1e-2 ||  fabs(gp[0]) < 1e-2)
+			//	continue;
+			//if (fabs(gq[1]) < 1e-2 ||  fabs(gq[0]) < 1e-2)
+			//	continue;
 			double gw = ngp * ngq; // multiplicative weight
 
 			double theta_p = p[0] * 2 * M_PI / w;
@@ -388,7 +388,7 @@ void tdip_state_compute_rand_acc(struct tdip_state *e)
 				lrint(alf * x[1] + bet)
 			};
 			if (insideP(tside, tside, ix[0], ix[1]))
-				e->transform[tside*ix[1] + ix[0]] += gw;
+				e->transform[tside*ix[1] + ix[0]] += log(gw);//gw;
 		}
 		cx += 1;
 	}
@@ -453,8 +453,8 @@ void tdip_state_update_input(struct tdip_state *e, float *x)
 	if (e->ntensor > 0) {
 		compute_structure_tensor_field_ultra_fancy(e->structure_tensor,
 				e->x, e->w, e->h, e->ntensor, 100);
-		iio_save_image_float_vec("/tmp/debustr.tiff",
-				e->structure_tensor, e->w, e->h, 7);
+		//iio_save_image_float_vec("/tmp/debustr.tiff",
+		//		e->structure_tensor, e->w, e->h, 7);
 	}
 	for (int i = 0; i < e->tside * e->tside; i++)
 		e->transform[i] = 0;
