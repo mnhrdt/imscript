@@ -1686,6 +1686,7 @@ struct tiff_octaves {
 	//
 	int noctaves;
 	char filename[MAX_OCTAVES][FILENAME_MAX];
+	int loaded[MAX_OCTAVES], megabytes;
 	struct tiff_info i[MAX_OCTAVES];
 	void **c[MAX_OCTAVES];        // pointers to cached tiles
 
@@ -1700,11 +1701,51 @@ struct tiff_octaves {
 //#include "smapa.h"
 //SMART_PARAMETER(FIRST_OCTAVE,0)
 
+static int load_one_octave_file(struct tiff_octaves *t, int o)
+{
+	if (!get_tiff_info_filename_e(t->i + o, t->filename[o]))
+		return 1;
+	if (t->i[o].bps < 8 || t->i[o].packed)
+		fail("caching of packed samples is not supported");
+
+	// set up essential data
+	t->c[o] = xmalloc((1 + t->i[o].ntiles) * sizeof*t->c);
+	for (int j = 0; j < t->i[o].ntiles; j++)
+		t->c[o][j] = 0;
+
+	// print debug info
+	struct tiff_info *ti = t->i + o;
+	fprintf(stderr, "\toctave %d:", o);
+	fprintf(stderr, " %dx%d", ti->w, ti->h);
+	fprintf(stderr, " %d tiles (%dx%d) of size %dx%d",
+			ti->ntiles, ti->ta, ti->td, ti->tw, ti->th);
+	fprintf(stderr, "\n");
+
+	// set up data for old tile deletion
+	if (t->megabytes) {
+		for (int o = 0; o < t->noctaves; o++)
+			t->a[o] = malloc(t->i[o].ntiles * sizeof*t->a[o]);
+		t->ax = 0;
+		int tilesize = t->i->tw * t->i->th * (t->i->bps/8) * t->i->spp;
+		double mbts = tilesize / (1024.0 * 1024);
+		t->maxtiles = t->megabytes / mbts;
+		t->curtiles = 0;
+	} else  {
+		// unlimited tile usage
+		t->a[0] = NULL;
+	}
+
+	t->loaded[o] = 1;
+	return 0;
+}
+
 void tiff_octaves_init(struct tiff_octaves *t, char *filepattern, int megabytes)
 {
 	fprintf(stderr, "tiff octaves init \"%s\"(%dMB)\n", filepattern, megabytes);
+	t->megabytes = megabytes;
 	// create filenames until possible
 	t->noctaves = 0;
+	for (int o = 0; o < MAX_OCTAVES; o++) t->loaded[o] = 0;
 	for (int o = 0; o < MAX_OCTAVES; o++)
 	{
 		//int oo = o + FIRST_OCTAVE();
@@ -1712,6 +1753,7 @@ void tiff_octaves_init(struct tiff_octaves *t, char *filepattern, int megabytes)
 		//fprintf(stderr, "f[%d]=%s\n", o, t->filename[o]);
 		if (!get_tiff_info_filename_e(t->i + o, t->filename[o]))
 			break;
+		t->loaded[o] = 1;
 		if (t->i[o].bps < 8 || t->i[o].packed)
 			fail("caching of packed samples is not supported");
 		if (0) {
@@ -1756,18 +1798,35 @@ void tiff_octaves_init(struct tiff_octaves *t, char *filepattern, int megabytes)
 	}
 
 	// set up data for old tile deletion
-	if (megabytes) {
+	if (t->megabytes) {
 		for (int o = 0; o < t->noctaves; o++)
 			t->a[o] = malloc(t->i[o].ntiles * sizeof*t->a[o]);
 		t->ax = 0;
 		int tilesize = t->i->tw * t->i->th * (t->i->bps/8) * t->i->spp;
 		double mbts = tilesize / (1024.0 * 1024);
-		t->maxtiles = megabytes / mbts;
+		t->maxtiles = t->megabytes / mbts;
 		t->curtiles = 0;
 	} else  {
 		// unlimited tile usage
 		t->a[0] = NULL;
 	}
+}
+
+// the "implicit" version of "tiff_octaves_init" does not do preliminary checks
+// it is much faster, but it delays failures for non-existing files
+// during runtime
+void tiff_octaves_init_implicit(struct tiff_octaves *t, char *fpat, int mbytes)
+{
+	fprintf(stderr, "tiff octaves init implicit \"%s\"(%dMB)\n",
+			fpat, mbytes);
+	t->megabytes = mbytes;
+	for (int o = 0; o < MAX_OCTAVES; o++)
+	{
+		t->loaded[o] = 0; // and it will stay like that
+		snprintf(t->filename[o], FILENAME_MAX, fpat, o);
+		// and that's it.  Do not ever check that the files exist
+	}
+	t->noctaves = MAX_OCTAVES;
 }
 
 void tiff_octaves_free(struct tiff_octaves *t)
@@ -1828,6 +1887,10 @@ static void notify_tile_access_octave(struct tiff_octaves *t, int o, int i)
 
 void *tiff_octaves_gettile(struct tiff_octaves *t, int o, int i, int j)
 {
+	// if file is not loaded, load it
+	if (!t->loaded[o])
+		load_one_octave_file(t, o);
+
 	// sanitize input
 	o = bound(0, o, t->noctaves - 1);
 	i = bound(0, i, t->i[o].w - 1);
