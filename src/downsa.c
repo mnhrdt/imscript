@@ -119,7 +119,11 @@ static void downsa2d(float *oy, float *ox, int w, int h, int pd, int n, int ty)
 		for (int jj = 0; jj < n; jj++)
 		for (int ii = 0; ii < n; ii++)
 		if (innerP(w, h, i*n+ii, j*n+jj))
-			vv[nv++] = x[j*n+jj][i*n+ii][l];
+		{
+			float v = x[j*n+jj][i*n+ii][l];
+			if (isfinite(v))
+				vv[nv++] = v;
+		}
 		struct statistics_float s;
 		statistics_getf(&s, vv, nv);
 		float g;
@@ -132,6 +136,7 @@ static void downsa2d(float *oy, float *ox, int w, int h, int pd, int n, int ty)
 		case 'V': g = s.laverage;     break;
 		case 's': g = s.variance;     break;
 		case 'r': g = s.sample;       break;
+		case 'n': g = nv;             break;
 		case 'f': g = vv[0];          break;
 		case 'l': g = vv[nv-1];       break;
 		case 'c': g = vv[(nv-1)/2];   break;
