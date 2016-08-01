@@ -1,6 +1,6 @@
 // gcc geotif_getpixel.c iio.o -lgdal -ltiff -lpng -ljpeg
 #include <stdio.h>
-#include "gdal.h"
+#include <gdal/gdal.h>
 #include "fancy_image.c"
 
 int main(int c, char *v[])

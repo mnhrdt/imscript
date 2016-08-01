@@ -34,6 +34,9 @@ Computation:
 	t	toggle structure tensor
 	r	toggle randomized voting
 	v	nfa
+	P,p	increase, decrease NFA parameter p
+	G,g	increase, decrease NFA parameter modgrad_th
+	L,l	increase, decrease NFA parameter log_epsilon
 
 Display:
 	u	toggle hud
@@ -42,6 +45,8 @@ Display:
 	o	toggle inferno
 	n	normalize contrast
 	0	reset cylinder phase
+	4	toggle dip visualization
+	5	toggle validatronics mode
 
 Mouse:
 	wheel	increase, decrease octave

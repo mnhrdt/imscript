@@ -762,13 +762,27 @@ static double nfa(int n, int k, double p, double logNT)
 /*----------------------------------------------------------------------------*/
 /* Normalized angle difference between 'a' and the symmetric of 'b'
    relative to a vertical axis. */
-static double norm_angle_diff(double a, double b)
+static double norm_angle_diff_pi(double a, double b)
 {
   a -= b;
   while( a <= -0.5*M_PI ) a += M_PI;
   while( a >   0.5*M_PI ) a -= M_PI;
 
   return fabs(a) * 2.0 / M_PI;
+}
+
+static double norm_angle_diff_twopi(double a, double b)
+{
+  a -= b;
+  while( a <= -M_PI ) a += 2*M_PI;
+  while( a >   M_PI ) a -= 2*M_PI;
+
+  return fabs(a) / M_PI;
+}
+
+static double norm_angle_diff(double a, double b)
+{
+	return norm_angle_diff_twopi(a, b);
 }
 
 double sin_nfac(double a, double b, double c, double * ox, double * oy,
