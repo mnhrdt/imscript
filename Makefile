@@ -21,9 +21,16 @@ ifeq ($(ENABLE_GSL), yes)
 	SRCGSL = paraflow minimize
 endif
 
+# swap next two lines for libraw support
 IIOFLAGS = -ljpeg -ltiff -lpng -lm -lraw -lHalf -lIex -lIlmImf -fopenmp
+IIOFLAGS = -ljpeg -ltiff -lpng -lm
 FFTFLAGS = -lfftw3f
 GSLFLAGS = -lgsl -lgslcblas
+
+# swap next two lines for libraw support
+IIO=../iio/contrib/cmake/libIIOLIB.a
+IIO=$(SRCDIR)/iio.o
+
 
 # compiler detection hacks
 # (because some compilers do not use the standard by default)
@@ -68,9 +75,6 @@ PROGRAMS = $(addprefix $(BINDIR)/,$(SRC) flow_ms rgfield rgfields rgfieldst elap
 default: $(PROGRAMS)
 
 $(addprefix $(BINDIR)/,depend) : $(SRCDIR)/
-
-IIO=$(SRCDIR)/iio.o
-IIO=../iio/contrib/cmake/libIIOLIB.a
 
 $(addprefix $(BINDIR)/,$(SRCIIO)) : $(BINDIR)/% : $(SRCDIR)/%.c $(IIO)
 	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS)
