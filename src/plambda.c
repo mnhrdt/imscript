@@ -2368,12 +2368,14 @@ static int run_program_vectorially(float *out, int pdmax,
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-	FORJ(*h) FORI(*w) {
+	for (int j = 0; j < *h; j++)
+	for (int i = 0; i < *w; i++)
+	{
 		float result[pdmax];
 		int r = run_program_vectorially_at(result, p,val, w,h,pd, i,j);
 		assert(r == pdmax);
 		if (r != pdmax) fail("r != pdmax");
-		FORL(r)
+		for (int l = 0; l < r; l++)
 			setsample_0(out, *w, *h, pdmax, i, j, l, result[l]);
 	}
 	return pdmax;

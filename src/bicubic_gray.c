@@ -61,7 +61,7 @@ float bicubic_interpolation_gray(float *img, int w, int h, float x, float y)
 	float c[4][4];
 	for (int j = 0; j < 4; j++)
 		for (int i = 0; i < 4; i++)
-			c[i][j] = p(img, w, h, 1, ix + i, iy + j, 0);
+			c[i][j] = p(img, w, h, ix + i, iy + j);
 	float r = bicubic_interpolation_cell(c, x - ix, y - iy);
 	return r;
 }
