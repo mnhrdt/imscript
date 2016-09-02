@@ -29,6 +29,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <libgen.h> // needed for dirname() multi-platform
+
+#ifdef __MINGW32__ // needed for tmpfile(), this flag is also set by MINGW64 
+#include <windows.h>
+#endif
+
 
 #include "iio.h" // only for IIO_MAX_DIMENSION
 
@@ -1077,7 +1083,18 @@ static FILE *iio_fmemopen(void *data, size_t size)
 #elif  I_CAN_HAS_FUNOPEN // BSD case
 	fail("implement fmemopen using funopen here");
 #else // portable case
-	FILE *f = tmpfile();
+	FILE *f;
+	#ifdef __MINGW32__
+		// creating a tempfile can be very slow
+		// this is extremely inefficient
+		char filename[FILENAME_MAX], pathname[FILENAME_MAX];
+		GetTempPath(FILENAME_MAX, pathname);
+		GetTempFileName(pathname,"temp",0,filename);
+		f = fopen(filename,"w+bTD");
+		IIO_DEBUG("creating MINGW temp file %s\n", filename);
+	#else
+		f = tmpfile();
+	#endif // MINGW32
 	if (!f) fail("tmpfile failed");
 	int cx = fwrite(data, size, 1, f);
 	if (cx != 1) fail("fwrite failed");
@@ -2308,21 +2325,11 @@ static int xml_get_tag_content(char *out, char *line, char *tag)
 	return 1;
 }
 
-char *gnu_dirname(char *path)
-{
-   char *base = strrchr(path, '/');
-   if (base) {
-      *base = '\0';
-   } else {
-      *path = '.'; *(path+1) = '\0';
-   }
-   return path;
-}
 
 static int read_beheaded_vrt(struct iio_image *x,
 		FILE *fin, char *header, int nheader)
 {
-	int n = FILENAME_MAX + 0x200, cx = 0, w, h;
+	int n = FILENAME_MAX + 0x200, cx = 0, w = 0, h = 0;
 	char fname[n], dirvrt[n], fullfname[n], line[n], *sl = fgets(line, n, fin);
 	if (!sl) return 1;
 	cx += xml_get_numeric_attr(&w, line, "Dataset", "rasterXSize");
@@ -2338,10 +2345,10 @@ static int read_beheaded_vrt(struct iio_image *x,
 	x->data = xmalloc(w * h * sizeof(float));
 	float (*xx)[w] = x->data;
 	int pos[4], pos_cx = 0, has_fname = 0;
-   
-   // obtain the path where the vrt file is located
-   strncpy(dirvrt, global_variable_containing_the_name_of_the_last_opened_file, n);
-   gnu_dirname(dirvrt);
+
+	// obtain the path where the vrt file is located
+	strncpy(dirvrt, global_variable_containing_the_name_of_the_last_opened_file, n);
+	char* dirvrt2 = dirname(dirvrt);
 
 	while (1) {
 		sl = fgets(line, n, fin);
@@ -2355,7 +2362,7 @@ static int read_beheaded_vrt(struct iio_image *x,
 		{
 			pos_cx = has_fname = 0;
 			int wt, ht;
-         sprintf(fullfname, "%s/%s", dirvrt, fname);
+			snprintf(fullfname,FILENAME_MAX,"%s/%s",dirvrt2,fname);
 			float *xt = iio_read_image_float(fullfname, &wt, &ht);
 			for (int j = 0; j < pos[3]; j++)
 			for (int i = 0; i < pos[2]; i++)
@@ -2476,11 +2483,11 @@ static int parse_raw_binary_image_explicit(struct iio_image *x,
 	size_t n = nsamples * ss;
 	memcpy(x->data, header_bytes + (char*)data, n);
 	if (endianness) {
-      if (ss == 2)
-		   switch_2endianness(x->data, nsamples);
-      if (ss >= 4)
-		   switch_4endianness(x->data, nsamples);
-   }
+		if (ss == 2)
+			switch_2endianness(x->data, nsamples);
+		if (ss >= 4)
+			switch_4endianness(x->data, nsamples);
+	}
 	return 0;
 }
 
@@ -3029,6 +3036,8 @@ static int guess_format(FILE *f, char *buf, int *nbuf, int bufmax)
 		if (b[3]==0xe0 && b[6]=='J' && b[7]=='F')
 			return IIO_FORMAT_JPEG;
 		if (b[3]==0xe1 && b[6]=='E' && b[7]=='x')
+			return IIO_FORMAT_JPEG;
+		if (b[3]==0xee || b[3]==0xed) // Adobe JPEG
 			return IIO_FORMAT_JPEG;
 	}
 #endif//I_CAN_HAS_LIBPNG
