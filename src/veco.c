@@ -67,6 +67,11 @@ static float float_med(float *x, int n)
 	return x[n/2];
 }
 
+static float float_cnt(float *x, int n)
+{
+	return n;
+}
+
 static float float_mod(float *x, int n)
 {
 	float h[0x100];
@@ -122,13 +127,28 @@ static float float_pick(float *x, int n)
 		fail("empty list of pixel values!");
 }
 
-static bool isgood(float x)
+typedef bool (*isgood_t)(float);
+
+static bool isgood_finite(float x)
 {
 	return isfinite(x);
 }
 
+static bool isgood_always(float x)
+{
+	return true;
+}
+
+static bool isgood_numeric(float x)
+{
+	return !isnan(x);
+}
+
+#include "pickopt.c"
+
 int main(int c, char *v[])
 {
+	int gpar = atoi(pick_option(&c, &v, "g", "1"));
 	if (c < 4) {
 		fprintf(stderr,
 		"usage:\n\t%s {sum|min|max|avg|mul|med] [v1 ...] > out\n", *v);
@@ -146,11 +166,17 @@ int main(int c, char *v[])
 	if (0 == strcmp(operation_name, "max"))   f = float_max;
 	if (0 == strcmp(operation_name, "med"))   f = float_med;
 	if (0 == strcmp(operation_name, "mod"))   f = float_mod;
+	if (0 == strcmp(operation_name, "cnt"))   f = float_cnt;
 	if (0 == strcmp(operation_name, "medi"))   f = float_med;
 	if (0 == strcmp(operation_name, "medv"))   f = float_medv;
 	if (0 == strcmp(operation_name, "rnd"))   f = float_pick;
 	if (0 == strcmp(operation_name, "first")) f = float_first;
 	if (!f) fail("unrecognized operation \"%s\"", operation_name);
+	bool (*isgood)(float) = NULL;
+	if (0 == gpar) isgood = isgood_finite;
+	if (1 == gpar) isgood = isgood_numeric;
+	if (2 == gpar) isgood = isgood_always;
+	if (!isgood) fail("unrecognized goodness %d", gpar);
 	float *x[n];
 	int w[n], h[n];
 	for (int i = 0; i < n; i++)
