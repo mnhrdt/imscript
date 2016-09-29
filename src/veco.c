@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -109,6 +110,20 @@ static float float_medv(float *x, int n)
 		return x[n/2];
 }
 
+static float float_percentile(float *x, int n)
+{
+	static float percentile = 50;
+	if (n == -1) { percentile = fmax(0, fmin(*x, 100)); return 0; }
+	if (n == 0) return NAN;
+	if (n == 1) return x[0];
+	qsort(x, n, sizeof*x, compare_floats);
+	int i = round(percentile * (n - 1) / 100.0);
+	//fprintf(stderr, "n=%d, percentile=%g, i=%d\n", n, percentile, i);
+	assert(i >= 0);
+	assert(i < n);
+	return x[i];
+}
+
 static float float_first(float *x, int n)
 {
 	if (n)
@@ -171,6 +186,11 @@ int main(int c, char *v[])
 	if (0 == strcmp(operation_name, "medv"))   f = float_medv;
 	if (0 == strcmp(operation_name, "rnd"))   f = float_pick;
 	if (0 == strcmp(operation_name, "first")) f = float_first;
+	if (*operation_name == 'q') {
+		float p = atof(1 + operation_name);
+		f = float_percentile;
+		f(&p, -1);
+	}
 	if (!f) fail("unrecognized operation \"%s\"", operation_name);
 	bool (*isgood)(float) = NULL;
 	if (0 == gpar) isgood = isgood_finite;
