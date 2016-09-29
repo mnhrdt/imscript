@@ -201,7 +201,7 @@ static void rgb_to_hsv_doubles(double *out, double *in)
 }
 
 // draw a segment between two points
-void traverse_segment(int px, int py, int qx, int qy,
+static void traverse_segment(int px, int py, int qx, int qy,
 		void (*f)(int,int,void*), void *e)
 {
 	if (px == qx && py == qy)
@@ -222,7 +222,7 @@ void traverse_segment(int px, int py, int qx, int qy,
 }
 
 // draw a segment between two points (somewhat anti-aliased)
-void traverse_segment_aa(int px, int py, int qx, int qy,
+static void traverse_segment_aa(int px, int py, int qx, int qy,
 		void (*f)(int,int,float,void*), void *e)
 {
 	if (px == qx && py == qy)
@@ -262,7 +262,7 @@ void traverse_segment_aa(int px, int py, int qx, int qy,
 }
 
 // draw a segment between two points (somewhat anti-aliased)
-void traverse_segment_aa2(float px, float py, float qx, float qy,
+static void traverse_segment_aa2(float px, float py, float qx, float qy,
 		void (*f)(int,int,float,void*), void *e)
 {
 	//if (px == qx && py == qy)
@@ -302,7 +302,7 @@ void traverse_segment_aa2(float px, float py, float qx, float qy,
 	}
 }
 
-int compare_floats(const void *a, const void *b)
+static int compare_floats(const void *a, const void *b)
 {
 	const float *da = (const float *) a;
 	const float *db = (const float *) b;

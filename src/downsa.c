@@ -104,7 +104,7 @@ static bool innerP(int w, int h, int i, int j)
 	return true;
 }
 
-static void downsa2d(float *oy, float *ox, int w, int h, int pd, int n, int ty)
+void downsa2d(float *oy, float *ox, int w, int h, int pd, int n, int ty)
 {
 	int W = w/n;
 	int H = h/n;

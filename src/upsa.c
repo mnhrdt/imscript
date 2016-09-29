@@ -328,7 +328,7 @@ static void interpolate_vec(float *out, float *x, int w, int h, int pd,
 	}
 }
 
-static float *zoom(float *x, int w, int h, int pd, int n, int zt,
+float *zoom(float *x, int w, int h, int pd, int n, int zt,
 		int *ow, int *oh)
 {
 	int W = n*w;// - n;

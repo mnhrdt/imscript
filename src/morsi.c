@@ -249,7 +249,7 @@ void morsi_all(
 }
 
 
-static int *build_disk(float radius)
+int *build_disk(float radius)
 {
 	if (!(radius >1)) return NULL;
 	fprintf(stderr, "building a disk of radius %g\n", radius);
