@@ -418,9 +418,9 @@ static void dump_font_as_parseable_c_struct_as_it_is(char *filename,
 	dump_data_in_c(f, font.data, font.ndata, font.packing);
 	fprintf(f, ";\n");
 	fprintf(f, "struct bitmap_font %s[1] = "
-			"{{%d, %d, %d, %s, \"%s\", %s_data}};\n",
+			"{{%d, %d, %d, %s, %d, \"%s\", %s_data}};\n",
 		name, font.number_of_glyphs, font.width, font.height,
-		packing_string(font.packing), name, name);
+		packing_string(font.packing), font.ndata, name, name);
 	xfclose(f);
 
 	double e = entropy(font.data, font.ndata);
