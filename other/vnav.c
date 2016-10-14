@@ -929,7 +929,7 @@ static double eval_this_nfa(struct pan_state *e, double abc[3])
 static
 void refine_this_sinusoid(struct pan_state *e, double abc[3])
 {
-	int nn = 20;
+	int nn = 36;
 	int n[][3] = {
 		{1,0,0}, {-1,0,0},
 		{0,1,0}, {0,-1,0},
@@ -941,6 +941,14 @@ void refine_this_sinusoid(struct pan_state *e, double abc[3])
 		{0,5,0}, {0,-5,0},//16
 		{10,0,0}, {-10,0,0},
 		{0,10,0}, {0,-10,0},//20
+		{20,0,0}, {-20,0,0},
+		{0,20,0}, {0,-20,0},//24
+		{50,0,0}, {-50,0,0},
+		{0,50,0}, {0,-50,0},//28
+		{100,0,0}, {-100,0,0},
+		{0,100,0}, {0,-100,0},//32
+		{0,0,5}, {0,0,-5},
+		{0,0,10}, {0,0,-10},//36
 		{0,0,0}
 	};
 

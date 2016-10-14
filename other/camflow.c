@@ -6,6 +6,7 @@
  * Website http://nashruddin.com
  */
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <math.h>
@@ -15,6 +16,18 @@
 
 
 #include "iio.h"
+#include "harris/harris.c"
+#include "harris/gauss.c"
+#include "harris/image.c"
+#include "harris/ntuple.c"
+#include "harris/misc.c"
+
+#define OMIT_MAIN_FONTU
+#include "fontu.c"
+#include "fonts/xfont9x15.c"
+#include "fonts/xfont8x13.c"
+
+#include "seconds.c"
 
 
 char *global_method_id;
@@ -25,6 +38,13 @@ float global_params[0x100];
 int   global_nparams;
 float global_vscale;
 const float global_vscale_factor = 1.4142;
+
+struct bitmap_font global_font;
+
+double global_harris_sigma = 1;    // s
+double global_harris_k = 0.04;     // k
+double global_harris_flat_th = 20; // t
+int    global_harris_neigh = 3;    // n
 
 enum flow_visualization_id {
 	VFLOW_COLORS,
@@ -253,12 +273,31 @@ static void d_tacu(float *out, float *in_a, float *in_b, int w, int h, int pd)
 	}
 
 	if (global_display_diff) {
-		for (int i = 0; i < w*h*pd; i++) {
-			float g = (in_b[i] - in_a[i])/1 + 128;
+		for (int l = 0; l < pd; l++)
+		for (int j = 0; j < h; j++)
+		for (int i = 0; i < w; i++)
+		{
+			float a00 = in_a[(j*w+i)*pd+l];
+			float a10 = in_a[(j*w+i+1)*pd+l];
+			float a01 = in_a[(j*w+i+w)*pd+l];
+			float adx = a10 - a00;
+			float ady = a01 - a00;
+			float na2 = adx*adx + ady*ady;
+			float b00 = in_b[(j*w+i)*pd+l];
+			float idt = b00 - a00;
+			float g = 127 + idt;//*na2/100;
+			//if (idt > 25) g = 255;
+			//if (idt < -25) g = 0;
 			if (g > 255) g = 255;
 			if (g < 0) g = 0;
-			out[i] = g;
+			out[(j*w+i)*pd+l] = g;
 		}
+		//for (int i = 0; i < w*h*pd; i++) {
+		//	float g = (in_b[i] - in_a[i])/1 + 128;
+		//	if (g > 255) g = 255;
+		//	if (g < 0) g = 0;
+		//	out[i] = g;
+		//}
 		return;
 	}
 
@@ -333,9 +372,88 @@ static void d_tacu(float *out, float *in_a, float *in_b, int w, int h, int pd)
 	free(u);
 	free(v);
 }
-
 // process one frame
 static void process_tacu(float *out, float *in, int w, int h, int pd)
+{
+	// convert image to gray
+	image_double in_gray = new_image_double(w, h);
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		int idx = j*w + i;
+		float r = in[3*idx+0];
+		float g = in[3*idx+1];
+		float b = in[3*idx+2];
+		in_gray->data[idx] = (r + g + b)/3;
+	}
+
+	// fill-in gray values (for visualization)
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		int idx = j*w + i;
+		out[3*idx+0] = in_gray->data[idx];
+		out[3*idx+1] = in_gray->data[idx];
+		out[3*idx+2] = in_gray->data[idx];
+	}
+
+	// computi harris-hessian
+	double tic = seconds();
+	ntuple_list hp = harris2(in_gray,
+			global_harris_sigma,
+			global_harris_k,
+			global_harris_flat_th,
+			global_harris_neigh
+			);
+	tic = seconds() - tic;
+	fprintf(stderr, "harris took %g milliseconds (%g hz)\n",
+			tic*1000, 1/tic);
+
+	// plot detected keypoints
+	int n[][2] = {
+		{0,0},
+	       	{-1,0}, {0,-1}, {0,1}, {1,0}, // 5
+		{-1,-1}, {-1,+1}, {1,-1}, {1,+1} // 9
+	}, nn = 9;
+
+	for (int i = 0; i < hp->size; i++)
+	{
+		assert(hp->dim == 2);
+		int x = hp->values[2*i+0];
+		int y = hp->values[2*i+1];
+		for (int p = 0; p < nn; p++)
+		{
+			int xx = x + n[p][0];
+			int yy = y + n[p][1];
+			int idx = yy*w + xx;
+			if (idx < 0 || idx >= w*h) continue;
+			out[3*idx + 0] = 0;
+			out[3*idx + 1] = 255;
+			out[3*idx + 2] = 0;
+		}
+		//int idx = y*w + x;
+		//if (idx < 0 || idx >= w*h) continue;
+		//out[3*idx + 0] = 0;
+		//out[3*idx + 1] = 0;
+		//out[3*idx + 2] = 255;
+	}
+
+	free_ntuple_list(hp);
+	free_image_double(in_gray);
+
+	// draw HUD
+	char buf[1000];
+	snprintf(buf, 1000, "sigma = %g\nk=%g\nt=%g\nn=%d",
+			global_harris_sigma,
+			global_harris_k,
+			global_harris_flat_th,
+			global_harris_neigh);
+	float fg[] = {0, 255, 0};
+	put_string_in_float_image(out,w,h,3, 5,5, fg, 0, &global_font, buf);
+}
+
+// process one frame
+static void process_tacu_old(float *out, float *in, int w, int h, int pd)
 {
 	if (pd != 3) fail("bad pd");
 	//for (int i = 0; i < w*h*pd; i++)
@@ -408,6 +526,9 @@ int main( int argc, char *argv[] )
 	global_nparams = parse_floats(global_params, 0x100, parstring);
 	global_vscale = atof(argv[6]);
 
+	global_font = *xfont8x13;
+	global_font = reformat_font(global_font, UNPACKED);
+
 	CvCapture *capture = 0;
 	int accum_index = 0;
 	int       key = 0;
@@ -441,7 +562,7 @@ int main( int argc, char *argv[] )
 	float *taccu_in = xmalloc(W*H*pd*sizeof*taccu_in);
 	float *taccu_out = xmalloc(W*H*pd*sizeof*taccu_in);
 	for (int i = 0; i < W*H; i++) {
-		int g = rand()%0x100;
+		int g = 0;//rand()%0x100;
 		taccu_in[3*i+0] = g;
 		taccu_in[3*i+1] = g;
 		taccu_in[3*i+2] = g;
@@ -486,6 +607,24 @@ int main( int argc, char *argv[] )
 
 		/* exit if user press 'q' */
 		key = cvWaitKey( 1 ) % 0x10000;
+		double wheel_factor = 1.1;
+		if (key == 's') global_harris_sigma /= wheel_factor;
+		if (key == 'S') global_harris_sigma *= wheel_factor;
+		if (key == 'k') global_harris_k /= wheel_factor;
+		if (key == 'K') global_harris_k *= wheel_factor;
+		if (key == 't') global_harris_flat_th /= wheel_factor;
+		if (key == 'T') global_harris_flat_th *= wheel_factor;
+		if (key == 'n' && global_harris_neigh > 1)
+			global_harris_neigh -= 1;
+		if (key == 'N') global_harris_neigh += 1;
+		if (isalpha(key)) {
+			printf("harris_sigma = %g\n", global_harris_sigma);
+			printf("harris_k = %g\n", global_harris_k);
+			printf("harris_t = %g\n", global_harris_flat_th);
+			printf("harris_n = %d\n", global_harris_neigh);
+			printf("\n");
+		}
+#if 0 // commented for surys demo
 		if (key == 'd') {
 			global_display_diff = !global_display_diff;
 			global_display_img = false;
@@ -500,10 +639,9 @@ int main( int argc, char *argv[] )
 		if (key == 'y') global_flow_visualization = VFLOW_DIVERGENCE;
 		if (key == 'b') global_flow_visualization = VFLOW_BACK;
 		if (key == 'v') global_flow_visualization = VFLOW_BACKDIFF;
-		if (key == '(')
-			global_vscale /= global_vscale_factor;
-		if (key == ')')
-			global_vscale *= global_vscale_factor;
+		if (key == '(') global_vscale /= global_vscale_factor;
+		if (key == ')') global_vscale *= global_vscale_factor;
+#endif
 		//if (key > 0) {
 		//	fprintf(stderr, "key = %d '%c'\n", key, key);
 		//	char buf[0x100];

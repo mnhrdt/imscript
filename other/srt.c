@@ -9,13 +9,15 @@
 // It does not have a concept of "tty" or "session", or other bullshit.
 // This is just a program that shows the output of another program as
 // characters drawn on a rectangular window.
+// It does not use X fonts, only a simple function to dump a bitmap into a
+// window.
 // The goal of this program is to be as simple as possible and fulfill the
-// required tast; there is no concern for efficiency.
+// required task; there is no concern for efficiency.
 //
 
 #include "ftr.c"
 #define OMIT_MAIN_FONTU
-#include "fontu.c"
+#include "fontu.c" // todo: cherry-pick the required fontu functions
 #include "xfont9x15.c"
 
 // a terminal is just a 80x25 matrix of characters, with some options
@@ -30,14 +32,24 @@ struct terminal {
 	int spacing;
 	struct bitmap_font font[1];
 	int *attributes; // colors and whatnot
+
+	// output of the program running inside the terminal at this moment
+	FILE *stream;
 };
 
+// Overall structure:
+// 1. a program P is run
+// 2. the stdout and stderr of P are dumped into the state machine
+// 3. keyboard events are dumpet into the stdin of P
+// 4. unless "canonicalized", keyboard events are also dumped into the state
+// machine
+
 // affect the terminal state from the given string
+//
+// (The terminal is a finite state machine.  This is the only function
+// that can be used to edit the state.)
 void term_puts(struct terminal *t, char *s)
 {
-	t->letters[0] = 'a';
-	t->letters[1] = 'b';
-	t->letters[2] = 'c';
 	while (1)
 	{
 		int c = *s++;
@@ -48,6 +60,7 @@ void term_puts(struct terminal *t, char *s)
 	}
 }
 
+// todo: do not use this function
 void term_add_char_under_cursor(struct terminal *t, int c)
 {
 	if (t->cursorx >= 0 && t->cursorx < t->w)
@@ -55,13 +68,14 @@ void term_add_char_under_cursor(struct terminal *t, int c)
 		t->letters[t->cursory * t->w + t->cursorx] = c;
 }
 
+// todo: do not use this function
 void term_new_line(struct terminal *t)
 {
 	t->cursory += 1;
 	t->cursorx = 0;
 }
 
-
+// todo: do not use this function
 void term_advance_cursor(struct terminal *t)
 {
 	if (t->cursorx < t->w -1)
@@ -139,6 +153,8 @@ static void term_key_handler(struct FTR *f, int k, int m, int x, int y)
 	// stream, just like the output of the program
 
 	struct terminal *t = f->userdata;
+
+	// todo: whatever happens here, push the
 	if (k == FTR_KEY_LEFT ) t->cursorx -= 1;
 	if (k == FTR_KEY_RIGHT) t->cursorx += 1;
 	if (k == FTR_KEY_UP   ) t->cursory -= 1;
@@ -166,6 +182,8 @@ static void term_key_handler(struct FTR *f, int k, int m, int x, int y)
 static void term_exposer(struct FTR *f, int b, int m, int x, int y)
 {
 	fprintf(stderr, "term expose\n");
+	// todo 1: expose only the changed part
+	// todo 2: if scroll, copy without recomputing
 	term_bitmap(f->rgb, f->w, f->h, (struct terminal *)f->userdata);
 	f->changed = 1;
 }
@@ -177,8 +195,7 @@ int main()
 	t->h = 25;
 	t->kerning = 0;
 	t->spacing = 0;
-	t->font[0] = *xfont9x15;
-	t->font[0] = reformat_font(t->font[0], UNPACKED);
+	t->font[0] = reformat_font(*xfont9x15, UNPACKED);
 	t->letters = malloc(sizeof(int) * t->w * t->h);
 	t->attributes = malloc(sizeof(int) * t->w * t->h);
 	t->cursorx = t->cursory = 0;

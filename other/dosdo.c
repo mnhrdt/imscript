@@ -20,7 +20,7 @@
 
 #define OMIT_MAIN_FONTU
 #include "fontu.c"
-#include "xfont9x15.c"
+#include "fonts/xfont9x15.c"
 
 // VISUALIZATION:
 // * A single window split in half.

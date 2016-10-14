@@ -170,6 +170,7 @@ void cregistration(float *out, float *left, float *right, int w, int h, int pd)
 }
 
 
+
 // main function
 int main(int argc, char **argv)
 {

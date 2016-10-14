@@ -250,7 +250,7 @@ void tdip_state_compute(struct tdip_state *e)
 		double g[2] = {0, 0};
 		if (local_orientation(g, e, i, j))
 		{
-			if (fabs(g[1]) < 1e-2 ||  fabs(g[0]) < 1e-2)
+			if (fabs(g[1]) < 1e-6 ||  fabs(g[0]) < 1e-6)
 				continue;
 			double gn = hypot(g[0], g[1]);
 			if (gn < GRADMIN())

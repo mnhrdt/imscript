@@ -223,7 +223,7 @@ static void fail(const char *fmt, ...)
 	exit(-1);
 #  else//NDEBUG
 	//print_trace(stderr);
-	exit(*(int *)0x43);
+	exit(*(int *)0);
 #  endif//NDEBUG
 #endif//IIO_ABORT_ON_ERROR
 }
@@ -2156,6 +2156,16 @@ static void pds_parse_line(char *key, char *value, char *line)
 		*key = *value = '\0'; return; }
 	IIO_DEBUG("PARSED \"%s\" = \"%s\"\n", key, value);
 }
+
+#ifndef SAMPLEFORMAT_UINT
+// definitions form tiff.h, needed for pds
+#define SAMPLEFORMAT_UINT  1
+#define SAMPLEFORMAT_INT  2
+#define SAMPLEFORMAT_IEEEFP  3
+#define SAMPLEFORMAT_VOID  4
+#define SAMPLEFORMAT_COMPLEXINT 5
+#define SAMPLEFORMAT_COMPLEXIEEEFP 6
+#endif//SAMPLEFORMAT_UINT
 
 static int read_beheaded_pds(struct iio_image *x,
 		FILE *f, char *header, int nheader)

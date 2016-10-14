@@ -10,6 +10,8 @@
 #include "xfopen.c"
 #include "fail.c"
 
+// TODO: fix data leaks when callinc "alloc_and_transform" functions
+
 enum font_data_format {
 	UNPACKED, // array of chars with boolean values
 	PACKED,   // array of chars with arbitrary values (with the same bitmap)

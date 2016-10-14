@@ -3,8 +3,8 @@
 ENABLE_GSL = yes
 WFLAGS=
 WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wstrict-prototypes -Wno-unused -Wno-parentheses -Wno-sign-compare -Werror -Wno-error=format -Wno-error=overflow
-WFLAGS=
 WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wstrict-prototypes -Wno-unused -Wno-sign-compare
+WFLAGS=
 
 CFLAGS = $(WFLAGS)
 CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE -fopenmp

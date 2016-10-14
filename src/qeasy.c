@@ -19,6 +19,7 @@ int main(int c, char *v[])
 
 	int w, h, pd;
 	float *x = iio_read_image_float_vec(in, &w, &h, &pd);
+	fprintf(stderr, "got here! x=%p w=%d h=%d pd=%d\n", in, w, h, pd);
 	uint8_t *y = xmalloc(w*h*pd);
 	for (int i = 0; i < w*h*pd; i++) {
 		float g = x[i];
