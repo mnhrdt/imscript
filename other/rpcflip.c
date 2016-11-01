@@ -906,6 +906,39 @@ static void inplace_rgb_span2(float *x, int w, int h, double a)
 		x[3*(j*w+i)+l] = 127 + a*(x[3*(j*w+i)+l] - avg[l])/sqrt(var[l]);
 }
 
+static int compare_floats(const void *a, const void *b)
+{
+	const float *da = (const float *) a;
+	const float *db = (const float *) b;
+	return (*da > *db) - (*da < *db);
+}
+
+static void inplace_rgb_span3(float *x, int w, int h, double a)
+{
+	int n = w*h;
+	int nnn[3] = {0, 0, 0};
+	float *tmp[3];
+	for (int l = 0; l < 3; l++) tmp[l] = xmalloc(n*sizeof(float));
+	for (int i = 0; i < n; i++)
+	for (int l = 0; l < 3; l++)
+		if (isfinite(x[3*i+l]))
+			tmp[l][nnn[l]++] = x[3*i+l];
+	for (int l = 0; l < 3; l++)
+		qsort(tmp[l], n, sizeof(float), compare_floats);
+	float med[3], iqd[3];
+	for (int l = 0; l < 3; l++) med[l] = tmp[l][n/2];
+	for (int l = 0; l < 3; l++) iqd[l] = tmp[l][3*n/4] - tmp[l][1*n/4];
+	fprintf(stderr, "qauto med %g %g %g | iqd %g %g %g\n",
+			med[0], med[1], med[2], iqd[0], iqd[1], iqd[2]);
+	for (int i = 0; i < n; i++)
+	for (int l = 0; l < 3; l++)
+	{
+		float xx = ( x[3*i+l] - med[l] ) / iqd[l];
+		x[3*i+l] = 127 + a * (x[3*i+l] - med[l] ) / iqd[l];
+	}
+	for (int l = 0; l < 3; l++) free(tmp[l]);
+}
+
 
 // pan_repaint {{{1
 //
@@ -1008,6 +1041,7 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 	}
 	if (e->qauto == 1) inplace_rgb_span(v->fdisplay, v->dw, v->dh, 1/e->a);
 	if (e->qauto == 2)inplace_rgb_span2(v->fdisplay, v->dw, v->dh, 40*e->a);
+	if (e->qauto == 3)inplace_rgb_span3(v->fdisplay, v->dw, v->dh, 40*e->a);
 	for (int i = 0; i < v->dw * v->dh * 3; i++)
 		v->display[i] = float_to_uint8(v->fdisplay[i]);
 }
@@ -1238,14 +1272,15 @@ static void action_cycle_rotation_status(struct FTR *f)
 	request_repaints(f);
 }
 
-static void action_cycle_contrast(struct FTR *f)
+static void action_cycle_contrast(struct FTR *f, int dir)
 {
 	struct pan_state *e = f->userdata;
-	e->qauto = ( e->qauto + 1 ) % 3;
+	e->qauto = ( e->qauto + dir ) % 4;
 	fprintf(stderr, "contrast change = ");
 	if (e->qauto == 0) fprintf(stderr, "NONE\n");
 	if (e->qauto == 1) fprintf(stderr, "MIN-MAX\n");
 	if (e->qauto == 2) fprintf(stderr, "AVG-STD\n");
+	if (e->qauto == 3) fprintf(stderr, "MED-IQD\n");
 	request_repaints(f);
 }
 
@@ -1384,7 +1419,8 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == '\b') action_cycle_view(f, -1, x, y);
 	if (k == '\'') action_toggle_diff_mode(f);
 	if (k == 'r') action_cycle_rotation_status(f);
-	if (k == 'c') action_cycle_contrast(f);
+	if (k == 'c') action_cycle_contrast(f, +1);
+	if (k == 'C') action_cycle_contrast(f, -1);
 
 	// arrows move the viewport
 	if (k > 1000) {
@@ -1586,8 +1622,8 @@ int main_gray(int c, char *v[])
 		return pan_non_interactive(e, command_string);
 
 	// open window
-	struct FTR f = ftr_new_window(320, 320);
-	//struct FTR f = ftr_new_window(800, 600);
+	//struct FTR f = ftr_new_window(320, 320);
+	struct FTR f = ftr_new_window(800, 600);
 	f.userdata = e;
 	f.changed = 1;
 	ftr_set_handler(&f, "key"   , pan_key_handler);

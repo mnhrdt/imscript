@@ -24,8 +24,8 @@
 
 #define OMIT_MAIN_FONTU
 #include "fontu.c"
-#include "fonts/xfont9x15.c"
-#include "fonts/xfont8x13.c"
+#include "fonts/xfont_9x15.c"
+#include "fonts/xfont_8x13.c"
 
 #include "seconds.c"
 
@@ -526,7 +526,7 @@ int main( int argc, char *argv[] )
 	global_nparams = parse_floats(global_params, 0x100, parstring);
 	global_vscale = atof(argv[6]);
 
-	global_font = *xfont8x13;
+	global_font = *xfont_8x13;
 	global_font = reformat_font(global_font, UNPACKED);
 
 	CvCapture *capture = 0;
@@ -534,7 +534,10 @@ int main( int argc, char *argv[] )
 	int       key = 0;
 
 	/* initialize camera */
-	capture = cvCaptureFromCAM( atoi(argv[1]) );
+	capture = cvCaptureFromCAM( 0 );
+	//cvCaptureFromCAM
+	//capture.set(CVCAP_IMAGE_WIDTH, 1920);
+
 
 	/* always check */
 	if ( !capture )
@@ -546,11 +549,11 @@ int main( int argc, char *argv[] )
 	int h = frame->height, H = 512;
 	int pd = frame->nChannels;
 	int depth = frame->depth;
+	fprintf(stderr, "%dx%d %d [%d]\n", w, h, pd, depth);
 	if (w != 640 || h != 480 || pd != 3)
 		fail("unexpected webcam size, "
 				"please change some hard-coded numbers");
 
-	fprintf(stderr, "%dx%d %d [%d]\n", w, h, pd, depth);
 	//if (W > w || H > h) fail("bad crop");
 	CvSize size;
 	size.width = W;
