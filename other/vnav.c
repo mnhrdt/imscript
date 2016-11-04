@@ -1059,7 +1059,7 @@ static void exclude_around_sinusoid(struct pan_state *e, struct sinusoid *s)
 		double yy = 360/M_PI*(a*cos(2*M_PI*x/(X-1))
 				+ b*sin(2*M_PI*x/(X-1))) + c;
 		int y = lrint(yy);
-		for (int h = -3; h <= 3; h++)
+		for (int h = -5; h <= 5; h++)
 			if (insideP(X, Y, x, y + h))
 				e->exclusion_mask[x+(y+h)*X] = 0;
 	}
@@ -1858,7 +1858,7 @@ int main_pan(int c, char *v[])
 	e->nb_meaningful_sinusoids = 0;
 	e->nb_refined_sinusoids = 0;
 	e->show_meaningful_sinusoids = false;
-	e->nfa_param_th_modgrad = 300;
+	e->nfa_param_th_modgrad = 1e-9;
 	e->nfa_param_p = 0;//.03125;
 	e->nfa_param_lepsilon = 0;
 	e->validatronics_mode = true;

@@ -13,6 +13,8 @@
 // window.
 // The goal of this program is to be as simple as possible and fulfill the
 // required task; there is no concern for efficiency.
+// The only (inevitable) legacy is that old vt100 control sequences are used.
+// This is to avoid having to define an essentially arbitrari terminfo.
 //
 
 #include "ftr.c"
@@ -40,7 +42,7 @@ struct terminal {
 // Overall structure:
 // 1. a program P is run
 // 2. the stdout and stderr of P are dumped into the state machine
-// 3. keyboard events are dumpet into the stdin of P
+// 3. keyboard events are dumped into the stdin of P
 // 4. unless "canonicalized", keyboard events are also dumped into the state
 // machine
 
