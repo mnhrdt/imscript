@@ -80,6 +80,8 @@
 #define FONT_BDF_FILE "/home/coco/.fonts2/9x15.bdf"
 #include "xfont9x15.c"
 
+#include "seconds.c"
+
 // arbitrary number, must be higher than the height of the window
 #define MAX_MEANINGFUL_SINUSOIDS 10000 
 
@@ -89,6 +91,13 @@ static uint8_t global_dirt[256][3];
 
 
 // structs              {{{1
+
+
+// data structure for a single sinusoid (with orientation)
+struct sinusoid {
+	double a, b, c;
+	int d; // -1 or 1
+};
 
 // data structure for the image viewer
 // this data goes into the "userdata" field of the FTR window structure
@@ -130,9 +139,8 @@ struct pan_state {
 
 	// 6. nfa options
 	int nb_meaningful_sinusoids, nb_refined_sinusoids;
-	int meaningful_sinusoid[MAX_MEANINGFUL_SINUSOIDS];
+	struct sinusoid meaningful_sinusoid[MAX_MEANINGFUL_SINUSOIDS];
 	double sinusoid_nfa[MAX_MEANINGFUL_SINUSOIDS];
-	double sinusoid_abc[3*MAX_MEANINGFUL_SINUSOIDS];
 	bool show_meaningful_sinusoids;
 	double *acontrario_orientations_x;
 	double *acontrario_orientations_y;
@@ -507,7 +515,8 @@ static double norm_angle_diff(double a, double b)
 	return norm_angle_diff_twopi(a, b);
 }
 
-double sin_nfac(double a, double b, double c, double * ox, double * oy,
+static
+double sin_nfa_continuous(struct sinusoid s, double *ox, double *oy,
                 int X, int Y, double logNT)
 {
   double sum_e = 0.0;
@@ -517,6 +526,10 @@ double sin_nfac(double a, double b, double c, double * ox, double * oy,
 
   for(i=0; i<X; i++)
     {
+      double a = s.a;
+      double b = s.b;
+      double c = s.c;
+      int dir = s.d;
       int x = i;
       double yy = 360/M_PI*(a*cos(2*M_PI*x/(X-1)) + b*sin(2*M_PI*x/(X-1))) + c;
       int y = lrint(yy);
@@ -525,7 +538,7 @@ double sin_nfac(double a, double b, double c, double * ox, double * oy,
         {
           double deriv = 720/(X-1) * ( -a*sin(2*M_PI*x/(X-1))
                                       + b*cos(2*M_PI*x/(X-1)) );
-          double norm_angle = atan2(1.0,-deriv);
+          double norm_angle = atan2(dir*1.0,-dir*deriv);
           double theta = atan2(oy[x+y*X],ox[x+y*X]);
 
           /* compute angle error */
@@ -551,54 +564,62 @@ double sin_nfac(double a, double b, double c, double * ox, double * oy,
 
 
 /*----------------------------------------------------------------------------*/
-static double sin_nfa(double a, double b, double c, double * ox, double * oy,
-               int X, int Y, double p, double logNT)
+static
+double sin_nfa(struct sinusoid s, double *ox, double *oy,
+		int X, int Y, double p, double logNT)
 {
-  if (!p) return sin_nfac(a, b, c, ox, oy, X, Y, logNT);
+	if (!p) return sin_nfa_continuous(s, ox, oy, X, Y, logNT);
 
-  double logNFA;
-  int n = 0;
-  int k = 0;
-  int x,y;
+	double logNFA;
+	int n = 0;
+	int k = 0;
+	int x,y;
 
-  for(x=0; x<X; x++)
-    {
-      /* compute y coordinate in the sinusoid */
-      // TODO: use the image width instead of 360 here
-      y = lrint(360/M_PI*(a*cos(2*M_PI*x/(X-1)) + b*sin(2*M_PI*x/(X-1))) + c);
+	for(x=0; x<X; x++)
+	{
+		double a = s.a;
+		double b = s.b;
+		double c = s.c;
+		int dir = s.d;
 
-      /* valid orientation */
-      if( x >= 0 && x < X && y >= 0 && y < Y && (ox[x+y*X] * ox[x+y*X]) != 0.0 )
-        {
-      // TODO: use 2*the image width instead of 720 here
-          double deriv = 720/(X-1) * ( -a*sin(2*M_PI*x/(X-1))
-                                      + b*cos(2*M_PI*x/(X-1)) );
-          double norm_angle = atan2(1.0,-deriv);
-          double theta = atan2(oy[x+y*X], ox[x+y*X]);
+		/* compute y coordinate in the sinusoid */
+		// TODO: use the image width instead of 360 here
+		y = lrint(360/M_PI*(a*cos(2*M_PI*x/(X-1))
+					+ b*sin(2*M_PI*x/(X-1))) + c);
 
-          ++n; /* a valid point */
-          if( norm_angle_diff(norm_angle,theta) <= p ) ++k; /* aligned point */
-        }
-    }
+		/* valid orientation */
+		if(x>=0 && x<X && y>=0 && y<Y && (ox[x+y*X] * ox[x+y*X]) != 0.0)
+		{
+			// TODO: use 2*the image width instead of 720 here
+			double deriv = 720/(X-1) * ( -a*sin(2*M_PI*x/(X-1))
+					+ b*cos(2*M_PI*x/(X-1)) );
+			double norm_angle = atan2(dir*1.0,-dir*deriv);
+			double theta = atan2(oy[x+y*X], ox[x+y*X]);
 
-  /* compute NFA */
-  logNFA = nfa(n,k,p,logNT);
+			++n; /* a valid point */
+			if( norm_angle_diff(norm_angle,theta) <= p )
+				++k; /* aligned point */
+		}
+	}
 
-  return logNFA;
+	/* compute NFA */
+	logNFA = nfa(n,k,p,logNT);
+
+	return logNFA;
 }
 
 // nfa optimization         {{{1
-static double eval_this_nfa(struct pan_state *e, double abc[3])
+static double eval_this_nfa(struct pan_state *e, struct sinusoid s)
 {
 	double logNT = 10 * log10(e->hough_w * e->hough_h);
-	double r = sin_nfa(abc[0], abc[1], abc[2],
+	double r = sin_nfa(s,
 		e->acontrario_orientations_x, e->acontrario_orientations_y,
 		e->strip_w, e->strip_h, 0*e->nfa_param_p, logNT);
 	return r;
 }
 
 static
-void refine_this_sinusoid(struct pan_state *e, double abc[3])
+void refine_this_sinusoid(struct pan_state *e, struct sinusoid *s)
 {
 	int nn = 36;
 	int n[][3] = {
@@ -629,7 +650,7 @@ void refine_this_sinusoid(struct pan_state *e, double abc[3])
 		1
 	};
 
-	double best_nfa = eval_this_nfa(e, abc);
+	double best_nfa = eval_this_nfa(e, *s);
 	int best_idx;
 	//fprintf(stderr, "before do nfa = %g [%g %g %g]\n", best_nfa,
 	//		abc[0], abc[1], abc[2]);
@@ -638,11 +659,10 @@ void refine_this_sinusoid(struct pan_state *e, double abc[3])
 		best_idx = -1;
 		for (int i = 0; i < nn; i++)
 		{
-			double tmp[3] = {
-				abc[0] + step[0] * n[i][0],
-				abc[1] + step[1] * n[i][1],
-				abc[2] + step[2] * n[i][2]
-			};
+			struct sinusoid tmp = *s;
+			tmp.a += step[0] * n[i][0];
+			tmp.b += step[1] * n[i][1];
+			tmp.c += step[2] * n[i][2];
 			double NFA = eval_this_nfa(e, tmp);
 			if (NFA < best_nfa)
 			{
@@ -652,9 +672,9 @@ void refine_this_sinusoid(struct pan_state *e, double abc[3])
 		}
 		if (best_idx >= 0)
 		{
-			abc[0] = abc[0] + step[0] * n[best_idx][0];
-			abc[1] = abc[1] + step[1] * n[best_idx][1];
-			abc[2] = abc[2] + step[2] * n[best_idx][2];
+			s->a += step[0] * n[best_idx][0];
+			s->b += step[1] * n[best_idx][1];
+			s->c += step[2] * n[best_idx][2];
 		}
 	} while (best_idx >= 0);
 	//fprintf(stderr, "after while (nfa=%g) %g %g %g\n", best_nfa,
@@ -978,6 +998,7 @@ static void action_nfa(struct FTR *f)//{{{2
 	int c_to = e->strip_h - amplitude - 10;
 	assert(0 <= c_from);
 	assert(c_to < e->strip_h);
+	for (int d = -1; d <= 1; d += 2)
 	for (int c = c_from; c < c_to; c++)
 	{
 		// TODO: allow changing this 0.05 (angle threshold) as a
@@ -989,12 +1010,13 @@ static void action_nfa(struct FTR *f)//{{{2
 		// NOTE2: also, we may have an alternative interface that
 		// returns "thick" sinusoids (that will be computed todos a la
 		// vez)
-		double NFA = sin_nfa(A, B, c, ox, oy,
+		struct sinusoid s = { A, B, c, d };
+		double NFA = sin_nfa(s, ox, oy,
 				e->strip_w, e->strip_h,
 			       	e->nfa_param_p, logNT);
 		if (NFA < e->nfa_param_lepsilon)
 		{
-			e->meaningful_sinusoid[e->nb_meaningful_sinusoids] = c;
+			e->meaningful_sinusoid[e->nb_meaningful_sinusoids] = s;
 			e->sinusoid_nfa[e->nb_meaningful_sinusoids] = NFA;
 			e->nb_meaningful_sinusoids += 1;
 		}
@@ -1007,39 +1029,19 @@ static void action_nfa(struct FTR *f)//{{{2
 static void action_nfa_with_refinement(struct FTR *f)//{{{2
 {
 	struct pan_state *e = f->userdata;
+
+	double tic = seconds();
 	if (!e->nb_meaningful_sinusoids)
 		action_nfa(f);
 	e->nb_refined_sinusoids = e->nb_meaningful_sinusoids;
+	double tac = seconds() - tic;
+	fprintf(stderr, "action_nfa at %g fps\n", 1/tac);
 
+	tic = seconds();
 	for (int i = 0; i < e->nb_meaningful_sinusoids; i++)
-	{
-		e->sinusoid_abc[3*i+0] = e->dip_a;
-		e->sinusoid_abc[3*i+1] = e->dip_b;
-		e->sinusoid_abc[3*i+2] = e->meaningful_sinusoid[i];
-
-		refine_this_sinusoid(e, e->sinusoid_abc + 3*i);
-	}
-
-	//int best_idx = -1;
-	//double best_nfa = INFINITY;
-	//for (int i = 0; i < e->nb_meaningful_sinusoids; i++)
-	//	if (e->sinusoid_nfa[i] < best_nfa)
-	//	{
-	//		best_idx = i;
-	//		best_nfa = e->sinusoid_nfa[i];
-	//	}
-
-	//if (best_idx >= 0)
-	//{
-	//	e->sinusoid_abc[3*0+0] = e->dip_a;
-	//	e->sinusoid_abc[3*0+1] = e->dip_b;
-	//	e->sinusoid_abc[3*0+2] = e->meaningful_sinusoid[best_idx];
-
-	//	refine_this_sinusoid(e, e->sinusoid_abc + 3*0);
-
-	//	e->nb_refined_sinusoids += 1;
-	//	f->changed = 1;
-	//}
+		refine_this_sinusoid(e, e->meaningful_sinusoid + i);
+	tac = seconds() - tic;
+	fprintf(stderr, "sinusoid refinement at %g fps\n", 1/tac);
 }
 
 
@@ -1488,40 +1490,16 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 
 	// TODO: show the detected nfa-sinusoids in green, if they are
 	// available
-	if (0 && e->show_meaningful_sinusoids)
-	{
-		for (int i_theta = 0; i_theta < e->strip_w; i_theta++)
-		{
-			int n_theta = e->strip_w;
-			int n_z = e->strip_h;
-			float theta = i_theta * 2 * M_PI / n_theta;
-			float z = e->dip_a * cos(theta) + e->dip_b * sin(theta);
-			float magic_factor = n_theta / M_PI;
-			int i_z = magic_factor * z;
-			for (int i = 0; i < e->nb_meaningful_sinusoids; i++)
-			{
-				int k = i_z + e->meaningful_sinusoid[i];
-				if (insideP(f->w, f->h, i_theta, k) &&
-					insideP(f->w, f->h, i_theta, k+1)&&
-					insideP(f->w, f->h, i_theta, k-1))
-				{
-					int fidx = (k+1) * f->w + i_theta;
-					f->rgb[3*fidx+0] = 255;
-					//f->rgb[3*fidx+1] = 255;
-					f->rgb[3*fidx+2] /= 2;
-				}
-			}
-		}
-	}
 	if (e->show_meaningful_sinusoids && e->nb_refined_sinusoids > 0)
 	{
 		for (int i = 0; i < e->nb_refined_sinusoids; i++)
 		{
 			for (int i_theta = 0; i_theta < e->strip_w; i_theta++)
 			{
-				double A = e->sinusoid_abc[3*i+0];
-				double B = e->sinusoid_abc[3*i+1];
-				double C = e->sinusoid_abc[3*i+2];
+				double A = e->meaningful_sinusoid[i].a;
+				double B = e->meaningful_sinusoid[i].b;
+				double C = e->meaningful_sinusoid[i].c;
+				int D = e->meaningful_sinusoid[i].d;
 				int n_theta = e->strip_w;
 				int n_z = e->strip_h;
 				float theta = i_theta * 2 * M_PI / n_theta;
@@ -1534,8 +1512,8 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 					insideP(f->w, f->h, i_theta, k-1))
 				{
 					int fidx = (k+1) * f->w + i_theta;
-					f->rgb[3*fidx+0] = 0;
-					f->rgb[3*fidx+1] = 255;
+					f->rgb[3*fidx+0] = D>0?255:0;
+					f->rgb[3*fidx+1] = D<0?255:0;
 					f->rgb[3*fidx+2] = 0;
 				}
 			}
