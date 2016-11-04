@@ -1,3 +1,4 @@
+// vnav: a borehole sinusoid explorer                            {{{1
 // gcc-6 -std=c99 -O3 vnav.c iio.o -o vnav -lX11 -ltiff -lpng -lfftw3f -ljpeg -lm
 //
 // A program for visualizing borehole images of size 361xN, where N is huge.
@@ -33,6 +34,7 @@
 //
 // 11. Zoom-in and out of the Hough space, with the mouse-wheel
 //
+// includes and defines               {{{1
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -78,12 +80,15 @@
 #define FONT_BDF_FILE "/home/coco/.fonts2/9x15.bdf"
 #include "xfont9x15.c"
 
-static uint8_t global_dirt[256][3];
-
 // arbitrary number, must be higher than the height of the window
 #define MAX_MEANINGFUL_SINUSOIDS 10000 
 
+// global variables              {{{1
+static uint8_t global_dirt[256][3];
 
+
+
+// structs              {{{1
 
 // data structure for the image viewer
 // this data goes into the "userdata" field of the FTR window structure
@@ -137,6 +142,8 @@ struct pan_state {
 	bool validatronics_mode;
 };
 
+
+// utility functions: coordinates, image access             {{{1
 // change of coordinates: from window "int" pixels to image "double" point
 static void window_to_image(double p[2], struct pan_state *e, int i, int j)
 {
@@ -249,293 +256,8 @@ static void img_debug(float *x, int w, int h, int pd, const char *fmt, ...)
 	iio_save_image_float_vec(fname, x, w, h, pd);
 }
 
-static void action_offset_viewport(struct FTR *f, int dx, int dy)
-{
-	struct pan_state *e = f->userdata;
-	e->offset_x -= dx/e->zoom_x;
-	e->offset_y -= dy/e->zoom_y;
 
-	f->changed = 1;
-}
-
-static void action_reset_phase(struct FTR *f)
-{
-	struct pan_state *e = f->userdata;
-	e->offset_x = 0;
-	e->has_hough = false;
-	f->changed = 1;
-}
-
-static void action_reset_zoom_and_position(struct FTR *f)
-{
-	struct pan_state *e = f->userdata;
-
-	e->zoom_x = 1;
-	e->zoom_y = 1;
-	e->octave = 0;
-	e->offset_x = 0;
-	e->offset_y = 0;
-	/*
-	e->a = 1;
-	e->b = 0;
-	*/
-
-	e->has_hough = false;
-	f->changed = 1;
-}
-
-static void action_reset_rotation(struct FTR *f)
-{
-	struct pan_state *e = f->userdata;
-	e->offset_x = 0;
-	e->has_hough = false;
-	f->changed = 1;
-}
-
-static void action_contrast_change(struct FTR *f, float afac, float bshift)
-{
-	struct pan_state *e = f->userdata;
-
-	e->a *= afac;
-	e->b += bshift;
-
-	f->changed = 1;
-}
-
-static void action_qauto(struct FTR *f)
-{
-	struct pan_state *e = f->userdata;
-
-	//float m = INFINITY, M = -m;
-	float m = 0, M = 255;
-	//int pid = 3;
-	//for (int i = 0; i < 3 * e->pyr_w[pid] * e->pyr_h[pid]; i++)
-	//{
-	//	float g = e->pyr_rgb[pid][i];
-	//	m = fmin(m, g);
-	//	M = fmax(M, g);
-	//}
-
-	e->a = 255 / ( M - m );
-	e->b = 255 * m / ( m - M );
-
-	f->changed = 1;
-}
-
-static void action_center_contrast_at_point(struct FTR *f, int x, int y)
-{
-	struct pan_state *e = f->userdata;
-
-	double p[2];
-	window_to_image(p, e, x, y);
-	float C = pixel(e, p[0], p[1]);
-	if (!isfinite(C)) C = 0;
-
-	e->b = 127.5 - e->a * C;
-
-	f->changed = 1;
-}
-
-static void action_base_contrast_at_point(struct FTR *f, int x, int y)
-{
-	struct pan_state *e = f->userdata;
-
-	double p[2];
-	window_to_image(p, e, x, y);
-	float C = pixel(e, p[0], p[1]);
-	if (!isfinite(C)) C = 0;
-
-	e->b =  255 - e->a * C;
-
-	f->changed = 1;
-}
-
-static void action_contrast_span(struct FTR *f, float factor)
-{
-	struct pan_state *e = f->userdata;
-
-	float c = (127.5 - e->b)/ e->a;
-	e->a *= factor;
-	e->b = 127.5 - e->a * c;
-
-	f->changed = 1;
-}
-
-static void action_change_zoom_to_factor(struct FTR *f, int x, int y,
-		double Fx, double Fy)
-{
-	struct pan_state *e = f->userdata;
-
-	if (Fx == 1 && Fy == 1) e->octave = 0;
-
-	double c[2];
-	window_to_image(c, e, x, y);
-
-	e->zoom_x = 1/Fx;
-	e->zoom_y = 1/Fy;
-	e->offset_x = c[0] - x/e->zoom_x;
-	e->offset_y = c[1] - y/e->zoom_y;
-	fprintf(stderr, "\t zoom changed to %g %g {%g %g}\n", e->zoom_x, e->zoom_y, e->offset_x, e->offset_y);
-
-	e->has_hough = false;
-	f->changed = 1;
-}
-
-static void getstrip(struct FTR *f)
-{
-	struct pan_state *e = f->userdata;
-	int w = e->strip_w;//STRIP_WIDTH;
-	int h = f->h;
-	float *strip = e->strip;
-	for (int j = 0; j < h; j++)
-	for (int i = 0; i < w; i++)
-	{
-		double p[2];
-		window_to_image(p, e, i, j);
-		float v = pixel(e, p[0], p[1]);
-		strip[j*w+i] = v;
-	}
-	if (e->inpaint_strip)
-		poisson_recursive(strip, strip, 0, w, h, 0.25, 10, 99);
-}
-
-static void action_nfa(struct FTR*);
-static void action_nfa_with_refinement(struct FTR*);
-
-static void action_compute_hough(struct FTR *f)
-{
-	struct pan_state *e = f->userdata;
-	if (e->inferno) return;
-	fprintf(stderr, "compute hough\n");
-	e->nb_meaningful_sinusoids = 0;
-	e->has_hough = true;
-	f->changed = 1;
-
-	// buffer for the image data (current strip)
-	int w = e->strip_w;//STRIP_WIDTH;
-	int h = f->h;
-	float *strip = e->strip;
-	for (int j = 0; j < h; j++)
-	for (int i = 0; i < w; i++)
-	{
-		double p[2];
-		window_to_image(p, e, i, j);
-		float v = pixel(e, p[0], p[1]);
-		strip[j*w+i] = v;
-	}
-	img_debug(strip, w, h, 1, "/tmp/strip_at_z%g_x%g_y%g.tiff",
-			e->zoom_y, e->offset_x, e->offset_y);
-
-	// buffer for the transform data
-	int tside = e->hough_w;
-	float *hough = e->hough;
-	for (int i = 0; i < tside * tside; i++)
-		hough[i] = 0;
-
-	// inpaint the "NAN" values of the image data
-	poisson_recursive(strip, strip, 0, w, h, 0.4, 10, 99);
-	img_debug(strip, w, h, 1, "/tmp/istrip_at_z%g_x%g_y%g.tiff",
-			e->zoom_y, e->offset_x, e->offset_y);
-
-	// blur the image
-	float sigma[1] = {e->pre_blur_sigma};
-	blur_2d(strip, strip, w, h, 1, e->pre_blur_type, sigma, 1);
-	img_debug(strip, w, h, 1, "/tmp/bistrip_at_z%g_x%g_y%g.tiff",
-			e->zoom_y, e->offset_x, e->offset_y);
-
-	for (int j = 0; j < h; j++)
-	for (int i = 0; i < w; i++)
-	{
-		double p[2];
-		window_to_image(p, e, i, j);
-		float v = pixel(e, p[0], p[1]);
-		//if (!isfinite(v))
-		//	strip[j*w+i] = NAN;
-	}
-
-	// compute the dip picker transform
-	float *c_strip = strip + w*h/4;
-	int c_h = 3*h/4; // central window of the strip
-	blackbox_transform_general(hough, tside, c_strip, w, c_h,
-			e->aradius, e->randomized, e->tensor?e->ntensor:0);
-	//if (!e->randomized)
-	//	tdip(hough, e->aradius, tside, c_strip, w, c_h);
-	//else {
-	//	for (int i = 0; i < tside*tside; i++)
-	//		hough[i] = 0;
-	//	tdipr_acc(hough, e->aradius, tside, c_strip, w, c_h,
-	//			e->randomized);
-	//}
-	img_debug(hough, tside, tside, 1, "/tmp/hbistrip_at_z%g_x%g_y%g.tiff",
-			e->zoom_y, e->offset_x, e->offset_y);
-
-	// blur the accumulator
-	sigma[0] = e->post_blur_sigma;
-	blur_2d(hough, hough, tside, tside, 1, e->post_blur_type, sigma, 1);
-
-	// compute statistics
-	float hmax = -INFINITY;
-	int xmax, ymax;
-	for (int j = 0; j < tside; j++)
-	for (int i = 0; i < tside; i++)
-	{
-		int ij = i + j * tside;
-		if (hough[ij] > hmax) {
-			hmax = hough[ij];
-			xmax = i;
-			ymax = j;
-		}
-	}
-
-	{
-		int tside = e->hough_w;
-		double arad = e->aradius;
-		int ia = xmax;// - e->strip_w;
-		int ib = ymax;
-		e->dip_a = arad * (ia / (tside - 1.0) - 0.5);
-		e->dip_b = arad * (ib / (tside - 1.0) - 0.5);
-		e->show_dip_bundle = true;
-		f->changed = 1;
-	}
-
-	//// dump the blurred image to the window
-	//assert(f->w == tside + w);
-	//assert(f->h == h);
-	//for (int j = 0; j < w; j++)
-	//for (int i = 0; i < h; i++)
-	//for (int l = 0; l < 3; l++)
-	//	f->rgb[3*(i+j*f->w)+l] = strip[i+j*w];
-
-	//// dump the transform to the window
-	//assert(f->w == tside + w);
-	//assert(f->h == tside);
-	//for (int j = 0; j < tside; j++)
-	//for (int i = 0; i < tside; i++)
-	//for (int l = 0; l < 3; l++)
-	//	f->rgb[3*(i+w+j*f->w)+l] = 255 * hough[i+j*tside] / hmax;
-
-	action_nfa_with_refinement(f);
-
-	// write dip line
-	{
-		double p[2];
-		window_to_image(p, e, 0, e->strip_h / 2);
-		char fname[FILENAME_MAX];
-		snprintf(fname, FILENAME_MAX, "/tmp/vdip_%d_%g_%g.txt",
-				e->octave, p[0], p[1]);
-		FILE *f = xfopen(fname, "w");
-		fprintf(f, "%g %g %g %g %g %g\n",
-				e->dip_a,
-				e->dip_b,
-				e->aradius,
-				e->min_grad,
-				e->pre_blur_sigma,
-				e->post_blur_sigma
-		       );
-		xfclose(f);
-	}
-}
-
+// NFA computations         {{{1
 static void compute_orientation(struct pan_state *e,
 		double *ox, double *oy,
 		float *img, int X, int Y)
@@ -865,58 +587,7 @@ static double sin_nfa(double a, double b, double c, double * ox, double * oy,
   return logNFA;
 }
 
-
-// fill-in the nfa detection using the current dip e->dip_{a,b}
-static void action_nfa(struct FTR *f)
-{
-	struct pan_state *e = f->userdata;
-	double A = e->dip_a;// * pow(2, -e->octave);
-	double B = e->dip_b;// * pow(2, -e->octave);
-	fprintf(stderr, "NFAs(%g,%g)\n", e->dip_a, e->dip_b);
-
-	// the image is (e->strip, e->strip_w, e->strip_h)
-	double *ox = e->acontrario_orientations_x;
-	double *oy = e->acontrario_orientations_y;
-	// TODO: instead of calling compute_orientation, use the same
-	// orientation field of the dip (requires changing the "tdip" function
-	// interface)
-	compute_orientation(e, ox, oy, e->strip, e->strip_w, e->strip_h);
-	//double logNT = 10 * log10(e->strip_w * e->strip_h );
-	double logNT = 10 * log10(e->hough_w * e->hough_h);
-	e->nb_meaningful_sinusoids = 0;
-	e->show_meaningful_sinusoids = true;
-	// TODO: this loop must only traverse the heights that are inside the
-	// ROI
-	float amplitude = hypot(A, B) * 360 / M_PI;
-	int c_from = 10 + amplitude;
-	int c_to = e->strip_h - amplitude - 10;
-	assert(0 <= c_from);
-	assert(c_to < e->strip_h);
-	for (int c = c_from; c < c_to; c++)
-	{
-		// TODO: allow changing this 0.05 (angle threshold) as a
-		// user-interface parameter
-		//
-		// NOTE: in the future, we may have a "continuous" version of
-		// sin_nfa that does not have this parameter.
-		//
-		// NOTE2: also, we may have an alternative interface that
-		// returns "thick" sinusoids (that will be computed todos a la
-		// vez)
-		double NFA = sin_nfa(A, B, c, ox, oy,
-				e->strip_w, e->strip_h,
-			       	e->nfa_param_p, logNT);
-		if (NFA < e->nfa_param_lepsilon)
-		{
-			e->meaningful_sinusoid[e->nb_meaningful_sinusoids] = c;
-			e->sinusoid_nfa[e->nb_meaningful_sinusoids] = NFA;
-			e->nb_meaningful_sinusoids += 1;
-		}
-	}
-	fprintf(stderr, "got %d dips\n", e->nb_meaningful_sinusoids);
-	f->changed = 1;
-}
-
+// nfa optimization         {{{1
 static double eval_this_nfa(struct pan_state *e, double abc[3])
 {
 	double logNT = 10 * log10(e->hough_w * e->hough_h);
@@ -990,8 +661,350 @@ void refine_this_sinusoid(struct pan_state *e, double abc[3])
 	//		abc[0], abc[1], abc[2]);
 }
 
+// actions          {{{1
+
+static void action_offset_viewport(struct FTR *f, int dx, int dy)//{{{2
+{
+	struct pan_state *e = f->userdata;
+	e->offset_x -= dx/e->zoom_x;
+	e->offset_y -= dy/e->zoom_y;
+
+	f->changed = 1;
+}
+
+static void action_reset_phase(struct FTR *f)//{{{2
+{
+	struct pan_state *e = f->userdata;
+	e->offset_x = 0;
+	e->has_hough = false;
+	f->changed = 1;
+}
+
+static void action_reset_zoom_and_position(struct FTR *f)//{{{2
+{
+	struct pan_state *e = f->userdata;
+
+	e->zoom_x = 1;
+	e->zoom_y = 1;
+	e->octave = 0;
+	e->offset_x = 0;
+	e->offset_y = 0;
+	/*
+	e->a = 1;
+	e->b = 0;
+	*/
+
+	e->has_hough = false;
+	f->changed = 1;
+}
+
+static void action_reset_rotation(struct FTR *f)//{{{2
+{
+	struct pan_state *e = f->userdata;
+	e->offset_x = 0;
+	e->has_hough = false;
+	f->changed = 1;
+}
+
+static void action_contrast_change(struct FTR *f,float afac, float bshift)//{{{2
+{
+	struct pan_state *e = f->userdata;
+
+	e->a *= afac;
+	e->b += bshift;
+
+	f->changed = 1;
+}
+
+static void action_qauto(struct FTR *f)//{{{2
+{
+	struct pan_state *e = f->userdata;
+
+	//float m = INFINITY, M = -m;
+	float m = 0, M = 255;
+	//int pid = 3;
+	//for (int i = 0; i < 3 * e->pyr_w[pid] * e->pyr_h[pid]; i++)
+	//{
+	//	float g = e->pyr_rgb[pid][i];
+	//	m = fmin(m, g);
+	//	M = fmax(M, g);
+	//}
+
+	e->a = 255 / ( M - m );
+	e->b = 255 * m / ( m - M );
+
+	f->changed = 1;
+}
+
+static void action_center_contrast_at_point(struct FTR *f, int x, int y)//{{{2
+{
+	struct pan_state *e = f->userdata;
+
+	double p[2];
+	window_to_image(p, e, x, y);
+	float C = pixel(e, p[0], p[1]);
+	if (!isfinite(C)) C = 0;
+
+	e->b = 127.5 - e->a * C;
+
+	f->changed = 1;
+}
+
+static void action_base_contrast_at_point(struct FTR *f, int x, int y)//{{{2
+{
+	struct pan_state *e = f->userdata;
+
+	double p[2];
+	window_to_image(p, e, x, y);
+	float C = pixel(e, p[0], p[1]);
+	if (!isfinite(C)) C = 0;
+
+	e->b =  255 - e->a * C;
+
+	f->changed = 1;
+}
+
+static void action_contrast_span(struct FTR *f, float factor)//{{{2
+{
+	struct pan_state *e = f->userdata;
+
+	float c = (127.5 - e->b)/ e->a;
+	e->a *= factor;
+	e->b = 127.5 - e->a * c;
+
+	f->changed = 1;
+}
+
+static void action_change_zoom_to_factor(struct FTR *f, int x, int y,//{{{2
+		double Fx, double Fy)
+{
+	struct pan_state *e = f->userdata;
+
+	if (Fx == 1 && Fy == 1) e->octave = 0;
+
+	double c[2];
+	window_to_image(c, e, x, y);
+
+	e->zoom_x = 1/Fx;
+	e->zoom_y = 1/Fy;
+	e->offset_x = c[0] - x/e->zoom_x;
+	e->offset_y = c[1] - y/e->zoom_y;
+	fprintf(stderr, "\t zoom changed to %g %g {%g %g}\n", e->zoom_x, e->zoom_y, e->offset_x, e->offset_y);
+
+	e->has_hough = false;
+	f->changed = 1;
+}
+
+static void getstrip(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	int w = e->strip_w;//STRIP_WIDTH;
+	int h = f->h;
+	float *strip = e->strip;
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		double p[2];
+		window_to_image(p, e, i, j);
+		float v = pixel(e, p[0], p[1]);
+		strip[j*w+i] = v;
+	}
+	if (e->inpaint_strip)
+		poisson_recursive(strip, strip, 0, w, h, 0.25, 10, 99);
+}
+
+static void action_nfa(struct FTR*);
+static void action_nfa_with_refinement(struct FTR*);
+
+static void action_compute_hough(struct FTR *f)//{{{2
+{
+	struct pan_state *e = f->userdata;
+	if (e->inferno) return;
+	fprintf(stderr, "compute hough\n");
+	e->nb_meaningful_sinusoids = 0;
+	e->has_hough = true;
+	f->changed = 1;
+
+	// buffer for the image data (current strip)
+	int w = e->strip_w;//STRIP_WIDTH;
+	int h = f->h;
+	float *strip = e->strip;
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		double p[2];
+		window_to_image(p, e, i, j);
+		float v = pixel(e, p[0], p[1]);
+		strip[j*w+i] = v;
+	}
+	img_debug(strip, w, h, 1, "/tmp/strip_at_z%g_x%g_y%g.tiff",
+			e->zoom_y, e->offset_x, e->offset_y);
+
+	// buffer for the transform data
+	int tside = e->hough_w;
+	float *hough = e->hough;
+	for (int i = 0; i < tside * tside; i++)
+		hough[i] = 0;
+
+	// inpaint the "NAN" values of the image data
+	poisson_recursive(strip, strip, 0, w, h, 0.4, 10, 99);
+	img_debug(strip, w, h, 1, "/tmp/istrip_at_z%g_x%g_y%g.tiff",
+			e->zoom_y, e->offset_x, e->offset_y);
+
+	// blur the image
+	float sigma[1] = {e->pre_blur_sigma};
+	blur_2d(strip, strip, w, h, 1, e->pre_blur_type, sigma, 1);
+	img_debug(strip, w, h, 1, "/tmp/bistrip_at_z%g_x%g_y%g.tiff",
+			e->zoom_y, e->offset_x, e->offset_y);
+
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		double p[2];
+		window_to_image(p, e, i, j);
+		float v = pixel(e, p[0], p[1]);
+		//if (!isfinite(v))
+		//	strip[j*w+i] = NAN;
+	}
+
+	// compute the dip picker transform
+	float *c_strip = strip + w*h/4;
+	int c_h = 3*h/4; // central window of the strip
+	blackbox_transform_general(hough, tside, c_strip, w, c_h,
+			e->aradius, e->randomized, e->tensor?e->ntensor:0);
+	//if (!e->randomized)
+	//	tdip(hough, e->aradius, tside, c_strip, w, c_h);
+	//else {
+	//	for (int i = 0; i < tside*tside; i++)
+	//		hough[i] = 0;
+	//	tdipr_acc(hough, e->aradius, tside, c_strip, w, c_h,
+	//			e->randomized);
+	//}
+	img_debug(hough, tside, tside, 1, "/tmp/hbistrip_at_z%g_x%g_y%g.tiff",
+			e->zoom_y, e->offset_x, e->offset_y);
+
+	// blur the accumulator
+	sigma[0] = e->post_blur_sigma;
+	blur_2d(hough, hough, tside, tside, 1, e->post_blur_type, sigma, 1);
+
+	// compute statistics
+	float hmax = -INFINITY;
+	int xmax, ymax;
+	for (int j = 0; j < tside; j++)
+	for (int i = 0; i < tside; i++)
+	{
+		int ij = i + j * tside;
+		if (hough[ij] > hmax) {
+			hmax = hough[ij];
+			xmax = i;
+			ymax = j;
+		}
+	}
+
+	{
+		int tside = e->hough_w;
+		double arad = e->aradius;
+		int ia = xmax;// - e->strip_w;
+		int ib = ymax;
+		e->dip_a = arad * (ia / (tside - 1.0) - 0.5);
+		e->dip_b = arad * (ib / (tside - 1.0) - 0.5);
+		e->show_dip_bundle = true;
+		f->changed = 1;
+	}
+
+	//// dump the blurred image to the window
+	//assert(f->w == tside + w);
+	//assert(f->h == h);
+	//for (int j = 0; j < w; j++)
+	//for (int i = 0; i < h; i++)
+	//for (int l = 0; l < 3; l++)
+	//	f->rgb[3*(i+j*f->w)+l] = strip[i+j*w];
+
+	//// dump the transform to the window
+	//assert(f->w == tside + w);
+	//assert(f->h == tside);
+	//for (int j = 0; j < tside; j++)
+	//for (int i = 0; i < tside; i++)
+	//for (int l = 0; l < 3; l++)
+	//	f->rgb[3*(i+w+j*f->w)+l] = 255 * hough[i+j*tside] / hmax;
+
+	action_nfa_with_refinement(f);
+
+	// write dip line
+	{
+		double p[2];
+		window_to_image(p, e, 0, e->strip_h / 2);
+		char fname[FILENAME_MAX];
+		snprintf(fname, FILENAME_MAX, "/tmp/vdip_%d_%g_%g.txt",
+				e->octave, p[0], p[1]);
+		FILE *f = xfopen(fname, "w");
+		fprintf(f, "%g %g %g %g %g %g\n",
+				e->dip_a,
+				e->dip_b,
+				e->aradius,
+				e->min_grad,
+				e->pre_blur_sigma,
+				e->post_blur_sigma
+		       );
+		xfclose(f);
+	}
+}
+
+
+
+// fill-in the nfa detection using the current dip e->dip_{a,b}
+static void action_nfa(struct FTR *f)//{{{2
+{
+	struct pan_state *e = f->userdata;
+	double A = e->dip_a;// * pow(2, -e->octave);
+	double B = e->dip_b;// * pow(2, -e->octave);
+	fprintf(stderr, "NFAs(%g,%g)\n", e->dip_a, e->dip_b);
+
+	// the image is (e->strip, e->strip_w, e->strip_h)
+	double *ox = e->acontrario_orientations_x;
+	double *oy = e->acontrario_orientations_y;
+	// TODO: instead of calling compute_orientation, use the same
+	// orientation field of the dip (requires changing the "tdip" function
+	// interface)
+	compute_orientation(e, ox, oy, e->strip, e->strip_w, e->strip_h);
+	//double logNT = 10 * log10(e->strip_w * e->strip_h );
+	double logNT = 10 * log10(e->hough_w * e->hough_h);
+	e->nb_meaningful_sinusoids = 0;
+	e->show_meaningful_sinusoids = true;
+	// TODO: this loop must only traverse the heights that are inside the
+	// ROI
+	float amplitude = hypot(A, B) * 360 / M_PI;
+	int c_from = 10 + amplitude;
+	int c_to = e->strip_h - amplitude - 10;
+	assert(0 <= c_from);
+	assert(c_to < e->strip_h);
+	for (int c = c_from; c < c_to; c++)
+	{
+		// TODO: allow changing this 0.05 (angle threshold) as a
+		// user-interface parameter
+		//
+		// NOTE: in the future, we may have a "continuous" version of
+		// sin_nfa that does not have this parameter.
+		//
+		// NOTE2: also, we may have an alternative interface that
+		// returns "thick" sinusoids (that will be computed todos a la
+		// vez)
+		double NFA = sin_nfa(A, B, c, ox, oy,
+				e->strip_w, e->strip_h,
+			       	e->nfa_param_p, logNT);
+		if (NFA < e->nfa_param_lepsilon)
+		{
+			e->meaningful_sinusoid[e->nb_meaningful_sinusoids] = c;
+			e->sinusoid_nfa[e->nb_meaningful_sinusoids] = NFA;
+			e->nb_meaningful_sinusoids += 1;
+		}
+	}
+	fprintf(stderr, "got %d dips\n", e->nb_meaningful_sinusoids);
+	f->changed = 1;
+}
+
 // refine the nfa detection
-static void action_nfa_with_refinement(struct FTR *f)
+static void action_nfa_with_refinement(struct FTR *f)//{{{2
 {
 	struct pan_state *e = f->userdata;
 	if (!e->nb_meaningful_sinusoids)
@@ -1040,7 +1053,7 @@ static void action_nfa_with_refinement(struct FTR *f)
 //	action_change_zoom_by_factor(f, x, y, 1.0/WHEEL_FACTOR);
 //}
 
-static void action_change_presigma_by_factor(struct FTR *f, double factor)
+static void action_change_presigma_by_factor(struct FTR *f, double factor)//{{{2
 {
 	struct pan_state *e = f->userdata;
 	if (e->tensor) {
@@ -1056,7 +1069,7 @@ static void action_change_presigma_by_factor(struct FTR *f, double factor)
 	action_compute_hough(f);
 }
 
-static void action_change_postsigma_by_factor(struct FTR *f, double factor)
+static void action_change_postsigma_by_factor(struct FTR *f,double factor)//{{{2
 {
 	struct pan_state *e = f->userdata;
 	e->post_blur_sigma *= factor;
@@ -1064,7 +1077,7 @@ static void action_change_postsigma_by_factor(struct FTR *f, double factor)
 	action_compute_hough(f);
 }
 
-static void action_change_aradius_by_factor(struct FTR *f, double factor)
+static void action_change_aradius_by_factor(struct FTR *f, double factor)//{{{2
 {
 	struct pan_state *e = f->userdata;
 	e->aradius *= factor;
@@ -1072,7 +1085,7 @@ static void action_change_aradius_by_factor(struct FTR *f, double factor)
 	action_compute_hough(f);
 }
 
-static void action_change_nrandom_by_factor(struct FTR *f, double factor)
+static void action_change_nrandom_by_factor(struct FTR *f, double factor)//{{{2
 {
 	struct pan_state *e = f->userdata;
 	e->randomized *= factor;
@@ -1082,16 +1095,7 @@ static void action_change_nrandom_by_factor(struct FTR *f, double factor)
 	action_compute_hough(f);
 }
 
-//static void action_change_nfa_modgrad(struct FTR *f, int increase)
-//{
-//	struct pan_state *e = f->userdata;
-//	double factor = increase ? 1 : -1;
-//	e->nfa_param_th_modgrad += factor * STEP_NFA_MODGRAD;
-//	fprintf(stderr, "nfa_modgrad = %g\n", e->nfa_param_th_modgrad);
-//	action_nfa(f);
-//}
-
-static void action_change_nfa_modgrad(struct FTR *f, int increase)
+static void action_change_nfa_modgrad(struct FTR *f, int increase)//{{{2
 {
 	struct pan_state *e = f->userdata;
 	double factor = increase ? 1 : -1;
@@ -1103,7 +1107,7 @@ static void action_change_nfa_modgrad(struct FTR *f, int increase)
 	action_nfa_with_refinement(f);
 }
 
-static void action_change_nfa_p(struct FTR *f, int increase)
+static void action_change_nfa_p(struct FTR *f, int increase)//{{{2
 {
 	struct pan_state *e = f->userdata;
 	double factor = increase ? 1 : -1;
@@ -1116,7 +1120,7 @@ static void action_change_nfa_p(struct FTR *f, int increase)
 	action_nfa_with_refinement(f);
 }
 
-static void action_change_nfa_lepsilon(struct FTR *f, int increase)
+static void action_change_nfa_lepsilon(struct FTR *f, int increase)//{{{2
 {
 	struct pan_state *e = f->userdata;
 	double factor = increase ? 1 : -1;
@@ -1126,7 +1130,7 @@ static void action_change_nfa_lepsilon(struct FTR *f, int increase)
 }
 
 
-static void action_toggle_randomized(struct FTR *f)
+static void action_toggle_randomized(struct FTR *f)//{{{2
 {
 	struct pan_state *e = f->userdata;
 	if (e->randomized)
@@ -1137,27 +1141,27 @@ static void action_toggle_randomized(struct FTR *f)
 	action_compute_hough(f);
 }
 
-static void action_toggle_tensor(struct FTR *f)
+static void action_toggle_tensor(struct FTR *f)//{{{2
 {
 	struct pan_state *e = f->userdata;
 	e->tensor = !e->tensor;
 	action_compute_hough(f);
 }
 
-static void action_toggle_inferno(struct FTR *f)
+static void action_toggle_inferno(struct FTR *f)//{{{2
 {
 	struct pan_state *e = f->userdata;
 	e->inferno = !e->inferno;
 }
 
-static void action_toggle_inpainting(struct FTR *f)
+static void action_toggle_inpainting(struct FTR *f)//{{{2
 {
 	struct pan_state *e = f->userdata;
 	e->inpaint_strip = !e->inpaint_strip;
 }
 
 
-static void action_save_shot(struct FTR *f)
+static void action_save_shot(struct FTR *f)//{{{2
 {
 	static int shot_counter = 1;
 	char fname[FILENAME_MAX];
@@ -1167,7 +1171,7 @@ static void action_save_shot(struct FTR *f)
 	shot_counter += 1;
 }
 
-static void action_save_fancy_shot(struct FTR *f)
+static void action_save_fancy_shot(struct FTR *f)//{{{2
 {
 	struct pan_state *e = f->userdata;
 	static int scx = 1;
@@ -1204,7 +1208,7 @@ static void action_save_fancy_shot(struct FTR *f)
 
 
 
-static void action_increase_octave(struct FTR *f, int x, int y)
+static void action_increase_octave(struct FTR *f, int x, int y)//{{{2
 {
 	struct pan_state *e = f->userdata;
 
@@ -1218,7 +1222,7 @@ static void action_increase_octave(struct FTR *f, int x, int y)
 	fprintf(stderr, "increased octave to %d\n", e->octave);
 }
 
-static void action_decrease_octave(struct FTR *f, int x, int y)
+static void action_decrease_octave(struct FTR *f, int x, int y)//{{{2
 {
 	struct pan_state *e = f->userdata;
 
@@ -1236,14 +1240,14 @@ static void action_decrease_octave(struct FTR *f, int x, int y)
 	fprintf(stderr, "decreased octave to %d\n", e->octave);
 }
 
-static void action_toggle_hud(struct FTR *f)
+static void action_toggle_hud(struct FTR *f)//{{{2
 {
 	struct pan_state *e = f->userdata;
 	e->head_up_display = !e->head_up_display;
 	f->changed = 1;
 }
 
-static void action_toggle_meaningful_sinusoids(struct FTR *f)
+static void action_toggle_meaningful_sinusoids(struct FTR *f)//{{{2
 {
 	struct pan_state *e = f->userdata;
 	e->show_meaningful_sinusoids = !e->show_meaningful_sinusoids;
@@ -1253,7 +1257,7 @@ static void action_toggle_meaningful_sinusoids(struct FTR *f)
 	f->changed = 1;
 }
 
-static void action_toggle_validatronics_mode(struct FTR *f)
+static void action_toggle_validatronics_mode(struct FTR *f)//{{{2
 {
 	struct pan_state *e = f->userdata;
 	e->validatronics_mode = !e->validatronics_mode;
@@ -1262,13 +1266,14 @@ static void action_toggle_validatronics_mode(struct FTR *f)
 	f->changed = 1;
 }
 
-static void action_toggle_autocontrast(struct FTR *f)
+static void action_toggle_autocontrast(struct FTR *f)//{{{2
 {
 	struct pan_state *e = f->userdata;
 	e->autocontrast = !e->autocontrast;
 	f->changed = 1;
 }
 
+// drawing functions                                 {{{1
 static unsigned char float_to_byte(float x)
 
 {
@@ -1609,6 +1614,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	f->changed = 1;
 }
 
+// event handlers {{{1
 // update offset variables by dragging
 static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 {
@@ -1786,6 +1792,7 @@ static void fill_global_dirt(void)
 SMART_PARAMETER(INFERNAL_A,-60)
 SMART_PARAMETER(INFERNAL_B,20000)
 
+// main {{{1
 //#define STRIP_WIDTH 360
 #define HOUGH_SIDE 512
 int main_pan(int c, char *v[])
@@ -1872,3 +1879,4 @@ int main(int c, char *v[])
 {
 	return main_pan(c, v);
 }
+// vim:set foldmethod=marker:
