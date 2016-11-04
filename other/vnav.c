@@ -83,7 +83,7 @@
 #include "seconds.c"
 
 // arbitrary number, must be higher than the height of the window
-#define MAX_MEANINGFUL_SINUSOIDS 10000 
+#define MAX_MEANINGFUL_SINUSOIDS 10000
 
 // global variables              {{{1
 static uint8_t global_dirt[256][3];
@@ -97,6 +97,7 @@ static uint8_t global_dirt[256][3];
 struct sinusoid {
 	double a, b, c;
 	int d; // -1 or 1
+	double nfa;
 };
 
 // data structure for the image viewer
@@ -140,7 +141,6 @@ struct pan_state {
 	// 6. nfa options
 	int nb_meaningful_sinusoids, nb_refined_sinusoids;
 	struct sinusoid meaningful_sinusoid[MAX_MEANINGFUL_SINUSOIDS];
-	double sinusoid_nfa[MAX_MEANINGFUL_SINUSOIDS];
 	bool show_meaningful_sinusoids;
 	double *acontrario_orientations_x;
 	double *acontrario_orientations_y;
@@ -148,6 +148,7 @@ struct pan_state {
 	double nfa_param_p; // "p" 0.05 (factor = 0.7)
 	double nfa_param_lepsilon; // "l" 0 (offset = 1)
 	bool validatronics_mode;
+	char *exclusion_mask;
 };
 
 
@@ -517,7 +518,7 @@ static double norm_angle_diff(double a, double b)
 
 static
 double sin_nfa_continuous(struct sinusoid s, double *ox, double *oy,
-                int X, int Y, double logNT)
+                int X, int Y, double logNT, char *mask)
 {
   double sum_e = 0.0;
   int num_e = 0;
@@ -534,7 +535,8 @@ double sin_nfa_continuous(struct sinusoid s, double *ox, double *oy,
       double yy = 360/M_PI*(a*cos(2*M_PI*x/(X-1)) + b*sin(2*M_PI*x/(X-1))) + c;
       int y = lrint(yy);
 
-      if( x >= 0 && x < X && y >= 0 && y < Y && (ox[x+y*X] * ox[x+y*X]) != 0.0 )
+      if( x >= 0 && x < X && y >= 0 && y < Y && (ox[x+y*X] * ox[x+y*X]) != 0.0
+		      && (!mask || mask[x+y*X]) )
         {
           double deriv = 720/(X-1) * ( -a*sin(2*M_PI*x/(X-1))
                                       + b*cos(2*M_PI*x/(X-1)) );
@@ -566,9 +568,9 @@ double sin_nfa_continuous(struct sinusoid s, double *ox, double *oy,
 /*----------------------------------------------------------------------------*/
 static
 double sin_nfa(struct sinusoid s, double *ox, double *oy,
-		int X, int Y, double p, double logNT)
+		int X, int Y, double p, double logNT, char *mask)
 {
-	if (!p) return sin_nfa_continuous(s, ox, oy, X, Y, logNT);
+	if (!p) return sin_nfa_continuous(s, ox, oy, X, Y, logNT, mask);
 
 	double logNFA;
 	int n = 0;
@@ -588,7 +590,8 @@ double sin_nfa(struct sinusoid s, double *ox, double *oy,
 					+ b*sin(2*M_PI*x/(X-1))) + c);
 
 		/* valid orientation */
-		if(x>=0 && x<X && y>=0 && y<Y && (ox[x+y*X] * ox[x+y*X]) != 0.0)
+		if(x>=0 && x<X && y>=0 && y<Y && (ox[x+y*X] * ox[x+y*X]) != 0.0
+				&& (!mask || mask[x+y*X]) )
 		{
 			// TODO: use 2*the image width instead of 720 here
 			double deriv = 720/(X-1) * ( -a*sin(2*M_PI*x/(X-1))
@@ -614,12 +617,13 @@ static double eval_this_nfa(struct pan_state *e, struct sinusoid s)
 	double logNT = 10 * log10(e->hough_w * e->hough_h);
 	double r = sin_nfa(s,
 		e->acontrario_orientations_x, e->acontrario_orientations_y,
-		e->strip_w, e->strip_h, 0*e->nfa_param_p, logNT);
+		e->strip_w, e->strip_h, 0*e->nfa_param_p, logNT,
+		e->exclusion_mask);
 	return r;
 }
 
 static
-void refine_this_sinusoid(struct pan_state *e, struct sinusoid *s)
+int refine_this_sinusoid(struct pan_state *e, struct sinusoid *s)
 {
 	int nn = 36;
 	int n[][3] = {
@@ -651,6 +655,8 @@ void refine_this_sinusoid(struct pan_state *e, struct sinusoid *s)
 	};
 
 	double best_nfa = eval_this_nfa(e, *s);
+	s->nfa = best_nfa;
+	if (best_nfa > e->nfa_param_lepsilon) return 0;
 	int best_idx;
 	//fprintf(stderr, "before do nfa = %g [%g %g %g]\n", best_nfa,
 	//		abc[0], abc[1], abc[2]);
@@ -675,10 +681,12 @@ void refine_this_sinusoid(struct pan_state *e, struct sinusoid *s)
 			s->a += step[0] * n[best_idx][0];
 			s->b += step[1] * n[best_idx][1];
 			s->c += step[2] * n[best_idx][2];
+			s->nfa = best_nfa;
 		}
 	} while (best_idx >= 0);
 	//fprintf(stderr, "after while (nfa=%g) %g %g %g\n", best_nfa,
 	//		abc[0], abc[1], abc[2]);
+	return 1;
 }
 
 // actions          {{{1
@@ -980,6 +988,10 @@ static void action_nfa(struct FTR *f)//{{{2
 	double B = e->dip_b;// * pow(2, -e->octave);
 	fprintf(stderr, "NFAs(%g,%g)\n", e->dip_a, e->dip_b);
 
+	// reset the exclusion mask
+	for (int i = 0; i < e->strip_w * e->strip_h; i++)
+		e->exclusion_mask[i] = 1;
+
 	// the image is (e->strip, e->strip_w, e->strip_h)
 	double *ox = e->acontrario_orientations_x;
 	double *oy = e->acontrario_orientations_y;
@@ -1010,19 +1022,47 @@ static void action_nfa(struct FTR *f)//{{{2
 		// NOTE2: also, we may have an alternative interface that
 		// returns "thick" sinusoids (that will be computed todos a la
 		// vez)
-		struct sinusoid s = { A, B, c, d };
-		double NFA = sin_nfa(s, ox, oy,
-				e->strip_w, e->strip_h,
-			       	e->nfa_param_p, logNT);
-		if (NFA < e->nfa_param_lepsilon)
-		{
-			e->meaningful_sinusoid[e->nb_meaningful_sinusoids] = s;
-			e->sinusoid_nfa[e->nb_meaningful_sinusoids] = NFA;
-			e->nb_meaningful_sinusoids += 1;
-		}
+		struct sinusoid s = { A, B, c, d, NAN };
+		s.nfa = sin_nfa(s, ox, oy, e->strip_w, e->strip_h,
+			       	e->nfa_param_p, logNT, e->exclusion_mask);
+		if (s.nfa < e->nfa_param_lepsilon)
+			e->meaningful_sinusoid[e->nb_meaningful_sinusoids++] = s;
 	}
 	fprintf(stderr, "got %d dips\n", e->nb_meaningful_sinusoids);
 	f->changed = 1;
+}
+
+static int compare_sinusoid_nfas(const void *aa, const void *bb)
+{
+	const struct sinusoid *a = (const struct sinusoid *) aa;
+	const struct sinusoid *b = (const struct sinusoid *) bb;
+	return (a->nfa > b->nfa) - (a->nfa < b->nfa);
+}
+
+static void rebuild_list_of_meaningful_sinusoids(struct pan_state *e)
+{
+	int cx = 0;
+	for (int i = 0; i < e->nb_meaningful_sinusoids; i++)
+		cx += e->meaningful_sinusoid[i].nfa < e->nfa_param_lepsilon;
+	fprintf(stderr, "collapsed %d into %d\n",e->nb_meaningful_sinusoids,cx);
+}
+
+static void exclude_around_sinusoid(struct pan_state *e, struct sinusoid *s)
+{
+	int X = e->strip_w;
+	int Y = e->strip_h;
+	for(int x=0; x<X; x++)
+	{
+		double a = s->a;
+		double b = s->b;
+		double c = s->c;
+		double yy = 360/M_PI*(a*cos(2*M_PI*x/(X-1))
+				+ b*sin(2*M_PI*x/(X-1))) + c;
+		int y = lrint(yy);
+		for (int h = -3; h <= 3; h++)
+			if (insideP(X, Y, x, y + h))
+				e->exclusion_mask[x+(y+h)*X] = 0;
+	}
 }
 
 // refine the nfa detection
@@ -1034,14 +1074,19 @@ static void action_nfa_with_refinement(struct FTR *f)//{{{2
 	if (!e->nb_meaningful_sinusoids)
 		action_nfa(f);
 	e->nb_refined_sinusoids = e->nb_meaningful_sinusoids;
-	double tac = seconds() - tic;
-	fprintf(stderr, "action_nfa at %g fps\n", 1/tac);
+	fprintf(stderr, "action_nfa at %g fps\n", 1/(seconds()-tic));
+
+	qsort(e->meaningful_sinusoid, e->nb_meaningful_sinusoids,
+			sizeof*e->meaningful_sinusoid, compare_sinusoid_nfas);
 
 	tic = seconds();
 	for (int i = 0; i < e->nb_meaningful_sinusoids; i++)
-		refine_this_sinusoid(e, e->meaningful_sinusoid + i);
-	tac = seconds() - tic;
-	fprintf(stderr, "sinusoid refinement at %g fps\n", 1/tac);
+		if (refine_this_sinusoid(e, e->meaningful_sinusoid + i))
+			exclude_around_sinusoid(e, e->meaningful_sinusoid + i);
+
+	fprintf(stderr, "sinusoid refinement at %g fps\n", 1/(seconds()-tic));
+
+	rebuild_list_of_meaningful_sinusoids(e);
 }
 
 
@@ -1494,6 +1539,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	{
 		for (int i = 0; i < e->nb_refined_sinusoids; i++)
 		{
+			if (e->meaningful_sinusoid[i].nfa<e->nfa_param_lepsilon)
 			for (int i_theta = 0; i_theta < e->strip_w; i_theta++)
 			{
 				double A = e->meaningful_sinusoid[i].a;
@@ -1818,6 +1864,7 @@ int main_pan(int c, char *v[])
 	e->validatronics_mode = true;
 	e->acontrario_orientations_x = xmalloc(e->strip_w * e->strip_h * sizeof*e->acontrario_orientations_x);
 	e->acontrario_orientations_y = xmalloc(e->strip_w * e->strip_h * sizeof*e->acontrario_orientations_y);
+	e->exclusion_mask = xmalloc(e->strip_w * e->strip_h);
 
 	e->aradius = 1.5;
 	e->pre_blur_sigma = 2;
