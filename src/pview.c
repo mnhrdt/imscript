@@ -9,10 +9,12 @@
 // pview triplets w h [mask.txt] < triplets.txt
 // pview epipolar f1 ... f9 w h < pairs.txt
 // pview epipolar f1 ... f9 w h [mask.txt] < pairs.txt
+// pview polygons w h < polygons.txt
 //
 // points.txt   = file with two columns of numbers (list of 2D points)
 // pairs.txt    = file with four columns of numbers (list of 2D point pairs)
 // triplets.txt = file with six columns of numbers (list of 2D point triplets)
+// polygons.txt = file with one polygonal curve per line (list of 2D points)
 
 
 #include <assert.h>
@@ -29,6 +31,7 @@
 #include "xfopen.c"
 #include "parsenumbers.c"
 #include "drawsegment.c"
+#include "pickopt.c"
 
 struct rgb_value {
 	uint8_t r, g, b;
@@ -342,6 +345,56 @@ int main_viewpairs(int c, char *v[])
 		}
 	}
 	iio_save_image_uint8_vec("-", (uint8_t*)o, sizex, sizey, 4);
+	return EXIT_SUCCESS;
+}
+
+// read stream until character "stop" is found
+// if EOF is reached, return NULL
+// otherwise return line
+static char *fgets_until(char *line, int n, FILE *f, int stop)
+{
+	int i = 0;
+	while(1) {
+		if (i >= n-1) break;
+		int c = fgetc(f);
+		if (c == EOF) return NULL;
+		line[i] = c;
+		if (c == stop) break;
+		i += 1;
+	}
+	line[i+1] = '\0';
+	//fprintf(stderr, "FGETS UNTIL %d \"%s\"\n", i, line);
+	return line;
+}
+
+// CLI utility to view a set of polygonal curves
+// boolean option "-c" : close the polygon
+int main_viewpolygons(int c, char *v[])
+{
+	bool option_c = pick_option(&c, &v, "c", NULL);
+	if (c != 3 && c != 3) {
+		fprintf(stderr, "usage:\n\t"
+			"%s w h [-c] < polygons.txt\n", *v);
+		//       0  1 2
+		return EXIT_FAILURE;
+	}
+	int w = atoi(v[1]);
+	int h = atoi(v[2]);
+	struct rgba_value (*o)[w] = xmalloc(w * h * 4);
+	for (int i = 0; i < w*h; i++)
+		o[0][i] = RGBA_BLACK;
+	while (1) {
+		int n, maxlin = 1000*12*4;
+		char line[maxlin], *sl = fgets_until(line, maxlin, stdin, '\n');
+		if (!sl) break;
+		double *t = alloc_parse_doubles(maxlin, line, &n);
+		n /= 2;
+		for (int i = 0; i < n - 1 + option_c; i++)
+			overlay_segment_color(*o, w, h, t[2*i+0], t[2*i+1],
+				t[(2*i+2)%(2*n)], t[(2*i+3)%(2*n)], RGBA_GREEN);
+		free(t);
+	}
+	iio_save_image_uint8_vec("-", (uint8_t*)o, w, h, 4);
 	return EXIT_SUCCESS;
 }
 
@@ -735,6 +788,7 @@ int main(int c, char *v[])
 	else if (0 == strcmp(v[1], "points")) return main_viewp(c-1, v+1);
 	else if (0 == strcmp(v[1], "hpoints")) return main_viewhp(c-1, v+1);
 	else if (0 == strcmp(v[1], "pairs")) return main_viewpairs(c-1, v+1);
+	else if (0 == strcmp(v[1], "polygons")) return main_viewpolygons(c-1, v+1);
 	else if (0 == strcmp(v[1], "triplets")) return main_viewtrips(c-1, v+1);
 	else if (0 == strcmp(v[1], "epipolar")) return main_viewepi(c-1, v+1);
 	else if (0 == strcmp(v[1], "fmpair")) return main_viewfmpair(c-1, v+1);

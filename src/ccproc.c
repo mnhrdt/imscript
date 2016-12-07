@@ -185,12 +185,14 @@ int ccproc(
 	for (int i = 0; i < r; i++)
 	{
 		int *ti = out_all + out_first[i];
-		int topo = out_size[i]; // index of top non-boundary element
+		int topo = out_size[i] - 1; // index of top non-boundary element
+		// vector: ti[0] ti[1] ... ti[topo-1]
 		for (int j = 0; j < out_size[i]; j++)
 		{
 			int idx = ti[j];
 			if (!boundaryingP(out_idx, w, h, idx))
 			{
+				// XXX TODO: correct the following bug:
 				if (j == topo) break;
 				topo -= 1;
 				swapi(ti, topo, j);

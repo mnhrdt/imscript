@@ -295,9 +295,16 @@ static float kernel_2d_invr(float x, float y, float *p)
 	float sigma = p[1];
 
 	float a = hypot(x, y) / sigma;
-	//float a = hypot(x, y);
 	float r = a ? 1/a : 1;
-	//float r = a ? 1/a : 0;
+	return r;
+}
+
+static float kernel_2d_land(float x, float y, float *p)
+{
+	float sigma = p[1];
+
+	float a = hypot(x, y) / sigma;
+	float r = a ? 1/(a*a*a) : 1;
 	return r;
 }
 
@@ -434,6 +441,7 @@ void blur_2d(float *y, float *x, int w, int h, int pd,
 	case 'p': f = kernel_2d_powerlaw2;   break;
 	case 'a': f = kernel_2d_pareto;   break;
 	case 'i': f = kernel_2d_invr;   break;
+	case 'r': f = kernel_2d_land;   break;
 	case 'y': f = kernel_2d_ynvr;   break;
 	case 'z': f = kernel_2d_ilogr;   break;
 	case 't': f = kernel_2d_r2logr;   break;

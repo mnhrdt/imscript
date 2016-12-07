@@ -2921,6 +2921,21 @@ static void iio_save_image_as_pfm(const char *filename, struct iio_image *x)
 	xfclose(f);
 }
 
+// ASC writer                                                               {{{2
+static void iio_save_image_as_asc(const char *filename, struct iio_image *x)
+{
+	FILE *f = xfopen(filename, "w");
+	int w = x->sizes[0];
+	int h = x->sizes[1];
+	int d = x->sizes[2];
+	int pd = x->pixel_dimension;
+	float *t = x->data;
+	fprintf(f, "%d %d %d %d\n", w, h, d, pd);
+	for (int i = 0; i < w*h*d*pd; i++)
+		fprintf(f, "%a\n", t[i]);
+	fwrite(x->data, w * h * x->pixel_dimension * sizeof(float), 1 ,f);
+	xfclose(f);
+}
 
 // RIM writer                                                               {{{2
 
