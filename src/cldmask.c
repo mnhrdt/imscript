@@ -141,6 +141,41 @@ int read_cloud_mask_from_gml_file(struct cloud_mask *m, char *filename)
 	return 0;
 }
 
+static void update_uplow(struct cloud_mask *m)
+{
+	m->low[0] = m->low[1] = INFINITY;
+	m->up[0] = m->up[1] = -INFINITY;
+	for (int i = 0; i < m->n; i++)
+	for (int j = 0; j < m->t[i].n; i++)
+	{
+		m->low[0] = fmin(m->low[0], m->t[i].v[2*j+0]);
+		m->low[1] = fmin(m->low[1], m->t[i].v[2*j+1]);
+		m->up [0] = fmax(m->up [0], m->t[i].v[2*j+0]);
+		m->up [1] = fmax(m->up [1], m->t[i].v[2*j+1]);
+	}
+}
+
+int read_cloud_mask_from_txt_file(struct cloud_mask *m, char *filename)
+{
+	m->n = 0;
+	m->t = NULL;
+
+	FILE *f = xfopen(filename, "r");
+	while (1) {
+		int n, maxlin = 1000*12*4;
+		char line[maxlin], *sl = fgets_until(line, maxlin, f, '\n');
+		if (!sl) break;
+		struct cloud_polygon p;
+		p.v = alloc_parse_doubles(maxlin, line, &p.n);
+		p.n /= 2;
+		cloud_add_polygon(m, p);
+	}
+	xfclose(f);
+	m->low[0] = NAN;
+	//update_uplow(m);
+	return 0;
+}
+
 static void putpixel_0(int *img, int w, int h, float x, float y, int v)
 {
 	int i = round(x);
@@ -263,6 +298,7 @@ static int winding_number_clouds(struct cloud_mask *m, int x, int y)
 // rescale a cloud of points to fit in the given rectangle
 static void cloud_mask_rescale(struct cloud_mask *m, int w, int h)
 {
+	if (!isfinite(m->low[0])) return;
 	for (int i = 0; i < m->n; i++)
 	{
 		struct cloud_polygon *p = m->t + i;
@@ -374,6 +410,7 @@ int main(int c, char *v[])
 {
 	// read input arguments
 	char *Hstring = pick_option(&c, &v, "h", "");
+	bool option_t = pick_option(&c, &v, "t", NULL);
 	if (c != 5 && c!= 4 && c != 3) {
 		return fprintf(stderr, "usage:\n\t%s"
 		"width height [-h \"h1 ... h9\"] [clouds.gml [out.png]]\n", *v);
@@ -386,7 +423,10 @@ int main(int c, char *v[])
 
 	// read input cloud file
 	struct cloud_mask m[1];
-	read_cloud_mask_from_gml_file(m, filename_clg);
+	if (option_t)
+		read_cloud_mask_from_txt_file(m, filename_clg);
+	else
+		read_cloud_mask_from_gml_file(m, filename_clg);
 
 	// acquire space for output image
 	int w = out_width;
