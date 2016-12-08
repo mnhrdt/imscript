@@ -130,8 +130,9 @@ int main(int c, char *v[])
 				case 2: px -= 0.5; break;
 				case 3: py += 0.5; break;
 				}
-				printf("%g %g%c", px, py, k==bd_n-1?'\n':' ');
+				printf("%g %g ", px, py);
 			}
+			printf("%g\n", d2/d1);
 		}
 	}
 	return 0;
