@@ -1,6 +1,33 @@
 #include <math.h>
 #include <stdio.h>
 
+static double transport_distance(double *a, double *b, int n)
+{
+	// accumulate
+	double aa[n], bb[n];
+	aa[0] = a[0];
+	bb[0] = b[0];
+	for (int i = 1; i < n; i++)
+	{
+		aa[i] = aa[i-1] + a[i];
+		bb[i] = bb[i-1] + b[i];
+	}
+
+	// normalize
+	for (int i = 0; i < n; i++)
+	{
+		aa[i] /= aa[n-1];
+		bb[i] /= bb[n-1];
+	}
+
+	// compute L1 norm of the difference
+	double r = 0;
+	for (int i = 0; i < n; i++)
+		r += fabs(aa[i] - bb[i]);
+
+	return r;
+}
+
 static void accumulate_histogram(long double h[256])
 {
 	for (int i = 1; i < 256; i++)
