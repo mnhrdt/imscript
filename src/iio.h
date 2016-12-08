@@ -175,7 +175,7 @@ uint16_t *iio_read_image_uint16_vec(const char *fname, int *w, int *h, int *pd);
 //
 // EDITABLE CONFIGURATION:
 //
-#define IIO_MAX_DIMENSION 5
+#define IIO_MAX_DIMENSION 15
 //#define IIO_ABORT_ON_ERROR true
 //
 //
