@@ -107,10 +107,13 @@ int main(int c, char *v[])
 		// compute distances to both barycenters
 		double d1 = transport_distance(H, M1, nbins*nbands);
 		double d2 = transport_distance(H, M2, nbins*nbands);
+		fprintf(stderr, "region %d\tarea %d\td1=%g\td2=%g\tr=%g\n", i,
+				out_size[i], d1, d2, d2/d1);
 
 		// if it is much closer to M1 than to M2, output the polygon
 		if (POLYGONIFY_F() * d1 < d2)
 		{
+			fprintf(stderr, "\taccepted!\n");
 			// index of one interior pixel
 			int ridx = out_all[out_first[i]+0];
 			int rx = ridx % w;
@@ -118,8 +121,17 @@ int main(int c, char *v[])
 			int bd_n = bfollow(bd_tmp, y, w, h, floatnan_equality,
 					rx, ry);
 			for (int k = 0; k < bd_n; k++)
-				printf("%d %d%c", bd_tmp[3*k+0], bd_tmp[3*k+1],
-						k==bd_n-1 ? '\n' : ' ');
+			{
+				float px = bd_tmp[3*k+0];
+				float py = bd_tmp[3*k+1];
+				switch(bd_tmp[3*k+2]) {
+				case 0: px += 0.5; break;
+				case 1: py -= 0.5; break;
+				case 2: px -= 0.5; break;
+				case 3: py += 0.5; break;
+				}
+				printf("%g %g%c", px, py, k==bd_n-1?'\n':' ');
+			}
 		}
 	}
 	return 0;
