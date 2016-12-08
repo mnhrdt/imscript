@@ -40,7 +40,7 @@ static int ncompare_pair(const void *aa, const void *bb)
 	return (*a < *b) - (*a > *b);
 }
 
-static bool boundaryingP(int *idxs, int w, int h, int idx)
+static bool idx_boundaryingP(int *idxs, int w, int h, int idx)
 {
 	int i = idx % w;
 	int j = idx / w;
@@ -58,6 +58,107 @@ static void swapi(int *t, int i, int j)
 	int tmp = t[i];
 	t[i] = t[j];
 	t[j] = tmp;
+}
+
+static bool insideP(int w, int h, int i, int j)
+{
+	return i >= 0 && j >= 0 && i < w && j < h;
+}
+
+// directions
+//	0: ( 1, 0)
+//	1: ( 0,-1)
+//	2: (-1, 0)
+//	3: ( 0, 1)
+
+static void get_neighbour(int *ni, int *nj, int i, int j, int dir)
+{
+	*ni = i;
+	*nj = j;
+	switch (dir) {
+	case 0:	*ni += 1; break;
+	case 1:	*nj -= 1; break;
+	case 2:	*ni -= 1; break;
+	case 3:	*nj += 1; break;
+	}
+}
+
+static bool pix_boundaryingP(float *x, int w, int h,
+		float_equivalence_relation_t eq, int i, int j, int dir)
+{
+	assert(insideP(w, h, i, j));
+	int ni, nj;
+	get_neighbour(&ni, &nj, i, j, dir);
+	if (!insideP(w, h, ni, nj))
+		return true;
+	float vij = x[ j*w+ i];
+	float vnn = x[nj*w+ni];
+	return !eq(vij, vnn);
+}
+
+// follow the closed boundary of a connected component containing point (i,j)
+// note: the output array must be pre-allocated
+// out_bd is a list of triplets (i,j,dir) conforming the boundary
+int bfollow(int *out_bd, float *x, int w, int h,
+		float_equivalence_relation_t eq,
+		int i, int j)
+{
+	assert(i >= 0 && j >= 0 && i < w && j < h);
+
+	// find a pixel that is outside, it will be used to begin the loop
+	int ifirst = i;
+	int jfirst = j;
+	int dfirst = 1;
+	while (!pix_boundaryingP(x, w, h, eq, ifirst, jfirst, dfirst))
+		ifirst -= 1;
+
+	// loop until the first boundary element is found again
+	int out_n = 0;
+	int dir = dfirst;
+	i = ifirst;
+	j = jfirst;
+	do {
+		assert(pix_boundaryingP(x, w, h, eq, i, j, dir));
+		out_bd[3*out_n + 0] = i;
+		out_bd[3*out_n + 1] = j;
+		out_bd[3*out_n + 2] = dir;
+		out_n += 1;
+		switch(dir) { // counterclockwise track (could be a table also)
+		case 0: if (pix_boundaryingP(x, w, h, eq, i, j, 1))
+				dir = 1;
+			else if (pix_boundaryingP(x, w, h, eq, i, j-1, 0))
+				j -= 1;
+			else if (pix_boundaryingP(x, w, h, eq, i+1, j-1, 3)) {
+				i += 1; j -= 1; dir = 3;
+			} else fail("bullshit 0\n");
+			break;
+		case 1: if (pix_boundaryingP(x, w, h, eq, i, j, 2))
+				dir = 2;
+			else if (pix_boundaryingP(x, w, h, eq, i-1, j, 1))
+				i -= 1;
+			else if (pix_boundaryingP(x, w, h, eq, i-1, j-1, 0)) {
+				i -= 1; j -= 1; dir = 0;
+			} else fail("bullshit 1\n");
+			break;
+		case 2: if (pix_boundaryingP(x, w, h, eq, i, j, 3))
+				dir = 3;
+			else if (pix_boundaryingP(x, w, h, eq, i, j+1, 2))
+				j += 1;
+			else if (pix_boundaryingP(x, w, h, eq, i-1, j+1, 1)) {
+				i -= 1; j += 1; dir = 1;
+			} else fail("bullshit 2\n");
+			break;
+		case 3: if (pix_boundaryingP(x, w, h, eq, i, j, 0))
+				dir = 0;
+			else if (pix_boundaryingP(x, w, h, eq, i+1, j, 3))
+				i += 1;
+			else if (pix_boundaryingP(x, w, h, eq, i+1, j+1, 2)) {
+				i += 1; j += 1; dir = 2;
+			} else fail("bullshit 3\n");
+			break;
+		}
+	} while (i != ifirst || j != jfirst || dir != dfirst);
+	return out_n;
 }
 
 // Compute the number of connected components of equivalent pixels in an image.
@@ -190,7 +291,7 @@ int ccproc(
 		for (int j = 0; j < out_size[i]; j++)
 		{
 			int idx = ti[j];
-			if (!boundaryingP(out_idx, w, h, idx))
+			if (!idx_boundaryingP(out_idx, w, h, idx))
 			{
 				// XXX TODO: correct the following bug:
 				if (j == topo) break;
@@ -208,6 +309,30 @@ int ccproc(
 	free(tmpi);
 	return r;
 }
+
+#ifdef MAIN_BDFOLLOW
+#include "iio.h"
+int main(int c, char *v[])
+{
+	if (c != 4)
+		return fprintf(stderr, "usage:\n\t%s img i j\n", *v);
+		//                                 0 1   2 3
+	char *filename_in = v[1];
+	int in_i = atoi(v[2]);
+	int in_j = atoi(v[3]);
+
+	int w, h;
+	float *x = iio_read_image_float(filename_in, &w, &h);
+	int *bd = xmalloc(3*4*w*h*sizeof*bd);
+
+	int r = bfollow(bd, x, w, h, floatnan_equality, in_i, in_j);
+	printf("r = %d\n", r);
+	for (int i = 0; i < r; i++)
+		printf("\t%d %d %d\n", bd[3*i+0], bd[3*i+1], bd[3*i+2]);
+
+	return 0;
+}
+#endif//MAIN_BDFOLLOW
 
 //#define MAIN_CCPROC
 #ifdef MAIN_CCPROC
