@@ -1,3 +1,6 @@
+// This file contains the implemantation of the "ccproc" function
+// It is a general tool to deal with connect components in images.
+
 #include <math.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -173,7 +176,7 @@ int bfollow(int *out_bd, float *x, int w, int h,
 // out_first[i] = first point of ith region on table out_all (0<=i<N)
 // out_idx[p] = index of the region containing pixel p
 //
-int ccproc(
+int ccproc_old(
 		int *out_size,          // total size of each CC
 		int *out_bdsize,        // boundary size of each CC
 		int *out_all,           // array of all the indexes, connected
@@ -304,6 +307,171 @@ int ccproc(
 
 	// cleanup and exit
 	free(ipair);
+	free(pair);
+	free(rep);
+	free(tmpi);
+	return r;
+}
+
+static int compute_representatives(int *rep, float *x, int w, int h,
+		float_equivalence_relation_t eq)
+{
+	// rep[i] = i
+	adsf_begin(rep, w*h);
+
+	// join equivalent neighbors (neighbors == 4-neighbors ALWAYS)
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		int p0 = j*w + i;
+		int p1 = j*w + i+1;
+		int p2  = (j+1)*w + i;
+		if (i+1 < w && eq(x[p0], x[p1])) adsf_union(rep, w*h, p0, p1);
+		if (j+1 < h && eq(x[p0], x[p2])) adsf_union(rep, w*h, p0, p2);
+	}
+
+	// canonicalize dsf (after this, the DSF is not changed anymore)
+	for (int i = 0; i < w*h; i++)
+		rep[i] = adsf_find(rep, w*h, i);
+
+	// count connected components
+	int r = 0;
+	for (int i = 0; i < w*h; i++)
+		if (rep[i] == i)
+			r += 1;
+	return r;
+}
+
+static
+void compute_pos_and_idx(int *pos, int *idx, int *rep, int w, int h, int r)
+{
+	for (int i = 0; i < r; i++)
+		pos[2*i + 0] = 0; // initialize areas of each region
+
+	int rcx = 0;
+	for (int i = 0; i < w*h; i++)
+		if (rep[i] == i)
+		{
+			idx[i] = rcx;
+			pos[2*rcx + 1] = i; // representative
+			rcx += 1;
+		}
+	assert(rcx == r);
+	for (int i = 0; i < w*h; i++)
+	{
+		int j = rep[i];
+		int t = idx[j];
+		pos[2*t + 0] += 1;
+	}
+	qsort(pos, r, 2*sizeof*pos, ncompare_pair);
+	for (int i = 0; i < r; i++)
+	{
+		int ir = pos[2*i + 1];
+		idx[ir] = i;
+		assert(ir == rep[ir]);
+	}
+}
+
+static void reverse_indexes(int *out_all, int *idx, int *rep, int n)
+{
+	int *ipair = xmalloc(2 * n * sizeof*ipair);
+
+	// reverse indices
+	for (int i = 0; i < n; i++)
+	{
+		ipair[2*i + 0] = idx[rep[i]];
+		ipair[2*i + 1] = i;
+	}
+	qsort(ipair, n, 2*sizeof*ipair, compare_pair);
+
+	// fill-in table of all indices
+	for (int i = 0; i < n; i++)
+		out_all[i] = ipair[2*i+1];
+
+	free(ipair);
+}
+
+static void reorder_boundaries(int *bdsize,
+	int *idx, int *all, int *first, int *size, int w, int h, int r)
+{
+	for (int i = 0; i < r; i++)
+	{
+		int *ti = all + first[i];
+		int topo = size[i] - 1; // index of top non-boundary element
+		// vector: ti[0] ti[1] ... ti[topo-1]
+		for (int j = 0; j < size[i]; j++)
+		{
+			int ij = ti[j];
+			if (!idx_boundaryingP(idx, w, h, ij))
+			{
+				// XXX TODO: correct the following bug:
+				if (j == topo) break;
+				topo -= 1;
+				swapi(ti, topo, j);
+			}
+		}
+		bdsize[i] = topo;
+	}
+}
+
+static
+void assert_consistency(int *idx, int *all, int *size, int *first, int r)
+{
+	for (int i = 0; i < r; i++)
+	for (int j = 0; j < size[i]; j++)
+		assert(idx[all[first[i] + j]] == i);
+}
+
+int ccproc(
+		int *out_size,          // total size of each CC
+		int *out_bdsize,        // boundary size of each CC
+		int *out_all,           // array of all the indexes, connected
+		int *out_first,         // array of first indexes of each CC
+		int *out_idx,           // image with the indices of each region
+		float *x, int w, int h, // input image
+		float_equivalence_relation_t eq
+	  )
+{
+	// pre-setup
+	if (!eq)
+		eq = floatnan_equality;
+
+	// create table of representatives
+	int *rep = xmalloc(w * h * sizeof*rep);
+	int r = compute_representatives(rep, x, w, h, eq);
+
+	// set the index/position correspondence
+	int *pair = xmalloc(2 * r * sizeof*pair);
+	int *tmpi = xmalloc(w*h*sizeof*tmpi);
+	compute_pos_and_idx(pair, tmpi, rep, w, h, r);
+
+	// reverse indexes and fill table with all
+	reverse_indexes(out_all, tmpi, rep, w*h);
+
+	// fill-in table of sizes
+	for (int i = 0; i < r; i++)
+		out_size[i] = pair[2*i + 0];
+
+	// fill-in image of representatives
+	for (int i = 0; i < w*h; i++)
+		out_idx[i] = tmpi[rep[i]];
+
+	// fill-in table of first indexes
+	out_first[0] = 0;
+	int cx = 1;
+	for (int i = 1; i < w*h; i++)
+		if (rep[out_all[i-1]] != rep[out_all[i]])
+			out_first[cx++] = i;
+	assert(cx == r);
+
+	// verify consistence
+	assert_consistency(out_idx, out_all, out_size, out_first, r);
+
+	// reorder out_all so that boundarying points come first
+	reorder_boundaries(out_bdsize, out_idx, out_all, out_first, out_size,
+								w, h, r);
+
+	// cleanup and exit
 	free(pair);
 	free(rep);
 	free(tmpi);

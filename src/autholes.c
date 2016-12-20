@@ -72,6 +72,7 @@ int main(int c, char *v[])
 			floatnan_equality
 			);
 
+	fprintf(stderr, "r = %d\n", r);
 	for (int i = 0; i < r; i++)
 	{
 		fprintf(stderr, "r_%d : area=%d perim=%d first=%d\n",
