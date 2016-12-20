@@ -40,7 +40,7 @@ static void render_roads(float *out, int w, int h, int offset_x, int offset_y,
 		//fprintf(stderr, "\tq = %lf %lf %lf\n", q[0], q[1], q[2]);
 
 		// w : road segment width
-		double rwidth = 4 * (3 - e[5*i + 4]);
+		double rwidth = 2 * (3 - e[5*i + 4]);
 
 		// road segment projected normal vector
 		double u[2] = { q[1] - p[1], p[0] - q[0] };
