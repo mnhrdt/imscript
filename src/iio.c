@@ -223,7 +223,7 @@ static void fail(const char *fmt, ...)
 	exit(-1);
 #  else//NDEBUG
 	//print_trace(stderr);
-	exit(*(int *)0);
+	exit(*(int *)0x43);
 #  endif//NDEBUG
 #endif//IIO_ABORT_ON_ERROR
 }
@@ -1141,6 +1141,21 @@ recover_broken_pixels_float(float *clear, float *broken, int n, int pd)
 		clear[pd*i + l] = broken[n*l + i];
 }
 
+static
+void repair_broken_pixels(void *clear, void *broken, int n, int pd, int sz)
+{
+	FORL(pd) FORI(n)
+		memcpy(clear + sz*(pd*i+l), broken + sz*(n*l + i), sz);
+}
+
+static void repair_broken_pixels_inplace(void *x, int n, int pd, int sz)
+{
+	char *t = malloc(n * pd * sz);
+	memcpy(t, x, n * pd * sz);
+	repair_broken_pixels(x, t, n, pd, sz);
+	free(t);
+}
+
 static void
 recover_broken_pixels_double(double *clear, double *broken, int n, int pd)
 {
@@ -1318,7 +1333,7 @@ static TIFF *tiffopen_fancy(const char *filename, char *mode)
 	if (!tif) return tif;
 	for (int i = 0; i < index; i++)
 		TIFFReadDirectory(tif);
-	
+
 	return tif;
 }
 
@@ -1397,12 +1412,17 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 	IIO_DEBUG("bps = %d\n", (int)bps);
 	IIO_DEBUG("spp = %d\n", (int)spp);
 	IIO_DEBUG("sls = %d\n", (int)scanline_size);
+	IIO_DEBUG("uss = %d\n", (int)uscanline_size);
 	int sls = TIFFScanlineSize(tif);
 	IIO_DEBUG("sls(r) = %d\n", (int)sls);
 	if ((int)scanline_size != sls)
 		fprintf(stderr, "scanline_size,sls = %d,%d\n", (int)scanline_size,sls);
 	//assert((int)scanline_size == sls);
-	scanline_size = sls;
+	if (!broken)
+		assert((int)scanline_size == sls);
+	else
+		assert((int)scanline_size == spp*sls);
+	assert((int)scanline_size >= sls);
 	uint8_t *data = xmalloc(w * h * spp * rbps);
 	uint8_t *buf = xmalloc(scanline_size);
 
@@ -1460,7 +1480,8 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 	} else
 
 	// dump scanline data
-	FORI(h) {
+	if (broken && bps < 8) fail("cannot unpack broken scanlines");
+	if (!broken) FORI(h) {
 		r = TIFFReadScanline(tif, buf, i, 0);
 		if (r < 0) fail("error reading tiff row %d/%d", i, (int)h);
 
@@ -1470,7 +1491,21 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 					scanline_size, bps);
 			fmt_iio = IIO_TYPE_UINT8;
 		} else {
-			memcpy(data + i*scanline_size, buf, scanline_size);
+			memcpy(data + i*sls, buf, sls);
+		}
+	}
+	else {
+		FORI(h)
+		{
+			FORJ(spp)
+			{
+				r = TIFFReadScanline(tif, buf, i, j);
+				if (r < 0)
+					fail("tiff bad %d/%d;%d", i, (int)h, j);
+				memcpy(data + i*spp*sls + j*sls, buf, sls);
+			}
+			repair_broken_pixels_inplace(data + i*spp*sls,
+					w, spp, bps/8);
 		}
 	}
 	TIFFClose(tif);

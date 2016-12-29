@@ -8,9 +8,11 @@ WFLAGS=
 
 CFLAGS = $(WFLAGS)
 CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE -fopenmp
-CFLAGS = $(WFLAGS) -g
 CFLAGS = $(WFLAGS) -O3 -DNDEBUG
+CFLAGS = $(WFLAGS) -g -DIIO_SHOW_DEBUG_MESSAGES
+CFLAGS = $(WFLAGS) -g
 CFLAGS = $(WFLAGS) -O3 -march=native
+CFLAGS = $(WFLAGS) -O3 -march=native -DNDEBUG
 
 SRCDIR = src
 BINDIR = bin
