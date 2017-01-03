@@ -100,11 +100,18 @@ void fancy_image_trilinear(float *out, struct fancy_image *f,
 int fancy_image_leak_tiff_info(int *tw, int *th, int *fmt, int *bps,
 		struct fancy_image *f);
 
+// leaky abstraction
+void *fancy_image_leak_gdal_info(struct fancy_image *f);
+
 
 
 // future API
 // ----------
 // default option string = "r,megabytes=100,octaves=0"
+//
+// metadata options, e.g., "r,gdalpointer=true", fill-in userdata
+// with a pointer to the gdal metadata (when available, NULL otherwise)
+//
 //
 //
 //
