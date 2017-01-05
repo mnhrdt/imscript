@@ -2983,6 +2983,23 @@ static void iio_save_image_as_asc(const char *filename, struct iio_image *x)
 	xfclose(f);
 }
 
+// CSV writer                                                               {{{2
+static void iio_save_image_as_csv(const char *filename, struct iio_image *x)
+{
+	FILE *f = xfopen(filename, "w");
+	int w = x->sizes[0];
+	int h = x->sizes[1];
+	int d = x->sizes[2];
+	int pd = x->pixel_dimension;
+	assert(d == 1);
+	assert(pd == 1);
+	assert(x->type == IIO_TYPE_FLOAT);
+	float *t = x->data;
+	for (int i = 0; i < w*h; i++)
+		fprintf(f, "%.9g%c", t[i], (i+1)%w?',':'\n');
+	xfclose(f);
+}
+
 // RIM writer                                                               {{{2
 
 static void rim_putshort(FILE *f, uint16_t n)
@@ -3867,6 +3884,11 @@ static void iio_save_image_default(const char *filename, struct iio_image *x)
 	if (string_suffix(filename, ".pfm") && typ == IIO_TYPE_FLOAT
 		&& (x->pixel_dimension == 1 || x->pixel_dimension == 3)) {
 		iio_save_image_as_pfm(filename, x);
+		return;
+	}
+	if (string_suffix(filename, ".csv") && typ == IIO_TYPE_FLOAT
+				&& x->pixel_dimension == 1) {
+		iio_save_image_as_csv(filename, x);
 		return;
 	}
 	if (string_suffix(filename, ".mw") && typ == IIO_TYPE_FLOAT
