@@ -40,6 +40,10 @@ struct FI {
 	bool x_changed;
 	char x_filename[FILENAME_MAX];
 
+	bool gdal;
+#ifdef FANCY_GDAL
+	// gdal shit
+#endif//FANCY_GDAL
 };
 
 // Compiler trick to check that "FI" can fit inside a "fancy_image"

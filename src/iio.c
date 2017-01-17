@@ -165,7 +165,10 @@ typedef long double longdouble;
 #  ifndef I_CAN_HAS_LIBPNG
 #    include <setjmp.h>
 #  endif//I_CAN_HAS_LIBPNG
-_Thread_local jmp_buf global_jump_buffer;
+#  if __STDC_VERSION__ >= 201112L
+_Thread_local
+#  endif
+jmp_buf global_jump_buffer;
 #endif//IIO_ABORT_ON_ERROR
 
 //#include <errno.h> // only for errno
@@ -265,7 +268,10 @@ static void xfree(void *p)
 	free(p);
 }
 
-_Thread_local static const
+#  if __STDC_VERSION__ >= 201112L
+_Thread_local
+#  endif
+static const
 char *global_variable_containing_the_name_of_the_last_opened_file = NULL;
 
 static FILE *xfopen(const char *s, const char *p)
@@ -1147,8 +1153,10 @@ recover_broken_pixels_float(float *clear, float *broken, int n, int pd)
 static
 void repair_broken_pixels(void *clear, void *broken, int n, int pd, int sz)
 {
+	char *c = clear;
+	char *b = broken;
 	FORL(pd) FORI(n)
-		memcpy(clear + sz*(pd*i+l), broken + sz*(n*l + i), sz);
+		memcpy(c + sz*(pd*i+l), b + sz*(n*l + i), sz);
 }
 
 static void repair_broken_pixels_inplace(void *x, int n, int pd, int sz)
@@ -2405,7 +2413,7 @@ static int read_beheaded_vrt(struct iio_image *x,
 	x->contiguous_data = false;
 	x->data = xmalloc(w * h * sizeof(float));
 	float (*xx)[w] = x->data;
-	int pos[4], pos_cx = 0, has_fname = 0;
+	int pos[4] = {0,0,0,0}, pos_cx = 0, has_fname = 0;
 
 	// obtain the path where the vrt file is located
 	strncpy(dirvrt, global_variable_containing_the_name_of_the_last_opened_file, n);
@@ -2458,7 +2466,7 @@ static int read_beheaded_ffd(struct iio_image *x,
 	x->type = IIO_TYPE_UINT16;
 	x->contiguous_data = false;
 	x->data = xmalloc(w * h * 4 * sizeof(uint16_t));
-	int r = fread(x->data, 2, w*h*4, fin);
+	uint32_t r = fread(x->data, 2, w*h*4, fin);
 	if (r != w*h*4) return 1;
 	switch_2endianness(x->data, r);
 	return 0;

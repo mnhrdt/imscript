@@ -53,7 +53,7 @@ $(addprefix $(BINDIR)/,$(SRCGSL)) : $(BINDIR)/% : $(SRCDIR)/%.c $(IIO)
 	$(CC) $(CFLAGS) $(OFLAGS) $^ -o $@ $(IIOFLAGS) $(GSLFLAGS)
 
 $(SRCDIR)/iio.o : $(SRCDIR)/iio.c $(SRCDIR)/iio.h
-	$(CC) $(CFLAGSIIO) $(OFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(OFLAGS) -c $< -o $@
 
 $(SRCDIR)/hs.o: $(SRCDIR)/hs.c
 	$(CC) $(CFLAGS) $(OFLAGS) -DOMIT_MAIN -c $< -o $@
