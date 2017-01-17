@@ -2357,6 +2357,10 @@ static int read_beheaded_csv(struct iio_image *x,
 static int read_beheaded_dlm(struct iio_image *x,
 		FILE *fin, char *header, int nheader)
 {
+	(void)x;
+	(void)fin;
+	(void)header;
+	(void)nheader;
 	fail("dlm reader not implemented, use csv by now\n");
 	return 1;
 }
@@ -2398,6 +2402,7 @@ static int xml_get_tag_content(char *out, char *line, char *tag)
 static int read_beheaded_vrt(struct iio_image *x,
 		FILE *fin, char *header, int nheader)
 {
+	(void)header; (void)nheader;
 	int n = FILENAME_MAX + 0x200, cx = 0, w = 0, h = 0;
 	char fname[n], dirvrt[n], fullfname[n], line[n], *sl = fgets(line, n, fin);
 	if (!sl) return 1;
@@ -2451,6 +2456,7 @@ static int read_beheaded_vrt(struct iio_image *x,
 static int read_beheaded_ffd(struct iio_image *x,
 		FILE *fin, char *header, int nheader)
 {
+	(void)header; (void)nheader;
 	for (int i = 0; i < 4; i++)
 		pick_char_for_sure(fin);
 	int s[8];
@@ -2731,6 +2737,7 @@ static int read_beheaded_raw(struct iio_image *x,
 
 //static int read_image(struct iio_image*, const char *);
 static int read_image_f(struct iio_image*, FILE *);
+inline
 static int read_beheaded_whatever(struct iio_image *x,
 	       	FILE *fin, char *header, int nheader)
 {
@@ -2888,6 +2895,11 @@ static void iio_save_image_as_tiff(const char *filename, struct iio_image *x)
 	}
 	TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT, tsf);
 
+    // define TIFFTAG_ROWSPERSTRIP to satisfy some readers (e.g. gdal)
+    uint32_t rows_per_strip = x->sizes[1];
+    rows_per_strip = TIFFDefaultStripSize(tif, rows_per_strip);
+    TIFFSetField(tif, TIFFTAG_ROWSPERSTRIP, rows_per_strip);
+
 	FORI(x->sizes[1]) {
 		void *line = i*sls + (char *)x->data;
 		int r = TIFFWriteScanline(tif, line, i, 0);
@@ -2980,6 +2992,7 @@ static void iio_save_image_as_pfm(const char *filename, struct iio_image *x)
 }
 
 // ASC writer                                                               {{{2
+inline
 static void iio_save_image_as_asc(const char *filename, struct iio_image *x)
 {
 	FILE *f = xfopen(filename, "w");
