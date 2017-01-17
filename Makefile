@@ -34,41 +34,6 @@ IIO=../iio/contrib/cmake/libIIOLIB.a
 IIO=$(SRCDIR)/iio.o
 
 
-# compiler detection hacks
-# (because some compilers do not use the standard by default)
-# TODO: move this stuff to a separate "hacks" file
-ifeq ($(CC), cc)
-	CC += -std=c99
-endif
-ifeq ($(CC), gcc)
-	CC += -std=c99
-endif
-ifeq ($(CC), icc)
-	CC += -std=c99
-endif
-
-
-# OS detection hacks
-# TODO: move this stuff to a separate "portability" file
-UNAME := $(shell uname)
-ifeq ($(UNAME), Linux)
-	CFLAGSIIO = $(CFLAGS) -D_POSIX_C_SOURCE=200809L -D_XOPEN_SOURCE=700
-endif
-ifeq ($(UNAME), Darwin)
-	MPE := $(shell if test -d /opt/macports ; then echo yes ; fi)
-	ifeq ($(MPE), yes)
-		export C_INCLUDE_PATH := /opt/macports/include:$(C_INCLUDE_PATH)
-		export LIBRARY_PATH := /opt/macports/lib:$(LIBRARY_PATH)
-	endif
-	MPE := $(shell if test -d /usr/X11 ; then echo yes ; fi)
-	ifeq ($(MPE), yes)
-		export C_INCLUDE_PATH := /usr/X11/include:$(C_INCLUDE_PATH)
-		export LIBRARY_PATH := /usr/X11/lib:$(LIBRARY_PATH)
-	endif
-endif
-
-
-
 SRC = $(SRCIIO) $(SRCFFT) $(SRCGSL)
 PROGRAMS = $(addprefix $(BINDIR)/,$(SRC) flow_ms rgfield rgfields rgfieldst elap2 flambda fancy_zoomout fancy_downsa fancy_crop)
 
