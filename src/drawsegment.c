@@ -2,6 +2,7 @@
 #define _DRAWSEGMENT_C
 
 #include <assert.h>
+#include <stdlib.h> // for "abs"
 #include <math.h>
 
 // draw a segment between two points

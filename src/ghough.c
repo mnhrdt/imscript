@@ -1,7 +1,9 @@
 #include <assert.h>
 #include <math.h>
 
+#ifndef M_PI
 #define M_PI 3.1416
+#endif
 
 void ghough(float *transform, int n_theta, int n_rho, float *grad, int w, int h)
 {

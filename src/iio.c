@@ -165,7 +165,7 @@ typedef long double longdouble;
 #  ifndef I_CAN_HAS_LIBPNG
 #    include <setjmp.h>
 #  endif//I_CAN_HAS_LIBPNG
-static jmp_buf global_jump_buffer;
+_Thread_local jmp_buf global_jump_buffer;
 #endif//IIO_ABORT_ON_ERROR
 
 //#include <errno.h> // only for errno
@@ -265,7 +265,7 @@ static void xfree(void *p)
 	free(p);
 }
 
-static const
+_Thread_local static const
 char *global_variable_containing_the_name_of_the_last_opened_file = NULL;
 
 static FILE *xfopen(const char *s, const char *p)
@@ -309,8 +309,10 @@ static void xfclose(FILE *f)
 static int pick_char_for_sure(FILE *f)
 {
 	int c = getc(f);
-	if (EOF == c)
+	if (EOF == c) {
+		xfclose(f);
 		fail("input file ended before expected");
+	}
 	//IIO_DEBUG("pcs = '%c'\n", c);
 	return c;
 }
@@ -1478,7 +1480,7 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 			}
 		}
 		xfree(tbuf);
-	} else
+	} else {
 
 	// dump scanline data
 	if (broken && bps < 8) fail("cannot unpack broken scanlines");
@@ -1509,6 +1511,7 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 					w, spp, bps/8);
 		}
 	}
+    }
 	TIFFClose(tif);
 
 
@@ -2330,7 +2333,7 @@ static int read_beheaded_csv(struct iio_image *x,
 
 	// read data
 	char *delim = ",\n", *tok = strtok(filedata, delim);
-	while (tok)
+	while (tok && numbers < (float*)(x->data)+w*h)
 	{
 		*numbers++ = atof(tok);
 		tok = strtok(NULL, delim);
@@ -2726,6 +2729,7 @@ static int read_beheaded_whatever(struct iio_image *x,
 	// dump data to file
 	long filesize;
 	void *filedata = load_rest_of_file(&filesize, fin, header, nheader);
+	xfclose(fin);
 	char *filename = put_data_into_temporary_file(filedata, filesize);
 	xfree(filedata);
 
@@ -3305,11 +3309,11 @@ int read_beheaded_image(struct iio_image *x, FILE *f, char *h, int hn, int fmt)
 	case IIO_FORMAT_RAFA:   return read_beheaded_rafa (x, f, h, hn);
 	*/
 
-//#ifdef I_CAN_HAS_WHATEVER
+#ifdef I_CAN_HAS_WHATEVER
 	case IIO_FORMAT_UNRECOGNIZED: return read_beheaded_whatever(x,f,h,hn);
-//#else
-//	case IIO_FORMAT_UNRECOGNIZED: return -2;
-//#endif
+#else
+	case IIO_FORMAT_UNRECOGNIZED: return -2;
+#endif
 
 	default:              return -17;
 	}
@@ -3431,7 +3435,7 @@ static int read_image(struct iio_image *x, const char *fname)
 	case 2: IIO_DEBUG("READ IMAGE sizes = %d x %d\n",x->sizes[0],x->sizes[1]);break;
 	case 3: IIO_DEBUG("READ IMAGE sizes = %d x %d x %d\n",x->sizes[0],x->sizes[1],x->sizes[2]);break;
 	case 4: IIO_DEBUG("READ IMAGE sizes = %d x %d x %d x %d\n",x->sizes[0],x->sizes[1],x->sizes[2],x->sizes[3]);break;
-	default: fail("caca [dimension = %d]", x->dimension);
+	default: fail("invalid dimension [%d]", x->dimension);
 	}
 	IIO_DEBUG("READ IMAGE pixel_dimension = %d\n",x->pixel_dimension);
 	IIO_DEBUG("READ IMAGE type = %s\n", iio_strtyp(x->type));

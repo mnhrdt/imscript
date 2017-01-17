@@ -64,25 +64,20 @@ static float getsample_exit(float *x, int w, int h, int pd, int i, int j, int l)
 	return x[(i+j*w)*pd + l];
 }
 
-static int good_modulus(int nn, int p)
+// like n%p, but works for all numbers
+static int good_modulus(int n, int p)
 {
 	if (!p) return 0;
-	if (p < 1) return good_modulus(nn, -p);
+	if (p < 1) return good_modulus(n, -p);
 
-	unsigned int r;
-	if (nn >= 0)
-		r = nn % p;
-	else {
-		unsigned int n = nn;
-		r = p - (-n) % p;
-		if (r == p)
-			r = 0;
-	}
-	//assert(r >= 0);
-	if (!(r<p)) fprintf(stderr, "bad modulus nn=%d r=%d p=%d\n", nn, r, p);
-	//assert(r < p);
+	int r = n % p;
+	r = r < 0 ? r + p : r;
+
+//	assert(r >= 0);
+//	assert(r < p);
 	return r;
 }
+
 
 static int gmod(int x, int m)
 {
