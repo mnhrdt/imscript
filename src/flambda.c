@@ -229,13 +229,19 @@
 #include <string.h>
 #include <math.h>
 
+
+//#define __STDC_IEC_559_COMPLEX__ 1
+#ifdef __STDC_IEC_559_COMPLEX__
+#include <complex.h>
+#endif
+
 #include "smapa.h"
 
 #include "fail.c"
 #include "xmalloc.c"
 #include "random.c"
 #include "parsenumbers.c"
-#include "colorcoords.c"
+#include "colorcoordsf.c"
 
 #include "fancy_image.h"
 
@@ -378,6 +384,39 @@ static void complex_product(float *xy, float *x, float *y)
 	xy[0] = x[0]*y[0] - x[1]*y[1];
 	xy[1] = x[0]*y[1] + x[1]*y[0];
 }
+
+static void complex_exp(float *y, float *x)
+{
+#ifdef __STDC_IEC_559_COMPLEX__
+	*(complex float *)y = cexp(*(complex float *)x);
+#else
+	y[0] = exp(x[0]) * cos(x[1]);
+	y[1] = exp(x[0]) * sin(x[1]);
+#endif
+}
+
+#ifdef __STDC_IEC_559_COMPLEX__
+#define REGISTERC(f) static void complex_ ## f(float *y, float *x) {\
+	*(complex float *)y = f(*(complex float *)y); }
+REGISTERC(cacos)
+REGISTERC(cacosh)
+REGISTERC(casin)
+REGISTERC(casinh)
+REGISTERC(catan)
+REGISTERC(catanh)
+REGISTERC(ccos)
+REGISTERC(ccosh)
+REGISTERC(cexp)
+REGISTERC(clog)
+REGISTERC(conj)
+REGISTERC(cproj)
+REGISTERC(csin)
+REGISTERC(csinh)
+REGISTERC(csqrt)
+REGISTERC(ctan)
+REGISTERC(ctanh)
+#endif
+
 
 static void matrix_product_clean(
 		float *ab, int *ab_nrows, int *ab_ncols,
@@ -563,6 +602,16 @@ static int matrix_transpose(float *r, float *a, int nn)
 	return nn;
 }
 
+// instances of "univector_function"
+static int xyz2rgb(float *y, float *x, int n)
+	{ assert(n == 3); xyz_to_rgb_floats(y, x); return 3; }
+static int rgb2xyz(float *y, float *x, int n)
+	{ assert(n == 3); rgb_to_xyz_floats(y, x); return 3; }
+static int hsv2rgb(float *y, float *x, int n)
+	{ assert(n == 3); hsv_to_rgb_floats(y, x); return 3; }
+static int rgb2hsv(float *y, float *x, int n)
+	{ assert(n == 3); rgb_to_hsv_floats(y, x); return 3; }
+
 // instance of "univector_function"
 static int vector_avg(float *r, float *a, int n)
 {
@@ -734,8 +783,30 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(random_exponential,"rande",-1),
 	REGISTER_FUNCTIONN(random_pareto,"randp",-1),
 	REGISTER_FUNCTIONN(random_raw,"rand",-1),
+	REGISTER_FUNCTIONN(random_stable,"rands",2),
 	REGISTER_FUNCTIONN(from_cartesian_to_polar,"topolar", -2),
 	REGISTER_FUNCTIONN(from_polar_to_cartesian,"frompolar", -2),
+	REGISTER_FUNCTIONN(complex_exp,"cexp", -2),
+#ifdef __STDC_IEC_559_COMPLEX__
+	REGISTER_FUNCTIONN(complex_cacos , "cacos", -2),
+	REGISTER_FUNCTIONN(complex_cacosh, "cacosh", -2),
+	REGISTER_FUNCTIONN(complex_casin , "casin", -2),
+	REGISTER_FUNCTIONN(complex_casinh, "casinh", -2),
+	REGISTER_FUNCTIONN(complex_catan , "catan", -2),
+	REGISTER_FUNCTIONN(complex_catanh, "catanh", -2),
+	REGISTER_FUNCTIONN(complex_ccos  , "ccos", -2),
+	REGISTER_FUNCTIONN(complex_ccosh , "ccosh", -2),
+	REGISTER_FUNCTIONN(complex_cexp  , "ccexp", -2),
+	REGISTER_FUNCTIONN(complex_clog  , "clog", -2),
+	REGISTER_FUNCTIONN(complex_conj  , "conj", -2),
+	REGISTER_FUNCTIONN(complex_cproj , "cproj", -2),
+	REGISTER_FUNCTIONN(complex_csin  , "csin", -2),
+	REGISTER_FUNCTIONN(complex_csinh , "csinh", -2),
+	REGISTER_FUNCTIONN(complex_csqrt , "csqrt", -2),
+	REGISTER_FUNCTIONN(complex_ctan  , "ctan", -2),
+	REGISTER_FUNCTIONN(complex_ctanh , "ctanh", -2),
+#endif
+	REGISTER_FUNCTIONN(complex_exp,"cexp", -2),
 	REGISTER_FUNCTIONN(complex_product,"cprod", -3),
 	REGISTER_FUNCTIONN(matrix_product,"mprod",-5),
 	REGISTER_FUNCTIONN(vector_product,"vprod",-5),
@@ -754,8 +825,10 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(vector_dimension,"vdim",-6),
 	REGISTER_FUNCTIONN(vector_rgb2gray,"vgray",-6),
 	REGISTER_FUNCTIONN(vector_colorsign,"vcsign",-6),
-	//REGISTER_FUNCTIONN(rgb2hsv,"rgb2hsv",3),
-	//REGISTER_FUNCTIONN(hsv2rgb,"rgb2hsv",3),
+	REGISTER_FUNCTIONN(hsv2rgb,"hsv2rgb",-6),
+	REGISTER_FUNCTIONN(rgb2hsv,"rgb2hsv",-6),
+	REGISTER_FUNCTIONN(xyz2rgb,"xyz2rgb",-6),
+	REGISTER_FUNCTIONN(rgb2xyz,"rgb2xyz",-6),
 #undef REGISTER_FUNCTION
 #undef REGISTER_FUNCTIONN
 	{NULL, "pi", 0, M_PI},
@@ -817,6 +890,8 @@ static float eval_colonvar(int w, int h, int i, int j, int c)
 	case 't': return atan2((2.0/(h-1))*j-1,(2.0/(w-1))*i-1);
 	case 'I': return symmetrize_index_inside(i,w);
 	case 'J': return symmetrize_index_inside(j,h);
+	case 'P': return symmetrize_index_inside(i,w)*2*M_PI/w;
+	case 'Q': return symmetrize_index_inside(j,h)*2*M_PI/h;
 	case 'L': x = symmetrize_index_inside(i,w);
 		  y = symmetrize_index_inside(j,h);
 		  return -(x*x+y*y);
@@ -1233,8 +1308,6 @@ static int token_is_vardef(const char *t)
 #define PLAMBDA_STACKOP_ROT 5
 #define PLAMBDA_STACKOP_VMERGE3 6
 #define PLAMBDA_STACKOP_VMERGEALL 7
-#define PLAMBDA_STACKOP_HSV2RGB 8
-#define PLAMBDA_STACKOP_RGB2HSV 9
 #define PLAMBDA_STACKOP_NMERGE 10
 #define PLAMBDA_STACKOP_INTERLEAVE 11
 #define PLAMBDA_STACKOP_DEINTERLEAVE 12
@@ -1255,8 +1328,6 @@ static int token_is_stackop(const char *t)
 	if (0 == strcmp(t, "join3")) return PLAMBDA_STACKOP_VMERGE3;
 	if (0 == strcmp(t, "mergeall")) return PLAMBDA_STACKOP_VMERGEALL;
 	if (0 == strcmp(t, "joinall")) return PLAMBDA_STACKOP_VMERGEALL;
-	if (0 == strcmp(t, "hsv2rgb")) return PLAMBDA_STACKOP_HSV2RGB;
-	if (0 == strcmp(t, "rgb2hsv")) return PLAMBDA_STACKOP_RGB2HSV;
 	if (0 == strcmp(t, "njoin")) return PLAMBDA_STACKOP_NMERGE;
 	if (0 == strcmp(t, "nmerge")) return PLAMBDA_STACKOP_NMERGE;
 	if (0 == strcmp(t, "interleave")) return PLAMBDA_STACKOP_INTERLEAVE;
@@ -1804,8 +1875,7 @@ static void vstack_apply_function(struct value_vstack *s,
 	float r[PLAMBDA_MAX_PIXELDIM];
 	FORI(f->nargs)
 		d[i] = vstack_pop_vector(v[i], s);
-	// the d[i] which are larger than one must be equal
-	FORI(f->nargs)
+	FORI(f->nargs) // the d[i] which are larger than one must be equal
 		if (d[i] > 1) {
 			if (rd > 1 && d[i] != rd)
 				fail("can not vectorize (%d %d)", rd, d[i]);
@@ -1874,28 +1944,6 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 		FORI(nz) x[nx+ny+i] = z[i];
 		vstack_push_vector(s, x, nx+ny+nz);
 				     }
-		break;
-	case PLAMBDA_STACKOP_HSV2RGB: {
-		float x[PLAMBDA_MAX_PIXELDIM];
-		int n = vstack_pop_vector(x, s);
-		if (n != 3) fail("hsv2rgb needs a 3-vector");
-		double dx[3] = {x[0], x[1], x[2]};
-		double dy[3];
-		hsv_to_rgb_doubles(dy, dx);
-		FORI(3) x[i] = dy[i];
-		vstack_push_vector(s, x, 3);
-				      }
-		break;
-	case PLAMBDA_STACKOP_RGB2HSV: {
-		float x[PLAMBDA_MAX_PIXELDIM];
-		int n = vstack_pop_vector(x, s);
-		if (n != 3) fail("rgb2hsv needs a 3-vector");
-		double dx[3] = {x[0], x[1], x[2]};
-		double dy[3];
-		rgb_to_hsv_doubles(dy, dx);
-		FORI(3) x[i] = dy[i];
-		vstack_push_vector(s, x, 3);
-				      }
 		break;
 	case PLAMBDA_STACKOP_ROT: {
 		float x[PLAMBDA_MAX_PIXELDIM];
@@ -2601,6 +2649,8 @@ verbosity>0?
 " :t\trelative angle from the center of the image\n"
 " :I\thorizontal coordinate of the pixel (centered)\n"
 " :J\tvertical coordinate of the pixel (centered)\n"
+" :P\thorizontal coordinate of the pixel (phased)\n"
+" :Q\tvertical coordinate of the pixel (phased)\n"
 " :R\tcentered distance to the center\n"
 " :L\tminus squared centered distance to the center\n"
 " :W\twidth of the image divided by 2*pi\n"
@@ -2681,6 +2731,8 @@ verbosity>0?
 " frompolar\tconvert a 2-vector from polar to cartesian\n"
 " hsv2rgb\tconvert a 3-vector from HSV to RGB\n"
 " rgb2hsv\tconvert a 3-vector from RGB to HSV\n"
+" xyz2rgb\tconvert a 3-vector from XYZ to RGB\n"
+" rgb2xyz\tconvert a 3-vector from RGB to XYZ\n"
 " cprod\t\tmultiply two 2-vectrs as complex numbers\n"
 " mprod\t\tmultiply two 2-vectrs as matrices (4-vector = 2x2 matrix, etc)\n"
 " vprod\t\tvector product of two 3-vectors\n"
@@ -2709,8 +2761,13 @@ verbosity>0?
 
 static int do_man(void)
 {
+#ifdef __OpenBSD__
+#define MANPIPE "|mandoc -a"
+#else
+#define MANPIPE "|man -l -"
+#endif
 	return system("help2man -N -S imscript -n \"evaluate an expression "
-				"with images as variables\" plambda|man -l -");
+				"with images as variables\" plambda" MANPIPE);
 }
 
 int main(int c, char **v)
