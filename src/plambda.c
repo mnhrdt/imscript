@@ -241,7 +241,7 @@
 #include "xmalloc.c"
 #include "random.c"
 #include "parsenumbers.c"
-#include "colorcoords.c"
+#include "colorcoordsf.c"
 
 
 // #defines {{{1
@@ -600,6 +600,16 @@ static int matrix_transpose(float *r, float *a, int nn)
 	return nn;
 }
 
+// instances of "univector_function"
+static int xyz2rgb(float *y, float *x, int n)
+	{ assert(n == 3); xyz_to_rgb_floats(y, x); return 3; }
+static int rgb2xyz(float *y, float *x, int n)
+	{ assert(n == 3); rgb_to_xyz_floats(y, x); return 3; }
+static int hsv2rgb(float *y, float *x, int n)
+	{ assert(n == 3); hsv_to_rgb_floats(y, x); return 3; }
+static int rgb2hsv(float *y, float *x, int n)
+	{ assert(n == 3); rgb_to_hsv_floats(y, x); return 3; }
+
 // instance of "univector_function"
 static int vector_avg(float *r, float *a, int n)
 {
@@ -814,8 +824,10 @@ struct predefined_function {
 	REGISTER_FUNCTIONN(vector_dimension,"vdim",-6),
 	REGISTER_FUNCTIONN(vector_rgb2gray,"vgray",-6),
 	REGISTER_FUNCTIONN(vector_colorsign,"vcsign",-6),
-	//REGISTER_FUNCTIONN(rgb2hsv,"rgb2hsv",3),
-	//REGISTER_FUNCTIONN(hsv2rgb,"rgb2hsv",3),
+	REGISTER_FUNCTIONN(hsv2rgb,"hsv2rgb",-6),
+	REGISTER_FUNCTIONN(rgb2hsv,"rgb2hsv",-6),
+	REGISTER_FUNCTIONN(xyz2rgb,"xyz2rgb",-6),
+	REGISTER_FUNCTIONN(rgb2xyz,"rgb2xyz",-6),
 #undef REGISTER_FUNCTION
 #undef REGISTER_FUNCTIONN
 	{NULL, "pi", 0, M_PI},
@@ -1301,8 +1313,6 @@ static int token_is_vardef(const char *t)
 #define PLAMBDA_STACKOP_ROT 5
 #define PLAMBDA_STACKOP_VMERGE3 6
 #define PLAMBDA_STACKOP_VMERGEALL 7
-#define PLAMBDA_STACKOP_HSV2RGB 8
-#define PLAMBDA_STACKOP_RGB2HSV 9
 #define PLAMBDA_STACKOP_NMERGE 10
 #define PLAMBDA_STACKOP_INTERLEAVE 11
 #define PLAMBDA_STACKOP_DEINTERLEAVE 12
@@ -1323,8 +1333,6 @@ static int token_is_stackop(const char *t)
 	if (0 == strcmp(t, "join3")) return PLAMBDA_STACKOP_VMERGE3;
 	if (0 == strcmp(t, "mergeall")) return PLAMBDA_STACKOP_VMERGEALL;
 	if (0 == strcmp(t, "joinall")) return PLAMBDA_STACKOP_VMERGEALL;
-	if (0 == strcmp(t, "hsv2rgb")) return PLAMBDA_STACKOP_HSV2RGB;
-	if (0 == strcmp(t, "rgb2hsv")) return PLAMBDA_STACKOP_RGB2HSV;
 	if (0 == strcmp(t, "njoin")) return PLAMBDA_STACKOP_NMERGE;
 	if (0 == strcmp(t, "nmerge")) return PLAMBDA_STACKOP_NMERGE;
 	if (0 == strcmp(t, "interleave")) return PLAMBDA_STACKOP_INTERLEAVE;
@@ -1941,28 +1949,6 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 		FORI(nz) x[nx+ny+i] = z[i];
 		vstack_push_vector(s, x, nx+ny+nz);
 				     }
-		break;
-	case PLAMBDA_STACKOP_HSV2RGB: {
-		float x[PLAMBDA_MAX_PIXELDIM];
-		int n = vstack_pop_vector(x, s);
-		if (n != 3) fail("hsv2rgb needs a 3-vector");
-		double dx[3] = {x[0], x[1], x[2]};
-		double dy[3];
-		hsv_to_rgb_doubles(dy, dx);
-		FORI(3) x[i] = dy[i];
-		vstack_push_vector(s, x, 3);
-				      }
-		break;
-	case PLAMBDA_STACKOP_RGB2HSV: {
-		float x[PLAMBDA_MAX_PIXELDIM];
-		int n = vstack_pop_vector(x, s);
-		if (n != 3) fail("rgb2hsv needs a 3-vector");
-		double dx[3] = {x[0], x[1], x[2]};
-		double dy[3];
-		rgb_to_hsv_doubles(dy, dx);
-		FORI(3) x[i] = dy[i];
-		vstack_push_vector(s, x, 3);
-				      }
 		break;
 	case PLAMBDA_STACKOP_ROT: {
 		float x[PLAMBDA_MAX_PIXELDIM];
@@ -2679,6 +2665,8 @@ verbosity>0?
 " frompolar\tconvert a 2-vector from polar to cartesian\n"
 " hsv2rgb\tconvert a 3-vector from HSV to RGB\n"
 " rgb2hsv\tconvert a 3-vector from RGB to HSV\n"
+" xyz2rgb\tconvert a 3-vector from XYZ to RGB\n"
+" rgb2xyz\tconvert a 3-vector from RGB to XYZ\n"
 " cprod\t\tmultiply two 2-vectrs as complex numbers\n"
 " mprod\t\tmultiply two 2-vectrs as matrices (4-vector = 2x2 matrix, etc)\n"
 " vprod\t\tvector product of two 3-vectors\n"
