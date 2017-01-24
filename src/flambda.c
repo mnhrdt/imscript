@@ -2583,7 +2583,7 @@ static int print_version(void)
 static int print_help(char *v, int verbosity)
 {
 	printf(
-"Plambda evaluates an expression with images as variables.\n"
+"Flambda evaluates an expression with images as variables.\n"
 "\n"
 "The expression is written in reverse polish notation using common\n"
 "operators and functions from `math.h'.  The variables appearing on the\n"
@@ -2594,21 +2594,16 @@ static int print_help(char *v, int verbosity)
 //"expression are assigned to each input image in alphabetical order.\n"
 "%s"
 "\n"
-"Usage: %s a.png b.png c.png ... \"EXPRESSION\" > output\n"
-"   or: %s a.png b.png c.png ... \"EXPRESSION\" -o output.png\n"
-"   or: %s -c num1 num2 num3  ... \"EXPRESSION\"\n"
+"Usage: %s a.tiff b.tiff c.tiff ... \"EXPRESSION\" -o output.tiff\n"
 "\n"
 "Options:\n"
-" -o file\tsave output to named file\n"
-" -c\t\tact as a symbolic calculator\n"
 " -h\t\tdisplay short help message\n"
 " --help\t\tdisplay longer help message\n"
 //" --version\tdisplay version\n"
 //" --man\tdisplay manpage\n"
 "\n"
 "Examples:\n"
-" plambda a.tiff b.tiff \"x y +\" > sum.tiff\tCompute the sum of two images.\n"
-" plambda -c \"1 atan 4 *\"\t\t\tPrint pi\n"
+" plambda a.tiff b.tiff \"x y +\" -o sum.tiff\tCompute the sum of two images.\n"
 "%s"
 "\n"
 "Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>.\n",
@@ -2752,10 +2747,7 @@ verbosity>0?
 	:
 	"See the manual page for details on the syntax for expressions.\n"
 	,
-	v, v, v,
-	verbosity < 1 ? "" :
-	" plambda -c \"355 113 /\"\t\t\t\tPrint an approximation of pi\n"
-		);
+	v, v);
 	return 0;
 }
 
@@ -2767,7 +2759,7 @@ static int do_man(void)
 #define MANPIPE "|man -l -"
 #endif
 	return system("help2man -N -S imscript -n \"evaluate an expression "
-				"with images as variables\" plambda" MANPIPE);
+				"with images as variables\" flambda" MANPIPE);
 }
 
 int main(int c, char **v)
