@@ -2351,9 +2351,6 @@ static int run_program_vectorially(float *out, int pdmax,
 		struct plambda_program *p,
 		float **val, int *w, int *h, int *pd)
 {
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
 	for (int j = 0; j < *h; j++)
 	for (int i = 0; i < *w; i++)
 	{
