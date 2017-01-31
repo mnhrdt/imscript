@@ -118,4 +118,4 @@ src/plambda.c: src/random.c
 
 
 test: $(BINDIR)/plambda $(BINDIR)/imprintf
-	plambda zero:512x512 "rand rand rand rand rand 5 njoin" | plambda - "split del 0 >" | imprintf "%s\n" | grep -q 130945
+	$(BINDIR)/plambda zero:512x512 "rand rand rand rand rand 5 njoin" | $(BINDIR)/plambda - "split del 0 >" | $(BINDIR)/imprintf "%s\n" | grep -q 130945
