@@ -7,9 +7,5 @@ addons:
       - libgsl0-dev
 env: CFLAGS=-std=gnu99
 script:
-  - dpkg --get-selections | grep fft
-  - dpkg -L libfftw3-dev
-  - find / 2>/dev/null | grep fftw3
-  - make bin/blur
-    #  - make
+  - make
   - make test
