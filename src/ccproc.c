@@ -422,6 +422,7 @@ void assert_consistency(int *idx, int *all, int *size, int *first, int r)
 		assert(idx[all[first[i] + j]] == i);
 }
 
+// core functoin
 int ccproc(
 		int *out_size,          // total size of each CC
 		int *out_bdsize,        // boundary size of each CC
@@ -430,7 +431,7 @@ int ccproc(
 		int *out_idx,           // image with the indices of each region
 		float *x, int w, int h, // input image
 		float_equivalence_relation_t eq
-	  )
+	)
 {
 	// pre-setup
 	if (!eq)
@@ -477,6 +478,32 @@ int ccproc(
 	free(tmpi);
 	return r;
 }
+
+int ccproc_mini(
+	int *o_size, int *o_bdsize, int *o_all, int *o_first, int *o_idx,
+	float *x, int w, int h, float_equivalence_relation_t eq)
+{
+	if (!eq)
+		eq = floatnan_equality;
+	int rep[w*h];
+	int r = compute_representatives(rep, x, w, h, eq);
+	int pos[2*r];
+	int idx[w*h];
+	compute_pos_and_idx(pos, idx, rep, w, h, r);
+	reverse_indexes(o_all, idx, rep, w*h);
+	for (int i = 0; i < r; i++)
+		o_size[i] = pos[2*i + 0];
+	for (int i = 0; i < w*h; i++)
+		o_idx[i] = idx[rep[i]];
+	o_first[0] = 0;
+	int cx = 1;
+	for (int i = 1; i < w*h; i++)
+		if (rep[o_all[i-1]] != rep[o_all[i]])
+			o_first[cx++] = i;
+	reorder_boundaries(o_bdsize, o_idx, o_all, o_first, o_size, w, h, r);
+	return r;
+}
+
 
 #ifdef MAIN_BDFOLLOW
 #include "iio.h"

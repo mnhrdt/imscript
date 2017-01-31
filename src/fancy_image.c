@@ -9,7 +9,15 @@
 #include "fancy_image.h"
 
 #include "iio.h"
+
+#define FANCY_TIFF
+
+#ifdef FANCY_TIFF
 #include "tiff_octaves_rw.c"
+#endif//FANCY_TIFF
+
+#ifdef FANCY_GDAL
+#endif//FANCY_GDAL
 
 // the following struct is an implementation detail,
 // it is only used on this file
@@ -34,11 +42,13 @@ struct FI {
 
 	// implementation details
 	bool tiffo;
+#ifdef FANCY_TIFF
 	struct tiff_octaves t[1];
 	float *x, *pyr_x[MAX_OCTAVES];
 	int pyr_w[MAX_OCTAVES], pyr_h[MAX_OCTAVES];
 	bool x_changed;
 	char x_filename[FILENAME_MAX];
+#endif
 
 	bool gdal;
 #ifdef FANCY_GDAL

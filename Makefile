@@ -10,8 +10,8 @@ CFLAGS = $(WFLAGS)
 CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE -fopenmp
 CFLAGS = $(WFLAGS) -O3 -DNDEBUG
 CFLAGS = $(WFLAGS) -g -DIIO_SHOW_DEBUG_MESSAGES
-CFLAGS = $(WFLAGS) -g
 CFLAGS = $(WFLAGS) -O3 -march=native
+CFLAGS = $(WFLAGS) -g
 CFLAGS = $(WFLAGS) -O3 -march=native -DNDEBUG
 
 SRCDIR = src
@@ -118,3 +118,9 @@ zip: clean
 include src/dependencies
 
 src/plambda.c: src/random.c
+
+
+
+
+test: $(BINDIR)/plambda $(BINDIR)/imprintf
+	plambda zero:512x512 "rand rand rand rand rand 5 njoin" | plambda - "split del 0 >" | imprintf "%s\n" | grep -q 130945
