@@ -5,6 +5,7 @@ addons.apt.packages:
   - libgsl0-dev
 env: CFLAGS=-std=gnu99
 script:
-  - find / | grep fftw3
+  - find / 2>/dev/null | grep fftw3
+  - make blur
   - make
   - make test
