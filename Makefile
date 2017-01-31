@@ -6,13 +6,8 @@ WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wstrict-prototypes -Wno-unused -Wno-p
 WFLAGS = -pedantic -Wall -Wextra -Wshadow -Wstrict-prototypes -Wno-unused -Wno-sign-compare
 WFLAGS=
 
-CFLAGS = $(WFLAGS)
-CFLAGS = $(WFLAGS) -g -rdynamic -DDOTRACE -fopenmp
-CFLAGS = $(WFLAGS) -O3 -DNDEBUG
-CFLAGS = $(WFLAGS) -g -DIIO_SHOW_DEBUG_MESSAGES
-CFLAGS = $(WFLAGS) -O3 -march=native
-CFLAGS = $(WFLAGS) -g
-CFLAGS = $(WFLAGS) -O3 -march=native -DNDEBUG
+OFLAGS = $(WFLAGS)
+OFLAGS = -march=native -O3
 
 SRCDIR = src
 BINDIR = bin

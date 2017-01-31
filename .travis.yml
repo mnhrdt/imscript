@@ -1,5 +1,6 @@
 dist: trusty
 language: c
+env: CFLAGS=-std=gnu99
 script:
   - make
   - make test
