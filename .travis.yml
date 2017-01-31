@@ -1,5 +1,9 @@
 dist: trusty
 language: c
+addons.apt.packages:
+  - libfftw3-dev
+  - libgsl0-dev
 env: CFLAGS=-std=gnu99
 script:
+  - make
   - make test
