@@ -1,11 +1,18 @@
-dist: trusty
 language: c
-addons:
-  apt:
-    packages:
-      - libfftw3-dev
-      - libgsl0-dev
 env: CFLAGS=-std=gnu99
+
+#addons:
+#  apt:
+#    packages:
+#      - libfftw3-dev
+#      - libgsl0-dev
+
+matrix:
+  include:
+    - os: linux
+      dist: trusty
+    - os: osx
+
 script:
-  - make
+#  - make
   - make test
