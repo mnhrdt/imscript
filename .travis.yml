@@ -10,7 +10,6 @@ env: CFLAGS=-std=gnu99
 matrix:
   include:
     - os: linux
-      dist: trusty
     - os: osx
 
 script:
