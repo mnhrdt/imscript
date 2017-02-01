@@ -27,7 +27,7 @@ uint32_t lcg_knuth_rand(void)
 {
 	lcg_knuth_seed *= 6364136223846793005;
 	lcg_knuth_seed += 1442695040888963407;
-	return lcg_knuth_seed >> 33;
+	return lcg_knuth_seed >> 32;
 }
 
 
