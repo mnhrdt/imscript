@@ -395,7 +395,7 @@ static void complex_exp(float *y, float *x)
 
 #ifdef __STDC_IEC_559_COMPLEX__
 #define REGISTERC(f) static void complex_ ## f(float *y, float *x) {\
-	*(complex float *)y = f(*(complex float *)y); }
+	*(complex float *)y = f(*(complex float *)x); }
 REGISTERC(cacos)
 REGISTERC(cacosh)
 REGISTERC(casin)
@@ -667,6 +667,7 @@ static int vector_norm(float *r, float *a, int n)
 // instance of "univector_function"
 static int vector_dimension(float *r, float *a, int n)
 {
+	(void)a;
 	*r = n;
 	return 1;
 }
@@ -941,14 +942,12 @@ struct image_stats {
 	bool init_simple, init_vsimple, init_ordered, init_vordered;
 	float scalar_min, scalar_max, scalar_avg, scalar_med, scalar_sum;
 	float scalar_std;
-	//float vector_cmin[PLAMBDA_MAX_PIXELDIM];  // component-wise min
-	float vector_n1min[PLAMBDA_MAX_PIXELDIM]; // exemplar with min L1
+	//float vector_n1min[PLAMBDA_MAX_PIXELDIM]; // exemplar with min L1
 	float vector_n2min[PLAMBDA_MAX_PIXELDIM]; // exemplar with min L2
-	float vector_nimin[PLAMBDA_MAX_PIXELDIM]; // exemplar with min Linf
-	//float vector_cmax[PLAMBDA_MAX_PIXELDIM];
-	float vector_n1max[PLAMBDA_MAX_PIXELDIM];
+	//float vector_nimin[PLAMBDA_MAX_PIXELDIM]; // exemplar with min Linf
+	//float vector_n1max[PLAMBDA_MAX_PIXELDIM];
 	float vector_n2max[PLAMBDA_MAX_PIXELDIM];
-	float vector_nimax[PLAMBDA_MAX_PIXELDIM];
+	//float vector_nimax[PLAMBDA_MAX_PIXELDIM];
 	float vector_avg[PLAMBDA_MAX_PIXELDIM];
 	float vector_med[PLAMBDA_MAX_PIXELDIM];
 	float vector_sum[PLAMBDA_MAX_PIXELDIM];
@@ -960,7 +959,52 @@ struct image_stats {
 	float component_sum[PLAMBDA_MAX_PIXELDIM];
 	float component_std[PLAMBDA_MAX_PIXELDIM];
 	float *sorted_samples, *sorted_components[PLAMBDA_MAX_PIXELDIM];
+
+	// original image data, for debugging purposes
+	int w, h, pd;
+	float *x;
 };
+
+// silly function to print the components of a vector to stderr
+//static int devec(float *x, int n)
+//{
+//	for (int i = 0; i < n; i++)
+//		fprintf(stderr, "%g%s", x[i], i==n-1?"":", ");
+//}
+//
+//TODO: make a reasonable way to call this debugging function
+//static void print_image_stats_to_stderr(struct image_stats *s)
+//{
+//	int n = s->pd;
+//	fprintf(stderr, "image [%dx%d,%d] (%p) stats %p\n", s->w, s->h, n,
+//			(void*)s->x, (void*)s);
+//	if (s->init_simple) {
+//		fprintf(stderr, "\tscalar_min = %g\n", s->scalar_min);
+//		fprintf(stderr, "\tscalar_max = %g\n", s->scalar_min);
+//		fprintf(stderr, "\tscalar_avg = %g\n", s->scalar_min);
+//		fprintf(stderr, "\tscalar_sum = %g\n", s->scalar_min);
+//		fprintf(stderr, "\tscalar_std = %g\n", s->scalar_min);
+//	}
+//	if (s->init_ordered) {
+//		fprintf(stderr, "\tscalar_med = %g\n", s->scalar_med);
+//	}
+//	if (s->init_vsimple) {
+//		fprintf(stderr,"\tvector_sum = "); devec(s->vector_sum,n);
+//		fprintf(stderr,"\tvector_avg = "); devec(s->vector_avg,n);
+//		fprintf(stderr,"\tvector_n2min = "); devec(s->vector_n2min,n);
+//		fprintf(stderr,"\tvector_n2max = "); devec(s->vector_n2max,n);
+//	}
+//	if (s->init_csimple) {
+//		fprintf(stderr,"\tcomponent_min = "); devec(s->component_min,n);
+//		fprintf(stderr,"\tcomponent_max = "); devec(s->component_max,n);
+//		fprintf(stderr,"\tcomponent_avg = "); devec(s->component_avg,n);
+//		fprintf(stderr,"\tcomponent_sum = "); devec(s->component_sum,n);
+//		fprintf(stderr,"\tcomponent_std = "); devec(s->component_std,n);
+//	}
+//	if (s->init_cordered) {
+//		fprintf(stderr,"\tcomponent_med = "); devec(s->component_med,n);
+//	}
+//}
 
 struct linear_statistics {
 	float min, max, avg, avgnz, sum, std;
@@ -1149,6 +1193,7 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 			t[i].init_vordered = false;
 			t[i].init_csimple = false;
 			t[i].init_cordered = false;
+			t[i].w=w;t[i].h=h;t[i].pd=pd;t[i].x=x; // for debug only
 		}
 		initt = true;
 	}
@@ -1654,6 +1699,7 @@ static const char *arity(struct predefined_function *f)
 	}
 }
 
+inline
 static void print_compiled_program(struct plambda_program *p)
 {
 	fprintf(stderr, "COMPILED PROGRAM OF %d TOKENS:\n", p->n);

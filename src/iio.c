@@ -31,6 +31,7 @@
 #define I_CAN_HAS_LIBTIFF
 //#define I_CAN_HAS_LIBEXR
 #define I_CAN_HAS_WGET
+//#define I_CAN_HAS_WHATEVER
 //#define I_CAN_KEEP_TMP_FILES
 
 
@@ -2756,7 +2757,7 @@ static int read_beheaded_raw(struct iio_image *x,
 
 //static int read_image(struct iio_image*, const char *);
 static int read_image_f(struct iio_image*, FILE *);
-inline
+#ifdef I_CAN_HAS_WHATEVER
 static int read_beheaded_whatever(struct iio_image *x,
 	       	FILE *fin, char *header, int nheader)
 {
@@ -2786,6 +2787,7 @@ static int read_beheaded_whatever(struct iio_image *x,
 
 	return r;
 }
+#endif
 
 
 // RAW PHOTO reader                                                               {{{2

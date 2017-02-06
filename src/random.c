@@ -41,17 +41,17 @@ static int xrand(void)
 	return lcg_knuth_rand();
 }
 
-static double random_raw(void)
+double random_raw(void)
 {
 	return xrand();
 }
 
-static double random_uniform(void)
+double random_uniform(void)
 {
 	return lcg_knuth_rand()/(0.0+UINT_MAX);
 }
 
-static double random_ramp(void)
+double random_ramp(void)
 {
 	double x1 = random_uniform();
 	double x2 = random_uniform();
@@ -64,7 +64,7 @@ static double random_ramp(void)
 #define M_PI 3.14159265358979323846264338328
 #endif
 
-static double random_normal(void)
+double random_normal(void)
 {
 	double x1 = random_uniform();
 	double x2 = random_uniform();
@@ -82,7 +82,7 @@ int randombounds(int a, int b)
 	return a + lcg_knuth_rand() % (b - a + 1);
 }
 
-static double random_laplace(void)
+double random_laplace(void)
 {
 	double x = random_uniform();
 	double y = random_uniform();
@@ -90,7 +90,7 @@ static double random_laplace(void)
 	return isfinite(r)?r:0;
 }
 
-static double random_cauchy(void)
+double random_cauchy(void)
 {
 	double x1 = random_uniform();
 	double x2 = random_uniform();
@@ -100,7 +100,7 @@ static double random_cauchy(void)
 	return isfinite(r)?r:0;
 }
 
-static double random_exponential(void)
+double random_exponential(void)
 {
 	//double u = random_uniform();
 	//double r = -log(1-u);
@@ -108,7 +108,7 @@ static double random_exponential(void)
 	return fabs(random_laplace());
 }
 
-static double random_pareto(void)
+double random_pareto(void)
 {
 	return exp(random_exponential());
 }
@@ -123,7 +123,7 @@ static double random_pareto(void)
 //
 // Observation: the algorithm is numerically imprecise when alpha approaches 1.
 // TODO: implement appropriate rearrangements as suggested in the article.
-static double random_stable(double alpha, double beta)
+double random_stable(double alpha, double beta)
 {
 	double U = (random_uniform() - 0.5) * M_PI;
 	double W = random_exponential();

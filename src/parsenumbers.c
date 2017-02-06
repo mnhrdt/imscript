@@ -7,7 +7,7 @@
 // utility function: parse floats from a text file
 // returns a pointer to a malloc'ed array of the parsed floats
 // fills *no with the number of floats
-static float *read_ascii_floats(FILE *f, int *no)
+inline static float *read_ascii_floats(FILE *f, int *no)
 {
 	int r, n = 0, nt = 0;
 	float *t = NULL;
@@ -29,7 +29,7 @@ static float *read_ascii_floats(FILE *f, int *no)
 // utility function: parse doubles from a text file
 // returns a pointer to a malloc'ed array of the parsed doubles
 // fills *no with the number of doubles
-static double *read_ascii_doubles(FILE *f, int *no)
+inline static double *read_ascii_doubles(FILE *f, int *no)
 {
 	int r, n = 0, nt = 0;
 	double *t = NULL;
@@ -48,6 +48,7 @@ static double *read_ascii_doubles(FILE *f, int *no)
 	return t;
 }
 
+inline
 static double *read_ascii_doubles_fn(const char *fname, int *no)
 {
 	FILE *f = fopen(fname, "r");
@@ -79,6 +80,7 @@ static double *read_ascii_doubles_fn(const char *fname, int *no)
 //	return t;
 //}
 
+inline
 static int parse_doubles(double *t, int nmax, const char *s)
 {
 	int i = 0, w;
@@ -89,6 +91,7 @@ static int parse_doubles(double *t, int nmax, const char *s)
 	return i;
 }
 
+inline
 static int parse_floats(float *t, int nmax, const char *s)
 {
 	int i = 0, w;
@@ -99,6 +102,7 @@ static int parse_floats(float *t, int nmax, const char *s)
 	return i;
 }
 
+inline
 static float *alloc_parse_floats2(int nmax, const char *s, int *n)
 {
 	if (!nmax) nmax = strlen(s);
@@ -114,6 +118,7 @@ static float *alloc_parse_floats2(int nmax, const char *s, int *n)
 	return r;
 }
 
+inline
 static float *alloc_parse_floats(int nmax, const char *ss, int *n)
 {
 	// add a space to s, so that gabriele's expression works as intended
@@ -136,6 +141,7 @@ static float *alloc_parse_floats(int nmax, const char *ss, int *n)
 	return r;
 }
 
+inline
 static double *alloc_parse_doubles(int nmax, const char *ss, int *n)
 {
 	// add a space to s, so that gabriele's expression works as intended
@@ -160,6 +166,7 @@ static double *alloc_parse_doubles(int nmax, const char *ss, int *n)
 // or the name of a file containing a list of ascii numbers.
 // In case of failure, unread numbers are set to zero.
 // Returns the number of read numbers.
+inline
 static int read_n_doubles_from_string(double *out, char *string, int n)
 {
 	for (int i = 0; i < n; i++)
