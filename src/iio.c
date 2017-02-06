@@ -148,17 +148,18 @@
 #include "iio.h" // only for IIO_MAX_DIMENSION
 
 
-
 #ifdef I_CAN_HAS_LIBPNG
 // ugly "feature" in png.h forces this header to be included here
 #  include <png.h>
 #endif
 
+// portabil
+
 #if _POSIX_C_SOURCE >= 200809L
 #  define I_CAN_HAS_FMEMOPEN 1
 #endif
 
-#if _POSIX_C_SOURCE >= 200112L || __OpenBSD__ || __OSX__
+#if _POSIX_C_SOURCE >= 200112L || __OpenBSD__ || __APPLE__
 #  define I_CAN_HAS_MKSTEMP 1
 #endif
 
