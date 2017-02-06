@@ -3035,10 +3035,8 @@ static void iio_save_image_as_csv(const char *filename, struct iio_image *x)
 	FILE *f = xfopen(filename, "w");
 	int w = x->sizes[0];
 	int h = x->sizes[1];
-	int d = x->sizes[2];
-	int pd = x->pixel_dimension;
-	assert(d == 1);
-	assert(pd == 1);
+	assert(x->sizes[2] == 1);
+	assert(x->pixel_dimension == 1);
 	assert(x->type == IIO_TYPE_FLOAT);
 	float *t = x->data;
 	for (int i = 0; i < w*h; i++)
