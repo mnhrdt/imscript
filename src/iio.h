@@ -1,7 +1,7 @@
 #ifndef _IIO_H
 #define _IIO_H
 
-//#include <stddef.h>
+#include <stdint.h>
 #include <stdbool.h>
 
 
@@ -123,14 +123,6 @@ void *iio_read_nd_image_as_desired(char *fname,
 
 
 
-
-// versions of the API using FILE*
-// ...
-
-// rest of the API: chars and ints
-// ...
-
-
 #ifdef UINT8_MAX
 
 // basic byte API (returns a freeable pointer)
@@ -163,105 +155,11 @@ uint8_t (**iio_read_image_uint8_matrix_rgba(const char *fnam, int *w, int *h))[4
 // stored.)
 uint8_t ***iio_read_image_uint8_matrix_vec(const char *fnam, int *w, int *h, int *pd);
 
-// _4d versions, etc
-// ...
-
 #endif//UINT8_MAX
 
 #ifdef UINT16_MAX
 uint16_t *iio_read_image_uint16_vec(const char *fname, int *w, int *h, int *pd);
 #endif//UINT16_MAX
-
-//
-// EDITABLE CONFIGURATION:
-//
-#define IIO_MAX_DIMENSION 15
-//#define IIO_ABORT_ON_ERROR true
-//
-//
-//
-
-//
-//void *iio_read_image_raw(const char *fname,
-//		int *dimension,
-//		int sizes[IIO_MAX_DIMENSION],
-//		int *pixel_dimension,
-//		size_t *sample_integer_size,
-//		size_t *sample_float_size,
-//		int *metadata_id);
-
-
-/*
-//////////////////////////////
-// LOW-LEVEL API FUNCTIONS  //
-// (using a data structure) //
-//////////////////////////////
-
-
-
-//
-// opaque structure
-//
-struct iio_image;
-
-
-
-//
-// input
-//
-
-// return an image and its data into a single memory block
-struct iio_image *iio_read_and_build_image(const char *filename);
-struct iio_image *iio_read_and_build_image_f(FILE *f);
-
-//// fill an existing iio_image with data from file
-//void iio_read_image(struct iio_image *x, const char *filename);
-//void iio_read_image_f(struct iio_image *x, FILE *F);
-//void iio_free_image_data(struct iio_image);
-
-
-
-
-//
-// output
-//
-
-
-// write an image in the format specified by its extension
-//void iio_write_image(const char *filename, struct iio_image *);
-
-// write an image in an explicitly given format
-void iio_write_image(const char *filename, struct iio_image *, int format);
-void iio_write_image_f(FILE *f, struct iio_image *, int format);
-
-
-
-//
-// query
-//
-
-int iio_image_get_dimension(struct iio_image *x);
-int *iio_image_get_sizes(struct iio_image *x);
-int iio_image_get_type(struct iio_image *x);
-int iio_image_get_pixel_dimension(struct iio_image *x);
-int iio_image_get_meta(struct iio_image *x);
-int iio_image_get_layout(struct iio_image *x);
-int iio_image_get_format(struct iio_image *x);
-void *iio_image_get_data(struct iio_image *x);
-
-
-//
-// constructor
-//
-
-struct iio_image *iio_image_build(int dimension, int *sizes,
-		int type, int pixel_dimension, void *data);
-*/
-
-
-
-
-#include <stdint.h>
 
 void iio_save_image_float_vec(char *filename, float *x, int w, int h, int pd);
 void iio_save_image_float_split(char *filename, float *x, int w, int h, int pd);
@@ -283,20 +181,6 @@ void iio_save_image_uint8_matrix(char *f, unsigned char **x, int w, int h);
 // (w, h; 1 float) => tiff, pfm
 // (w, h; 3 float) => tiff, pfm
 
-//
-// EDITABLE CONFIGURATION:
-//
-//
-
-#define I_CAN_HAS_LIBPNG
-#define I_CAN_HAS_LIBJPEG
-#define I_CAN_HAS_LIBTIFF
-//#define I_CAN_HAS_LIBEXR
-#define I_CAN_HAS_WGET
-
-#define I_CAN_KEEP_TMP_FILES
-#define I_CAN_HAS_LINUX
-#define I_CAN_POSIX
-
+#define IIO_MAX_DIMENSION 20
 
 #endif//_IIO_H
