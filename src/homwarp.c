@@ -29,17 +29,37 @@ static double invert_homography(double invH[9], double H[9])
 	return det;
 }
 
+
 #include <math.h>
 #include "bicubic_gray.c"
+#include "bilinear_interpolation.c"
 
-void homwarp(float *X, int W, int H, double M[9], float *x, int w, int h)
+static
+float nearest_neighbor_interpolator(float *x, int w, int h, float p, float q)
 {
+	int ip = round(p);
+	int iq = round(q);
+	if (ip < 0) p = 0;
+	if (iq < 0) q = 0;
+	if (ip >= w) p = w - 1;
+	if (iq >= h) q = h - 1;
+	return x[w*iq+ip];
+}
+
+typedef float (*gray_interpolator_t)(float *,int,int,float,float);
+
+void homwarp(float *X, int W, int H, double M[9], float *x, int w, int h, int o)
+{
+	gray_interpolator_t u = bicubic_interpolation_gray;
+	if (o == 0) u = nearest_neighbor_interpolator;
+	if (o == 2) u = bilinear_interpolation_at;
+
 	for (int j = 0; j < H; j++)
 	for (int i = 0; i < W; i++)
 	{
 		double p[2] = {i, j}, Mp[2];
 		apply_homography(Mp, M, p);
-		X[j*W+i] = bicubic_interpolation_gray(x, w, h, Mp[0], Mp[1]);
+		X[j*W+i] = u(x, w, h, Mp[0], Mp[1]);
 	}
 }
 
@@ -51,9 +71,10 @@ void homwarp(float *X, int W, int H, double M[9], float *x, int w, int h)
 #include "pickopt.c"
 int main(int c, char *v[])
 {
+	int order = atoi(pick_option(&c, &v, "i", "3"));
 	if (c < 4 || c > 6)
 		return fprintf(stderr, "usage:\n\t"
-				"%s [-i {0|1|2|3}] hom w h [in [out]]\n", *v);
+				"%s [-i {0|2|3}] hom w h [in [out]]\n", *v);
 		//                0                1   2 3  4   5
 	double H[9];
 	read_n_doubles_from_string(H, v[1], 9);
@@ -67,7 +88,7 @@ int main(int c, char *v[])
 	float *y = xmalloc(ow * oh * pd * sizeof*y);
 
 	for (int i = 0; i < pd; i++)
-		homwarp(y + i*ow*oh, ow, oh, H, x + i*w*h, w, h);
+		homwarp(y + i*ow*oh, ow, oh, H, x + i*w*h, w, h, order);
 
 	iio_save_image_float_split(filename_out, y, ow, oh, pd);
 	return 0;
