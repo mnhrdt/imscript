@@ -1,5 +1,4 @@
 language: c
-env: CFLAGS=-std=gnu99
 
 #addons:
 #  apt:
