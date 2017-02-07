@@ -39,10 +39,10 @@ float nearest_neighbor_interpolator(float *x, int w, int h, float p, float q)
 {
 	int ip = round(p);
 	int iq = round(q);
-	if (ip < 0) p = 0;
-	if (iq < 0) q = 0;
-	if (ip >= w) p = w - 1;
-	if (iq >= h) q = h - 1;
+	if (ip < 0) ip = 0;
+	if (iq < 0) iq = 0;
+	if (ip >= w) ip = w - 1;
+	if (iq >= h) iq = h - 1;
 	return x[w*iq+ip];
 }
 
