@@ -9,26 +9,6 @@ static void apply_homography(double y[2], double H[9], double x[2])
 	y[1] = Y / Z;
 }
 
-// compute the inverse homography (inverse of a 3x3 matrix)
-static double invert_homography(double invH[9], double H[9])
-{
-	// 0 1 2
-	// 3 4 5
-	// 6 7 8
-	double det = H[0]*H[4]*H[8] + H[2]*H[3]*H[7] + H[1]*H[5]*H[6]
-		   - H[2]*H[4]*H[6] - H[1]*H[3]*H[8] - H[0]*H[5]*H[7];
-	invH[0] = ( H[4] * H[8] - H[5] * H[7] ) / det;
-	invH[1] = ( H[2] * H[7] - H[1] * H[8] ) / det;
-	invH[2] = ( H[1] * H[5] - H[2] * H[4] ) / det;
-	invH[3] = ( H[5] * H[6] - H[3] * H[8] ) / det;
-	invH[4] = ( H[0] * H[8] - H[2] * H[6] ) / det;
-	invH[5] = ( H[2] * H[3] - H[0] * H[5] ) / det;
-	invH[6] = ( H[3] * H[7] - H[4] * H[6] ) / det;
-	invH[7] = ( H[1] * H[6] - H[0] * H[7] ) / det;
-	invH[8] = ( H[0] * H[4] - H[1] * H[3] ) / det;
-	return det;
-}
-
 
 #include <math.h>
 #include "bilinear_interpolation.c"
@@ -50,7 +30,8 @@ float nearest_neighbor_interpolator(float *x, int w, int h, float p, float q)
 
 typedef float (*gray_interpolator_t)(float *,int,int,float,float);
 
-void shomwarp(float *X, int W, int H, double M[9], float *x,
+
+int homwarp(float *X, int W, int H, double M[9], float *x,
 		int w, int h, int o)
 {
 	gray_interpolator_t u = bicubic_interpolation_gray;
@@ -62,25 +43,37 @@ void shomwarp(float *X, int W, int H, double M[9], float *x,
 	for (int i = 0; i < W; i++)
 	{
 		double p[2] = {i, j}, Mp[2];
-		apply_homography(Mp, M, p);
-		X[j*W+i] = u(x, w, h, Mp[0], Mp[1]);
+		apply_homography(p, M, p);
+		X[j*W+i] = u(x, w, h, p[0], p[1]);
 	}
+
+	return 0;
 }
 
-void homwarp(float *X, int W, int H, double M[9], float *x,
+int shomwarp(float *X, int W, int H, double M[9], float *x,
 		int w, int h, int o)
 {
-	gray_interpolator_t u = bicubic_interpolation_gray;
-	if (o == 0) u = nearest_neighbor_interpolator;
-	if (o == 2) u = bilinear_interpolation_at;
+	// if low order-interpolation, evaluate right away
+	if (o == 0 || o == 1 || o == 2 || o == -3)
+		return homwarp(X, W, H, M, x, w, h, o);
 
+	// otherwise, pre-filtering is required
+	bool r = prepare_spline(x, w, h, 1, o);
+	if (!r) return 2;
+
+	// warp the points
 	for (int j = 0; j < H; j++)
 	for (int i = 0; i < W; i++)
 	{
-		double p[2] = {i, j}, Mp[2];
-		apply_homography(Mp, M, p);
-		X[j*W+i] = u(x, w, h, Mp[0], Mp[1]);
+		double p[2] = {i, j};
+		apply_homography(p, M, p);
+		p[0] += 0.5; // solve a mis-alignement convention
+		p[1] += 0.5;
+		float *out = X + (j*W + i);
+		evaluate_spline_at(out, x, w, h, 1, o, p[0], p[1]);
 	}
+
+	return 0;
 }
 
 #include <stdio.h>
@@ -107,9 +100,10 @@ int main(int c, char *v[])
 	float *x = iio_read_image_float_split(filename_in, &w, &h, &pd);
 	float *y = xmalloc(ow * oh * pd * sizeof*y);
 
+	int r = 0;
 	for (int i = 0; i < pd; i++)
-		shomwarp(y + i*ow*oh, ow, oh, H, x + i*w*h, w, h, order);
+		r += shomwarp(y + i*ow*oh, ow, oh, H, x + i*w*h, w, h, order);
 
 	iio_save_image_float_split(filename_out, y, ow, oh, pd);
-	return 0;
+	return r;
 }
