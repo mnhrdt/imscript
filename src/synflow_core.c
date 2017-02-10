@@ -1,7 +1,7 @@
 // this is common code for the "synflow" and "paraflow" programs
 
 
-
+#include "fail.c"
 #include "getpixel.c"
 #include "marching_interpolation.c"
 
@@ -32,7 +32,7 @@ static float interpolate_cell(float a, float b, float c, float d,
 	case 0: return interpolate_nearest(a, b, c, d, x, y);
 	case 1: return marchi(a, b, c, d, x, y);
 	case 2: return interpolate_bilinear(a, b, c, d, x, y);
-	default: error("caca de vaca");
+	default: fail("caca de vaca");
 	}
 	//return -1;
 }
@@ -364,7 +364,7 @@ static double produce_homography(double H[9], int w, int h,
 		homography_from_eight_points(R, a[0], a[1], a[2], a[3],
 				b[0], b[1], b[2], b[3]);
 		FORI(9) H[i] = R[i/3][i%3];
-	} else error("unrecognized homography type \"%s\"", homtype);
+	} else fail("unrecognized homography type \"%s\"", homtype);
 	return 0;
 }
 
@@ -481,7 +481,7 @@ static double produce_affinity(double A[6], int w, int h,
 			0, scale, (1-scale)*H/2.0
 		};
 		FORI(6) A[i] = R[i];
-	} else error("unrecognized affinity type \"%s\"", afftype);
+	} else fail("unrecognized affinity type \"%s\"", afftype);
 	return 0;
 }
 
@@ -501,7 +501,7 @@ static double produce_radial_model(double A[3], double iA[3], int w, int h,
 		double p = v[2];
 		double a = p*w/100.0;
 		A[2] = (8*a)/(1.0*w*w*w);
-	} else error("non-raw radial model not yet supported");
+	} else fail("non-raw radial model not yet supported");
 	if (A[2] < 0) {
 		// TODO: some more fine-grained warnings about warping
 		double a = -A[2];
@@ -532,7 +532,7 @@ static double produce_iradial_model(double A[3], double iA[3], int w, int h,
 		double p = v[2];
 		double a = p*w/100.0;
 		A[2] = (8*a)/(1.0*w*w*w);
-	} else error("non-raw radial model not yet supported");
+	} else fail("non-raw radial model not yet supported");
 	return 0;
 }
 
@@ -663,7 +663,7 @@ static int parse_flow_name(int *vp, int *hidden_id, char *model_name)
 		}
 		i = i + 1;
 	}
-	error("unrecognized transform name %s", model_name);
+	fail("unrecognized transform name %s", model_name);
 	//return 0;
 }
 
@@ -681,7 +681,7 @@ static void produce_flow_model(struct flow_model *f,
 	int vp;
 	f->nh = parse_flow_name(&vp, &f->hidden_id, name);
 	if (vp != np)
-		error("flow model \"%s\" expects %d parameters but got %d",
+		fail("flow model \"%s\" expects %d parameters but got %d",
 				name, vp, np);
 	f->model_name = name;
 	f->w = w;
@@ -728,7 +728,7 @@ static void produce_flow_model(struct flow_model *f,
 	//	produce_icombi2_model(H, invH, w, h, f->model_name, f->p);
 	//	FORI(15) f->H[i] = H[i];
 	//	FORI(15) f->iH[i] = invH[i];
-	} else error("flow model \"%s\" not yet implemented", name);
+	} else fail("flow model \"%s\" not yet implemented", name);
 
 	if (SYNFLOW_VERBOSE()) {
 		FORI(np) fprintf(stderr, "pfm p[%d] = %g\n", i, f->p[i]);
@@ -808,7 +808,7 @@ static void apply_flow(float y[2], struct flow_model *f, float x[2], bool inv)
 		apply_flowmodel_pradial(y, tmp2, f->H + 12, !inv);
 		break;
 				      }
-	default: error("bizarre");
+	default: fail("bizarre");
 	}
 }
 

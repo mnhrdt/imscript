@@ -6,7 +6,6 @@
 
 #include "iio.h"
 
-#include "fragments.c"
 #include "statistics.c"
 
 static void printvals(float *x, int n)

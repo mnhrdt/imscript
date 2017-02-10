@@ -5,6 +5,7 @@
 #include "fail.c"
 #include "xmalloc.c"
 #include "xfopen.c"
+#include "random.c"
 
 // generic function
 // evaluate the error of a datapoint according to a model
@@ -72,7 +73,7 @@ int ransac_trial(
 // utility function: return a random number in the interval [a, b)
 static int random_index(int a, int b)
 {
-	int r = a + rand()%(b - a);
+	int r = a + lcg_knuth_rand()%(b - a);
 	assert(r >= a);
 	assert(r < b);
 	return r;
@@ -95,15 +96,6 @@ static bool are_different(int *t, int n)
 		if (t[i-1] == t[i])
 			return false;
 	return true;
-}
-
-static int randombounds(int a, int b)
-{
-	if (b < a)
-		fail("the interval [%d, %d] is empty!", a, b);
-	if (b == a)
-		return b;
-	return a + rand()%(b - a + 1);
 }
 
 static void swap(void *a, void *b, size_t s)
@@ -218,6 +210,8 @@ int ransac(
 	fprintf(stderr, "a model must have more than %d inliers\n",
 			min_inliers);
 
+	if (n < nfit)
+	  return 0;
 	int best_ninliers = 0;
 	float best_model[modeldim];
 	bool *best_mask = xmalloc(n * sizeof*best_mask);

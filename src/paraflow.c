@@ -16,7 +16,7 @@
 #define FORJ(n) for(int j=0;j<(n);j++)
 #define FORL(n) for(int l=0;l<(n);l++)
 
-#include "fragments.c"
+#include "fail.c"
 #include "statistics.c"
 
 
@@ -388,7 +388,7 @@ static double error_at_pcpoints(float *xx, float *yy, int w, int h, int pd,
 			m += 1;
 		}
 	}
-	if (!m) error("could not evaluate error at any of the given points!");
+	if (!m) fail("could not evaluate error at any of the given points!");
 	return r/m;
 }
 
@@ -405,8 +405,8 @@ static double error_at_points(float *xx, float *yy, int w, int h, int pd,
 			m += 1;
 		}
 	}
-	if (m != 8) error("m != 8 (%d)", m);
-	if (!m) error("could not evaluate error at any of the given points!");
+	if (m != 8) fail("m != 8 (%d)", m);
+	if (!m) fail("could not evaluate error at any of the given points!");
 	return r/m;
 }
 
@@ -501,8 +501,8 @@ static double evaluate_error_between_images(float *xx, float *yy,
 	} else if (0 == strcmp(error_id, "kendall")) {
 		r = kendall(xvals, yvals, nvals);
 		r = fabs(r);
-		error("kendall computation too slow!");
-	} else error("bad error id \"%s\"", error_id);
+		fail("kendall computation too slow!");
+	} else fail("bad error id \"%s\"", error_id);
 	//struct statistics_float s;
 	//statistics_getf(&s, d, n);
 	//print_stats(stderr, &s, "fabs(diff)");
@@ -580,7 +580,7 @@ int main(int c, char *v[])
 	float *x = iio_read_image_float_vec(v[1], &wx, &hx, &pdx);
 	float *y = iio_read_image_float_vec(v[2], &wy, &hy, &pdy);
 	if (wx != wy || hx != hy || pdx != pdy)
-		error("input size mismatch");
+		fail("input size mismatch");
 
 	int maxparam = 40;
 	double param[maxparam];

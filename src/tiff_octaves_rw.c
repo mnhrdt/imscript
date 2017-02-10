@@ -596,13 +596,6 @@ void tiff_octaves_free(struct tiff_octaves *t)
 	xfree(t->changed);
 }
 
-static int bound(int a, int x, int b)
-{
-	if (x < a) x = a;
-	if (x > b) x = b;
-	return x;
-}
-
 
 static void free_oldest_tile_octave(struct tiff_octaves *t)
 {
