@@ -1,0 +1,310 @@
+INTEGRAGION ISSUES WITH SINGLE-FILE C PROGRAMS
+==============================================
+
+
+THE PROBLEM
+-----------
+
+
+It is beautiful when a program is written in a single file.
+You send this file, people get your program.
+
+Thus, the source code for program "foo" is contained on file "foo.c".
+
+        // foo.c
+
+        void foo(...)
+        {
+                // compute foo and stuff
+        }
+
+        int main(int c, char *v[])
+        {
+                ... = get_arguments(c, v);
+                foo(...);
+                return 0;
+        }
+
+To compile this file, you run "cc foo.c -o foo".
+
+In an ideal world---in UNIX heaven---this would be the end of it.  The program
+"foo", whose source code is on file "foo.c", does one thing and does it well.
+
+However, in some situations you may want to call the function "foo()" directly
+from another program, without writing files to transfer the information.  This
+happens a lot, for example, in image processing, where images are huge arrays
+of numbers that you do not want to write and read to files between each step of
+the computation.
+
+Thus, there are a few things that we actually want to do with "foo.c"
+
+1. Compile a command-line program "foo" that reads and writes files (stdin and
+stdout by default), and performs the computation.  This program is compiled by
+running "cc foo.c -o foo".
+
+2. Use the C function "foo()" from program "bar.c".  There are two
+possibilities for that:
+
+2.1. #include "foo.c" inside "bar.c", from where you call the function "foo()".
+
+2.2. Compile "foo.o" and "bar.o" separately and then link them together.
+Each program is compiled using "cc -c".
+
+3. Create a single, static executable containing all the "foo" and "bar" and
+other programs accessible à la busybox.
+
+Obviously, this cannot be so simple, because when compiling each program with
+"-c", the "main()" function appears inside any object, and then you cannot link
+them together.
+
+How can we solve this problem?
+
+
+BASIC IDEA OF THE SOLUTIONS
+---------------------------
+
+Since it is impossible to distinguish, from within the C code, whether the
+compiler was called with or without the "-c" option, we need to use macros to
+help the compiler.  The different solutions correspond to what is the default
+behaviour when no macros are given.
+
+
+
+FIRST SOLUTION
+--------------
+
+By default, the "main()" function of each program is visible.
+
+With this solution, it is easy to create command line programs, but harder to
+call the C functions from other programs.
+
+The usage is the following:
+
+        # create command line utilities
+        cc foo.c -o foo
+        cc bar.c -o bar
+        cc baz.c -o baz
+        cc qux.c -o qux
+
+        # create linkable objects (typically not necessary)
+        cc -DOMIT_MAIN_FOO -c foo.c
+        cc -DOMIT_MAIN_BAR -c bar.c
+        cc -DOMIT_MAIN_BAZ -c baz.c
+        cc -DOMIT_MAIN_QUX -c qux.c
+
+The implementation is the following:
+
+        // foo.c
+        int foo(...)
+        {
+                ...
+        }
+        #ifndef OMIT_MAIN_FOO
+        int main(...)
+        {
+                ...
+                foo(...);
+                ...
+        }
+        #endif
+
+
+        // bar.c
+        #define OMIT_MAIN_FOO
+        #include "foo.c"
+        int bar(...)
+        {
+                ...
+                foo(...);
+                ...
+        }
+        #ifndef OMIT_MAIN_BAR
+        int main(...)
+        {
+                ...
+                bar(...);
+                ...
+        }
+        #endif
+
+
+The Makefile looks simply like this:
+
+        BIN=foo bar baz qux
+        all: $(BIN)
+        clean:
+        	$(RM) $(BIN)
+
+
+SECOND SOLUTION
+---------------
+
+By default, the "main()" function of each program is invisible.
+
+With this solution, it is easy to call the C functions, but harder to create
+independent command-line programs.
+
+The usage is the following:
+
+        # create command line utilities
+        cc -DMAIN_foo foo.c -o foo
+        cc -DMAIN_bar bar.c -o bar
+        cc -DMAIN_baz baz.c -o baz
+        cc -DMAIN_qux qux.c -o qux
+
+        # create linkable objects (typically not necessary)
+        cc -c foo.c
+        cc -c bar.c
+        cc -c baz.c
+        cc -c qux.c
+
+The implementation is the following:
+
+        // foo.c
+        int foo(...)
+        {
+                ...
+        }
+        #ifdef MAIN_foo
+        int main(...)
+        {
+                ...
+                foo(...);
+                ...
+        }
+        #endif
+
+
+        // bar.c
+        #include "foo.c"
+        int bar(...)
+        {
+                ...
+                foo(...);
+                ...
+        }
+        #ifdef MAIN_bar
+        int main(...)
+        {
+                ...
+                bar(...);
+                ...
+        }
+        #endif
+
+
+The Makefile looks like this
+
+        BIN=foo bar baz qux
+        all: $(BIN)
+        $(BIN) : % : %.c
+        	$(CC) -DMAIN_% -o $@ $^
+        clean:
+        	$(RM) $(BIN)
+
+
+
+THIRD SOLUTION
+--------------
+
+The need for a third solution arises when we want to create a single entry
+program that calls all the main functions.  In that case, we have to separate
+the "main()" symbol to its implementation.  Thus, there are three compilation
+modes.
+
+The usage is the following:
+
+        # create separate command line utilities
+        cc -DFULL_MAIN_foo foo.c -o foo
+        cc -DFULL_MAIN_bar bar.c -o bar
+        cc -DFULL_MAIN_baz baz.c -o baz
+        cc -DFULL_MAIN_qux qux.c -o qux
+
+        # create objects with linkable mains
+        cc -c -DNAMED_MAIN_foo foo.c
+        cc -c -DNAMED_MAIN_bar bar.c
+        cc -c -DNAMED_MAIN_baz baz.c
+        cc -c -DNAMED_MAIN_qux qux.c
+
+        # create single interface
+        cc main.c foo.o bar.o baz.o qux.o -o main
+
+The implementation is the following
+
+        // bar.c
+        #include "foo.c"
+        int bar(...)
+        {
+                ...
+                foo(...);
+                ...
+        }
+        #ifdef defined(NAMED_MAIN_bar) || defined(FULL_MAIN_bar)
+        int main_bar(...)
+        {
+                ...
+                bar(...);
+                ...
+        }
+        #endif
+        #ifdef FULL_MAIN_bar
+        int main(int c, char *v[]) { return main_bar(c, v); }
+        #endif
+
+        // main.c
+        int main_foo(int,char**);
+        int main_bar(int,char**);
+        int main_baz(int,char**);
+        int main_qux(int,char**);
+        #include <string.h>
+        int main(int c, char *v[])
+        {
+                if (c < 2) return 1;
+                if (!strmcmp(v[1], "foo")) return main_foo(c-1, v+1);
+                if (!strmcmp(v[1], "bar")) return main_bar(c-1, v+1);
+                if (!strmcmp(v[1], "baz")) return main_baz(c-1, v+1);
+                if (!strmcmp(v[1], "qux")) return main_qux(c-1, v+1);
+                return 2;
+        }
+
+
+The Makefile for this case looks like this:
+
+        OBJ=foo.o bar.o baz.o qux.o
+        main: $(OBJ)
+        	$(CC) main.c $^ -o $@
+        %.o : %.c
+        	$(CC) -c -DMAIN_% %.c
+        clean:
+        	$(RM) $(OBJ) main
+
+
+
+FOURTH SOLUTION
+---------------
+
+The need for a fourth solution arises when we want each program to "export"
+more than one function.
+
+
+
+GENERAL CONSIDERATIONS
+----------------------
+
+Do not use include guards; they promote sloppy coding.  You will be forced to
+be very careful of what exactly happens when you "#include" a source file.
+Being this careful is a good thing, and its sets up an appropriate mental state.
+
+All the functions that are not meant to be externally visible are marked
+static.  Typically, only one function of your program will be non-static
+besides "main()".
+
+All non-static functions should have meaningful names that do not clash.
+
+
+CONCLUSION
+----------
+
+Since we favor simple Makefiles, and we rarely need individual objects, we
+prefer the first solution.  All the complications come from the fact that we
+need to #define OMIT_MAIN_* before including any file.

@@ -8,11 +8,17 @@
 #define FORJ(n) for(int j=0;j<(n);j++)
 #define FORL(n) for(int l=0;l<(n);l++)
 
+#ifdef IIO_MAX_DIMENSION
+# define MAX_PIXELDIM IIO_MAX_DIMENSION
+#else
+# define MAX_PIXELDIM 20
+#endif
+
 struct vecstats {
 	int pd;
-	float min[IIO_MAX_DIMENSION];
-	float max[IIO_MAX_DIMENSION];
-	float avg[IIO_MAX_DIMENSION];
+	float min[MAX_PIXELDIM];
+	float max[MAX_PIXELDIM];
+	float avg[MAX_PIXELDIM];
 };
 
 static float euclidean_norm(float *x, int n)

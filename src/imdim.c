@@ -67,6 +67,12 @@ static char *typstring(int w, bool ieeefp, bool sign)
 	return "x";
 }
 
+#ifdef IIO_MAX_DIMENSION
+# define MAX_PIXELDIM IIO_MAX_DIMENSION
+#else
+# define MAX_PIXELDIM 20
+#endif
+
 int main(int c, char *v[])
 {
 	if (c != 1 && c != 2) {
@@ -79,7 +85,7 @@ int main(int c, char *v[])
 	//float *x = iio_read_image_float_vec(fname, &w, &h, &pd);
 	//printf("%d %d %d\n", w, h, pd);
 
-	int dim, siz[IIO_MAX_DIMENSION], pd, ss;
+	int dim, siz[MAX_PIXELDIM], pd, ss;
 	bool ieeefp, sgn;
 	void *x = iio_read_nd_image_as_stored(fname, &dim, siz, &pd, &ss, &ieeefp, &sgn);
 

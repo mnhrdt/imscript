@@ -31,10 +31,10 @@
 #define I_CAN_HAS_LIBTIFF
 //#define I_CAN_HAS_LIBEXR
 #define I_CAN_HAS_WGET
-//#define I_CAN_HAS_WHATEVER
+#define I_CAN_HAS_WHATEVER
 //#define I_CAN_KEEP_TMP_FILES
 
-
+#define IIO_MAX_DIMENSION 20
 
 //
 // portability macros to choose OS features
@@ -577,7 +577,7 @@ static const char *iio_strfmt(int format)
 #undef M
 }
 
-inline
+#ifdef IIO_SHOW_DEBUG_MESSAGES
 static void iio_print_image_info(FILE *f, struct iio_image *x)
 {
 	fprintf(f, "iio_print_image_info %p\n", (void *)x);
@@ -594,6 +594,7 @@ static void iio_print_image_info(FILE *f, struct iio_image *x)
 	fprintf(f, "type = %s\n", iio_strtyp(x->type));
 	fprintf(f, "data = %p\n", (void *)x->data);
 }
+#endif//IIO_SHOW_DEBUG_MESSAGES
 
 
 static void iio_image_fill(struct iio_image *x,
@@ -3013,21 +3014,20 @@ static void iio_save_image_as_pfm(const char *filename, struct iio_image *x)
 }
 
 // ASC writer                                                               {{{2
-inline
-static void iio_save_image_as_asc(const char *filename, struct iio_image *x)
-{
-	FILE *f = xfopen(filename, "w");
-	int w = x->sizes[0];
-	int h = x->sizes[1];
-	int d = x->sizes[2];
-	int pd = x->pixel_dimension;
-	float *t = x->data;
-	fprintf(f, "%d %d %d %d\n", w, h, d, pd);
-	for (int i = 0; i < w*h*d*pd; i++)
-		fprintf(f, "%a\n", t[i]);
-	fwrite(x->data, w * h * x->pixel_dimension * sizeof(float), 1 ,f);
-	xfclose(f);
-}
+//static void iio_save_image_as_asc(const char *filename, struct iio_image *x)
+//{
+//	FILE *f = xfopen(filename, "w");
+//	int w = x->sizes[0];
+//	int h = x->sizes[1];
+//	int d = x->sizes[2];
+//	int pd = x->pixel_dimension;
+//	float *t = x->data;
+//	fprintf(f, "%d %d %d %d\n", w, h, d, pd);
+//	for (int i = 0; i < w*h*d*pd; i++)
+//		fprintf(f, "%a\n", t[i]);
+//	fwrite(x->data, w * h * x->pixel_dimension * sizeof(float), 1 ,f);
+//	xfclose(f);
+//}
 
 // CSV writer                                                               {{{2
 static void iio_save_image_as_csv(const char *filename, struct iio_image *x)
@@ -3872,10 +3872,10 @@ static bool this_float_is_actually_a_byte(float x)
 	return (x == floor(x)) && (x >= 0) && (x < 256);
 }
 
-static bool this_float_is_actually_a_short(float x)
-{
-	return (x == floor(x)) && (x >= 0) && (x < 65536);
-}
+//static bool this_float_is_actually_a_short(float x)
+//{
+//	return (x == floor(x)) && (x >= 0) && (x < 65536);
+//}
 
 static bool these_floats_are_actually_bytes(float *t, int n)
 {
@@ -3886,14 +3886,14 @@ static bool these_floats_are_actually_bytes(float *t, int n)
 	return true;
 }
 
-inline static bool these_floats_are_actually_shorts(float *t, int n)
-{
-	IIO_DEBUG("checking %d floats for shortness (%p)\n", n, (void*)t);
-	FORI(n)
-		if (!this_float_is_actually_a_short(t[i]))
-			return false;
-	return true;
-}
+//static bool these_floats_are_actually_shorts(float *t, int n)
+//{
+//	IIO_DEBUG("checking %d floats for shortness (%p)\n", n, (void*)t);
+//	FORI(n)
+//		if (!this_float_is_actually_a_short(t[i]))
+//			return false;
+//	return true;
+//}
 
 static bool string_suffix(const char *s, const char *suf)
 {

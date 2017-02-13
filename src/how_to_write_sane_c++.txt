@@ -1,0 +1,24 @@
+
+
+BASIC HYGIENE
+
+H0. use C++14
+H1. never use the following keywords: new delete
+H2. never use the following keywords: throw try catch
+H3. never use the following keywords: class
+H4. never use the following keywords: using
+H5. do not overload operators
+H6. do not overload functions
+H7. do not use default arguments
+H8. do not use C style casts
+
+
+
+STYLE
+
+S0. write procedural-style code
+S1. understand and use the standard data structures (vector, map, hash_map, ...)
+S2. define more complex types with templated typedefs
+S3. define data structures using plain structs, without member functions
+S4. use pointers for output arguments that must change (not references)
+S5. use references to avoid copying input arguments (not pointers)

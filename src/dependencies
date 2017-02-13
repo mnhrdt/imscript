@@ -1,104 +1,457 @@
-src/iio.o: src/iio.c src/iio.h
-src/fftshift.o: src/fftshift.c src/iio.h
-src/sterint.o: src/sterint.c src/iio.h src/xmalloc.c src/fail.c
-src/plambda.o: src/plambda.c src/iio.h src/fail.c src/xmalloc.c src/random.c \
- src/colorcoords.c src/getpixel.c src/smapa.h
-src/viewflow.o: src/viewflow.c src/iio.h src/fragments.c \
- src/marching_squares.c
-src/imprintf.o: src/imprintf.c src/iio.h
-src/ntiply.o: src/ntiply.c src/iio.h
-src/backflow.o: src/backflow.c src/iio.h src/fail.c src/xmalloc.c \
- src/getpixel.c src/bicubic.c src/smapa.h
-src/unalpha.o: src/unalpha.c src/iio.h
-src/imdim.o: src/imdim.c src/iio.h
-src/downsa.o: src/downsa.c src/iio.h src/fragments.c
-src/flowarrows.o: src/flowarrows.c src/iio.h src/fragments.c src/getpixel.c \
- src/smapa.h
-src/flowdiv.o: src/flowdiv.c src/iio.h src/fragments.c src/getpixel.c
-src/fnorm.o: src/fnorm.c src/iio.h
-src/imgstats.o: src/imgstats.c src/iio.h
-src/qauto.o: src/qauto.c src/iio.h
-src/qeasy.o: src/qeasy.c src/iio.h
-src/lrcat.o: src/lrcat.c src/iio.h src/xmalloc.c src/fail.c src/getpixel.c
-src/lk.o: src/lk.c src/iio.h src/svd.c src/vvector.h src/smapa.h
-src/hs.o: src/hs.c src/iio.h
-src/rgbcube.o: src/rgbcube.c src/iio.h
-src/iminfo.o: src/iminfo.c src/iio.h src/fragments.c src/statistics.c
-src/setdim.o: src/setdim.c src/iio.h
-src/synflow.o: src/synflow.c src/iio.h src/fragments.c src/synflow_core.c \
- src/getpixel.c src/marching_interpolation.c src/vvector.h src/cmphomod.c
-src/vecstack.o: src/vecstack.c src/iio.h
-src/ofc.o: src/ofc.c src/iio.h src/fragments.c src/vvector.h
-src/component.o: src/component.c src/iio.h
-src/faxpb.o: src/faxpb.c src/iio.h
-src/faxpby.o: src/faxpby.c src/iio.h
-src/iion.o: src/iion.c src/iio.h
-src/flowgrad.o: src/flowgrad.c src/iio.h src/fragments.c src/getpixel.c
-src/frakes_monaco_smith.o: src/frakes_monaco_smith.c src/fail.c src/xmalloc.c \
- src/iio.h
-src/fillcorners.o: src/fillcorners.c src/iio.h src/xmalloc.c src/fail.c
-src/colorflow.o: src/colorflow.c src/fail.c src/xmalloc.c src/colorcoords.c \
- src/drawsegment.c src/marching_squares.c src/iio.h
-src/lic.o: src/lic.c src/fail.c src/xmalloc.c src/random.c \
- src/bilinear_interpolation.c src/smapa.h src/iio.h
-src/deframe.o: src/deframe.c src/fail.c src/xmalloc.c src/getpixel.c \
- src/cmphomod.c src/bicubic.c src/iio.h
-src/crosses.o: src/crosses.c src/fail.c src/xmalloc.c src/iio.h
-src/crop.o: src/crop.c src/fail.c src/xmalloc.c src/iio.h
-src/angleplot.o: src/angleplot.c src/iio.h src/fail.c src/xmalloc.c
-src/closeup.o: src/closeup.c src/iio.h src/marching_squares.c \
- src/marching_interpolation.c
-src/hrezoom.o: src/hrezoom.c src/vvector.h
-src/upsa.o: src/upsa.c src/iio.h src/marching_squares.c \
- src/marching_interpolation.c src/bicubic.c src/getpixel.c
-src/veco.o: src/veco.c src/iio.h src/fail.c src/xmalloc.c src/random.c
-src/vecov.o: src/vecov.c src/iio.h src/fail.c src/xmalloc.c src/random.c
-src/flowinv.o: src/flowinv.c src/iio.h src/fail.c src/xmalloc.c src/bicubic.c \
- src/getpixel.c
-src/ghisto.o: src/ghisto.c src/iio.h src/xmalloc.c src/fail.c src/smapa.h
-src/shuntingyard.o: src/shuntingyard.c src/fail.c src/xmalloc.c
-src/rpc.o: src/rpc.c src/xfopen.c src/fail.c src/smapa.h
-src/overpoints.o: src/overpoints.c src/iio.h src/fail.c src/xfopen.c \
+src/abstract_dsf: src/abstract_dsf.c src/abstract_dsf.h
+src/ad_functions: src/ad_functions.c
+src/aff3d: src/aff3d.c src/xfopen.c src/fail.c src/parsenumbers.c \
  src/xmalloc.c
-src/periodize.o: src/periodize.c src/iio.h src/xmalloc.c src/fail.c
-src/rpcflow.o: src/rpcflow.c src/iio.h src/xmalloc.c src/fail.c src/rpc.c \
- src/xfopen.c src/smapa.h
-src/ransac.o: src/ransac.c src/fail.c src/xmalloc.c src/xfopen.c \
- src/cmphomod.c src/ransac_cases.c src/vvector.h src/moistiv_epipolar.c \
+src/alphadots: src/alphadots.c src/iio.h src/pickopt.c
+src/amle: src/amle.c src/iio.h src/fail.c src/xmalloc.c src/smapa.h
+src/amle_rec: src/amle_rec.c src/smapa.h src/iio.h
+src/amle_recsep: src/amle_recsep.c src/smapa.h src/iio.h
+src/angleplot: src/angleplot.c src/iio.h src/fail.c src/xmalloc.c
+src/apm: src/apm.c src/iio.h src/smapa.h
+src/aronsson11: src/aronsson11.c src/iio.h src/xmalloc.c src/fail.c
+src/aronsson43: src/aronsson43.c src/iio.h src/xmalloc.c src/fail.c
+src/autholes: src/autholes.c src/iio.h src/fail.c src/xmalloc.c \
+ src/ccproc.c src/abstract_dsf.c src/abstract_dsf.h
+src/awgn: src/awgn.c src/smapa.h src/random.c src/iio.h
+src/backflow: src/backflow.c src/iio.h src/fail.c src/xmalloc.c \
+ src/getpixel.c src/bicubic.c src/smapa.h
+src/bandhisto: src/bandhisto.c src/iio.h
+src/basify: src/basify.c
+src/bdint: src/bdint.c src/abstract_dsf.c src/abstract_dsf.h src/iio.h \
+ src/pickopt.c
+src/bfollow: src/bfollow.c
+src/bicubic: src/bicubic.c src/getpixel.c
+src/bicubic_gray: src/bicubic_gray.c
+src/bilinear_interpolation: src/bilinear_interpolation.c
+src/blur: src/blur.c src/fail.c src/xmalloc.c src/smapa.h src/iio.h \
  src/parsenumbers.c
-src/genk.o: src/genk.c src/fail.c src/xmalloc.c src/random.c src/smapa.h \
- src/iio.h
-src/cgi.o: src/cgi.c src/fail.c src/xmalloc.c src/bilinear_interpolation.c \
+src/bmfm: src/bmfm.c src/xmalloc.c src/fail.c src/getpixel.c
+src/bmfm_fancier: src/bmfm_fancier.c src/xmalloc.c src/fail.c \
+ src/getpixel.c
+src/bmfm_fancierw: src/bmfm_fancierw.c src/xmalloc.c src/fail.c \
+ src/getpixel.c
+src/bmms: src/bmms.c src/xmalloc.c src/fail.c src/getpixel.c src/iio.h \
+ src/pickopt.c
+src/ccfilt: src/ccfilt.c src/xmalloc.c src/fail.c src/iio.h
+src/ccmath_svd: src/ccmath_svd.c
+src/ccproc: src/ccproc.c src/abstract_dsf.c src/abstract_dsf.h \
+ src/xmalloc.c src/fail.c
+src/cdeint: src/cdeint.c src/iio.h
+src/censust: src/censust.c src/iio.h src/pickopt.c
+src/centroid: src/centroid.c src/bicubic.c src/getpixel.c src/iio.h
+src/cgi: src/cgi.c src/fail.c src/xmalloc.c src/bilinear_interpolation.c \
  src/random.c src/smapa.h src/iio.h
-src/zeropad.o: src/zeropad.c src/xmalloc.c src/fail.c src/iio.h
-src/siftu.o: src/siftu.c src/siftie.c src/fail.c src/xmalloc.c src/xfopen.c \
- src/parsenumbers.c src/siftie.h src/smapa.h
-src/pview.o: src/pview.c src/iio.h src/fail.c src/xmalloc.c src/xfopen.c \
- src/parsenumbers.c src/drawsegment.c src/smapa.h
-src/homfilt.o: src/homfilt.c src/parsenumbers.c src/xmalloc.c src/fail.c \
- src/vvector.h src/smapa.h
-src/rpchfilt.o: src/rpchfilt.c src/parsenumbers.c src/xmalloc.c src/fail.c \
- src/rpc.c src/xfopen.c src/smapa.h
-src/uncrop.o: src/uncrop.c src/iio.h
-src/maptp.o: src/maptp.c src/fail.c src/xmalloc.c src/parsenumbers.c
-src/rpcparcheck.o: src/rpcparcheck.c src/xmalloc.c src/fail.c \
- src/parsenumbers.c src/rpc.c src/xfopen.c src/smapa.h
-src/rpc_errsingle.o: src/rpc_errsingle.c src/rpc.c src/xfopen.c src/fail.c \
- src/smapa.h src/xmalloc.c src/iio.h
-src/rpc_errpair.o: src/rpc_errpair.c src/rpc.c src/xfopen.c src/fail.c \
- src/smapa.h src/xmalloc.c src/iio.h
-src/gblur.o: src/gblur.c src/iio.h src/fail.c src/xmalloc.c src/vvector.h
-src/fft.o: src/fft.c src/iio.h src/fail.c src/xmalloc.c
-src/dct.o: src/dct.c src/iio.h
-src/paraflow.o: src/paraflow.c src/iio.h src/fragments.c src/statistics.c \
- src/synflow_core.c src/getpixel.c src/marching_interpolation.c \
- src/vvector.h src/cmphomod.c
-src/minimize.o: src/minimize.c src/fail.c src/minimize_gsl.c src/smapa.h
-src/gblur.o: src/gblur.c src/iio.h src/fail.c src/xmalloc.c src/vvector.h
-src/hs.o: src/hs.c
-src/lk.o: src/lk.c src/iio.h src/svd.c src/vvector.h src/smapa.h
-src/flow_ms.o: src/flow_ms.c src/iio.h src/smapa.h src/fail.c src/xmalloc.c
-src/rgfield.o: src/rgfield.c src/iio.h src/xmalloc.c src/fail.c src/smapa.h
-src/rgfields.o: src/rgfields.c src/iio.h src/xmalloc.c src/fail.c src/smapa.h
-src/rgfieldst.o: src/rgfieldst.c src/iio.h src/xmalloc.c src/fail.c \
+src/cglap: src/cglap.c src/conjugate_gradient.c src/xmalloc.c src/fail.c \
+ src/smapa.h src/iio.h
+src/cglapsep: src/cglapsep.c src/conjugate_gradient.c src/xmalloc.c \
+ src/fail.c src/smapa.h src/iio.h
+src/cgpois: src/cgpois.c src/conjugate_gradient.c src/xmalloc.c src/fail.c \
+ src/smapa.h src/iio.h
+src/cgpois_rec: src/cgpois_rec.c src/conjugate_gradient.c src/xmalloc.c \
+ src/fail.c src/smapa.h src/iio.h
+src/chan: src/chan.c src/iio.h
+src/chisto: src/chisto.c src/iio.h src/xmalloc.c src/fail.c src/smapa.h
+src/cldmask: src/cldmask.c src/fail.c src/xmalloc.c src/xfopen.c \
+ src/parsenumbers.c src/drawsegment.c src/iio.h src/pickopt.c
+src/cleant_cgpois: src/cleant_cgpois.c src/minicg.c src/smapa.h
+src/cline: src/cline.c src/fail.c src/bicubic.c src/getpixel.c \
+ src/bilinear_interpolation.c src/iio.h src/smapa.h
+src/closeup: src/closeup.c src/iio.h src/marching_squares.c \
+ src/marching_interpolation.c src/bicubic.c src/getpixel.c
+src/colorcoords: src/colorcoords.c
+src/colorcoordsf: src/colorcoordsf.c
+src/colorflow: src/colorflow.c src/fail.c src/xmalloc.c src/colorcoords.c \
+ src/drawsegment.c src/marching_squares.c src/iio.h
+src/colormesh: src/colormesh.c src/iio.h src/fail.c src/rpc.c src/xfopen.c \
  src/smapa.h
+src/colormeshh: src/colormeshh.c src/iio.h src/fail.c src/rpc.c \
+ src/xfopen.c src/smapa.h
+src/component: src/component.c src/iio.h
+src/conjugate_gradient: src/conjugate_gradient.c src/xmalloc.c src/fail.c
+src/conjugate_gradient_linverif: src/conjugate_gradient_linverif.c \
+ src/random.c
+src/contihist: src/contihist.c src/xfopen.c src/fail.c src/xmalloc.c \
+ src/iio.h
+src/contours: src/contours.c src/marching_squares.c \
+ src/marching_interpolation.c src/iio.h
+src/convolution: src/convolution.c
+src/crop: src/crop.c src/fail.c src/xmalloc.c src/iio.h
+src/crop_rect: src/crop_rect.c src/fail.c src/xmalloc.c src/iio.h
+src/crop_size: src/crop_size.c src/fail.c src/xmalloc.c src/iio.h
+src/croparound: src/croparound.c src/getpixel.c src/iio.h src/xmalloc.c \
+ src/fail.c
+src/crosses: src/crosses.c src/fail.c src/xmalloc.c src/iio.h
+src/cutrecombine: src/cutrecombine.c src/iio.h src/fail.c
+src/darboux: src/darboux.c src/xmalloc.c src/fail.c src/iio.h
+src/dataconv: src/dataconv.c src/xmalloc.c src/fail.c
+src/dct: src/dct.c src/iio.h
+src/deframe: src/deframe.c src/fail.c src/xmalloc.c src/getpixel.c \
+ src/homographies.c src/bicubic.c src/iio.h
+src/dht: src/dht.c src/iio.h src/xmalloc.c src/fail.c
+src/disp_to_corr: src/disp_to_corr.c src/iio.h src/fail.c src/xmalloc.c
+src/distance: src/distance.c src/abstract_heap.h src/xmalloc.c src/fail.c \
+ src/iio.h src/xfopen.c src/parsenumbers.c src/smapa.h
+src/dither: src/dither.c src/iio.h
+src/ditheru: src/ditheru.c src/iio.h src/pickopt.c
+src/downsa: src/downsa.c src/iio.h src/fail.c src/xmalloc.c
+src/drawroads: src/drawroads.c src/drawsegment.c src/iio.h src/fail.c \
+ src/parsenumbers.c src/xmalloc.c src/pickopt.c
+src/drawsegment: src/drawsegment.c
+src/dveco: src/dveco.c src/iio.h src/fail.c src/xmalloc.c src/random.c \
+ src/pickopt.c
+src/dvecov_lm: src/dvecov_lm.c src/iio.h src/fail.c src/xmalloc.c \
+ src/pickopt.c
+src/elap: src/elap.c src/iio.h
+src/elap2: src/elap2.c src/iio.h
+src/elap3: src/elap3.c src/iio.h
+src/elap_rec: src/elap_rec.c src/iio.h
+src/elap_recsep: src/elap_recsep.c src/smapa.h src/iio.h
+src/elevate_matches: src/elevate_matches.c src/iio.h src/xfopen.c \
+ src/fail.c
+src/elevate_matcheshh: src/elevate_matcheshh.c src/iio.h src/xfopen.c \
+ src/fail.c src/parsenumbers.c src/xmalloc.c
+src/epilist: src/epilist.c
+src/error: src/error.c
+src/fabius: src/fabius.c
+src/fail: src/fail.c
+src/fancy_crop: src/fancy_crop.c src/fancy_image.h
+src/fancy_downsa: src/fancy_downsa.c src/fancy_image.h
+src/fancy_evals: src/fancy_evals.c src/fancy_image.c src/fancy_image.h \
+ src/iio.h src/tiff_octaves_rw.c
+src/fancy_image: src/fancy_image.c src/fancy_image.h src/iio.h \
+ src/tiff_octaves_rw.c
+src/fancy_trials: src/fancy_trials.c src/fancy_image.h
+src/fancy_zoomout: src/fancy_zoomout.c src/fancy_image.h
+src/faxpb: src/faxpb.c src/iio.h
+src/faxpby: src/faxpby.c src/iio.h
+src/fft: src/fft.c src/iio.h src/fail.c src/xmalloc.c
+src/fftper: src/fftper.c src/iio.h
+src/fftshift: src/fftshift.c src/iio.h
+src/fftwisdom: src/fftwisdom.c
+src/fill_bill: src/fill_bill.c src/iio.h
+src/fill_rect: src/fill_rect.c src/iio.h
+src/fillcorners: src/fillcorners.c src/iio.h src/xmalloc.c src/fail.c
+src/flambda: src/flambda.c src/smapa.h src/fail.c src/xmalloc.c \
+ src/random.c src/parsenumbers.c src/colorcoordsf.c src/fancy_image.h \
+ src/getpixel.c
+src/flow_ms: src/flow_ms.c src/iio.h src/smapa.h src/fail.c src/xmalloc.c
+src/flowarrows: src/flowarrows.c src/iio.h src/fragments.c src/getpixel.c \
+ src/smapa.h
+src/flowback: src/flowback.c src/iio.h
+src/flowdiv: src/flowdiv.c src/iio.h src/fragments.c src/getpixel.c
+src/flowgrad: src/flowgrad.c src/iio.h src/fragments.c src/getpixel.c
+src/flowh: src/flowh.c src/iio.h src/fail.c src/xmalloc.c
+src/flowinv: src/flowinv.c src/iio.h src/fail.c src/xmalloc.c src/bicubic.c \
+ src/getpixel.c
+src/flowjac: src/flowjac.c src/iio.h src/fragments.c src/getpixel.c
+src/flownop: src/flownop.c src/iio.h src/fragments.c src/getpixel.c
+src/fmsrA: src/fmsrA.c src/svd.c
+src/fnorm: src/fnorm.c src/iio.h
+src/font_6x12: src/font_6x12.c
+src/fontu: src/fontu.c src/xmalloc.c src/fail.c src/xfopen.c src/dataconv.c \
+ src/iio.h src/pickopt.c
+src/fontu2: src/fontu2.c src/xmalloc.c src/fail.c src/xfopen.c \
+ src/dataconv.c src/iio.h src/pickopt.c
+src/fragments: src/fragments.c
+src/frakes_monaco_smith: src/frakes_monaco_smith.c src/fail.c src/xmalloc.c \
+ src/iio.h
+src/frustumize: src/frustumize.c src/iio.h src/parsenumbers.c src/xmalloc.c \
+ src/fail.c src/pickopt.c src/smapa.h
+src/gblur: src/gblur.c src/iio.h src/fail.c src/xmalloc.c src/vvector.h
+src/gblur_core: src/gblur_core.c src/iio.h
+src/gblurs: src/gblurs.c src/iio.h
+src/gdal_getsample: src/gdal_getsample.c
+src/genk: src/genk.c src/fail.c src/xmalloc.c src/random.c src/smapa.h \
+ src/iio.h
+src/getopt_with_pickopt: src/getopt_with_pickopt.c
+src/getpixel: src/getpixel.c
+src/gharrows: src/gharrows.c src/iio.h src/smapa.h
+src/ghisto: src/ghisto.c src/iio.h src/xmalloc.c src/fail.c src/smapa.h
+src/ghough: src/ghough.c src/iio.h
+src/ghough2: src/ghough2.c src/pickopt.c src/iio.h
+src/graysing: src/graysing.c src/iio.h
+src/grid: src/grid.c src/fail.c
+src/harris: src/harris.c src/iio.h src/fragments.c src/getpixel.c
+src/histeq8: src/histeq8.c src/iio.h
+src/homaff: src/homaff.c
+src/homdots: src/homdots.c src/iio.h
+src/homfilt: src/homfilt.c src/parsenumbers.c src/xmalloc.c src/fail.c \
+ src/vvector.h src/smapa.h
+src/homographies: src/homographies.c
+src/homwarp: src/homwarp.c src/bilinear_interpolation.c \
+ src/marching_interpolation.c src/bicubic_gray.c src/spline.c src/iio.h \
+ src/xmalloc.c src/fail.c src/parsenumbers.c src/pickopt.c
+src/houghs: src/houghs.c src/iio.h
+src/hrezoom: src/hrezoom.c src/vvector.h
+src/hs: src/hs.c src/iio.h
+src/hs_core: src/hs_core.c
+src/hs_init: src/hs_init.c src/iio.h
+src/hs_new: src/hs_new.c src/iio.h
+src/hs_omp: src/hs_omp.c src/iio.h
+src/huffman: src/huffman.c src/abstract_heap.h
+src/hview: src/hview.c src/xmalloc.c src/fail.c src/iio.h
+src/ihough2: src/ihough2.c src/iio.h src/pickopt.c
+src/iio: src/iio.c src/iio.h
+src/iion: src/iion.c src/iio.h
+src/ijmesh: src/ijmesh.c src/iio.h
+src/imdim: src/imdim.c src/iio.h
+src/imgdist: src/imgdist.c src/iio.h
+src/imgerr: src/imgerr.c src/fail.c src/iio.h src/smapa.h src/xmalloc.c
+src/imgstats: src/imgstats.c src/iio.h
+src/iminfo: src/iminfo.c src/iio.h src/statistics.c src/fail.c \
+ src/xmalloc.c
+src/imprintf: src/imprintf.c src/iio.h
+src/imspread: src/imspread.c src/iio.h
+src/inppairs: src/inppairs.c src/iio.h
+src/ipol_datum: src/ipol_datum.c
+src/ipol_watermark: src/ipol_watermark.c src/iio.h
+src/isoricci: src/isoricci.c src/iio.h
+src/lapbediag: src/lapbediag.c src/smapa.h src/iio.h
+src/lapbediag_sep: src/lapbediag_sep.c src/smapa.h src/iio.h
+src/lapcolo: src/lapcolo.c src/lapbediag.c src/smapa.h src/iio.h
+src/lgblur: src/lgblur.c src/iio.h src/fail.c src/xmalloc.c
+src/lgblur2: src/lgblur2.c src/gblur.c src/iio.h src/fail.c src/xmalloc.c \
+ src/vvector.h
+src/lgblur3: src/lgblur3.c src/gblur.c src/iio.h src/fail.c src/xmalloc.c \
+ src/vvector.h src/bicubic.c src/getpixel.c src/smapa.h
+src/lic: src/lic.c src/fail.c src/xmalloc.c src/random.c \
+ src/bilinear_interpolation.c src/smapa.h src/iio.h
+src/lk: src/lk.c src/iio.h src/svd.c src/vvector.h src/smapa.h
+src/lk_omp: src/lk_omp.c src/iio.h src/svd.c src/vvector.h
+src/lka: src/lka.c src/iio.h src/svd.c src/vvector.h
+src/lkgen: src/lkgen.c
+src/lrcat: src/lrcat.c src/iio.h src/xmalloc.c src/fail.c src/getpixel.c \
+ src/pickopt.c
+src/lure: src/lure.c src/xmalloc.c src/fail.c src/getpixel.c src/blur.c \
+ src/smapa.h src/iio.h
+src/lures: src/lures.c src/xmalloc.c src/fail.c src/getpixel.c src/blur.c \
+ src/smapa.h src/iio.h
+src/maptp: src/maptp.c src/fail.c src/xmalloc.c src/parsenumbers.c
+src/marchi_clean: src/marchi_clean.c
+src/marching_follow: src/marching_follow.c
+src/marching_interpolation: src/marching_interpolation.c
+src/marching_squares: src/marching_squares.c
+src/metatiler: src/metatiler.c src/iio.h
+src/mima: src/mima.c src/iio.h
+src/mini_fhtre: src/mini_fhtre.c src/iio.h
+src/minicg: src/minicg.c
+src/minimize: src/minimize.c src/fail.c src/minimize_gsl.c src/smapa.h
+src/minimize_ccmath: src/minimize_ccmath.c src/optmiz.c src/smapa.h
+src/minimize_gsl: src/minimize_gsl.c src/smapa.h
+src/mnehs: src/mnehs.c src/iio.h src/xmalloc.c src/fail.c src/getpixel.c \
+ src/bicubic.c src/rpc.c src/xfopen.c src/smapa.h src/parsenumbers.c \
+ src/pickopt.c
+src/mnehs_ms: src/mnehs_ms.c src/iio.h src/xmalloc.c src/fail.c \
+ src/getpixel.c src/bicubic.c src/smapa.h src/parsenumbers.c \
+ src/pickopt.c
+src/moistiv_epipolar: src/moistiv_epipolar.c src/fail.c
+src/morsi: src/morsi.c src/iio.h
+src/morsi_demo: src/morsi_demo.c src/iio.h
+src/morsi_demo2: src/morsi_demo2.c src/iio.h
+src/nnint: src/nnint.c src/abstract_heap.h src/xmalloc.c src/fail.c \
+ src/iio.h src/pickopt.c
+src/nnlint: src/nnlint.c src/abstract_heap.h src/xmalloc.c src/fail.c \
+ src/iio.h src/pickopt.c
+src/ntiply: src/ntiply.c src/iio.h
+src/ofc: src/ofc.c src/iio.h src/fragments.c src/vvector.h
+src/ok_list: src/ok_list.c src/ok_list.h src/fail.c src/xmalloc.c
+src/optmiz: src/optmiz.c
+src/overflow: src/overflow.c src/iio.h src/fail.c src/xmalloc.c \
+ src/xfopen.c
+src/overpoints: src/overpoints.c src/iio.h src/fail.c src/xfopen.c \
+ src/xmalloc.c src/smapa.h
+src/p: src/p.c
+src/pairhom: src/pairhom.c src/iio.h src/xmalloc.c src/fail.c \
+ src/parsenumbers.c src/pickopt.c
+src/pairsinp: src/pairsinp.c src/iio.h src/xmalloc.c src/fail.c \
+ src/parsenumbers.c
+src/palette: src/palette.c src/fail.c src/xmalloc.c src/xfopen.c \
+ src/smapa.h src/iio.h
+src/pamle_rec: src/pamle_rec.c src/smapa.h src/iio.h
+src/paraflow: src/paraflow.c src/iio.h src/fail.c src/statistics.c \
+ src/xmalloc.c src/synflow_core.c src/getpixel.c \
+ src/marching_interpolation.c src/vvector.h src/homographies.c \
+ src/smapa.h
+src/parsenumbers: src/parsenumbers.c src/xmalloc.c src/fail.c
+src/percomp: src/percomp.c src/fft.c src/iio.h src/fail.c src/xmalloc.c
+src/periodize: src/periodize.c src/iio.h src/xmalloc.c src/fail.c
+src/perms: src/perms.c
+src/pickopt: src/pickopt.c
+src/plambda: src/plambda.c src/smapa.h src/fail.c src/xmalloc.c \
+ src/random.c src/parsenumbers.c src/colorcoordsf.c src/getpixel.c \
+ src/iio.h
+src/plyflatten: src/plyflatten.c src/xmalloc.c src/fail.c src/smapa.h \
+ src/iio.h
+src/plyroads: src/plyroads.c src/fail.c src/xfopen.c src/parsenumbers.c \
+ src/xmalloc.c
+src/plyroads_mini: src/plyroads_mini.c src/parsenumbers.c src/xmalloc.c \
+ src/fail.c
+src/pmba: src/pmba.c src/xfopen.c src/fail.c src/parsenumbers.c \
+ src/xmalloc.c src/pickopt.c
+src/pmba2: src/pmba2.c src/xfopen.c src/fail.c src/parsenumbers.c \
+ src/xmalloc.c src/pickopt.c
+src/poisson_rec: src/poisson_rec.c src/iio.h
+src/poisson_recsep: src/poisson_recsep.c src/iio.h
+src/polygonify: src/polygonify.c src/ccproc.c src/abstract_dsf.c \
+ src/abstract_dsf.h src/xmalloc.c src/fail.c src/smapa.h src/iio.h
+src/pomini: src/pomini.c
+src/posmax: src/posmax.c src/iio.h
+src/ppsboundary: src/ppsboundary.c src/iio.h
+src/ppsmooth: src/ppsmooth.c src/iio.h src/pickopt.c
+src/printmask: src/printmask.c src/iio.h
+src/pview: src/pview.c src/iio.h src/fail.c src/xmalloc.c src/xfopen.c \
+ src/parsenumbers.c src/drawsegment.c src/pickopt.c src/smapa.h \
+ src/random.c
+src/q: src/q.c
+src/qauto: src/qauto.c src/iio.h src/smapa.h
+src/qauto3: src/qauto3.c src/iio.h src/pickopt.c
+src/qeasy: src/qeasy.c src/iio.h
+src/qlambda: src/qlambda.c src/iio.h src/fragments.c src/getpixel.c
+src/r: src/r.c src/iio.h
+src/raddots: src/raddots.c src/iio.h
+src/radphar: src/radphar.c src/iio.h src/xmalloc.c src/fail.c
+src/rancloud: src/rancloud.c src/iio.h src/fragments.c
+src/random: src/random.c
+src/ranrecs: src/ranrecs.c src/iio.h src/fragments.c
+src/ransac: src/ransac.c src/fail.c src/xmalloc.c src/xfopen.c src/random.c \
+ src/ransac_cases.c src/vvector.h src/homographies.c \
+ src/moistiv_epipolar.c src/parsenumbers.c
+src/ransac_cases: src/ransac_cases.c src/vvector.h src/homographies.c \
+ src/moistiv_epipolar.c src/fail.c
+src/really_simplest_inpainting: src/really_simplest_inpainting.c src/iio.h
+src/reallysmall_svd: src/reallysmall_svd.c
+src/reallysmall_svd2: src/reallysmall_svd2.c
+src/reallysmall_svd3: src/reallysmall_svd3.c
+src/rednoise: src/rednoise.c src/iio.h
+src/remove_small_cc: src/remove_small_cc.c src/abstract_dsf.c \
+ src/abstract_dsf.h src/iio.h src/pickopt.c
+src/replicate: src/replicate.c src/iio.h src/xmalloc.c src/fail.c
+src/rgbcube: src/rgbcube.c src/iio.h
+src/rgfield: src/rgfield.c src/iio.h src/xmalloc.c src/fail.c src/smapa.h
+src/rgfields: src/rgfields.c src/iio.h src/xmalloc.c src/fail.c src/smapa.h
+src/rgfieldst: src/rgfieldst.c src/iio.h src/xmalloc.c src/fail.c \
+ src/smapa.h
+src/rip: src/rip.c
+src/rpc: src/rpc.c src/xfopen.c src/fail.c src/smapa.h
+src/rpc_angpair: src/rpc_angpair.c src/rpc.c src/xfopen.c src/fail.c \
+ src/smapa.h src/xmalloc.c src/iio.h
+src/rpc_curvpair: src/rpc_curvpair.c src/rpc.c src/xfopen.c src/fail.c \
+ src/smapa.h src/xmalloc.c src/iio.h
+src/rpc_epicyl: src/rpc_epicyl.c src/rpc.c src/xfopen.c src/fail.c \
+ src/smapa.h
+src/rpc_errfilt: src/rpc_errfilt.c src/parsenumbers.c src/xmalloc.c \
+ src/fail.c src/rpc.c src/xfopen.c src/smapa.h src/pickopt.c
+src/rpc_errpair: src/rpc_errpair.c src/rpc.c src/xfopen.c src/fail.c \
+ src/smapa.h src/xmalloc.c src/iio.h
+src/rpc_errsingle: src/rpc_errsingle.c src/rpc.c src/xfopen.c src/fail.c \
+ src/smapa.h src/xmalloc.c src/iio.h
+src/rpc_eval: src/rpc_eval.c src/rpc.c src/xfopen.c src/fail.c src/smapa.h
+src/rpc_mnehs: src/rpc_mnehs.c src/iio.h src/getpixel.c src/bicubic.c \
+ src/rpc.c src/xfopen.c src/fail.c src/smapa.h src/tiffu.c src/xmalloc.c
+src/rpc_pm: src/rpc_pm.c src/iio.h src/getpixel.c src/bicubic.c src/rpc.c \
+ src/xfopen.c src/fail.c src/smapa.h src/tiffu.c src/xmalloc.c
+src/rpc_pmn: src/rpc_pmn.c src/rpc.c src/xfopen.c src/fail.c src/smapa.h \
+ src/tiffu.c src/xmalloc.c src/iio.h
+src/rpc_warpab: src/rpc_warpab.c src/getpixel.c src/bicubic.c src/rpc.c \
+ src/xfopen.c src/fail.c src/smapa.h src/iio.h src/xmalloc.c
+src/rpc_warpabt: src/rpc_warpabt.c src/getpixel.c src/bicubic.c src/rpc.c \
+ src/xfopen.c src/fail.c src/smapa.h src/tiffu.c src/iio.h src/xmalloc.c
+src/rpcflow: src/rpcflow.c src/iio.h src/xmalloc.c src/fail.c src/rpc.c \
+ src/xfopen.c src/smapa.h
+src/rpchfilt: src/rpchfilt.c src/parsenumbers.c src/xmalloc.c src/fail.c \
+ src/rpc.c src/xfopen.c src/smapa.h
+src/rpcparcheck: src/rpcparcheck.c src/xmalloc.c src/fail.c \
+ src/parsenumbers.c src/rpc.c src/xfopen.c src/smapa.h
+src/rpctest: src/rpctest.c src/iio.h src/xmalloc.c src/fail.c src/rpc.c \
+ src/xfopen.c src/smapa.h
+src/satproj: src/satproj.c src/fail.c src/getpixel.c src/iio.h \
+ src/xmalloc.c src/parsenumbers.c src/pickopt.c
+src/scheme_plap: src/scheme_plap.c src/fail.c src/iio.h src/xmalloc.c
+src/seconds: src/seconds.c
+src/setdim: src/setdim.c src/iio.h
+src/sfblur: src/sfblur.c src/xmalloc.c src/fail.c src/iio.h
+src/shadowcast: src/shadowcast.c src/iio.h src/pickopt.c
+src/sheartilter: src/sheartilter.c
+src/shuntingyard: src/shuntingyard.c src/fail.c src/xmalloc.c
+src/siftie: src/siftie.c src/fail.c src/xmalloc.c src/xfopen.c \
+ src/parsenumbers.c src/siftie.h src/smapa.h src/ok_list.c src/ok_list.h \
+ src/grid.c src/iio.h
+src/siftu: src/siftu.c src/siftie.c src/fail.c src/xmalloc.c src/xfopen.c \
+ src/parsenumbers.c src/siftie.h src/smapa.h src/ok_list.c src/ok_list.h \
+ src/grid.c src/iio.h
+src/simplest_inpainting: src/simplest_inpainting.c src/iio.h
+src/simpois: src/simpois.c src/cleant_cgpois.c src/minicg.c src/smapa.h \
+ src/iio.h src/pickopt.c
+src/sort: src/sort.c src/iio.h
+src/sphereheights: src/sphereheights.c src/iio.h src/fail.c src/xmalloc.c
+src/spline: src/spline.c
+src/spline_double: src/spline_double.c
+src/spmf: src/spmf.c
+src/srmatch: src/srmatch.c src/fail.c src/xmalloc.c src/xfopen.c \
+ src/siftie.c src/parsenumbers.c src/siftie.h src/smapa.h src/ok_list.c \
+ src/ok_list.h src/grid.c src/iio.h src/ransac.c src/random.c \
+ src/ransac_cases.c src/vvector.h src/homographies.c \
+ src/moistiv_epipolar.c
+src/starfield: src/starfield.c src/random.c src/iio.h src/xmalloc.c \
+ src/fail.c
+src/startracker: src/startracker.c src/xmalloc.c src/fail.c src/getpixel.c \
+ src/ok_list.c src/ok_list.h src/grid.c src/iio.h
+src/statistics: src/statistics.c src/fail.c src/xmalloc.c
+src/sterint: src/sterint.c src/iio.h src/xmalloc.c src/fail.c
+src/strt: src/strt.c src/xmalloc.c src/fail.c src/iio.h src/pickopt.c
+src/sum: src/sum.c src/iio.h
+src/svd: src/svd.c
+src/svd_example: src/svd_example.c
+src/svd_smallexample: src/svd_smallexample.c src/reallysmall_svd.c
+src/svdmini: src/svdmini.c
+src/synflow: src/synflow.c src/iio.h src/xmalloc.c src/fail.c \
+ src/synflow_core.c src/getpixel.c src/marching_interpolation.c \
+ src/vvector.h src/homographies.c src/smapa.h
+src/synflow_core: src/synflow_core.c src/fail.c src/getpixel.c \
+ src/marching_interpolation.c src/vvector.h src/homographies.c \
+ src/smapa.h
+src/tbcat: src/tbcat.c src/iio.h src/smapa.h src/xmalloc.c src/fail.c \
+ src/getpixel.c src/pickopt.c
+src/tcregistration: src/tcregistration.c src/iio.h
+src/tdip: src/tdip.c src/iio.h src/strt.c src/xmalloc.c src/fail.c \
+ src/smapa.h src/random.c src/pickopt.c
+src/testgblur: src/testgblur.c src/gblur.c src/iio.h src/fail.c \
+ src/xmalloc.c src/vvector.h
+src/thinpa_recsep: src/thinpa_recsep.c src/smapa.h src/iio.h
+src/tiff_octaves: src/tiff_octaves.c
+src/tiff_octaves_notest: src/tiff_octaves_notest.c
+src/tiff_octaves_old: src/tiff_octaves_old.c
+src/tiff_octaves_rw: src/tiff_octaves_rw.c
+src/tiffu: src/tiffu.c
+src/tiloct: src/tiloct.c
+src/tilt_and_shear: src/tilt_and_shear.c src/bicubic.c src/getpixel.c \
+ src/fail.c src/xmalloc.c src/iio.h
+src/tiny_lure: src/tiny_lure.c src/getpixel.c src/blur.c src/fail.c \
+ src/xmalloc.c src/smapa.h src/iio.h
+src/tregistration: src/tregistration.c src/iio.h
+src/try_fancy: src/try_fancy.c src/fancy_image.h
+src/tvint: src/tvint.c src/smapa.h src/iio.h src/pickopt.c
+src/unalpha: src/unalpha.c src/iio.h
+src/uncrop: src/uncrop.c src/iio.h
+src/unshadow: src/unshadow.c src/iio.h src/pickopt.c
+src/upsa: src/upsa.c src/iio.h src/marching_squares.c \
+ src/marching_interpolation.c src/bicubic.c src/getpixel.c
+src/utm: src/utm.c
+src/veco: src/veco.c src/iio.h src/fail.c src/xmalloc.c src/random.c \
+ src/pickopt.c
+src/vecov: src/vecov.c src/iio.h src/fail.c src/xmalloc.c src/random.c \
+ src/smapa.h src/pickopt.c
+src/vecov_lm: src/vecov_lm.c src/iio.h src/fail.c src/xmalloc.c \
+ src/pickopt.c
+src/vecstack: src/vecstack.c src/iio.h
+src/viewflow: src/viewflow.c src/iio.h src/fragments.c \
+ src/marching_squares.c
+src/watermark: src/watermark.c src/xmalloc.c src/fail.c src/xfopen.c \
+ src/font_6x12.c src/iio.h
+src/wgs84: src/wgs84.c
+src/xfopen: src/xfopen.c src/fail.c
+src/xmalloc: src/xmalloc.c src/fail.c
+src/xmalloc_stats: src/xmalloc_stats.c
+src/zeropad: src/zeropad.c src/xmalloc.c src/fail.c src/iio.h
+src/zoombil: src/zoombil.c src/fail.c src/xmalloc.c \
+ src/bilinear_interpolation.c src/smapa.h src/iio.h

@@ -55,7 +55,11 @@
 
 #define xmalloc malloc
 
-#define MAX_PIXELDIM IIO_MAX_DIMENSION
+#ifdef IIO_MAX_DIMENSION
+# define MAX_PIXELDIM IIO_MAX_DIMENSION
+#else
+# define MAX_PIXELDIM 20
+#endif
 
 #define REQ_NOTHING 0
 #define REQ_BASIC 1

@@ -181,6 +181,5 @@ void iio_save_image_uint8_matrix(char *f, unsigned char **x, int w, int h);
 // (w, h; 1 float) => tiff, pfm
 // (w, h; 3 float) => tiff, pfm
 
-#define IIO_MAX_DIMENSION 20
 
 #endif//_IIO_H
