@@ -9,6 +9,21 @@ static void apply_homography(double y[2], double H[9], double x[2])
 	y[1] = Y / Z;
 }
 
+static double invert_homography(double o[9], double i[9])
+{
+    double det = i[0]*i[4]*i[8] + i[2]*i[3]*i[7] + i[1]*i[5]*i[6]
+               - i[2]*i[4]*i[6] - i[1]*i[3]*i[8] - i[0]*i[5]*i[7];
+    o[0] = (i[4]*i[8] - i[5]*i[7]) / det;
+    o[1] = (i[2]*i[7] - i[1]*i[8]) / det;
+    o[2] = (i[1]*i[5] - i[2]*i[4]) / det;
+    o[3] = (i[5]*i[6] - i[3]*i[8]) / det;
+    o[4] = (i[0]*i[8] - i[2]*i[6]) / det;
+    o[5] = (i[2]*i[3] - i[0]*i[5]) / det;
+    o[6] = (i[3]*i[7] - i[4]*i[6]) / det;
+    o[7] = (i[1]*i[6] - i[0]*i[7]) / det;
+    o[8] = (i[0]*i[4] - i[1]*i[3]) / det;
+    return det;
+}
 
 #include <math.h>
 #include "bilinear_interpolation.c"
@@ -90,7 +105,9 @@ int main(int c, char *v[])
 		"%s [-i {0|1|2|-3|3|5|7}] hom w h [in [out]]\n", *v);
 		//0                       1   2 3  4   5
 	double H[9];
+	double H_inv[9];
 	read_n_doubles_from_string(H, v[1], 9);
+	invert_homography(H_inv, H);
 	int ow = atoi(v[2]);
 	int oh = atoi(v[3]);
 	char *filename_in  = c > 4 ? v[4] : "-";
@@ -102,7 +119,7 @@ int main(int c, char *v[])
 
 	int r = 0;
 	for (int i = 0; i < pd; i++)
-		r += shomwarp(y + i*ow*oh, ow, oh, H, x + i*w*h, w, h, order);
+		r += shomwarp(y + i*ow*oh, ow, oh, H_inv, x + i*w*h, w, h, order);
 
 	iio_save_image_float_split(filename_out, y, ow, oh, pd);
 	return r;
