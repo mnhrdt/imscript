@@ -1503,6 +1503,7 @@ static void parse_imageop(const char *s, int *op, int *scheme)
 	//else if (hasprefix(s, "k")) *op = IMAGEOP_CURV;
 	//else fail("unrecognized comma modifier \",%s\"", s);
 	*scheme = SCHEME_SOBEL;
+	if (*op == IMAGEOP_XY) *scheme = SCHEME_CENTERED;
 	if (false) ;
 	else if (hassuffix(s, "f")) *scheme = SCHEME_FORWARD;
 	else if (hassuffix(s, "b")) *scheme = SCHEME_BACKWARD;

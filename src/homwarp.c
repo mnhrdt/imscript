@@ -99,15 +99,19 @@ int shomwarp(float *X, int W, int H, double M[9], float *x,
 #include "pickopt.c"
 int main(int c, char *v[])
 {
-	int order = atoi(pick_option(&c, &v, "i", "-3"));
+	bool do_invert = pick_option(&c, &v, "i", NULL);
+	int order = atoi(pick_option(&c, &v, "o", "-3"));
 	if (c < 4 || c > 6)
 		return fprintf(stderr, "usage:\n\t"
-		"%s [-i {0|1|2|-3|3|5|7}] hom w h [in [out]]\n", *v);
-		//0                       1   2 3  4   5
-	double H[9];
-	double H_inv[9];
-	read_n_doubles_from_string(H, v[1], 9);
-	invert_homography(H_inv, H);
+		"%s [-i] [-o {0|1|2|-3|3|5|7}] hom w h [in [out]]\n"
+		//0                            1   2 3  4   5
+		"\t-i\tinvert input homography\n"
+		"\t-o\tchose interpolation order (default -3 = bicubic)\n"
+		, *v);
+	double H_direct[9], H_inv[9];
+	read_n_doubles_from_string(H_direct, v[1], 9);
+	invert_homography(H_inv, H_direct);
+	double *H = do_invert ? H_inv : H_direct;
 	int ow = atoi(v[2]);
 	int oh = atoi(v[3]);
 	char *filename_in  = c > 4 ? v[4] : "-";
@@ -119,7 +123,7 @@ int main(int c, char *v[])
 
 	int r = 0;
 	for (int i = 0; i < pd; i++)
-		r += shomwarp(y + i*ow*oh, ow, oh, H_inv, x + i*w*h, w, h, order);
+		r += shomwarp(y + i*ow*oh, ow, oh, H, x + i*w*h, w, h, order);
 
 	iio_save_image_float_split(filename_out, y, ow, oh, pd);
 	return r;
