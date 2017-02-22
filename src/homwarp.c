@@ -101,9 +101,9 @@ int main(int c, char *v[])
 {
 	bool do_invert = pick_option(&c, &v, "i", NULL);
 	int order = atoi(pick_option(&c, &v, "o", "-3"));
-	if (c < 4 || c > 6)
+	if (c != 2 && c != 4 && c != 5 && c != 6)
 		return fprintf(stderr, "usage:\n\t"
-		"%s [-i] [-o {0|1|2|-3|3|5|7}] hom w h [in [out]]\n"
+		"%s [-i] [-o {0|1|2|-3|3|5|7}] hom [w h [in [out]]]\n"
 		//0                            1   2 3  4   5
 		"\t-i\tinvert input homography\n"
 		"\t-o\tchose interpolation order (default -3 = bicubic)\n"
@@ -112,13 +112,15 @@ int main(int c, char *v[])
 	read_n_doubles_from_string(H_direct, v[1], 9);
 	invert_homography(H_inv, H_direct);
 	double *H = do_invert ? H_inv : H_direct;
-	int ow = atoi(v[2]);
-	int oh = atoi(v[3]);
+	int ow = c > 2 ? atoi(v[2]) : -1;
+	int oh = c > 3 ? atoi(v[3]) : -1;
 	char *filename_in  = c > 4 ? v[4] : "-";
 	char *filename_out = c > 5 ? v[5] : "-";
 
 	int w, h, pd;
 	float *x = iio_read_image_float_split(filename_in, &w, &h, &pd);
+	if (ow == -1) ow = w;
+	if (oh == -1) oh = h;
 	float *y = xmalloc(ow * oh * pd * sizeof*y);
 
 	int r = 0;

@@ -2804,7 +2804,7 @@ int try_reading_file_with_libraw_4channels(const char *fname, struct iio_image *
 
 #ifdef I_CAN_HAS_LIBPNG
 
-static void iio_save_image_as_png(const char *filename, struct iio_image *x)
+static void iio_write_image_as_png(const char *filename, struct iio_image *x)
 {
 	png_structp pp = png_create_write_struct(PNG_LIBPNG_VER_STRING, 0,0,0);
 	if (!pp) fail("png_create_write_struct fail");
@@ -2861,7 +2861,7 @@ static void iio_save_image_as_png(const char *filename, struct iio_image *x)
 
 #ifdef I_CAN_HAS_LIBTIFF
 
-static void iio_save_image_as_tiff(const char *filename, struct iio_image *x)
+static void iio_write_image_as_tiff(const char *filename, struct iio_image *x)
 {
 	if (x->dimension != 2)
 		fail("only 2d images can be saved as TIFFs");
@@ -2931,18 +2931,18 @@ static void iio_save_image_as_tiff(const char *filename, struct iio_image *x)
 	TIFFClose(tif);
 }
 
-static void iio_save_image_as_tiff_smarter(const char *filename,
+static void iio_write_image_as_tiff_smarter(const char *filename,
 		struct iio_image *x)
 {
 	char *tiffname = strstr(filename, "TIFF:");
 	if (tiffname == filename) {
-		iio_save_image_as_tiff_smarter(filename+5, x);
+		iio_write_image_as_tiff_smarter(filename+5, x);
 		return;
 	}
 	if (0 == strcmp(filename, "-")) {
 		char tfn[FILENAME_MAX];
 		fill_temporary_filename(tfn);
-		iio_save_image_as_tiff(tfn, x);
+		iio_write_image_as_tiff(tfn, x);
 		FILE *f = xfopen(tfn, "r");
 		int c;
 		while ((c = fgetc(f)) != EOF)
@@ -2950,14 +2950,14 @@ static void iio_save_image_as_tiff_smarter(const char *filename,
 		fclose(f);
 		delete_temporary_file(tfn);
 	} else
-		iio_save_image_as_tiff(filename, x);
+		iio_write_image_as_tiff(filename, x);
 }
 
 #endif//I_CAN_HAS_LIBTIFF
 
 
 // JUV writer                                                               {{{2
-static void iio_save_image_as_juv(const char *filename, struct iio_image *x)
+static void iio_write_image_as_juv(const char *filename, struct iio_image *x)
 {
 	assert(x->type == IIO_TYPE_FLOAT);
 	assert(x->dimension == 2);
@@ -2980,7 +2980,7 @@ static void iio_save_image_as_juv(const char *filename, struct iio_image *x)
 
 
 // FLO writer                                                               {{{2
-static void iio_save_image_as_flo(const char *filename, struct iio_image *x)
+static void iio_write_image_as_flo(const char *filename, struct iio_image *x)
 {
 	assert(x->type == IIO_TYPE_FLOAT);
 	assert(x->dimension == 2);
@@ -2998,7 +2998,7 @@ static void iio_save_image_as_flo(const char *filename, struct iio_image *x)
 }
 
 // PFM writer                                                               {{{2
-static void iio_save_image_as_pfm(const char *filename, struct iio_image *x)
+static void iio_write_image_as_pfm(const char *filename, struct iio_image *x)
 {
 	assert(x->type == IIO_TYPE_FLOAT);
 	assert(x->dimension == 2);
@@ -3014,7 +3014,7 @@ static void iio_save_image_as_pfm(const char *filename, struct iio_image *x)
 }
 
 // ASC writer                                                               {{{2
-//static void iio_save_image_as_asc(const char *filename, struct iio_image *x)
+//static void iio_write_image_as_asc(const char *filename, struct iio_image *x)
 //{
 //	FILE *f = xfopen(filename, "w");
 //	int w = x->sizes[0];
@@ -3030,7 +3030,7 @@ static void iio_save_image_as_pfm(const char *filename, struct iio_image *x)
 //}
 
 // CSV writer                                                               {{{2
-static void iio_save_image_as_csv(const char *filename, struct iio_image *x)
+static void iio_write_image_as_csv(const char *filename, struct iio_image *x)
 {
 	FILE *f = xfopen(filename, "w");
 	int w = x->sizes[0];
@@ -3058,7 +3058,7 @@ static void rim_putshort(FILE *f, uint16_t n)
 	fputc(a, f);
 }
 
-static void iio_save_image_as_rim_fimage(const char *fname, struct iio_image *x)
+static void iio_write_image_as_rim_fimage(const char *fname, struct iio_image *x)
 {
 	if (x->type != IIO_TYPE_FLOAT) fail("fimage expects float data");
 	if (x->dimension != 2) fail("fimage expects 2d image");
@@ -3076,7 +3076,7 @@ static void iio_save_image_as_rim_fimage(const char *fname, struct iio_image *x)
 	xfclose(f);
 }
 
-static void iio_save_image_as_rim_cimage(const char *fname, struct iio_image *x)
+static void iio_write_image_as_rim_cimage(const char *fname, struct iio_image *x)
 {
 	if (x->type != IIO_TYPE_UINT8) fail("cimage expects byte data");
 	if (x->dimension != 2) fail("cimage expects 2d image");
@@ -3485,7 +3485,7 @@ static int read_image(struct iio_image *x, const char *fname)
 }
 
 
-static void iio_save_image_default(const char *filename, struct iio_image *x);
+static void iio_write_image_default(const char *filename, struct iio_image *x);
 
 
 
@@ -3907,7 +3907,7 @@ static bool string_suffix(const char *s, const char *suf)
 // Note:
 // This function was written without being designed.  See file "saving.txt" for
 // an attempt at designing it.
-static void iio_save_image_default(const char *filename, struct iio_image *x)
+static void iio_write_image_default(const char *filename, struct iio_image *x)
 {
 	int typ = normalize_type(x->type);
 	if (x->dimension != 2) fail("de moment només escrivim 2D");
@@ -3917,38 +3917,38 @@ static void iio_save_image_default(const char *filename, struct iio_image *x)
 	//}
 	if (string_suffix(filename, ".uv") && typ == IIO_TYPE_FLOAT
 				&& x->pixel_dimension == 2) {
-		iio_save_image_as_juv(filename, x);
+		iio_write_image_as_juv(filename, x);
 		return;
 	}
 	if (string_suffix(filename, ".flo") && typ == IIO_TYPE_FLOAT
 				&& x->pixel_dimension == 2) {
-		iio_save_image_as_flo(filename, x);
+		iio_write_image_as_flo(filename, x);
 		return;
 	}
 	if (string_suffix(filename, ".pfm") && typ == IIO_TYPE_FLOAT
 		&& (x->pixel_dimension == 1 || x->pixel_dimension == 3)) {
-		iio_save_image_as_pfm(filename, x);
+		iio_write_image_as_pfm(filename, x);
 		return;
 	}
 	if (string_suffix(filename, ".csv") && typ == IIO_TYPE_FLOAT
 				&& x->pixel_dimension == 1) {
-		iio_save_image_as_csv(filename, x);
+		iio_write_image_as_csv(filename, x);
 		return;
 	}
 	if (string_suffix(filename, ".mw") && typ == IIO_TYPE_FLOAT
 				&& x->pixel_dimension == 1) {
-		iio_save_image_as_rim_fimage(filename, x);
+		iio_write_image_as_rim_fimage(filename, x);
 		return;
 	}
 	if (string_suffix(filename, ".mw") && typ == IIO_TYPE_UINT8
 				&& x->pixel_dimension == 1) {
-		iio_save_image_as_rim_cimage(filename, x);
+		iio_write_image_as_rim_cimage(filename, x);
 		return;
 	}
 #ifdef I_CAN_HAS_LIBTIFF
 	if (x->pixel_dimension != 1 && x->pixel_dimension != 3 && x->pixel_dimension != 4 && x->pixel_dimension != 2 )
 	{
-		iio_save_image_as_tiff_smarter(filename, x);
+		iio_write_image_as_tiff_smarter(filename, x);
 		return;
 	}
 #endif//I_CAN_HAS_LIBTIFF
@@ -3962,7 +3962,7 @@ static void iio_save_image_default(const char *filename, struct iio_image *x)
 		x->data = xmalloc(nsamp*sizeof(float));
 		memcpy(x->data, old_data, nsamp*sizeof(float));
 		iio_convert_samples(x, IIO_TYPE_UINT8);
-		iio_save_image_default(filename, x); // recursive call
+		iio_write_image_default(filename, x); // recursive call
 		xfree(x->data);
 		x->data = old_data;
 		return;
@@ -3976,14 +3976,14 @@ static void iio_save_image_default(const char *filename, struct iio_image *x)
 				|| string_suffix(filename, ".TIF")
 		   )
 		{
-			iio_save_image_as_tiff_smarter(filename, x);
+			iio_write_image_as_tiff_smarter(filename, x);
 			return;
 		}
 	}
 	if (true) {
 		char *tiffname = strstr(filename, "TIFF:");
 		if (tiffname == filename) {
-			iio_save_image_as_tiff_smarter(filename+5, x);
+			iio_write_image_as_tiff_smarter(filename+5, x);
 			return;
 		}
 	}
@@ -3997,7 +3997,7 @@ static void iio_save_image_default(const char *filename, struct iio_image *x)
 				x->data = xmalloc(nsamp*sizeof(float));
 				memcpy(x->data, old_data, nsamp*sizeof(float));
 				iio_convert_samples(x, IIO_TYPE_UINT8);
-				iio_save_image_default(filename, x);//recursive
+				iio_write_image_default(filename, x);//recursive
 				xfree(x->data);
 				x->data = old_data;
 				return;
@@ -4007,12 +4007,12 @@ static void iio_save_image_default(const char *filename, struct iio_image *x)
 				x->data = xmalloc(nsamp*sizeof(int));
 				memcpy(x->data, old_data, nsamp*sizeof(int));
 				iio_convert_samples(x, IIO_TYPE_UINT8);
-				iio_save_image_default(filename, x);//recursive
+				iio_write_image_default(filename, x);//recursive
 				xfree(x->data);
 				x->data = old_data;
 				return;
 			}
-			iio_save_image_as_png(filename+4, x);
+			iio_write_image_as_png(filename+4, x);
 			return;
 		}
 	}
@@ -4024,12 +4024,12 @@ static void iio_save_image_default(const char *filename, struct iio_image *x)
 				x->data = xmalloc(nsamp*sizeof(float));
 				memcpy(x->data, old_data, nsamp*sizeof(float));
 				iio_convert_samples(x, IIO_TYPE_UINT16);
-				iio_save_image_default(filename, x);//recursive
+				iio_write_image_default(filename, x);//recursive
 				xfree(x->data);
 				x->data = old_data;
 				return;
 			}
-			iio_save_image_as_png(filename+6, x);
+			iio_write_image_as_png(filename+6, x);
 			return;
 		}
 	}
@@ -4046,7 +4046,7 @@ static void iio_save_image_default(const char *filename, struct iio_image *x)
 				x->data = xmalloc(nsamp*sizeof(float));
 				memcpy(x->data, old_data, nsamp*sizeof(float));
 				iio_convert_samples(x, IIO_TYPE_UINT8);
-				iio_save_image_default(filename, x);//recursive
+				iio_write_image_default(filename, x);//recursive
 				xfree(x->data);
 				x->data = old_data;
 				return;
@@ -4056,12 +4056,12 @@ static void iio_save_image_default(const char *filename, struct iio_image *x)
 				x->data = xmalloc(nsamp*sizeof(int));
 				memcpy(x->data, old_data, nsamp*sizeof(int));
 				iio_convert_samples(x, IIO_TYPE_UINT8);
-				iio_save_image_default(filename, x);//recursive
+				iio_write_image_default(filename, x);//recursive
 				xfree(x->data);
 				x->data = old_data;
 				return;
 			}
-			iio_save_image_as_png(filename, x);
+			iio_write_image_as_png(filename, x);
 			return;
 		}
 	}
@@ -4123,7 +4123,7 @@ static void iio_save_image_default(const char *filename, struct iio_image *x)
 		}
 	} else
 #ifdef I_CAN_HAS_LIBTIFF
-		iio_save_image_as_tiff_smarter(filename, x);
+		iio_write_image_as_tiff_smarter(filename, x);
 #else
 		fail("\n\n\nThis particular data format can not yet be saved."
 				"\nPlease, ask enric.\n");
@@ -4131,7 +4131,7 @@ static void iio_save_image_default(const char *filename, struct iio_image *x)
 	xfclose(f);
 }
 
-void iio_save_image_uint8_matrix_rgb(char *filename, uint8_t (**data)[3],
+void iio_write_image_uint8_matrix_rgb(char *filename, uint8_t (**data)[3],
 		int w, int h)
 {
 	struct iio_image x[1];
@@ -4141,10 +4141,10 @@ void iio_save_image_uint8_matrix_rgb(char *filename, uint8_t (**data)[3],
 	x->pixel_dimension = 3;
 	x->type = IIO_TYPE_UINT8;
 	x->data = data[0][0];
-	iio_save_image_default(filename, x);
+	iio_write_image_default(filename, x);
 }
 
-void iio_save_image_uint8_matrix(char *filename, uint8_t **data, int w, int h)
+void iio_write_image_uint8_matrix(char *filename, uint8_t **data, int w, int h)
 {
 	struct iio_image x[1];
 	x->dimension = 2;
@@ -4153,10 +4153,10 @@ void iio_save_image_uint8_matrix(char *filename, uint8_t **data, int w, int h)
 	x->pixel_dimension = 1;
 	x->type = IIO_TYPE_UINT8;
 	x->data = data[0];
-	iio_save_image_default(filename, x);
+	iio_write_image_default(filename, x);
 }
 
-void iio_save_image_float_vec(char *filename, float *data,
+void iio_write_image_float_vec(char *filename, float *data,
 		int w, int h, int pd)
 {
 	struct iio_image x[1];
@@ -4167,19 +4167,19 @@ void iio_save_image_float_vec(char *filename, float *data,
 	x->type = IIO_TYPE_FLOAT;
 	x->data = data;
 	x->contiguous_data = false;
-	iio_save_image_default(filename, x);
+	iio_write_image_default(filename, x);
 }
 
-void iio_save_image_float_split(char *filename, float *data,
+void iio_write_image_float_split(char *filename, float *data,
 		int w, int h, int pd)
 {
 	float *rdata = xmalloc(w*h*pd*sizeof*rdata);
 	recover_broken_pixels_float(rdata, data, w*h, pd);
-	iio_save_image_float_vec(filename, rdata, w, h, pd);
+	iio_write_image_float_vec(filename, rdata, w, h, pd);
 	xfree(rdata);
 }
 
-void iio_save_image_int_vec(char *filename, int *data,
+void iio_write_image_int_vec(char *filename, int *data,
 		int w, int h, int pd)
 {
 	struct iio_image x[1];
@@ -4190,10 +4190,10 @@ void iio_save_image_int_vec(char *filename, int *data,
 	x->type = IIO_TYPE_INT;
 	x->data = data;
 	x->contiguous_data = false;
-	iio_save_image_default(filename, x);
+	iio_write_image_default(filename, x);
 }
 
-void iio_save_image_double_vec(char *filename, double *data,
+void iio_write_image_double_vec(char *filename, double *data,
 		int w, int h, int pd)
 {
 	struct iio_image x[1];
@@ -4204,19 +4204,19 @@ void iio_save_image_double_vec(char *filename, double *data,
 	x->type = IIO_TYPE_DOUBLE;
 	x->data = data;
 	x->contiguous_data = false;
-	iio_save_image_default(filename, x);
+	iio_write_image_default(filename, x);
 }
 
-void iio_save_image_double_split(char *filename, double *data,
+void iio_write_image_double_split(char *filename, double *data,
 		int w, int h, int pd)
 {
 	double *rdata = xmalloc(w*h*pd*sizeof*rdata);
 	recover_broken_pixels_double(rdata, data, w*h, pd);
-	iio_save_image_double_vec(filename, rdata, w, h, pd);
+	iio_write_image_double_vec(filename, rdata, w, h, pd);
 	xfree(rdata);
 }
 
-void iio_save_image_float(char *filename, float *data, int w, int h)
+void iio_write_image_float(char *filename, float *data, int w, int h)
 {
 	struct iio_image x[1];
 	x->dimension = 2;
@@ -4226,10 +4226,10 @@ void iio_save_image_float(char *filename, float *data, int w, int h)
 	x->type = IIO_TYPE_FLOAT;
 	x->data = data;
 	x->contiguous_data = false;
-	iio_save_image_default(filename, x);
+	iio_write_image_default(filename, x);
 }
 
-void iio_save_image_double(char *filename, double *data, int w, int h)
+void iio_write_image_double(char *filename, double *data, int w, int h)
 {
 	struct iio_image x[1];
 	x->dimension = 2;
@@ -4239,10 +4239,10 @@ void iio_save_image_double(char *filename, double *data, int w, int h)
 	x->type = IIO_TYPE_DOUBLE;
 	x->data = data;
 	x->contiguous_data = false;
-	iio_save_image_default(filename, x);
+	iio_write_image_default(filename, x);
 }
 
-void iio_save_image_int(char *filename, int *data, int w, int h)
+void iio_write_image_int(char *filename, int *data, int w, int h)
 {
 	struct iio_image x[1];
 	x->dimension = 2;
@@ -4252,11 +4252,11 @@ void iio_save_image_int(char *filename, int *data, int w, int h)
 	x->type = IIO_TYPE_INT;
 	x->data = data;
 	x->contiguous_data = false;
-	iio_save_image_default(filename, x);
+	iio_write_image_default(filename, x);
 }
 
 
-void iio_save_image_uint8_vec(char *filename, uint8_t *data,
+void iio_write_image_uint8_vec(char *filename, uint8_t *data,
 		int w, int h, int pd)
 {
 	struct iio_image x[1];
@@ -4267,10 +4267,10 @@ void iio_save_image_uint8_vec(char *filename, uint8_t *data,
 	x->type = IIO_TYPE_UINT8;
 	x->data = data;
 	x->contiguous_data = false;
-	iio_save_image_default(filename, x);
+	iio_write_image_default(filename, x);
 }
 
-void iio_save_image_uint16_vec(char *filename, uint16_t *data,
+void iio_write_image_uint16_vec(char *filename, uint16_t *data,
 		int w, int h, int pd)
 {
 	struct iio_image x[1];
@@ -4281,7 +4281,23 @@ void iio_save_image_uint16_vec(char *filename, uint16_t *data,
 	x->type = IIO_TYPE_UINT16;
 	x->data = data;
 	x->contiguous_data = false;
-	iio_save_image_default(filename, x);
+	iio_write_image_default(filename, x);
 }
+
+// API (deprecated)                                                         {{{1
+#ifdef IIO_USE_INCONSISTENT_NAMES
+// code below generated by an ugly sed script
+void iio_save_image_float_vec(char *filename, float *x, int w, int h, int pd)       {return iio_write_image_float_vec       (filename, x, w, h, pd); }
+void iio_save_image_float_split(char *filename, float *x, int w, int h, int pd)     {return iio_write_image_float_split     (filename, x, w, h, pd); }
+void iio_save_image_double_vec(char *filename, double *x, int w, int h, int pd)     {return iio_write_image_double_vec      (filename, x, w, h, pd); }
+void iio_save_image_float(char *filename, float *x, int w, int h)                   {return iio_write_image_float           (filename, x, w, h); }
+void iio_save_image_double(char *filename, double *x, int w, int h)                 {return iio_write_image_double          (filename, x, w, h); }
+void iio_save_image_int(char *filename, int *x, int w, int h)                       {return iio_write_image_int             (filename, x, w, h); }
+void iio_save_image_int_vec(char *filename, int *x, int w, int h, int pd)           {return iio_write_image_int_vec         (filename, x, w, h, pd); }
+void iio_save_image_uint8_vec(char *filename, uint8_t *x, int w, int h, int pd)     {return iio_write_image_uint8_vec       (filename, x, w, h, pd); }
+void iio_save_image_uint16_vec(char *filename, uint16_t *x, int w, int h, int pd)   {return iio_write_image_uint16_vec      (filename, x, w, h, pd); }
+void iio_save_image_uint8_matrix_rgb(char *f, unsigned char (**x)[3], int w, int h) {return iio_write_image_uint8_matrix_rgb(f, x, w, h); }
+void iio_save_image_uint8_matrix(char *f, unsigned char **x, int w, int h)          {return iio_write_image_uint8_matrix    (f, x, w, h); }
+#endif//IIO_USE_INCONSISTENT_NAMES
 
 // vim:set foldmethod=marker:

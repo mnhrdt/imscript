@@ -12,8 +12,8 @@ float march_regular(float a, float b, float c, float d, float x, float y)
 		float ix = a;
 		if (alpha > 0) {
 			float y0=(x+alpha*y)/alpha;
-			assert(y0 >= 0);
-			assert(y0 <= 1);
+			//assert(y0 >= 0);
+			//assert(y0 <= 1);
 			ix = b*y0 + a*(1 - y0);
 		}
 		return ix;
@@ -25,8 +25,8 @@ float march_regular(float a, float b, float c, float d, float x, float y)
 		float ix = d;
 		if (beta < 1) {
 			float y0=(x+(1-beta)*y-1)/(1-beta);
-			assert(y0 >= 0);
-			assert(y0 <= 1);
+			//assert(y0 >= 0);
+			//assert(y0 <= 1);
 			ix = d*y0 + c*(1 - y0);
 		}
 		return ix;
