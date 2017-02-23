@@ -196,7 +196,7 @@ int main(int argc, char **argv)
 	cregistration(out, left, right, w, h, pd);
 
 	// save the output image
-	iio_save_image_float_vec(filename_Tright, out, w, h, pd);
+	iio_write_image_float_vec(filename_Tright, out, w, h, pd);
 
 	// cleanup and exit
 	free(left);

@@ -104,7 +104,7 @@ static void save_debug_image(char *fpat, int id, float *x, int w, int h)
 	char filename[0x100];
 	snprintf(filename, 0x100, fpat, id);
 	fprintf(stderr, "saving image \"%s\"\n", filename);
-	iio_save_image_float(filename, x, w, h);
+	iio_write_image_float(filename, x, w, h);
 }
 
 static void save_debug_flow(char *fpat, int id, float*u, float*v, int w, int h)
@@ -119,7 +119,7 @@ static void save_debug_flow(char *fpat, int id, float*u, float*v, int w, int h)
 	}
 
 	fprintf(stderr, "saving field \"%s\"\n", filename);
-	iio_save_image_float_vec(filename, f, w, h, 2);
+	iio_write_image_float_vec(filename, f, w, h, 2);
 	xfree(f);
 }
 
@@ -715,7 +715,7 @@ int main(int argc, char *argv[])
 	multi_scale_optical_flow(method_id, params, nparams,
 			u, v, a, b, w, h, nscales, scale_step, last_scale);
 
-	iio_save_image_float_split(filename_f, u, w, h, 2);
+	iio_write_image_float_split(filename_f, u, w, h, 2);
 
 	xfree(u);
 	xfree(a);
@@ -755,7 +755,7 @@ int main(int c, char *v[])
 		snprintf(buf, 0x100, filepattern_out, i);
 		printf("SCALE NUMBER %d: %dx%d (%d) => \"%s\"\n", i,
 				pyrw[i], pyrh[i], buf);
-		iio_save_image_float(buf, pyrx[i], pyrw[i], pyrh[i]);
+		iio_write_image_float(buf, pyrx[i], pyrw[i], pyrh[i]);
 	}
 
 
@@ -808,7 +808,7 @@ int main(int argc, char *argv[])
 		f[2*i] = u[i];
 		f[2*i+1] = v[i];
 	}
-	iio_save_image_float_vec(filename_f, f, w, h, 2);
+	iio_write_image_float_vec(filename_f, f, w, h, 2);
 
 	xfree(f);
 	xfree(u);

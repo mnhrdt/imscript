@@ -109,7 +109,7 @@ int main(int c, char *v[])
 
 	hshading(y, x, w, h);
 
-	iio_save_image_float_vec(filename_out, y, w, h, 1);
+	iio_write_image_float_vec(filename_out, y, w, h, 1);
 
 	free(x);
 	free(y);

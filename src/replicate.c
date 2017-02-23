@@ -19,6 +19,6 @@ int main(int c, char *v[])
 		y[j][i+w][l] = g;
 		y[h+j][w+i][l] = g;
 	}
-	iio_save_image_float_vec("-", y_raw, 2*w, 2*h, pd);
+	iio_write_image_float_vec("-", y_raw, 2*w, 2*h, pd);
 	return 0;
 }

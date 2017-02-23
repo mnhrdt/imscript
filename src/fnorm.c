@@ -30,6 +30,6 @@ int main(int c, char *v[])
 	float *y = xmalloc(w*h*sizeof*y);
 	for (int i = 0; i < w * h; i++)
 		y[i] = fnorm(x + pd*i, pd);//hypot(x[2*i], x[2*i+1]);
-	iio_save_image_float_vec(out, y, w, h, 1);
+	iio_write_image_float_vec(out, y, w, h, 1);
 	return EXIT_SUCCESS;
 }

@@ -34,6 +34,6 @@ int main(int c, char *v[])
 		e[j][i][1] = rij[1] - fij[1];
 
 	}
-	iio_save_image_float_vec("-", **e, nx, ny, 2);
+	iio_write_image_float_vec("-", **e, nx, ny, 2);
 	return 0;
 }

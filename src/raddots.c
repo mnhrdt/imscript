@@ -98,7 +98,7 @@ int main(int c, char *v[])
 	raddots(y, out_w, out_h, x, w, h, pd, H);
 
 	// save output result
-	iio_save_image_float_vec(filename_out, y, out_w, out_h, pd);
+	iio_write_image_float_vec(filename_out, y, out_w, out_h, pd);
 
 	// cleanup and exit
 	free(x);

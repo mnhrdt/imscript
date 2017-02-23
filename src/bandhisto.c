@@ -33,7 +33,7 @@ int main(int c, char *v[])
 		H[l*nbins+idx] += 1;
 	}
 
-	iio_save_image_double(filename_out, H, nbins, pd);
+	iio_write_image_double(filename_out, H, nbins, pd);
 
 	return 0;
 }

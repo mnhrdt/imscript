@@ -51,7 +51,7 @@ int main(int c, char **v)
 	float *x = xmalloc(2*w*h*sizeof*x);
 	pairsinp(x, w, h, p, n);
 
-	iio_save_image_float_vec("-", x, w, h, 2);
+	iio_write_image_float_vec("-", x, w, h, 2);
 
 	free(x);
 	free(p);

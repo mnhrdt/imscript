@@ -95,7 +95,7 @@ int main(int c, char *v[])
 
 	dct(y, x, w, h, pd);
 
-	iio_save_image_float_vec(out, y, w, h, pd);
+	iio_write_image_float_vec(out, y, w, h, pd);
 	free(x);
 	free(y);
 	return EXIT_SUCCESS;

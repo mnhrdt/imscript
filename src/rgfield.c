@@ -74,7 +74,7 @@ int main(int c, char *v[])
 
 	fill_random_field(f, w, h, sigma, eta);
 
-	iio_save_image_float_vec("-", f, w, h, 2);
+	iio_write_image_float_vec("-", f, w, h, 2);
 
 	free(f);
 

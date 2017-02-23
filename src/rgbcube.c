@@ -472,7 +472,7 @@ int main(void)
 	uint8_t (**d)[3] = matrix_build(dside, dside, 3);
 	draw_histogram(d, dside, h, bins);
 
-	iio_save_image_uint8_matrix_rgb("-", d, dside, dside);
+	iio_write_image_uint8_matrix_rgb("-", d, dside, dside);
 
 	xfree(d);
 	xfree(h);

@@ -95,8 +95,8 @@ int main(int argc, char *argv[])
 
 	lapbe_colorizer(outhue, outint, metric, colors, *w, *h, pd);
 
-	iio_save_image_float_vec(filename_outhue, outhue, *w, *h, pd);
-	iio_save_image_float_vec(filename_outint, outint, *w, *h, pd);
+	iio_write_image_float_vec(filename_outhue, outhue, *w, *h, pd);
+	iio_write_image_float_vec(filename_outint, outint, *w, *h, pd);
 
 	free(outhue); free(outint); free(metric); free(colors);
 	return 0;

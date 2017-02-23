@@ -153,7 +153,7 @@ int main(int c, char *v[])
 
 	bdint_gen_split(x, w, h, pd, a);
 
-	iio_save_image_float_split(filename_out, x, w, h, pd);
+	iio_write_image_float_split(filename_out, x, w, h, pd);
 
 	return 0;
 }

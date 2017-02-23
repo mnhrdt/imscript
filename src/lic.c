@@ -68,7 +68,7 @@ int main(int c, char *v[])
 
 	float *view = xmalloc(w * h * sizeof*view);
 	line_integral_convolution(view, flow, w, h);
-	iio_save_image_float_vec(outfile, view, w, h, 1);
+	iio_write_image_float_vec(outfile, view, w, h, 1);
 
 	free(view);
 	free(flow);

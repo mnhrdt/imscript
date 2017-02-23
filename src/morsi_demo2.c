@@ -403,7 +403,7 @@ int main(int c, char **v)
 #endif
 	for (int i = 0; i < 13; i++)
 		if (t[i].x)
-			iio_save_image_float_split(t[i].n, t[i].x, w, h, pd);
+			iio_write_image_float_split(t[i].n, t[i].x, w, h, pd);
 
 	// cleanup and exit
 	free(x); free(y);

@@ -42,7 +42,7 @@ int main(int c, char *v[])
 
 	float *x = xmalloc(w*h*sizeof*x);
 	aronsson11(x, w, h, alpha, x0, y0);
-	iio_save_image_float(filename_out, x, w, h);
+	iio_write_image_float(filename_out, x, w, h);
 	free(x);
 	return 0;
 }

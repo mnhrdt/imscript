@@ -189,7 +189,7 @@ static void reorder_mask(int (*m)[2], int n, float *x, int w, int h, char *opt)
 		//	points[2*i+1] = m[i][1];
 		//}
 		fill_distance_fast(dist, w, h, points, np);
-		//iio_save_image_float("/tmp/mydist", dist, w, h);
+		//iio_write_image_float("/tmp/mydist", dist, w, h);
 		struct pair *pairs = xmalloc(n*sizeof*pairs);
 		for (int i = 0; i < n; i++) {
 			int idx = w*m[i][1] + m[i][0];
@@ -278,7 +278,7 @@ int main(int argc, char *argv[])
 	explicit_poisson_extension_with_ordering_choice(out,
 			in, *w, *h, timestep, niter, ordering_option);
 
-	iio_save_image_float(filename_out, out, *w, *h);
+	iio_write_image_float(filename_out, out, *w, *h);
 
 	return 0;
 }

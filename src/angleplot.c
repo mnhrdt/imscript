@@ -55,7 +55,7 @@ int main(int c, char *v[])
 	if (pd != 2) fail("need 2D-valued input");
 	float *o = xmalloc(width * width * sizeof*o);
 	angleplot(o, width, scale, f, w, h);
-	iio_save_image_float_vec(filename_out, o, width, width, 1);
+	iio_write_image_float_vec(filename_out, o, width, width, 1);
 	return EXIT_SUCCESS;
 }
 

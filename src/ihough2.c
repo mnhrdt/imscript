@@ -315,8 +315,8 @@ static void dump_left(char *fname_left, char *fname_right,
 		}
 	}
 
-	iio_save_image_uint8_vec(fname_left, alpha_left, w, h, 4);
-	iio_save_image_uint8_vec(fname_right, alpha_right, ntheta, nrho, 4);
+	iio_write_image_uint8_vec(fname_left, alpha_left, w, h, 4);
+	iio_write_image_uint8_vec(fname_right, alpha_right, ntheta, nrho, 4);
 	free(alpha_left);
 	free(alpha_right);
 }
@@ -342,8 +342,8 @@ static void dump_right(char *fname_left, char *fname_right,
 	voterline(l, w, h, ntheta, nrho, click_a, click_b, folding);
 	plot_transparent_red_line(alpha_left, w, h, l);
 
-	iio_save_image_uint8_vec(fname_left, alpha_left, w, h, 4);
-	iio_save_image_uint8_vec(fname_right, alpha_right, ntheta, nrho, 4);
+	iio_write_image_uint8_vec(fname_left, alpha_left, w, h, 4);
+	iio_write_image_uint8_vec(fname_right, alpha_right, ntheta, nrho, 4);
 	free(alpha_left);
 	free(alpha_right);
 }
@@ -396,7 +396,7 @@ int main(int c, char *v[])
 	}
 
 	// save output image
-	iio_save_image_float_vec(f_out, transform, ntheta, nrho, 1);
+	iio_write_image_float_vec(f_out, transform, ntheta, nrho, 1);
 
 after_computation:
 

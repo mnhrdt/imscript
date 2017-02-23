@@ -203,7 +203,7 @@ int main(int argc, char **argv)
 	registration(out, left, right, w, h);
 
 	// save the output image
-	iio_save_image_float(filename_Tright, out, w, h);
+	iio_write_image_float(filename_Tright, out, w, h);
 
 	// cleanup and exit
 	free(left);

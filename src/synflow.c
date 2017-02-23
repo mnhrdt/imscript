@@ -58,8 +58,8 @@ int main_synflow(int c, char *v[])
 	fill_flow_field(f, fm, w, h);
 	transform_forward(y, fm, x, w, h, pd);
 
-	iio_save_image_float_vec(v[4], y, w, h, pd);
-	iio_save_image_float_vec(v[5], f, w, h, 2);
+	iio_write_image_float_vec(v[4], y, w, h, pd);
+	iio_write_image_float_vec(v[5], f, w, h, 2);
 
 	free(x);
 	free(y);

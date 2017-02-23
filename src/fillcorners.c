@@ -172,8 +172,8 @@ int main(int c, char *v[])
 
 	fillcorners(x, m, w, h, pd, width);
 
-	iio_save_image_float_vec(out_image, x, w, h, pd);
-	iio_save_image_float(out_mask, m, w, h);
+	iio_write_image_float_vec(out_image, x, w, h, pd);
+	iio_write_image_float(out_mask, m, w, h);
 	free(x);
 	free(m);
 	return EXIT_SUCCESS;

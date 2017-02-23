@@ -233,7 +233,7 @@ int main(int argc, char *argv[])
 		exit(fprintf(stderr, "input images size mismatch\n"));
 	float *f = xmalloc(w * h * 2 * sizeof(float));
 	cgi(f, a, b, w, h);
-	iio_save_image_float_vec(filename_f, f, w, h, 2);
+	iio_write_image_float_vec(filename_f, f, w, h, 2);
 
 	free(a); free(b); free(f);
 	return EXIT_SUCCESS;

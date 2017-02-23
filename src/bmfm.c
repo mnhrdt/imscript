@@ -158,7 +158,7 @@ int main(int c, char *v[])
 
 	bmfm(o, a, b, w, h, pd, fm);
 
-	iio_save_image_float_vec(filename_out, o, w, h, 3);
+	iio_write_image_float_vec(filename_out, o, w, h, 3);
 
 	free(a);
 	free(b);

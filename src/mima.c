@@ -52,7 +52,7 @@ int main(int c, char *v[])
 
 	mima_separable(y, x, w, h, pd);
 
-	iio_save_image_float_split(filename_out, y, w, h, pd);
+	iio_write_image_float_split(filename_out, y, w, h, pd);
 
 	free(x);
 	free(y);

@@ -377,7 +377,7 @@ int main(int argc, char *argv[])
 			tstep, niter, nscal, cgrad);
 
 	// save the output image
-	iio_save_image_float_split(filename_o, out, w, h, pd);
+	iio_write_image_float_split(filename_o, out, w, h, pd);
 
 	// cleanup and exit
 	free(out);

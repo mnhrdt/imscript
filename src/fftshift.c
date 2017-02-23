@@ -58,7 +58,7 @@ int main(int c, char *v[])
 	FOR(j,h) FOR(i,w) FOR(l,pd)
 		y[j][i][l] = p(x, w,h,pd, i+w/2, j+h/2, l);
 
-	iio_save_image_float_vec(out, y[0][0], w, h, pd);
+	iio_write_image_float_vec(out, y[0][0], w, h, pd);
 	free(x);
 	free(y);
 	return EXIT_SUCCESS;

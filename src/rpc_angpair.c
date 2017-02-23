@@ -63,6 +63,6 @@ int main(int c, char *v[])
 		e[j][i][2] = angle(vbase, vij);
 
 	}
-	iio_save_image_float_vec("-", **e, nx, ny, 3);
+	iio_write_image_float_vec("-", **e, nx, ny, 3);
 	return 0;
 }

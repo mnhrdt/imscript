@@ -453,8 +453,8 @@ void blur_2d(float *y, float *x, int w, int h, int pd,
 	fill_kernel_image(k, w, h, f, p);
 	if (isupper(kernel_id[0]))
 		substract_from_identity(k, w, h);
-	//void iio_save_image_float(char*,float*,int,int);
-	//iio_save_image_float("/tmp/blurk.tiff", k, w, h);
+	//void iio_write_image_float(char*,float*,int,int);
+	//iio_write_image_float("/tmp/blurk.tiff", k, w, h);
 
 	fftwf_complex *fk = fftwf_xmalloc(w*h*sizeof*fk);
 	fft_2dfloat(fk, k, w, h);
@@ -530,7 +530,7 @@ int main(int c, char *v[])
 
 	blur_2d(y, x, w, h, pd, kernel_id, param, nparams);
 
-	iio_save_image_float_vec(filename_out, y, w, h, pd);
+	iio_write_image_float_vec(filename_out, y, w, h, pd);
 	free(x);
 	free(y);
 	return EXIT_SUCCESS;

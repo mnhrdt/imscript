@@ -88,7 +88,7 @@ int main(int c, char *v[])
 	color_census_transform(y, nbytes, x, w, h, pd, winradius);
 
 	// save, cleanup, and exit
-	iio_save_image_uint8_vec(filename_out, y, w, h, nbytes);
+	iio_write_image_uint8_vec(filename_out, y, w, h, nbytes);
 	free(x);
 	free(y);
 	return 0;

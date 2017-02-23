@@ -184,7 +184,7 @@ int main(int argc, char *argv[])
 		f[2*i] = u[i];
 		f[2*i+1] = v[i];
 	}
-	iio_save_image_float_vec(filename_f, f, w, h, 2);
+	iio_write_image_float_vec(filename_f, f, w, h, 2);
 	return EXIT_SUCCESS;
 }
 #endif//OMIT_MAIN

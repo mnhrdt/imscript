@@ -473,7 +473,7 @@ int main(int argc, char *argv[])
 	tv_interpolator_separable(out, img_i, w, h, pd, nscal, niter, tstep);
 
 	// save the output image
-	iio_save_image_float_split(filename_o, out, w, h, pd);
+	iio_write_image_float_split(filename_o, out, w, h, pd);
 
 	// cleanup and exit
 	free(out);

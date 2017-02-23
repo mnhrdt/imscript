@@ -1222,7 +1222,7 @@ struct ann_pair *sift_fm_pairs(
 				if (insideP(dbg_w, dbg_h, xp, yp))
 					dbg[3*(dbg_w*yp+xp)+1] = 255;
 			}
-			iio_save_image_uint8_vec("/tmp/dbg_sfm.png", dbg, dbg_w, dbg_h, 3);
+			iio_write_image_uint8_vec("/tmp/dbg_sfm.png", dbg, dbg_w, dbg_h, 3);
 			free(dbg);
 			goto acabemaqui;
 		}

@@ -137,7 +137,7 @@ int main(int argc, char **argv)
 
 			char fnam[FILENAME_MAX];
 			snprintf(fnam, FILENAME_MAX, "/tmp/xtarfield_%04d.tiff", fid);
-			iio_save_image_float(fnam, x, w, h);
+			iio_write_image_float(fnam, x, w, h);
 			fid += 1;
 		}
 

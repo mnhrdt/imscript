@@ -125,7 +125,7 @@ static void nusavec(char *fmt, int idx, float *x, int w, int h, int pd)
 {
 	char fname[FILENAME_MAX];
 	snprintf(fname, FILENAME_MAX, fmt, idx);
-	iio_save_image_float_vec(fname, x, w, h, pd);
+	iio_write_image_float_vec(fname, x, w, h, pd);
 }
 
 static int global_scale;
@@ -403,7 +403,7 @@ int main_warp(int c, char *v[])
 	mnehs_affine_warp(out, h0, wi,hi,pd, a,wa,ha, b,wb,hb, PA, PB);
 
 	// save the output image
-	iio_save_image_float_vec(filename_out, out, wi, hi, pd);
+	iio_write_image_float_vec(filename_out, out, wi, hi, pd);
 
 	// cleanup and exit
 	free(out);
@@ -463,7 +463,7 @@ int main_compute(int c, char *v[])
 	//}
 
 	// save the output image
-	iio_save_image_float(filename_out, out, wi, hi);
+	iio_write_image_float(filename_out, out, wi, hi);
 
 	// cleanup and exit
 	free(out);

@@ -183,8 +183,8 @@ int main_rpc_warpabt(int c, char *v[])
 	rpc_warpabt(outa, outb, h0, w,h,pd, ta,rpca, tb,rpcb, axyh);
 
 	// save the output images
-	iio_save_image_float_vec(filename_outa, outa, w, h, pd);
-	iio_save_image_float_vec(filename_outb, outb, w, h, pd);
+	iio_write_image_float_vec(filename_outa, outa, w, h, pd);
+	iio_write_image_float_vec(filename_outb, outb, w, h, pd);
 
 	// cleanup and exit
 	free(outa);

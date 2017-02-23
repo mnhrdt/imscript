@@ -309,7 +309,7 @@ int main(int c, char *v[])
 
 	deframe(y, w+1, h+1, x, *w, *h, pd, points);
 
-	iio_save_image_float_vec(filename_out, y, w[1], h[1], pd);
+	iio_write_image_float_vec(filename_out, y, w[1], h[1], pd);
 	free(y);
 	free(x);
 	return EXIT_SUCCESS;

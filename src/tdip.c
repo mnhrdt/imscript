@@ -330,7 +330,7 @@ void tdip(float *transform, double arad, int tside, float *dip, int w, int h)
 	}
 
 	// debug stuff
-	//iio_save_image_float_vec("/tmp/gradmask.tiff", tmp, w, h, 1);
+	//iio_write_image_float_vec("/tmp/gradmask.tiff", tmp, w, h, 1);
 	free(tmp);
 }
 
@@ -452,7 +452,7 @@ void tdip_state_update_input(struct tdip_state *e, float *x)
 	if (e->ntensor > 0) {
 		compute_structure_tensor_field_ultra_fancy(e->structure_tensor,
 				e->x, e->w, e->h, e->ntensor, 100);
-		//iio_save_image_float_vec("/tmp/debustr.tiff",
+		//iio_write_image_float_vec("/tmp/debustr.tiff",
 		//		e->structure_tensor, e->w, e->h, 7);
 	}
 	for (int i = 0; i < e->tside * e->tside; i++)
@@ -559,7 +559,7 @@ int main(int c, char *v[])
 	//	tdip(transform, aradius, tside, dip, w, h);
 
 	// save output image
-	iio_save_image_float_vec("-", e->transform, e->tside, e->tside, 1);
+	iio_write_image_float_vec("-", e->transform, e->tside, e->tside, 1);
 
 	// cleanup and exti
 	free(dip);

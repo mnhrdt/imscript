@@ -57,7 +57,7 @@ void build_gaussian_pyramid(float *p, int npyr, float sfirst, float slast,
 
 		char buf[FILENAME_MAX];
 		snprintf(buf, FILENAME_MAX, "/tmp/pyra_%03d.png", i);
-		iio_save_image_float_vec(buf, p+i*w*h*pd, w, h, pd);
+		iio_write_image_float_vec(buf, p+i*w*h*pd, w, h, pd);
 	}
 }
 
@@ -151,7 +151,7 @@ int main(int c, char *v[])
 
 		apply_general_model(y, sigma,uv, px, npyr,sfirst,slast, w,h,pd);
 		//apply_local_blur(y, sigma, px, npyr, sfirst, slast, w, h, pd);
-		iio_save_image_float_vec(filename_out, y, w, h, pd);
+		iio_write_image_float_vec(filename_out, y, w, h, pd);
 		free(sigma);
 	}
 

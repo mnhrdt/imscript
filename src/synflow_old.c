@@ -575,10 +575,10 @@ int main_synflow(int c, char *v[])
 
 
 	//viewflow(vf, f, w, h, 1);
-	//iio_save_image_uint8_vec("/tmp/vf.png", vf[0][0], w, h, 3);
+	//iio_write_image_uint8_vec("/tmp/vf.png", vf[0][0], w, h, 3);
 
-	iio_save_image_float_vec(v[4], y[0][0], w, h, pd);
-	iio_save_image_float_vec(v[5], f[0][0], w, h, 2);
+	iio_write_image_float_vec(v[4], y[0][0], w, h, pd);
+	iio_write_image_float_vec(v[5], f[0][0], w, h, 2);
 
 	free(x);
 	free(y);

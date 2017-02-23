@@ -416,7 +416,7 @@ static void naive_affine_map_using_spline(double *y, int out_w, int out_h,
 	if (1) {
 		char buf[FILENAME_MAX];
 		snprintf(buf,FILENAME_MAX,"/tmp/prepared_spline_%d.tiff",order);
-		iio_save_image_double_vec(buf, fx, w, h, pd);
+		iio_write_image_double_vec(buf, fx, w, h, pd);
 	}
 	double invA[6]; invert_affinity(invA, A);
 	//fprintf(stderr, "A = %g %g %g  %g %g %g\n",
@@ -462,7 +462,7 @@ int main(int c, char *v[])
 	naive_affine_map_using_spline(y, out_w, out_h, x, w, h, pd, A, order);
 
 	// save output result
-	iio_save_image_double_vec(filename_out, y, out_w, out_h, pd);
+	iio_write_image_double_vec(filename_out, y, out_w, out_h, pd);
 
 	// cleanup and exit
 	free(x);

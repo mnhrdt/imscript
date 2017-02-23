@@ -48,7 +48,7 @@ int main(int c, char *v[])
 	if (pd != 2) error("2D vector field expected");
 	float *y = xmalloc(4*w*h*sizeof*y);
 	flowgrad(y, x, w, h);
-	iio_save_image_float_vec(outfile, y, w, h, 4);
+	iio_write_image_float_vec(outfile, y, w, h, 4);
 	free(x);
 	return EXIT_SUCCESS;
 }

@@ -70,7 +70,7 @@ int main(int c, char *v[])
 	for (int i = 0; i < pd; i++)
 		periodic_component(y + w*h*i, x + w*h*i, w, h);
 
-	iio_save_image_float_split(out, y, w, h, pd);
+	iio_write_image_float_split(out, y, w, h, pd);
 
 	free(x);
 	free(y);

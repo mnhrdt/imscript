@@ -323,7 +323,7 @@ int main(int c, char *v[])
 	else
 		fill_distance_fast(x, w, h, p, n);
 
-	iio_save_image_float(filename_outimage, x, w, h);
+	iio_write_image_float(filename_outimage, x, w, h);
 
 	free(x);
 	free(p);

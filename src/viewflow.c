@@ -297,7 +297,7 @@ int main_viewflow(int c, char *v[])
 	} else
 		viewflow_middlebury(view[0][0], flow[0][0], w, h);
 
-	iio_save_image_uint8_vec(outfile, view[0][0], w, h, 3);
+	iio_write_image_uint8_vec(outfile, view[0][0], w, h, 3);
 
 	free(view);
 	free(flow);

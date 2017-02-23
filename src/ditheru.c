@@ -81,7 +81,7 @@ int main(int c, char *v[])
 
 	dither_sep(x, w, h, pd, lev, top);
 
-	iio_save_image_float_split(filename_out, x, w, h, pd);
+	iio_write_image_float_split(filename_out, x, w, h, pd);
 
 	free(x);
 	return 0;

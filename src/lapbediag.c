@@ -301,7 +301,7 @@ int main(int argc, char *argv[])
 
 	lapbediag_rec(out, metric, data, *w, *h, timestep, niter, nscales);
 
-	iio_save_image_float(filename_out, out, *w, *h);
+	iio_write_image_float(filename_out, out, *w, *h);
 
 	return 0;
 }

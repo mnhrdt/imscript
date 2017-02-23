@@ -53,6 +53,6 @@ int main(int c, char *v[])
 		img_out[ioy][iox-1][2] = 0;
 	}
 	fprintf(stderr, "ok, saving file\n");
-	iio_save_image_uint8_vec("-", img_out_raw, w, h, 3);
+	iio_write_image_uint8_vec("-", img_out_raw, w, h, 3);
 	return 0;
 }

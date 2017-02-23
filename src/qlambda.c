@@ -959,7 +959,7 @@ int main(int c, char *v[])
 //	float *rout = xmalloc(*w * *h *opd * sizeof*rout);
 //	shrink_components(rout, out, *w * *h, opd, pdmax);
 //
-//	iio_save_image_float_vec("-", rout, *w, *h, opd);
+//	iio_write_image_float_vec("-", rout, *w, *h, opd);
 //
 //
 //	FORI(n) free(x[i]);

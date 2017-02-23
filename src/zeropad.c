@@ -31,7 +31,7 @@ int main(int c, char *v[])
 	for (int l = 0; l < pd; l++)
 		y[j][i][l] = (i<w && j<h) ? x[j][i][l] : 0;
 
-	iio_save_image_float_vec(filename_out, y_raw, w+mx, h+my, pd);
+	iio_write_image_float_vec(filename_out, y_raw, w+mx, h+my, pd);
 	free(x);
 	free(y);
 	return EXIT_SUCCESS;

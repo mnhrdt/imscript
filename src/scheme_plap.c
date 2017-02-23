@@ -236,7 +236,7 @@ int main(int c, char *v[])
 	double *x = iio_read_image_double(infile, &w, &h);
 	double *y = xmalloc(w*h*sizeof*y);
 	apply_plap(y, x, w, h, p, scheme_id);
-	iio_save_image_double(outfile, y, w, h);
+	iio_write_image_double(outfile, y, w, h);
 	free(x);
 	return 0;
 }

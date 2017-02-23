@@ -31,7 +31,7 @@ int main(int c, char *v[])
 		y [sj] [si] [l] = g;
 	}
 
-	iio_save_image_float_vec(out, y[0][0], 2*w, 2*h, pd);
+	iio_write_image_float_vec(out, y[0][0], 2*w, 2*h, pd);
 	free(x);
 	free(y);
 	return EXIT_SUCCESS;

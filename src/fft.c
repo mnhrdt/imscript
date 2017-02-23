@@ -176,7 +176,7 @@ int main(int c, char *v[])
 	else
 		fft_direct(y, x, w, h, pd);
 
-	iio_save_image_float_vec(out, y, w, h, pdout);
+	iio_write_image_float_vec(out, y, w, h, pdout);
 	free(x);
 	free(y);
 	return EXIT_SUCCESS;

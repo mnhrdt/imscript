@@ -215,10 +215,10 @@ static void ofc(float *xa, float *xb, int w, int h)
 			f2[j][i][l] = res[l];
 	}
 
-	iio_save_image_float_vec("/tmp/it.tiff", it[0], w, h, 1);
-	iio_save_image_float_vec("/tmp/grad.tiff", gradx[0][0], w, h, 2);
-	iio_save_image_float_vec("/tmp/f1.tiff", f1[0][0], w, h, 2);
-	iio_save_image_float_vec("/tmp/f2.tiff", f2[0][0], w, h, 2);
+	iio_write_image_float_vec("/tmp/it.tiff", it[0], w, h, 1);
+	iio_write_image_float_vec("/tmp/grad.tiff", gradx[0][0], w, h, 2);
+	iio_write_image_float_vec("/tmp/f1.tiff", f1[0][0], w, h, 2);
+	iio_write_image_float_vec("/tmp/f2.tiff", f2[0][0], w, h, 2);
 
 	xfree(it);
 	xfree(gradx);
@@ -249,8 +249,8 @@ static void ofc_err(float *fe, float *fi, float *xa, float *xb, int w, int h)
 			e[j][i] += gradx[j][i][l] * f[j][i][l];
 	}
 
-	iio_save_image_float_vec("/tmp/it.tiff", it[0], w, h, 1);
-	iio_save_image_float_vec("/tmp/grad.tiff", gradx[0][0], w, h, 2);
+	iio_write_image_float_vec("/tmp/it.tiff", it[0], w, h, 1);
+	iio_write_image_float_vec("/tmp/grad.tiff", gradx[0][0], w, h, 2);
 
 	xfree(it);
 	xfree(gradx);
@@ -280,7 +280,7 @@ int main(int c, char *v[])
 
 	ofc_err(ofce, f, xa, xb, *w, *h);
 
-	iio_save_image_float_vec("-", ofce, *w, *h, 1);
+	iio_write_image_float_vec("-", ofce, *w, *h, 1);
 
 	return EXIT_SUCCESS;
 }

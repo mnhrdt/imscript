@@ -571,9 +571,9 @@ int main(int c, char *v[])
 	}
 	assert(totsize == w*h);
 
-	iio_save_image_int("ccproc_idx.tiff", out_idx, w, h);
-	iio_save_image_int("ccproc_all.tiff", out_all, w, h);
-	iio_save_image_float("ccproc_xxx.tiff", x, w, h);
+	iio_write_image_int("ccproc_idx.tiff", out_idx, w, h);
+	iio_write_image_int("ccproc_all.tiff", out_all, w, h);
+	iio_write_image_float("ccproc_xxx.tiff", x, w, h);
 
 	for (int i = 0; i < w*h; i++)
 		x[i] = -1;
@@ -582,7 +582,7 @@ int main(int c, char *v[])
 		for (int j = 0; j < out_bdsize[i]; j++)
 			x[out_all[out_first[i] + j]] = i;
 	}
-	iio_save_image_float("ccproc_yyy.tiff", x, w, h);
+	iio_write_image_float("ccproc_yyy.tiff", x, w, h);
 
 
 	free(out_size);

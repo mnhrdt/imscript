@@ -108,6 +108,6 @@ int main(int c, char **v)
 	float *x = iio_read_image_float("-", &w, &h);
 	char *y = malloc(w*h);
 	gray_singularities(y, x, w, h);
-	iio_save_image_uint8_vec("-", (uint8_t*)y, w-1, h-1, 1);
+	iio_write_image_uint8_vec("-", (uint8_t*)y, w-1, h-1, 1);
 	return 0;
 }

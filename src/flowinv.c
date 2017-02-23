@@ -96,7 +96,7 @@ static float flowinv_eval(float *v, float *u, int w, int h)
 	char fname[0x100];
 	snprintf(fname, 0x100, "/tmp/fresi_%03d_%s.flo",
 			idcount/2, idcount%2?"odd":"even");
-	iio_save_image_float_vec(fname, sav[0][0], w, h, 2);
+	iio_write_image_float_vec(fname, sav[0][0], w, h, 2);
 	free(sav);
 	return r/cx;
 }
@@ -140,7 +140,7 @@ int main(int c, char *v[])
 	if (pd != 2) fail("2D vector field expected");
 	float *y = xmalloc(2*w*h*sizeof*y);
 	flowinv(y, x, w, h, niter, epsil);
-	iio_save_image_float_vec(outfile, y, w, h, 2);
+	iio_write_image_float_vec(outfile, y, w, h, 2);
 	free(x);
 	free(y);
 	return EXIT_SUCCESS;

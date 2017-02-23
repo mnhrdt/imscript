@@ -278,9 +278,9 @@ static void dump_warps(float *init_h, int w, int h,
 
 		char buf[FILENAME_MAX];
 		snprintf(buf, FILENAME_MAX, "/tmp/pm_%s_%d_w0.tiff", ident, k);
-		iio_save_image_float_vec(buf, w0, w, h, pd);
+		iio_write_image_float_vec(buf, w0, w, h, pd);
 		snprintf(buf, FILENAME_MAX, "/tmp/pm_%s_%d_wh.tiff", ident, k);
-		iio_save_image_float_vec(buf, wh, w, h, pd);
+		iio_write_image_float_vec(buf, wh, w, h, pd);
 
 		free(w0);
 		free(wh);
@@ -379,7 +379,7 @@ int main_rpc_pm(int c, char *v[])
 	pm_rpcn(out_h, in_h0, w, h, t, r, n, axyh);
 
 	// save the output raster
-	iio_save_image_float(filename_out, out_h, w, h);
+	iio_write_image_float(filename_out, out_h, w, h);
 
 	// cleanup and exit
 	free(in_h0);

@@ -167,9 +167,9 @@ static void hs(float *u, float *v, float *a, float *b, int w, int h,
 
 	compute_input_derivatives(gx, gy, gt, a, b, w, h);
 
-	iio_save_image_float("/tmp/Ex", gx, w, h);
-	iio_save_image_float("/tmp/Ey", gy, w, h);
-	iio_save_image_float("/tmp/Et", gt, w, h);
+	iio_write_image_float("/tmp/Ex", gx, w, h);
+	iio_write_image_float("/tmp/Ey", gy, w, h);
+	iio_write_image_float("/tmp/Et", gt, w, h);
 
 	// initial solution
 	for (int i = 0; i < w*h; i++)
@@ -195,9 +195,9 @@ static void hs_snapshots(char *filename_pattern,
 
 	compute_input_derivatives(gx, gy, gt, a, b, w, h);
 
-	iio_save_image_float("/tmp/Ex", gx, w, h);
-	iio_save_image_float("/tmp/Ey", gy, w, h);
-	iio_save_image_float("/tmp/Et", gt, w, h);
+	iio_write_image_float("/tmp/Ex", gx, w, h);
+	iio_write_image_float("/tmp/Ey", gy, w, h);
+	iio_write_image_float("/tmp/Et", gt, w, h);
 
 	// initial solution
 	float *u = xmalloc(w * h * sizeof(float));
@@ -255,6 +255,6 @@ static int main_single(int argc, char *argv[])
 		f[2*i] = u[i];
 		f[2*i+1] = v[i];
 	}
-	iio_save_image_float_vec(filename_f, f, w, h, 2);
+	iio_write_image_float_vec(filename_f, f, w, h, 2);
 	return EXIT_SUCCESS;
 }

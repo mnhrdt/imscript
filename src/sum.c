@@ -56,6 +56,6 @@ int main(int c, char *v[])
 		y[j][i][l] = p(x1,w[0],h[0],pd[0], i,j,l)
 				+ p(x2,w[1],h[1],pd[1], i,j,l);
 
-	iio_save_image_float_vec(outfile, y[0][0], w[2], h[2], pd[2]);
+	iio_write_image_float_vec(outfile, y[0][0], w[2], h[2], pd[2]);
 	return EXIT_SUCCESS;
 }

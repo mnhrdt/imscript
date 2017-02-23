@@ -22,6 +22,6 @@ int main(int c, char *v[])
 			for (int j = 0; j < *w * *h; j++)
 				out[j][i] = chan[i][j];
 	}
-	iio_save_image_float_vec("-", out[0], *w, *h, c-1);
+	iio_write_image_float_vec("-", out[0], *w, *h, c-1);
 	return EXIT_SUCCESS;
 }

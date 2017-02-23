@@ -20,7 +20,7 @@ int main(int c, char *v[])
 	for (int i = 0; i < n*w; i++)
 	for (int l = 0; l < pd; l++)
 		y[pd*(n*w*j+i)+l] = x[pd*(w*(j/n)+i/n)+l];
-	iio_save_image_float_vec(out, y, n*w, n*h, pd);
+	iio_write_image_float_vec(out, y, n*w, n*h, pd);
 	free(x);
 	free(y);
 	return EXIT_SUCCESS;

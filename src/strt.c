@@ -238,7 +238,7 @@ int main(int c, char *v[])
 
 	compute_structure_tensor_field_ultra_fancy(t, x, w, h, kside, ksigma);
 
-	iio_save_image_float_vec(filename_out, t, w, h, 7);
+	iio_write_image_float_vec(filename_out, t, w, h, 7);
 
 	free(x); free(t);
 	return 0;

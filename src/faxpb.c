@@ -18,7 +18,7 @@ int main(int c, char *v[])
 	float *x = iio_read_image_float_vec(in, &w, &h, &pd);
 	for (int i = 0; i < w * h * pd; i++)
 		x[i] = a*x[i] + b;
-	iio_save_image_float_vec(out, x, w, h, pd);
+	iio_write_image_float_vec(out, x, w, h, pd);
 	free(x);
 	return EXIT_SUCCESS;
 }

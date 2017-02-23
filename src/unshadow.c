@@ -47,7 +47,7 @@ int main(int c, char *v[])
 
 	unshadow(x, w, h);
 
-	iio_save_image_float(filename_out, x, w, h);
+	iio_write_image_float(filename_out, x, w, h);
 
 	return 0;
 }

@@ -451,7 +451,7 @@ int main(int c, char *v[])
 	clouds_mask_fill(x, w, h, m);
 
 	// save output image
-	iio_save_image_int(filename_out, x, w, h);
+	iio_write_image_int(filename_out, x, w, h);
 
 	//cleanup
 	free(x);

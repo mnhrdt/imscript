@@ -219,7 +219,7 @@ void create_iio_file(char *filename, int w, int h, int spp)
 	int n = w * h * spp;
 	uint8_t *buf = xmalloc(n);
 	memset(buf, 0, n);
-	iio_save_image_uint8_vec(filename, buf, w, h, spp);
+	iio_write_image_uint8_vec(filename, buf, w, h, spp);
 	free(buf);
 }
 
@@ -319,7 +319,7 @@ void fancy_image_close(struct fancy_image *fi)
 		tiff_octaves_free(f->t);
 	else {
 		if ((f->option_write && f->x_changed) || f->option_creat)
-			iio_save_image_float_vec(f->x_filename, f->x,
+			iio_write_image_float_vec(f->x_filename, f->x,
 					f->w, f->h, f->pd);
 		if (f->no > 1)
 			free_pyramid(f);
@@ -521,7 +521,7 @@ int main_croparound(int c, char *v[])
 		x[idx_o] = fancy_image_getsample_oct(f, octave, ii, jj, l);
 	}
 	fancy_image_close(f);
-	iio_save_image_float_vec(filename_out, x, diamet, diamet, f->pd);
+	iio_write_image_float_vec(filename_out, x, diamet, diamet, f->pd);
 	free(x);
 	return 0;
 }

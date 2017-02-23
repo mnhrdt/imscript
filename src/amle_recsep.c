@@ -317,13 +317,13 @@ void amle_recursive(float *out, float *in, int w, int h, int niter, int scale)
 
 		//char buf[FILENAME_MAX];
 		//snprintf(buf, FILENAME_MAX, "/tmp/elap_rec_in_%d", scale);
-		//iio_save_image_float(buf, in, w, h);
+		//iio_write_image_float(buf, in, w, h);
 		//snprintf(buf, FILENAME_MAX, "/tmp/elap_rec_ins_%d", scale);
-		//iio_save_image_float(buf, ins, ws, hs);
+		//iio_write_image_float(buf, ins, ws, hs);
 		//snprintf(buf, FILENAME_MAX, "/tmp/elap_rec_outs_%d", scale);
-		//iio_save_image_float(buf, outs, ws, hs);
+		//iio_write_image_float(buf, outs, ws, hs);
 		//snprintf(buf, FILENAME_MAX, "/tmp/elap_rec_init_%d", scale);
-		//iio_save_image_float(buf, init, w, h);
+		//iio_write_image_float(buf, init, w, h);
 
 		free(ins);
 		free(outs);
@@ -380,7 +380,7 @@ int main(int argc, char *argv[])
 
 	amle_recursive_separable(out, in, *w, *h, pd, niter, nscales);
 
-	iio_save_image_float_split(filename_out, out, *w, *h, pd);
+	iio_write_image_float_split(filename_out, out, *w, *h, pd);
 
 	return 0;
 }

@@ -85,7 +85,7 @@ int main(int c, char *v[])
 	if (pd != 2) error("2D vector field expected");
 	float *y = xmalloc(2*w*h*sizeof*y);
 	flowjac(y, x, w, h);
-	iio_save_image_float_vec(outfile, y, w, h, 2);
+	iio_write_image_float_vec(outfile, y, w, h, 2);
 	free(x);
 	return EXIT_SUCCESS;
 }

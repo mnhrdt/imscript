@@ -89,7 +89,7 @@ int main(int c, char *v[])
 	uint8_t *x = xmalloc(w * h * 4);
 	fill_crosses_rgba(x, w, h, p, np);
 
-	iio_save_image_uint8_vec(filename_out, x, w, h, 4);
+	iio_write_image_uint8_vec(filename_out, x, w, h, 4);
 	free(x);
 
 	return EXIT_SUCCESS;

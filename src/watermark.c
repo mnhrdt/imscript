@@ -299,7 +299,7 @@ exiterr:	fprintf(stderr, "usage:\n\t"
 		y = remove_watermark(x, w, h, pd, &ow, &oh);
 	else goto exiterr;
 
-	iio_save_image_float_vec(filename_out, y, ow, oh, pd);
+	iio_write_image_float_vec(filename_out, y, ow, oh, pd);
 
 	free(x);
 	free(y);

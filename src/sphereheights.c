@@ -91,7 +91,7 @@ int main(int c, char *v[])
 		sphere_count_neighbors_3d(o, x, w, h, rad, m);
 	}
 
-	iio_save_image_float(filename_out, o, w, h);
+	iio_write_image_float(filename_out, o, w, h);
 
 	free(o);
 	free(x);

@@ -77,7 +77,7 @@ int main(int c, char *v[])
 		}
 		char buf[0x100];
 		snprintf(buf, 0x100, outpat, k);
-		iio_save_image_uint8_vec(buf, (void*)x, w, w, 1);
+		iio_write_image_uint8_vec(buf, (void*)x, w, w, 1);
 	}
 	xfree(x);
 

@@ -730,7 +730,7 @@ static int main_puts(int c, char **v)
 			color[i] = (unsigned char)((255*(colorname[i]-'0'))/8);
 	put_string_in_float_image(x, w,h,pd, px,py, color, kerning, &f, text);
 
-	iio_save_image_float_vec(filename_out, x, w, h, pd);
+	iio_write_image_float_vec(filename_out, x, w, h, pd);
 
 	free(f.data);
 	free(x);

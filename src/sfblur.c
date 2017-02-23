@@ -120,7 +120,7 @@ int main(int c, char *v[])
 	superfast_blur_split(x, w, h, pd, side);
 
 	// save output image
-	iio_save_image_float_split(filename_out, x, w, h, pd);
+	iio_write_image_float_split(filename_out, x, w, h, pd);
 
 	// cleanup and exit
 	free(x);

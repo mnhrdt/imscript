@@ -313,7 +313,7 @@ int main(int c, char *v[])
 
 	colorflow(view, flow, w, h, method_id, parlist_string);
 
-	iio_save_image_uint8_vec(outfile, view, w, h, 3);
+	iio_write_image_uint8_vec(outfile, view, w, h, 3);
 
 	free(view);
 	free(flow);

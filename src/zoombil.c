@@ -126,7 +126,7 @@ int main(int c, char *v[])
 	resize_api_vec(y, ow, oh, x, w, h, pd);
 	//bilinear_interpolant_vec(y, ow, oh, x, w, h, pd);
 
-	iio_save_image_float_vec(v[4], y, ow, oh, pd);
+	iio_write_image_float_vec(v[4], y, ow, oh, pd);
 
 	free(x);
 	free(y);

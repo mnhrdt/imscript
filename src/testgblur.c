@@ -56,7 +56,7 @@ void build_gaussian_pyramid(float *p, int npyr, float sfirst, float slast,
 
 		char buf[FILENAME_MAX];
 		snprintf(buf, FILENAME_MAX, "/tmp/pyra_%03d.png", i);
-		iio_save_image_float_vec(buf, p+i*w*h*pd, w, h, pd);
+		iio_write_image_float_vec(buf, p+i*w*h*pd, w, h, pd);
 	}
 }
 

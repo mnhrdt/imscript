@@ -309,10 +309,10 @@ static void dump_warps(float *init_h, int w, int h,
 		huge_tiff_getpixel_float(wbh + pd*idx, tb, ipbh[0], ipbh[1]);
 	}
 
-	iio_save_image_float_vec("/tmp/pm_wa0.tiff", wa0, w, h, pd);
-	iio_save_image_float_vec("/tmp/pm_wb0.tiff", wb0, w, h, pd);
-	iio_save_image_float_vec("/tmp/pm_wah.tiff", wah, w, h, pd);
-	iio_save_image_float_vec("/tmp/pm_wbh.tiff", wbh, w, h, pd);
+	iio_write_image_float_vec("/tmp/pm_wa0.tiff", wa0, w, h, pd);
+	iio_write_image_float_vec("/tmp/pm_wb0.tiff", wb0, w, h, pd);
+	iio_write_image_float_vec("/tmp/pm_wah.tiff", wah, w, h, pd);
+	iio_write_image_float_vec("/tmp/pm_wbh.tiff", wbh, w, h, pd);
 
 	free(wa0); free(wb0);
 	free(wah); free(wbh);
@@ -398,7 +398,7 @@ int main_rpc_pm(int c, char *v[])
 	pm_rpc(out_h, in_h0, w, h, ta, rpca, tb, rpcb, axyh);
 
 	// save the output raster
-	iio_save_image_float(filename_out, out_h, w, h);
+	iio_write_image_float(filename_out, out_h, w, h);
 
 	// cleanup and exit
 	free(in_h0);

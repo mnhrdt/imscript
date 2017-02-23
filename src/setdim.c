@@ -89,7 +89,7 @@ int main(int c, char *v[])
 	for (int l = 0; l < opd; l++)
 		y[j][i][l] = p(x, w, h, pd, i, j, l);
 
-	iio_save_image_float_vec(fname_out, y[0][0], ow, oh, opd);
+	iio_write_image_float_vec(fname_out, y[0][0], ow, oh, opd);
 
 	free(x);
 	free(y);

@@ -128,7 +128,7 @@ int main(int c, char *v[])
 
 	float *y = xmalloc(w * h * sizeof*y);
 	frakes_monaco_smith(y, x, w, h, n, sigma, side, nwarps, epsilon);
-	iio_save_image_float("-", y, w, h);
+	iio_write_image_float("-", y, w, h);
 
 	for (int i = 0; i < n; i++) free(x[i]); free(x); free(y);
 	return EXIT_SUCCESS;

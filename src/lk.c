@@ -610,14 +610,14 @@ void least_squares_ofc(float *u, float *v,
 		float *st = xmalloc(w * h * STLEN * sizeof(float));
 		float *rhs = xmalloc(w * h * 2 * sizeof(float));
 		compute_structure_tensor_field(st, wv, wo, kside, gx, gy, w, h);
-		//iio_save_image_float_vec("/tmp/st.tiff", st, w, h, STLEN);
+		//iio_write_image_float_vec("/tmp/st.tiff", st, w, h, STLEN);
 		compute_rhs(rhs, wv, wo, kside, gx, gy, gt, w, h);
-		//iio_save_image_float_vec("/tmp/rhs.tiff", rhs, w, h, 2);
+		//iio_write_image_float_vec("/tmp/rhs.tiff", rhs, w, h, 2);
 		solve_pointwise(u, v, st, rhs, w, h);
 		if (LK_GRADTMIN() > 0 || LK_GRADXMIN() > 0)
 			zeroize_pointwise(u, v, gx, gy, gt, w, h);
-		//iio_save_image_float("/tmp/u.tiff", u, w, h);
-		//iio_save_image_float("/tmp/v.tiff", v, w, h);
+		//iio_write_image_float("/tmp/u.tiff", u, w, h);
+		//iio_write_image_float("/tmp/v.tiff", v, w, h);
 		free(rhs);
 		free(st);
 	}
@@ -641,7 +641,7 @@ int main(int argc, char *argv[])
 	float *b = iio_read_image_float(filename_b, &ww, &hh);
 	if (w != ww || h != hh)
 		exit(fprintf(stderr, "input images size mismatch\n"));
-	//iio_save_image_float("/tmp/merdota.tiff", a, w, h);
+	//iio_write_image_float("/tmp/merdota.tiff", a, w, h);
 	float *u = xmalloc(w * h * sizeof(float));
 	float *v = xmalloc(w * h * sizeof(float));
 	least_squares_ofc(u, v, a, b, w, h, kside, sigma);
@@ -650,7 +650,7 @@ int main(int argc, char *argv[])
 		f[2*i] = u[i];
 		f[2*i+1] = v[i];
 	}
-	iio_save_image_float_vec(filename_f, f, w, h, 2);
+	iio_write_image_float_vec(filename_f, f, w, h, 2);
 	return EXIT_SUCCESS;
 }
 #endif//OMIT_MAIN

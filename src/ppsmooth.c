@@ -346,12 +346,12 @@ int main(int c, char *v[])
 
 	ppsmooth_split(y, x, w, h, pd);
 
-	iio_save_image_float_split(filename_o, y, w, h, pd);
+	iio_write_image_float_split(filename_o, y, w, h, pd);
 
 	if (*filename_m) {
 		for (int i = 0; i < w*h*pd; i++)
 			y[i] = x[i] - y[i];
-		iio_save_image_float_split(filename_m, y, w, h, pd);
+		iio_write_image_float_split(filename_m, y, w, h, pd);
 	}
 
 	return 0;

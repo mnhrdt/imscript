@@ -204,7 +204,7 @@ int main(int c, char *v[])
 		add_dot(x, w, h, p, q, colour);
 	}
 
-	iio_save_image_uint8_vec(filename_out, x, w, h, 4);
+	iio_write_image_uint8_vec(filename_out, x, w, h, 4);
 
 	return 0;
 }

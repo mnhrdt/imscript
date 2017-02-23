@@ -57,8 +57,8 @@ int main(int c, char *v[])
 //				y[j+1][i][l] = (x[j][i][l] + x[j+2][i][l])/2;
 //	}
 
-	iio_save_image_float_vec(v[2], y[0][0], w, h, pd);
-	iio_save_image_float_vec(v[3], z[0][0], w, h, pd);
+	iio_write_image_float_vec(v[2], y[0][0], w, h, pd);
+	iio_write_image_float_vec(v[3], z[0][0], w, h, pd);
 
 	return EXIT_SUCCESS;
 }

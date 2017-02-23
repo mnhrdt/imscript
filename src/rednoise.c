@@ -107,7 +107,7 @@ int main()
 		traverse_segment(p[0], p[1], p[2], p[3], red_pixel, x);
 	}
 
-	iio_save_image_float_vec("-", x, w, h, 3);
+	iio_write_image_float_vec("-", x, w, h, 3);
 
 	return 0;
 }

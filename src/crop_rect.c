@@ -61,6 +61,6 @@ int main(int c, char *v[])
 	assert(xf - x0 == cw);
 	assert(yf - y0 == ch);
 
-	iio_save_image_float_vec(filename_out, image_out, cw, ch, pd);
+	iio_write_image_float_vec(filename_out, image_out, cw, ch, pd);
 	return EXIT_SUCCESS;
 }

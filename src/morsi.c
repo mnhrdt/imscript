@@ -420,7 +420,7 @@ int main(int c, char **v)
 			operation(y+k*w*h, x+k*w*h, w, h, structuring_element);
 
 	// save result
-	iio_save_image_float_split(filename_out, y, w, h, pd);
+	iio_write_image_float_split(filename_out, y, w, h, pd);
 
 	// cleanup
 	free(x);

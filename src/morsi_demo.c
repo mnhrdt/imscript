@@ -300,7 +300,7 @@ static void demo(char *filename_out,
 			y[i] = y[i] + 127;
 
 	// save result
-	iio_save_image_float_split(buf, y, w, h, pd);
+	iio_write_image_float_split(buf, y, w, h, pd);
 
 	// cleanup
 	free(y);

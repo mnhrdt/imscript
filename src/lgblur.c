@@ -108,7 +108,7 @@ int main(int c, char *v[])
 	float *y = xmalloc(w*h*pd*sizeof*y);
 	local_gaussian_blur(y, sigma, x, w, h, pd);
 
-	iio_save_image_float_split(filename_out, y, w, h, pd);
+	iio_write_image_float_split(filename_out, y, w, h, pd);
 	free(x); free(y); free(sigma);
 	return 0;
 }

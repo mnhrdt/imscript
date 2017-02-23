@@ -45,6 +45,6 @@ int main(int c, char *v[])
 	int nc = parse_components(l, v[1]);
 	float *y = xmalloc(w * h * nc * sizeof*y);
 	fill_requested_components(y, l, x);
-	iio_save_image_float(out, y, w, h);
+	iio_write_image_float(out, y, w, h);
 	return EXIT_SUCCESS;
 }

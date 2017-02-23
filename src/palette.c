@@ -249,7 +249,7 @@ int main(int c, char *v[])
 
 	apply_palette(y, x, w*h, palette_id, from, to);
 
-	iio_save_image_uint8_vec(filename_out, y, w, h, 3);
+	iio_write_image_uint8_vec(filename_out, y, w, h, 3);
 
 	free(x);
 	free(y);

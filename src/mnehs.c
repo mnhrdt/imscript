@@ -184,8 +184,8 @@ void mnehs_affine(float *out_h, float *init_h, int ow, int oh,
 		amb[j*ow+i] = va - vb;
 	}
 
-	iio_save_image_float_vec("Q.tiff", Q, ow, oh, 1);
-	iio_save_image_float_vec("amb.tiff", amb, ow, oh, 1);
+	iio_write_image_float_vec("Q.tiff", Q, ow, oh, 1);
+	iio_write_image_float_vec("amb.tiff", amb, ow, oh, 1);
 
 	// initialize h
 	for (int i = 0; i < ow * oh; i++)
@@ -205,7 +205,7 @@ void mnehs_affine(float *out_h, float *init_h, int ow, int oh,
 			h[ij] += TAU() * ax;
 		}
 	}
-	iio_save_image_float_vec("h.tiff", h, ow, oh, 1);
+	iio_write_image_float_vec("h.tiff", h, ow, oh, 1);
 
 	// update result
 	for (int i = 0; i < ow * oh; i++)
@@ -285,7 +285,7 @@ int main_warp(int c, char *v[])
 	mnehs_affine_warp(out, h0, wi,hi,pd, a,wa,ha, b,wb,hb, PA, PB);
 
 	// save the output image
-	iio_save_image_float_vec(filename_out, out, wi, hi, pd);
+	iio_write_image_float_vec(filename_out, out, wi, hi, pd);
 
 	// cleanup and exit
 	free(out);
@@ -337,7 +337,7 @@ int main_warprpc(int c, char *v[])
 	mnehs_rpc_warp(out, h0, wi,hi,pd, a,wa,ha, b,wb,hb, rpca, rpcb);
 
 	// save the output image
-	iio_save_image_float_vec(filename_out, out, wi, hi, pd);
+	iio_write_image_float_vec(filename_out, out, wi, hi, pd);
 
 	// cleanup and exit
 	free(out);
@@ -395,7 +395,7 @@ int main_compute(int c, char *v[])
 	}
 
 	// save the output image
-	iio_save_image_float(filename_out, out, wi, hi);
+	iio_write_image_float(filename_out, out, wi, hi);
 
 	// cleanup and exit
 	free(out);

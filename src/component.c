@@ -25,6 +25,6 @@ int main(int c, char *v[])
 	float *y = xmalloc(w*h*sizeof*y);
 	for (int i = 0; i < w*h; i++)
 		y[i] = x[i][component];
-	iio_save_image_float(out, y, w, h);
+	iio_write_image_float(out, y, w, h);
 	return EXIT_SUCCESS;
 }

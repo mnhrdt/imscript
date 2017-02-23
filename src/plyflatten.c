@@ -126,11 +126,11 @@ int main(int c, char *v[])
 			x.avg[i] = NAN;
 
 	// save output image
-	iio_save_image_float(filename_out, x.avg, w, h);
-	//iio_save_image_float("/tmp/flattened_min.tiff", x.min, w, h);
-	//iio_save_image_float("/tmp/flattened_max.tiff", x.max, w, h);
-	//iio_save_image_float("/tmp/flattened_cnt.tiff", x.cnt, w, h);
-	//iio_save_image_float("/tmp/flattened_avg.tiff", x.avg, w, h);
+	iio_write_image_float(filename_out, x.avg, w, h);
+	//iio_write_image_float("/tmp/flattened_min.tiff", x.min, w, h);
+	//iio_write_image_float("/tmp/flattened_max.tiff", x.max, w, h);
+	//iio_write_image_float("/tmp/flattened_cnt.tiff", x.cnt, w, h);
+	//iio_write_image_float("/tmp/flattened_avg.tiff", x.avg, w, h);
 
 	// cleanup and exit
 	free(x.min);

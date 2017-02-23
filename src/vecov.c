@@ -254,7 +254,7 @@ int main(int c, char *v[])
 			}
 		f(y + i**pd, tmp[0], *pd, ngood);
 	}
-	iio_save_image_float_vec(filename_out, y, *w, *h, *pd);
+	iio_write_image_float_vec(filename_out, y, *w, *h, *pd);
 	free(y);
 	for (int i = 0; i < n; i++)
 		free(x[i]);

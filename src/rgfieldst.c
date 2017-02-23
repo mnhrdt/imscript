@@ -81,7 +81,7 @@ int main(int c, char *v[])
 	for (int i = 0; i < d; i++) {
 		char buf[0x200];
 		snprintf(buf, 0x200, out_pattern, i);
-		iio_save_image_float_vec(buf, f+(w*h*2)*i, w, h, 2);
+		iio_write_image_float_vec(buf, f+(w*h*2)*i, w, h, 2);
 	}
 
 	free(f);

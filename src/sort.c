@@ -25,7 +25,7 @@ int main(int c, char *v[])
 
 	qsort(x, w*h*pd, sizeof*x, compare_floats);
 
-	iio_save_image_float_vec(out, x, w, h, pd);
+	iio_write_image_float_vec(out, x, w, h, pd);
 	free(x);
 	return EXIT_SUCCESS;
 }

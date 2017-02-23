@@ -127,6 +127,6 @@ int main(int c, char *v[])
 	for (int i = 0; i < pd; i++)
 		r += shomwarp(y + i*ow*oh, ow, oh, H, x + i*w*h, w, h, order);
 
-	iio_save_image_float_split(filename_out, y, ow, oh, pd);
+	iio_write_image_float_split(filename_out, y, ow, oh, pd);
 	return r;
 }

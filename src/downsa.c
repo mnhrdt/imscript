@@ -171,7 +171,7 @@ int main_downsa(int c, char *v[])
 	int H = h/n;
 	float *y = xmalloc(W*H*pd*sizeof*y);
 	downsa2d(y, x, w, h, pd, n, v[1][0]);
-	iio_save_image_float_vec(out, y, W, H, pd);
+	iio_write_image_float_vec(out, y, W, H, pd);
 	free(x);
 	free(y);
 	return EXIT_SUCCESS;

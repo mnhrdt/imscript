@@ -282,7 +282,7 @@ int main(int c, char *v[])
 	satproj(out, out_w, out_h, P, heights, colors, *w, *h, pd);
 
 	// save output
-	iio_save_image_float_vec(fname_output, out, out_w, out_h, pd);
+	iio_write_image_float_vec(fname_output, out, out_w, out_h, pd);
 
 	// cleanup and exit
 	free(heights);

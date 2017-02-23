@@ -290,7 +290,7 @@ int main(int c, char *v[])
 
 	nnint_split(x, w, h, pd);
 
-	iio_save_image_float_split(filename_out, x, w, h, pd);
+	iio_write_image_float_split(filename_out, x, w, h, pd);
 
 	return 0;
 }

@@ -28,6 +28,6 @@ int main(int c, char *v[])
 		if (g > 255) g = 255;
 		y[i] = g;
 	}
-	iio_save_image_uint8_vec(out, y, w, h, pd);
+	iio_write_image_uint8_vec(out, y, w, h, pd);
 	return EXIT_SUCCESS;
 }

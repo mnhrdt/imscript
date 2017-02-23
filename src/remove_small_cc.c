@@ -103,7 +103,7 @@ int main(int argc, char **argv)
 
 
 	/* write the results */
-   iio_save_image_float_split(out_file, out,w,h,nch);
+   iio_write_image_float_split(out_file, out,w,h,nch);
    free(img);
    free(out);
 }

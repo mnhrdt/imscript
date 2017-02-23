@@ -348,7 +348,7 @@ int main(int argc, char *argv[])
 	if (0 == strcmp(cost_id, "CENSUST")) e = eval_displacement_by_census;
 	bmms_rec(f, a, b, *w, *h, *pd, winradius, mfradius, nscales, e);
 
-	iio_save_image_float_vec(filename_out, f, *w, *h, 2);
+	iio_write_image_float_vec(filename_out, f, *w, *h, 2);
 
 	free(a);
 	free(b);

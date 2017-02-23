@@ -24,6 +24,6 @@ int main(int c, char *v[])
 		o[3][j*w/2+i] = x[(2*j+1)*w+(2*i+1)];
 	}
 	for (int i = 0; i < 4; i++)
-		iio_save_image_float(filename_out[i], o[i], w/2, h/2);
+		iio_write_image_float(filename_out[i], o[i], w/2, h/2);
 	return 0;
 }

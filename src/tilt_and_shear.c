@@ -45,7 +45,7 @@ int main(int c, char *v[])
 
 	tilt_and_shear(y, ow, oh, x, w, h, pd, tilt, shear);
 
-	iio_save_image_float_vec(filename_out, y, ow, oh, pd);
+	iio_write_image_float_vec(filename_out, y, ow, oh, pd);
 
 	free(x);
 	free(y);

@@ -80,7 +80,7 @@ int main(int c, char *v[])
 	double *ids = xmalloc(w * h * sizeof*ids);
 	float threshold = nextafterf(0);
 	int r = ccfilt(ids, m, w, h, threshold);
-	iio_save_image_double(ids, filename_out, w, h);
+	iio_write_image_double(ids, filename_out, w, h);
 
 	fprintf(stderr, "r = %d\n", r);
 

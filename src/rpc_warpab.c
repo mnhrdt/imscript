@@ -132,8 +132,8 @@ int main_rpc_warpab(int c, char *v[])
 	rpc_warpab(outa, outb, w,h,pd, a,wa,ha,rpca, b,wb,hb,rpcb, axyh);
 
 	// save the output images
-	iio_save_image_float_vec(filename_outa, outa, w, h, pd);
-	iio_save_image_float_vec(filename_outb, outb, w, h, pd);
+	iio_write_image_float_vec(filename_outa, outa, w, h, pd);
+	iio_write_image_float_vec(filename_outb, outb, w, h, pd);
 
 	// cleanup and exit
 	free(outa);

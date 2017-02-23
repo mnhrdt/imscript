@@ -62,6 +62,6 @@ int main(int c, char *v[])
 		e[j][i][0] = rpc_hcurv(ra, rb, fij[0], fij[1], h);
 
 	}
-	iio_save_image_float_vec("-", **e, nx, ny, 1);
+	iio_write_image_float_vec("-", **e, nx, ny, 1);
 	return 0;
 }

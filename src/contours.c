@@ -206,7 +206,7 @@ int main(int c, char *v[])
 		overlay_level_line_in_red(y, n, x, w, h, t[i]);
 
 	// save and exit
-	iio_save_image_uint8_matrix_rgb("-", y, W, H);
+	iio_write_image_uint8_matrix_rgb("-", y, W, H);
 	free(x);
 	free(y);
 	return EXIT_SUCCESS;

@@ -55,7 +55,7 @@ int main(int c, char *v[])
 	float *x = iio_read_image_float_vec(in, &w, &h, &pd);
 	float *y = xmalloc(w*h*sizeof*y);
 	harris(y, x, w, h, pd, kappa);
-	iio_save_image_float(out, y, w, h);
+	iio_write_image_float(out, y, w, h);
 	free(x);
 	free(y);
 	return EXIT_SUCCESS;

@@ -101,7 +101,7 @@ int main(int c, char *v[])
 	ghough(transform, nrho, ntheta, gradient, w, h, folding);
 
 	// save output image
-	iio_save_image_float_vec(fname_out, transform, nrho, ntheta, 1);
+	iio_write_image_float_vec(fname_out, transform, nrho, ntheta, 1);
 
 	// cleanup and exti
 	free(gradient);

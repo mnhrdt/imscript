@@ -157,7 +157,7 @@ int main(int argc, char *argv[])
 
 	fill_rect_split(out, in, *w, *h, pd);
 
-	iio_save_image_float_split(filename_out, out, *w, *h, pd);
+	iio_write_image_float_split(filename_out, out, *w, *h, pd);
 
 	return 0;
 }

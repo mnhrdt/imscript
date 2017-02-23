@@ -68,6 +68,6 @@ int main(int c, char *v[])
 			setsample_0(z, w[2], h[2], pd[2], i+w[0], j, l, s);
 		}
 
-	iio_save_image_float_vec(filename_out, z, w[2], h[2], pd[2]);
+	iio_write_image_float_vec(filename_out, z, w[2], h[2], pd[2]);
 	return EXIT_SUCCESS;
 }

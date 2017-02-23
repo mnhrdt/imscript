@@ -84,7 +84,7 @@ int main(int c, char *v[])
 	for (int i = 0; i < pd; i++)
 		dht(y + i*w*h, x + i*w*h, w, h);
 
-	iio_save_image_float_split(out, y, w, h, pd);
+	iio_write_image_float_split(out, y, w, h, pd);
 	free(x);
 	free(y);
 	return 0;

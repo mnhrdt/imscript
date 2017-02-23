@@ -22,6 +22,6 @@ int main(int c, char *v[])
 	}
 	for (int i = 0; i < *w * *h * *pd; i++)
 		x1[i] = a*x1[i] + b*x2[i];
-	iio_save_image_float_vec(outfile, x1, *w, *h, *pd);
+	iio_write_image_float_vec(outfile, x1, *w, *h, *pd);
 	return EXIT_SUCCESS;
 }

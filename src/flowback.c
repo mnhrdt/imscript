@@ -136,7 +136,7 @@ int main_backflow(int c, char *v[])
 	float *out = xmalloc(w*h*pd*sizeof*out);
 	fprintf(stderr, "p = %p\n", (void*)out);
 	invflow(out, flow, in, w, h, pd);
-	iio_save_image_float_vec(outname, out, w, h, pd);
+	iio_write_image_float_vec(outname, out, w, h, pd);
 	return EXIT_SUCCESS;
 }
 

@@ -15,18 +15,18 @@ int main(int c, char *v[])
 	int w, h, pd;
 	float *x = iio_read_image_float_vec(in, &w, &h, &pd);
 	if (pd == 1 || pd == 3)
-		iio_save_image_float_vec(out, x, w, h, pd);
+		iio_write_image_float_vec(out, x, w, h, pd);
 	else if (pd == 2) {
 		for (int i = 0; i < w*h; i++)
 			x[i] = x[2*i];
-		iio_save_image_float_vec(out, x, w, h, 1);
+		iio_write_image_float_vec(out, x, w, h, 1);
 	} else if (pd == 4) {
 		for (int i = 0; i < w*h; i++) {
 			x[3*i] = x[4*i];
 			x[3*i+1] = x[4*i+1];
 			x[3*i+2] = x[4*i+2];
 		}
-		iio_save_image_float_vec(out, x, w, h, 3);
+		iio_write_image_float_vec(out, x, w, h, 3);
 	} else
 		return EXIT_FAILURE;
 	return EXIT_SUCCESS;

@@ -268,10 +268,10 @@ void mnehs_rpc(float *out_h, float *init_h, int ow, int oh,
 		igb[(j*ow+i)*2+1] = vgb[1];
 	}
 
-	iio_save_image_float_vec("/tmp/mnehs_amb.tiff", amb, ow, oh, 1);
-	iio_save_image_float_vec("/tmp/mnehs_Q.tiff", Q, ow, oh, 1);
-	iio_save_image_float_vec("/tmp/mnehs_iga.tiff", iga, ow, oh, 2);
-	iio_save_image_float_vec("/tmp/mnehs_igb.tiff", igb, ow, oh, 2);
+	iio_write_image_float_vec("/tmp/mnehs_amb.tiff", amb, ow, oh, 1);
+	iio_write_image_float_vec("/tmp/mnehs_Q.tiff", Q, ow, oh, 1);
+	iio_write_image_float_vec("/tmp/mnehs_iga.tiff", iga, ow, oh, 2);
+	iio_write_image_float_vec("/tmp/mnehs_igb.tiff", igb, ow, oh, 2);
 
 	// save raster grid
 	float *raster_grid = xmalloc(2 * ow * oh * sizeof(float));
@@ -284,7 +284,7 @@ void mnehs_rpc(float *out_h, float *init_h, int ow, int oh,
 		raster_grid[(j*ow+i)*2+1] = y;
 
 	}
-	iio_save_image_float_vec("/tmp/mnehs_raster.tiff",raster_grid,ow,oh,2);
+	iio_write_image_float_vec("/tmp/mnehs_raster.tiff",raster_grid,ow,oh,2);
 	free(raster_grid);
 
 	// initialize h
@@ -307,7 +307,7 @@ void mnehs_rpc(float *out_h, float *init_h, int ow, int oh,
 				h[ij] = -amb[ij]/Q[ij];
 		}
 	}
-	iio_save_image_float_vec("/tmp/mnehs_h.tiff", h, ow, oh, 1);
+	iio_write_image_float_vec("/tmp/mnehs_h.tiff", h, ow, oh, 1);
 
 	// update result
 	for (int i = 0; i < ow * oh; i++)
@@ -379,7 +379,7 @@ int main_rpc_warpabt(int c, char *v[])
 	}
 
 	// save the output raster
-	iio_save_image_float(filename_out, out_h, w, h);
+	iio_write_image_float(filename_out, out_h, w, h);
 
 	// cleanup and exit
 	free(in_h0);

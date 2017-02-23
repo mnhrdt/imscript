@@ -157,7 +157,7 @@ void dump_orbit_for_debugging_purposes(char *name, struct apm_orbit *o)
 		char fname[FILENAME_MAX];
 		snprintf(fname, FILENAME_MAX, "/tmp/apm_%s_%d.tiff", name, i);
 		struct apm_planet *p = o->t + i;
-		iio_save_image_float_vec(fname, p->x, p->w, p->h, p->pd);
+		iio_write_image_float_vec(fname, p->x, p->w, p->h, p->pd);
 	}
 }
 
@@ -477,9 +477,9 @@ int main(int c, char *v[])
 	apm(dout, cout, pout, a, aw, ah, b, bw, bh, apd, dmin, dmax);
 
 	// save the output images
-	iio_save_image_float(filename_dout, dout, aw, ah);
-	iio_save_image_float(filename_cout, cout, aw, ah);
-	iio_save_image_int_vec("pout.tiff", pout, aw, ah, 2);
+	iio_write_image_float(filename_dout, dout, aw, ah);
+	iio_write_image_float(filename_cout, cout, aw, ah);
+	iio_write_image_int_vec("pout.tiff", pout, aw, ah, 2);
 
 	// cleanup and exit
 	return 0;

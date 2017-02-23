@@ -84,7 +84,7 @@ int main(int c, char *v[])
 	int oh = ow;
 	float *y = xmalloc(ow*oh*sizeof*y);
 	flowh(y, ow, oh, x, w, h, number_of_bins_per_unit, number_of_units);
-	iio_save_image_float_vec(outfile, y, ow, oh, 1);
+	iio_write_image_float_vec(outfile, y, ow, oh, 1);
 	return 0;
 }
 #endif

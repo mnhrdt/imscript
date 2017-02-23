@@ -228,8 +228,8 @@ int main(int c, char *v[])
 		*h -= 2*m;
 	}
 
-	iio_save_image_float_vec("/tmp/xx.tmp.asc", xx, *w, *h, *pd);
-	iio_save_image_float_vec("/tmp/yy.tmp.asc", yy, *w, *h, *pd);
+	iio_write_image_float_vec("/tmp/xx.tmp.asc", xx, *w, *h, *pd);
+	iio_write_image_float_vec("/tmp/yy.tmp.asc", yy, *w, *h, *pd);
 	double e = imgerr(metric_id, xx, yy, *w**h**pd);
 
 	printf("%.16lf\n", e);

@@ -45,7 +45,7 @@ int main(int c, char *v[])
 		//		f[j][i][0], f[j][i][1]);
 	}
 
-	iio_save_image_float_vec(filename_flow, f[0][0], w, h, 2);
+	iio_write_image_float_vec(filename_flow, f[0][0], w, h, 2);
 
 	return 0;
 }

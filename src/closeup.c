@@ -406,11 +406,11 @@ static float *closeup(float *x, int w, int h, int pd, struct closeup_params *p,
 	// crop the image
 	int cw, ch;
 	float *cx = crop(x, w, h, pd, p->cropbox, &cw, &ch);
-	iio_save_image_float_vec("/tmp/cropped.png", cx, cw, ch, pd);
+	iio_write_image_float_vec("/tmp/cropped.png", cx, cw, ch, pd);
 
 	// compute the scalar channel
 	float *scx = scalar(cx, cw, ch, pd, p->level_type);
-	iio_save_image_float_vec("/tmp/scalar.png", scx, cw, ch, 1);
+	iio_write_image_float_vec("/tmp/scalar.png", scx, cw, ch, 1);
 
 	// compute the zoomed image
 	int zcw, zch;
@@ -523,7 +523,7 @@ int main(int c, char *v[])
 	float *y = closeup(x, w, h, pd, p, &ow, &od, &opd);
 
 	fprintf(stderr, "opd = %d\n", opd);
-	iio_save_image_float_vec(v[12], y, ow, od, opd);
+	iio_write_image_float_vec(v[12], y, ow, od, opd);
 
 	free(x);
 	free(y);

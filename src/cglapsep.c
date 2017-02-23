@@ -203,7 +203,7 @@ int main(int argc, char *argv[])
 
 	harmonic_extension_steps(out, in, *w, *h);
 
-	iio_save_image_float(filename_out, out, *w, *h);
+	iio_write_image_float(filename_out, out, *w, *h);
 
 	return 0;
 }

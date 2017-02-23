@@ -78,7 +78,7 @@ int main(int c, char *v[])
 	accumulate_histogram(H);
 	equalize_inplace(x, H, w*h);
 
-	iio_save_image_float(filename_out, x, w, h);
+	iio_write_image_float(filename_out, x, w, h);
 
 	return 0;
 }

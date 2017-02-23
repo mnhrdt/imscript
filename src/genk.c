@@ -75,6 +75,6 @@ int main(int c, char *v[])
 	int w = 2*kw + 1;
 	float *x = xmalloc(w * w * sizeof*x);
 	build_k(x, w, np, var, nc);
-	iio_save_image_float(filename_out, x, w, w);
+	iio_write_image_float(filename_out, x, w, w);
 	return EXIT_SUCCESS;
 }

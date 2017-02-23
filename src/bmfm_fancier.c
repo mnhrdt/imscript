@@ -219,8 +219,8 @@ int main(int c, char *v[])
 
 	bmfm_fancy(o, e, a, b, w, h, pd, fm, i, rad);
 
-	iio_save_image_float_vec(filename_out_disp, o, w, h, 2);
-	iio_save_image_float(filename_out_err, e, w, h);
+	iio_write_image_float_vec(filename_out_disp, o, w, h, 2);
+	iio_write_image_float(filename_out_err, e, w, h);
 
 	free(a);
 	free(b);

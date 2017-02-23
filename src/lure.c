@@ -228,7 +228,7 @@ int main(int c, char *v[])
 		int idx = idx_first + i;
 		char filename_out[FILENAME_MAX];
 		snprintf(filename_out, FILENAME_MAX, filepattern_out, idx);
-		iio_save_image_float_vec(filename_out, y[i], w, h, pd);
+		iio_write_image_float_vec(filename_out, y[i], w, h, pd);
 	}
 
 	return 0;

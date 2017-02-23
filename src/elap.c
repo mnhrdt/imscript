@@ -159,7 +159,7 @@ int main(int argc, char *argv[])
 
 	explicit_poisson_extension(out, in, *w, *h, timestep, niter);
 
-	iio_save_image_float(filename_out, out, *w, *h);
+	iio_write_image_float(filename_out, out, *w, *h);
 
 	return 0;
 }

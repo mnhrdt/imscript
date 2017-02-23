@@ -77,7 +77,7 @@ int main(int c, char *v[])
 		x[i] = 255*isnan(x[i]);
 
 	// save the output image
-	iio_save_image_float_split(filename_out, x, w, h, 1);
+	iio_write_image_float_split(filename_out, x, w, h, 1);
 
 	// cleanup (unnecessary) and exit
 	return 0;

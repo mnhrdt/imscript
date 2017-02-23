@@ -108,7 +108,7 @@ static int main_viewp(int c, char *v[])
 		if (inner_point(sizex, sizey, a, b))
 			x[b][a] = RGBA_GREEN;
 	}
-	iio_save_image_uint8_vec("-", (uint8_t*)x, sizex, sizey, 4);
+	iio_write_image_uint8_vec("-", (uint8_t*)x, sizex, sizey, 4);
 	free(t); free(x);
 	return EXIT_SUCCESS;
 }
@@ -136,7 +136,7 @@ static int main_viewhp(int c, char *v[])
 		if (inner_point(sizex, sizey, a, b))
 			x[b][a] += 1;
 	}
-	iio_save_image_float("-", x[0], sizex, sizey);
+	iio_write_image_float("-", x[0], sizex, sizey);
 	free(t); free(x);
 	return EXIT_SUCCESS;
 }
@@ -344,7 +344,7 @@ int main_viewpairs(int c, char *v[])
 				"looking at the wrong model or mask file.\n");
 		}
 	}
-	iio_save_image_uint8_vec("-", (uint8_t*)o, sizex, sizey, 4);
+	iio_write_image_uint8_vec("-", (uint8_t*)o, sizex, sizey, 4);
 	return EXIT_SUCCESS;
 }
 
@@ -394,7 +394,7 @@ int main_viewpolygons(int c, char *v[])
 				t[(2*i+2)%(2*n)], t[(2*i+3)%(2*n)], RGBA_GREEN);
 		free(t);
 	}
-	iio_save_image_uint8_vec("-", (uint8_t*)o, w, h, 4);
+	iio_write_image_uint8_vec("-", (uint8_t*)o, w, h, 4);
 	return EXIT_SUCCESS;
 }
 
@@ -448,7 +448,7 @@ int main_viewtrips(int c, char *v[])
 			o[Z[1]][Z[0]] = RGBA_MAGENTA;
 		}
 	}
-	iio_save_image_uint8_vec("-", (uint8_t*)o, s[0], s[1], 4);
+	iio_write_image_uint8_vec("-", (uint8_t*)o, s[0], s[1], 4);
 	return EXIT_SUCCESS;
 }
 
@@ -555,7 +555,7 @@ int main_viewepi(int c, char *v[])
 				o[y[1]][y[0]] = RGBA_BLUE;
 		}
 	}
-	iio_save_image_uint8_vec("-", (uint8_t*)o, s[0], s[1], 4);
+	iio_write_image_uint8_vec("-", (uint8_t*)o, s[0], s[1], 4);
 
 	if (true) { // show statistics
 		int n_inliers = 0, n_outliers = 0;
@@ -695,7 +695,7 @@ int main_viewfmpair(int c, char *v[])
 	}
 
 
-	iio_save_image_uint8_vec("-", (uint8_t*)o, 2*s[0], s[1], 4);
+	iio_write_image_uint8_vec("-", (uint8_t*)o, 2*s[0], s[1], 4);
 	return EXIT_SUCCESS;
 }
 
@@ -775,7 +775,7 @@ int main_viewfmpair(int c, char *v[])
 //	}
 //
 //
-//	iio_save_image_uint8_vec("-", (uint8_t*)o, 2*s[0], s[1], 4);
+//	iio_write_image_uint8_vec("-", (uint8_t*)o, 2*s[0], s[1], 4);
 //	return EXIT_SUCCESS;
 //}
 

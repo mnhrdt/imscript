@@ -15,7 +15,7 @@ static void img_debug(float *x, int w, int h, int pd, const char *fmt, ...)
 	va_start(ap, fmt);
 	vsnprintf(fname, FILENAME_MAX, fmt, ap);
 	va_end(ap);
-	iio_save_image_float_vec(fname, x, w, h, pd);
+	iio_write_image_float_vec(fname, x, w, h, pd);
 }
 
 static void img_debug_int(int *x, int w, int h, int pd, const char *fmt, ...)
@@ -25,7 +25,7 @@ static void img_debug_int(int *x, int w, int h, int pd, const char *fmt, ...)
 	va_start(ap, fmt);
 	vsnprintf(fname, FILENAME_MAX, fmt, ap);
 	va_end(ap);
-	iio_save_image_int_vec(fname, x, w, h, pd);
+	iio_write_image_int_vec(fname, x, w, h, pd);
 }
 static bool size_is_admissible(double *size, int nsizes, int sidx, int x)
 {
@@ -121,9 +121,9 @@ int main(int c, char *v[])
 	}
 	assert(totsize == w*h);
 
-	iio_save_image_int("ccproc_idx.tiff", out_idx, w, h);
-	iio_save_image_int("ccproc_all.tiff", out_all, w, h);
-	iio_save_image_float("ccproc_xxx.tiff", x, w, h);
+	iio_write_image_int("ccproc_idx.tiff", out_idx, w, h);
+	iio_write_image_int("ccproc_all.tiff", out_all, w, h);
+	iio_write_image_float("ccproc_xxx.tiff", x, w, h);
 
 	for (int i = 0; i < w*h; i++)
 		x[i] = -1;
@@ -132,7 +132,7 @@ int main(int c, char *v[])
 		for (int j = 0; j < out_bdsize[i]; j++)
 			x[out_all[out_first[i] + j]] = i;
 	}
-	iio_save_image_float("ccproc_yyy.tiff", x, w, h);
+	iio_write_image_float("ccproc_yyy.tiff", x, w, h);
 
 
 	free(out_size);

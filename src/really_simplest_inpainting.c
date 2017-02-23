@@ -139,7 +139,7 @@ int main(int argc, char *argv[])
 
 	simplest_inpainting_separable(out, in, *w, *h, pd, nscales);
 
-	iio_save_image_float_split(filename_out, out, *w, *h, pd);
+	iio_write_image_float_split(filename_out, out, *w, *h, pd);
 
 	return 0;
 }

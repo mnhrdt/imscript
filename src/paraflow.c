@@ -57,7 +57,7 @@ static double eval_objective_function(struct problem_data *p, double *v, int nv)
 	produce_flow_model(fm, v, nv, p->model_id, w, h);
 	transform_back(bp, fm, y, w, h, pd);
 	//apply_parametric_invflow(bp, y, w, h, pd, p->model_id, v, nv);
-	//iio_save_image_float_vec("/tmp/merdota.tiff", bp, w, h, pd);
+	//iio_write_image_float_vec("/tmp/merdota.tiff", bp, w, h, pd);
 	double r = evaluate_error_between_images(bp, x, w, h, pd, p->error_id);
 	free(bp);
 	return r;
@@ -482,7 +482,7 @@ static double evaluate_error_between_images(float *xx, float *yy,
 				nvals += 1;
 		}
 
-	//iio_save_image_float_vec("/tmp/diff.tiff", d[0][0], w, h, pd);
+	//iio_write_image_float_vec("/tmp/diff.tiff", d[0][0], w, h, pd);
 	if (0 == strcmp(error_id, "l2")) {
 		r = 0;
 		FORI(n)
@@ -555,7 +555,7 @@ static void do_stuff(float *x, float *y, int w, int h, int pd,
 		produce_flow_model(fm, rrr, nparams, model_id, w, h);
 		float *flo = xmalloc(w*h*2*sizeof*flo);
 		fill_flow_field(flo, fm, w, h);
-		iio_save_image_float_vec("/tmp/fff.tiff", flo, w, h, 2);
+		iio_write_image_float_vec("/tmp/fff.tiff", flo, w, h, 2);
 		free(flo);
 	}
 

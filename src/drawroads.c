@@ -190,10 +190,10 @@ int main(int c, char *v[])
 	float *x = xmalloc(2*w*h*sizeof*x);
 	if (!draw_directions) {
 		render_roads(x, w, h, param_x0, param_y0, e, n, ne, nn);
-		iio_save_image_float(filename_out, x, w, h);
+		iio_write_image_float(filename_out, x, w, h);
 	} else {
 		render_droads(x, w, h, param_x0, param_y0, e, n, ne, nn);
-		iio_save_image_float_vec(filename_out, x, w, h, 2);
+		iio_write_image_float_vec(filename_out, x, w, h, 2);
 	}
 
 	// cleanup and exit

@@ -99,7 +99,7 @@ int main(int c, char **v)
 			k_width, k_height, k_centerx, k_centery);
 
 	// save result
-	iio_save_image_float(filename_out, y, w, h);
+	iio_write_image_float(filename_out, y, w, h);
 
 	// cleanup
 	free(x);

@@ -121,7 +121,7 @@ int main(int c, char *v[])
 			x[i] /= n;
 
 	// save accumulated image
-	iio_save_image_double_vec(filename_out, x, w, h, pd);
+	iio_write_image_double_vec(filename_out, x, w, h, pd);
 
 
 	// cleanup and exit

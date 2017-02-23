@@ -116,9 +116,9 @@ int main(int c, char *v[])
 	xfclose(fs);
 
 	// save output
-	iio_save_image_float_vec(filename_out_a, ox, *w, *h, *pd);
-	iio_save_image_float_vec(filename_out_b, oy, *w, *h, *pd);
-	iio_save_image_float_vec(filename_out_f, of, *w, *h, 2);
+	iio_write_image_float_vec(filename_out_a, ox, *w, *h, *pd);
+	iio_write_image_float_vec(filename_out_b, oy, *w, *h, *pd);
+	iio_write_image_float_vec(filename_out_f, of, *w, *h, 2);
 
 	// cleanup and exit
 	free(x); free(y); free(f);

@@ -87,6 +87,6 @@ int main(int c, char *v[])
 	}
 	croparound(image_out, cw, ch, image_in, w, h, pd, x, y);
 
-	iio_save_image_float_vec(filename_out, image_out, cw, ch, pd);
+	iio_write_image_float_vec(filename_out, image_out, cw, ch, pd);
 	return EXIT_SUCCESS;
 }

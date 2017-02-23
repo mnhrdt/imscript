@@ -42,6 +42,6 @@ int main(void)
 	for (int l = 0; l < pd; l++)
 		x[j][i][l] = NAN;
 
-	iio_save_image_float_vec("-", xx, w, h, pd);
+	iio_write_image_float_vec("-", xx, w, h, pd);
 	return 0;
 }

@@ -89,7 +89,7 @@ int main(int c, char *v[])
 	float *x = iio_read_image_float(in, &w, &h);
 	float *y = xmalloc(w*h*sizeof*y);
 	stereo_interpolation(y, x, w, h);
-	iio_save_image_float(out, y, w, h);
+	iio_write_image_float(out, y, w, h);
 	free(x);
 	free(y);
 	return EXIT_SUCCESS;

@@ -216,6 +216,6 @@ int main(int c, char *v[])
 				tmp[ngood++] = x[j][i];
 		y[i] = f(tmp, ngood);
 	}
-	iio_save_image_double("-", y, *w, *h);
+	iio_write_image_double("-", y, *w, *h);
 	return EXIT_SUCCESS;
 }

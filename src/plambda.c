@@ -2542,7 +2542,7 @@ int main_images(int c, char **v)
 	int opd = run_program_vectorially(out, pdreal, p, x, w, h, pd);
 	assert(opd == pdreal);
 
-	iio_save_image_float_vec(filename_out, out, *w, *h, opd);
+	iio_write_image_float_vec(filename_out, out, *w, *h, opd);
 
 	FORI(n) free(x[i]);
 	free(out);

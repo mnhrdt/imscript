@@ -157,7 +157,7 @@ int main(int c, char *v[])
 	centroid(out, in, n, ref, w, h, pd);
 
 	// save output image
-	iio_save_image_float_vec(filename_out, out, w, h, pd);
+	iio_write_image_float_vec(filename_out, out, w, h, pd);
 
 	// free resources and exit
 	for (int i = 0; i < n; i++)
