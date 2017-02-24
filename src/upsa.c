@@ -509,7 +509,7 @@ static int parse_floats(float *t, int nmax, const char *s)
 	return i;
 }
 
-int main(int c, char *v[])
+int main_upsa(int c, char *v[])
 {
 	if (c < 3 || c > 5) {
 		fprintf(stderr, "usage:\n\t%s zoomf zoomtype [in [out]]\n", *v);
@@ -535,3 +535,8 @@ int main(int c, char *v[])
 
 	return EXIT_SUCCESS;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_upsa(c, v); }
+#endif
+

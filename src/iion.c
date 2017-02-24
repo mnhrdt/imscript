@@ -4,7 +4,7 @@
 #include "iio.h"
 
 // read an image in any format from STDIN and write a ppm to STDOUT
-int main(int c, char *v[])
+int main_iion(int c, char *v[])
 {
 	if (c != 3)
 		return fprintf(stderr, "usage:\n\t%s infile outfile\n", *v);
@@ -19,3 +19,6 @@ int main(int c, char *v[])
 	free(x);
 	return 0;
 }
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_iion(c, v); }
+#endif

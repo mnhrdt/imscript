@@ -64,7 +64,7 @@ void dither_sep(float *x, int w, int h, int pd)
 #include <stdio.h>
 #include <stdlib.h>
 #include "iio.h"
-int main(int c, char *v[])
+int main_dither(int c, char *v[])
 {
 	if (c != 1 && c != 2 && c != 3) {
 		fprintf(stderr, "usage:\n\t%s [gray [binary]]\n", *v);
@@ -85,3 +85,7 @@ int main(int c, char *v[])
 	free(x);
 	return 0;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_dither(c, v); }
+#endif

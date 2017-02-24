@@ -68,9 +68,6 @@ int main_synflow(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
-#ifndef OMIT_MAIN
-int main(int c, char *v[])
-{
-	return main_synflow(c, v);
-}
-#endif//OMIT_MAIN
+#ifndef HIDE_ALL_MAINS
+int main(int c, char *v[]) { return main_synflow(c, v); }
+#endif

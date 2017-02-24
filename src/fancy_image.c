@@ -83,7 +83,7 @@ static bool filename_corresponds_to_tiffo(char *filename)
 // type of a "zoom-out" function
 typedef void (*zoom_out_function_t)(float*,int,int,float*,int,int,int);
 
-static float getsample_0(float *x, int w, int h, int pd, int i, int j, int l)
+static float getsample_zero(float *x, int w, int h, int pd, int i, int j, int l)
 {
 	if (i < 0 || i >= w) return 0;
 	if (j < 0 || j >= h) return 0;
@@ -100,10 +100,10 @@ static void zoom_out_by_factor_two(float *out, int ow, int oh,
 	for (int l = 0; l < pd; l++)
 	{
 		float a[4];
-		a[0] = getsample_0(in, iw, ih, pd, 2*i  , 2*j  , l);
-		a[1] = getsample_0(in, iw, ih, pd, 2*i+1, 2*j  , l);
-		a[2] = getsample_0(in, iw, ih, pd, 2*i  , 2*j+1, l);
-		a[3] = getsample_0(in, iw, ih, pd, 2*i+1, 2*j+1, l);
+		a[0] = getsample_zero(in, iw, ih, pd, 2*i  , 2*j  , l);
+		a[1] = getsample_zero(in, iw, ih, pd, 2*i+1, 2*j  , l);
+		a[2] = getsample_zero(in, iw, ih, pd, 2*i  , 2*j+1, l);
+		a[3] = getsample_zero(in, iw, ih, pd, 2*i+1, 2*j+1, l);
 		out[pd*(ow*j + i)+l] = (a[0] + a[1] + a[2] + a[3])/4;
 	}
 }

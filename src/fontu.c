@@ -810,7 +810,7 @@ static int main_puts(int c, char **v)
 	return 0;
 }
 
-int main(int c, char **v)
+int main_fontu(int c, char **v)
 {
 	if (c < 2) goto usage;
 	else if (0 == strcmp(v[1], "cdump")) return main_cdump(c-1, v+1);
@@ -822,4 +822,7 @@ int main(int c, char **v)
 	       return 1;
 	}
 }
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_fontu(c, v); }
+#endif
 #endif//MAIN_FONTU

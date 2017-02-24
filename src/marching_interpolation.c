@@ -224,6 +224,7 @@ static float single_marcho(float a, float b, float c, float d, float x, float y)
 	return march_cyclic(a, b, c, d, x, y);
 }
 
+static
 float marchi(float a, float b, float c, float d, float x, float y)
 {
 	if (a <= b && a <= c && a <= d) {

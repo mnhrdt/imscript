@@ -103,7 +103,7 @@ void dump_histogram(long double (*h)[2], int n)
 	free(a);
 }
 
-int main(int c, char *v[])
+int main_ghisto(int c, char *v[])
 {
 	if (c != 2 && c != 1) {
 		fprintf(stderr, "usage:\n\t%s [in]\n", *v);
@@ -150,3 +150,8 @@ void print_gnuplot_stats_string(long double (*h)[2], int n, float bs)
 	//		(double)mass*bs, (double)avg, sqrt(var));
 	//note: Cauchy estimation is much hairier ("avg" and "var" do not work)
 }
+
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_ghisto(c, v); }
+#endif

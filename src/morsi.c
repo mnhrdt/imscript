@@ -360,7 +360,7 @@ static int *build_Drec(float radius)
 #ifdef MORSI_TEST_MAIN
 #include <string.h>
 #include "iio.h"
-int main(int c, char **v)
+int main_morsi(int c, char **v)
 {
 	// data for available structuring elements
 	int cross[] = {5,0,  0,0, -1,0, 0,0, 1,0, 0,-1, 0,1 };
@@ -427,4 +427,9 @@ int main(int c, char **v)
 	free(y);
 	return 0;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_morsi(c, v); }
+#endif
+
 #endif//MORSI_TEST_MAIN

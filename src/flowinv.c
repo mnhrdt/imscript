@@ -123,7 +123,7 @@ static void flowinv(float *v, float *u, int w, int h, int niter, int epsil)
 	}
 }
 
-int main(int c, char *v[])
+int main_flowinv(int c, char *v[])
 {
 	if (c != 3 && c != 4 && c != 5) {
 		fprintf(stderr, "usage:\n\t%s niter epsil [in [out]]\n", *v);
@@ -145,3 +145,7 @@ int main(int c, char *v[])
 	free(y);
 	return EXIT_SUCCESS;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_flowinv(c, v); }
+#endif 

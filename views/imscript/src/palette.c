@@ -1,0 +1,1 @@
+../../../src/palette.c

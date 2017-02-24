@@ -296,7 +296,7 @@ void amle_old(float *y, float *x, int w, int h)
 #endif
 
 
-int main(int c, char *v[])
+int main_amle(int c, char *v[])
 {
 	if (c > 4 || (v[1] && v[1][0]=='-' && v[1][1]=='h')) {
 		fprintf(stderr, "usage:\n\t%s [in [mask [out]]]\n", *v);
@@ -328,3 +328,7 @@ int main(int c, char *v[])
 
 	return 0;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_amle(c, v); }
+#endif

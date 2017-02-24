@@ -18,12 +18,12 @@
 
 static uint64_t lcg_knuth_seed = 0;
 
-void lcg_knuth_srand(uint32_t x)
+static void lcg_knuth_srand(uint32_t x)
 {
 	lcg_knuth_seed = x;
 }
 
-uint32_t lcg_knuth_rand(void)
+static uint32_t lcg_knuth_rand(void)
 {
 	lcg_knuth_seed *= 6364136223846793005;
 	lcg_knuth_seed += 1442695040888963407;
@@ -41,17 +41,17 @@ static int xrand(void)
 	return lcg_knuth_rand();
 }
 
-double random_raw(void)
+static double random_raw(void)
 {
 	return xrand();
 }
 
-double random_uniform(void)
+static double random_uniform(void)
 {
 	return lcg_knuth_rand()/(0.0+UINT_MAX);
 }
 
-double random_ramp(void)
+static double random_ramp(void)
 {
 	double x1 = random_uniform();
 	double x2 = random_uniform();
@@ -64,7 +64,7 @@ double random_ramp(void)
 #define M_PI 3.14159265358979323846264338328
 #endif
 
-double random_normal(void)
+static double random_normal(void)
 {
 	double x1 = random_uniform();
 	double x2 = random_uniform();
@@ -73,7 +73,7 @@ double random_normal(void)
 	return y;
 }
 
-int randombounds(int a, int b)
+static int randombounds(int a, int b)
 {
 	if (b < a)
 		return randombounds(b, a);
@@ -82,7 +82,7 @@ int randombounds(int a, int b)
 	return a + lcg_knuth_rand() % (b - a + 1);
 }
 
-double random_laplace(void)
+static double random_laplace(void)
 {
 	double x = random_uniform();
 	double y = random_uniform();
@@ -90,7 +90,7 @@ double random_laplace(void)
 	return isfinite(r)?r:0;
 }
 
-double random_cauchy(void)
+static double random_cauchy(void)
 {
 	double x1 = random_uniform();
 	double x2 = random_uniform();
@@ -100,7 +100,7 @@ double random_cauchy(void)
 	return isfinite(r)?r:0;
 }
 
-double random_exponential(void)
+static double random_exponential(void)
 {
 	//double u = random_uniform();
 	//double r = -log(1-u);
@@ -108,7 +108,7 @@ double random_exponential(void)
 	return fabs(random_laplace());
 }
 
-double random_pareto(void)
+static double random_pareto(void)
 {
 	return exp(random_exponential());
 }
@@ -123,7 +123,7 @@ double random_pareto(void)
 //
 // Observation: the algorithm is numerically imprecise when alpha approaches 1.
 // TODO: implement appropriate rearrangements as suggested in the article.
-double random_stable(double alpha, double beta)
+static double random_stable(double alpha, double beta)
 {
 	double U = (random_uniform() - 0.5) * M_PI;
 	double W = random_exponential();

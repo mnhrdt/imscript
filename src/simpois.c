@@ -300,7 +300,7 @@ void poisson_solver_separable(float *out, float *in, float *dat,
 #ifdef MAIN_IPOL_POISSON
 #include "iio.h"      // library for image input/output
 #include "pickopt.c"  // function for extracting named command line arguments
-int main(int argc, char *argv[])
+int main_simpois(int argc, char *argv[])
 {
 	// extract named arguments
 	float tstep = atof(pick_option(&argc, &argv, "t", "0.25"));
@@ -386,4 +386,9 @@ int main(int argc, char *argv[])
 	if (img_f) free(img_f);
 	return 0;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_simpois(c, v); }
+#endif
+
 #endif//MAIN_IPOL_POISSON

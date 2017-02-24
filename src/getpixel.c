@@ -1,5 +1,5 @@
-#ifndef _GETPIXEL_C
-#define _GETPIXEL_C
+#ifndef GETPIXEL_C
+#define GETPIXEL_C
 
 typedef float (*getsample_operator)(float*,int,int,int,int,int,int);
 //typedef void (*setsample_operator)(float*,int,int,int,int,int,int,float);
@@ -201,4 +201,4 @@ static float getpixel_1(float *x, int w, int h, int i, int j)
 //	x[i + j*w] = v;
 //}
 
-#endif//_GETPIXEL_C
+#endif//GETPIXEL_C

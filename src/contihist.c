@@ -456,7 +456,7 @@ void dump_histogram_noacc(long double (*h)[2], int n)
 #include <stdio.h>
 #include <stdlib.h>
 #include "iio.h"
-int main(int c, char *v[])
+int main_contihist(int c, char *v[])
 {
 	// process input arguments
 	if (c != 5) {
@@ -486,3 +486,7 @@ int main(int c, char *v[])
 	free(x);
 	return 0;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_contihist(c, v); }
+#endif

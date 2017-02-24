@@ -57,7 +57,7 @@ static void color_census_transform(unsigned char *y, int opd,
 
 #include "iio.h"
 #include "pickopt.c"
-int main(int c, char *v[])
+int main_censust(int c, char *v[])
 {
 	// process command line arguments
 	char *radius_opt = pick_option(&c, &v, "r", "1");
@@ -93,3 +93,7 @@ int main(int c, char *v[])
 	free(y);
 	return 0;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_censust(c, v); }
+#endif

@@ -25,7 +25,11 @@ static double invert_homography(double o[9], double i[9])
     return det;
 }
 
+
+typedef float (*gray_interpolator_t)(float *,int,int,float,float);
+
 #include <math.h>
+#include "extrapolators.c"
 #include "bilinear_interpolation.c"
 #include "marching_interpolation.c"
 #include "bicubic_gray.c"
@@ -42,9 +46,6 @@ float nearest_neighbor_interpolator(float *x, int w, int h, float p, float q)
 	if (iq >= h) iq = h - 1;
 	return x[w*iq+ip];
 }
-
-typedef float (*gray_interpolator_t)(float *,int,int,float,float);
-
 
 int homwarp(float *X, int W, int H, double M[9], float *x,
 		int w, int h, int o)
@@ -97,7 +98,7 @@ int shomwarp(float *X, int W, int H, double M[9], float *x,
 #include "xmalloc.c"
 #include "parsenumbers.c"
 #include "pickopt.c"
-int main(int c, char *v[])
+int main_homwarp(int c, char *v[])
 {
 	bool do_invert = pick_option(&c, &v, "i", NULL);
 	int order = atoi(pick_option(&c, &v, "o", "-3"));
@@ -130,3 +131,7 @@ int main(int c, char *v[])
 	iio_write_image_float_split(filename_out, y, ow, oh, pd);
 	return r;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_homwarp(c, v); }
+#endif

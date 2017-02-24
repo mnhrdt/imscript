@@ -1,6 +1,6 @@
 
-#ifndef _BICUBIC_C
-#define _BICUBIC_C
+#ifndef BICUBIC_C
+#define BICUBIC_C
 
 
 #include "getpixel.c"
@@ -23,6 +23,7 @@ static float bicubic_interpolation_cell(float p[4][4], float x, float y)
 	return cubic_interpolation(v, x);
 }
 
+static
 void bicubic_interpolation(float *result,
 		float *img, int w, int h, int pd, float x, float y)
 {
@@ -43,6 +44,7 @@ void bicubic_interpolation(float *result,
 	}
 }
 
+static
 void bicubic_interpolation_nans(float *result,
 		float *img, int w, int h, int pd, float x, float y)
 {
@@ -64,6 +66,7 @@ void bicubic_interpolation_nans(float *result,
 }
 
 
+static
 void bicubic_interpolation_boundary(float *result,
 		float *img, int w, int h, int pd, float x, float y,
 		int boundary)
@@ -93,6 +96,7 @@ void bicubic_interpolation_boundary(float *result,
 	}
 }
 
+static
 void bicubic_interpolation_boundary2(float *result,
 		float *img, int w, int h, int pd, float x, float y,
 		getsample_operator p)
@@ -112,4 +116,4 @@ void bicubic_interpolation_boundary2(float *result,
 	}
 }
 
-#endif//_BICUBIC_C
+#endif//BICUBIC_C

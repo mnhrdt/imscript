@@ -120,7 +120,7 @@ void bdint_gen_split(float *x, int w, int h, int pd, accumulator_t *a)
 #include <stdio.h>
 #include "iio.h"
 #include "pickopt.c"
-int main(int c, char *v[])
+int main_bdint(int c, char *v[])
 {
 	char *opt_a = pick_option(&c, &v, "a", "min");
 	char *filename_mask = pick_option(&c, &v, "m", "");
@@ -157,4 +157,9 @@ int main(int c, char *v[])
 
 	return 0;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_bdint(c, v); }
+#endif
+
 #endif//USE_BDINT_MAIN
