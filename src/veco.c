@@ -161,7 +161,7 @@ static bool isgood_numeric(float x)
 
 #include "pickopt.c"
 
-int main(int c, char *v[])
+int main_veco(int c, char *v[])
 {
 	int gpar = atoi(pick_option(&c, &v, "g", "1"));
 	if (c < 4) {
@@ -218,3 +218,7 @@ int main(int c, char *v[])
 	iio_write_image_float("-", y, *w, *h);
 	return EXIT_SUCCESS;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_veco(c, v); }
+#endif

@@ -15,7 +15,7 @@ int main(int c, char *v[])
 	float *x = iio_read_image_float_vec(filename_in, &w, &h, &pd);
 	if (!x)
 		return fprintf(stderr, "cannot image \"%s\"\n", filename_in);
-	iio_save_image_float_vec(filename_out, x, w, h, pd);
+	iio_write_image_float_vec(filename_out, x, w, h, pd);
 	free(x);
 	return 0;
 }

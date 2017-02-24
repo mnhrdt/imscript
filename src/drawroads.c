@@ -151,7 +151,7 @@ static void render_droads(float *out, int w, int h, int offset_x, int offset_y,
 #include "fail.c"
 #include "parsenumbers.c"
 #include "pickopt.c"
-int main(int c, char *v[])
+int main_drawroads(int c, char *v[])
 {
 	bool draw_directions = pick_option(&c, &v, "d", NULL);
 	// process input arguments
@@ -199,3 +199,7 @@ int main(int c, char *v[])
 	// cleanup and exit
 	return 0;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_drawroads(c, v); }
+#endif

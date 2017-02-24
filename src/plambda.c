@@ -2748,7 +2748,7 @@ static int do_man(void)
 				"with images as variables\" plambda" MANPIPE);
 }
 
-int main(int c, char **v)
+int main_plambda(int c, char **v)
 {
 	if (c == 1) return print_help(*v, 0);
 	if (c == 2 && 0 == strcmp(v[1], "-h")) return print_help(*v,0);
@@ -2766,5 +2766,9 @@ int main(int c, char **v)
 	}
 	return f(c,v);
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_plambda(c, v); }
+#endif
 
 // vim:set foldmethod=marker:

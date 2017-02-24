@@ -205,7 +205,7 @@ static bool isgood(float *x, int n)
 
 #include "pickopt.c"
 
-int main(int c, char *v[])
+int main_vecov(int c, char *v[])
 {
 	char *filename_out = pick_option(&c, &v, "o", "-");
 	if (c < 4) {
@@ -260,3 +260,7 @@ int main(int c, char *v[])
 		free(x[i]);
 	return EXIT_SUCCESS;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_vecov(c, v); }
+#endif

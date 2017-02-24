@@ -146,8 +146,6 @@
 #endif
 
 
-#include "iio.h" // only for IIO_MAX_DIMENSION
-
 
 #ifdef I_CAN_HAS_LIBPNG
 // ugly "feature" in png.h forces this header to be included here
@@ -2420,6 +2418,7 @@ static int xml_get_tag_content(char *out, char *line, char *tag)
 }
 
 
+float *iio_read_image_float(const char *fname, int *w, int *h); // forward
 static int read_beheaded_vrt(struct iio_image *x,
 		FILE *fin, char *header, int nheader)
 {

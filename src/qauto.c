@@ -34,7 +34,7 @@ static void get_rminmax(float *rmin, float *rmax, float *x, int n, int rb)
 #include "smapa.h"
 SMART_PARAMETER_SILENT(QAUTOR,0.5)
 
-int main(int c, char *v[])
+int main_qauto(int c, char *v[])
 {
 	if (c != 3 && c != 2 && c != 1) {
 		fprintf(stderr, "usage:\n\t%s [in [out]]\n", *v);
@@ -62,3 +62,7 @@ int main(int c, char *v[])
 	iio_write_image_uint8_vec(out, y, w, h, pd);
 	return EXIT_SUCCESS;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_qauto(c, v); }
+#endif

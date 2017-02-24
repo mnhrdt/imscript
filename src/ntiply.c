@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "iio.h"
 
-int main(int c, char *v[])
+int main_ntiply(int c, char *v[])
 {
 	if (c != 2 && c != 4 && c != 3) {
 		fprintf(stderr, "usage:\n\t%s n [in [out]]\n", *v);
@@ -25,3 +25,7 @@ int main(int c, char *v[])
 	free(y);
 	return EXIT_SUCCESS;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_ntiply(c, v); }
+#endif

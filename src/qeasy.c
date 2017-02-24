@@ -5,7 +5,7 @@
 
 #define xmalloc malloc
 
-int main(int c, char *v[])
+int main_qeasy(int c, char *v[])
 {
 	if (c != 5 && c != 4 && c != 3) {
 		fprintf(stderr,"usage:\n\t%s black white  [in [out]]\n", *v);
@@ -31,3 +31,7 @@ int main(int c, char *v[])
 	iio_write_image_uint8_vec(out, y, w, h, pd);
 	return EXIT_SUCCESS;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_qeasy(c, v); }
+#endif

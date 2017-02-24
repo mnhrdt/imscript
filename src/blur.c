@@ -501,7 +501,7 @@ static int print_help(void)
 
 #include "iio.h"
 #include "parsenumbers.c"
-int main(int c, char *v[])
+int main_blur(int c, char *v[])
 {
 	if (c == 2 && 0 == strcmp(v[1], "--version")) return print_version();
 	if (c == 2 && 0 == strcmp(v[1], "--help")) return print_help();
@@ -535,4 +535,9 @@ int main(int c, char *v[])
 	free(y);
 	return EXIT_SUCCESS;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_blur(c, v); }
+#endif
+
 #endif//MAIN_BLUR

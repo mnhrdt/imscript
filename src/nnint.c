@@ -263,7 +263,7 @@ void nnint_split(float *x, int w, int h, int pd)
 #include <stdio.h>
 #include "iio.h"
 #include "pickopt.c"
-int main(int c, char *v[])
+int main_nnint(int c, char *v[])
 {
 	char *filename_mask = pick_option(&c, &v, "m", "");
 	int help_argument = (int)pick_option(&c, &v, "h", 0);
@@ -294,4 +294,7 @@ int main(int c, char *v[])
 
 	return 0;
 }
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_nnint(c, v); }
+#endif
 #endif//USE_NNINT_MAIN
