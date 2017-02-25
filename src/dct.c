@@ -76,8 +76,7 @@ static void normalize_float_array_inplace(float *x, int n)
 
 }
 
-#ifndef OMIT_FFT_MAIN
-int main(int c, char *v[])
+int main_dct(int c, char *v[])
 {
 	if (c != 1 && c != 2 && c != 3) {
 		fprintf(stderr, "usage:\n\t%s [in [out]]\n", *v);
@@ -100,4 +99,7 @@ int main(int c, char *v[])
 	free(y);
 	return EXIT_SUCCESS;
 }
-#endif//OMIT_FFT_MAIN
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_dct(c, v); }
+#endif

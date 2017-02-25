@@ -321,7 +321,7 @@ void bmms_rec(float *out, float *a, float *b,
 #ifdef MAIN_BMMS
 #include "iio.h"
 #include "pickopt.c"
-int main(int argc, char *argv[])
+int main_bmms(int argc, char *argv[])
 {
 	char *cost_id = pick_option(&argc, &argv, "t", "CENSUS");
 	if (argc != 7) {
@@ -355,4 +355,9 @@ int main(int argc, char *argv[])
 	free(f);
 	return 0;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_bmms(c, v); }
+#endif
+
 #endif

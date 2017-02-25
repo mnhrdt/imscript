@@ -151,7 +151,6 @@ void print_gnuplot_stats_string(long double (*h)[2], int n, float bs)
 	//note: Cauchy estimation is much hairier ("avg" and "var" do not work)
 }
 
-
 #ifndef HIDE_ALL_MAINS
 int main(int c, char **v) { return main_ghisto(c, v); }
 #endif

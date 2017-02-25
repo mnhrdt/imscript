@@ -17,6 +17,7 @@ src/backflow: src/backflow.c src/iio.h src/fail.c src/xmalloc.c \
  src/getpixel.c src/bicubic.c src/smapa.h
 src/bandhisto: src/bandhisto.c src/iio.h
 src/basify: src/basify.c
+src/bayerparts: src/bayerparts.c src/iio.h
 src/bdint: src/bdint.c src/abstract_dsf.c src/abstract_dsf.h src/iio.h \
  src/pickopt.c
 src/bfollow: src/bfollow.c
@@ -323,6 +324,7 @@ src/reallysmall_svd: src/reallysmall_svd.c
 src/reallysmall_svd2: src/reallysmall_svd2.c
 src/reallysmall_svd3: src/reallysmall_svd3.c
 src/rednoise: src/rednoise.c src/iio.h
+src/registration: src/registration.c src/iio.h
 src/remove_small_cc: src/remove_small_cc.c src/abstract_dsf.c \
  src/abstract_dsf.h src/iio.h src/pickopt.c
 src/replicate: src/replicate.c src/iio.h src/xmalloc.c src/fail.c

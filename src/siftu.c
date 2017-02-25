@@ -544,7 +544,7 @@ int main_siftrr(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
-int main(int c, char *v[])
+int main_siftu(int c, char *v[])
 {
 	if (c < 2) goto usage;
 	else if (0 == strcmp(v[1],"pair"))   return main_siftcpairs(c-1, v+1);
@@ -569,3 +569,7 @@ int main(int c, char *v[])
 		return EXIT_FAILURE;
 	}
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_siftu(c, v); }
+#endif

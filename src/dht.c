@@ -64,8 +64,7 @@ static void dht(float *y, float *x, int w, int h)
 
 
 
-#ifndef OMIT_DHT_MAIN
-int main(int c, char *v[])
+int main_dht(int c, char *v[])
 {
 	if (c != 1 && c != 2 && c != 3) {
 		fprintf(stderr, "usage:\n\t%s [in [out]]\n", *v);
@@ -89,4 +88,7 @@ int main(int c, char *v[])
 	free(y);
 	return 0;
 }
-#endif//OMIT_DHT_MAIN
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_dht(c, v); }
+#endif

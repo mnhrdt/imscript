@@ -39,7 +39,7 @@ static float extend_float_image_periodic(float *xx, int w, int h, int pd,
 	return x[j][i][l];
 }
 
-int main(int c, char *v[])
+int main_fftshift(int c, char *v[])
 {
 	if (c != 1 && c != 2 && c != 3) {
 		fprintf(stderr, "usage:\n\t%s [in [out]]\n", *v);
@@ -63,3 +63,7 @@ int main(int c, char *v[])
 	free(y);
 	return EXIT_SUCCESS;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_fftshift(c, v); }
+#endif

@@ -36,7 +36,7 @@ static void crop(float *out, int *cw, int *ch, float *in, int w, int h, int pd,
 
 #include "iio.h"
 
-int main(int c, char *v[])
+int main_crop(int c, char *v[])
 {
 	if (c < 5 || c > 7) {
 		fprintf(stderr, "usage:\n\t%s x0 y0 xf yf [in [out]]\n", *v);
@@ -61,3 +61,7 @@ int main(int c, char *v[])
 	iio_write_image_float_vec(filename_out, image_out, cw, ch, pd);
 	return EXIT_SUCCESS;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_crop(c, v); }
+#endif

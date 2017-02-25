@@ -781,7 +781,7 @@ int main_viewfmpair(int c, char *v[])
 
 // CLI utility to access some visualization programs
 // all programs read text file from stdin and write a transparent PNG to stdout
-int main(int c, char *v[])
+int main_pview(int c, char *v[])
 {
 	assert(4 == sizeof(struct rgba_value));
 	if (c < 2) goto usage;
@@ -799,3 +799,7 @@ int main(int c, char *v[])
 	       return EXIT_FAILURE;
 	}
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_pview(c, v); }
+#endif

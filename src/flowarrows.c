@@ -95,7 +95,7 @@ void flowarrows(float *vv, float *ff, int w, int h, float s, int g)
 }
 
 #ifndef OMIT_MAIN
-int main(int c, char *v[])
+int main_flowarrows(int c, char *v[])
 {
 	if (c != 3 && c != 4 && c != 5) {
 		fprintf(stderr, "usage:\n\t%s scale gridsize [in [out]]\n", *v);
@@ -119,4 +119,8 @@ int main(int c, char *v[])
 	iio_write_image_float_vec(outfile, y, w, h, 1);
 	return EXIT_SUCCESS;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_flowarrows(c, v); }
+#endif
 #endif

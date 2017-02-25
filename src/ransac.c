@@ -640,8 +640,12 @@ int main_hack_fundamental_trimatrix(int c, char *v[])
 
 
 
-int main(int c, char *v[])
+int main_ransac(int c, char *v[])
 {
 	return main_cases(c, v);
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_ransac(c, v); }
+#endif
 #endif//OMIT_MAIN

@@ -738,7 +738,7 @@ static void imprintf_2d(FILE *f, char *fmt, float *x, int w, int h, int pd)
 	print_printable_data(f, p);
 }
 
-int main(int c, char *v[])
+int main_imprintf(int c, char *v[])
 {
 	if (c != 2 && c != 3) {
 		fprintf(stderr, "usage:\n\t%s format [image]\n", *v);
@@ -752,3 +752,7 @@ int main(int c, char *v[])
 	imprintf_2d(stdout, format, x, w, h, pd);
 	return EXIT_SUCCESS;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_imprintf(c, v); }
+#endif

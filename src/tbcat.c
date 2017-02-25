@@ -11,7 +11,7 @@
 
 SMART_PARAMETER(BACKGROUND,0)
 
-int main(int c, char *v[])
+int main_tbcat(int c, char *v[])
 {
 	if (c != 3 && c != 4) {
 		fprintf(stderr, "usage:\n\t%s a b [ab]\n", *v);
@@ -50,3 +50,7 @@ int main(int c, char *v[])
 	iio_write_image_float_vec(filename_out, z, w[2], h[2], pd[2]);
 	return EXIT_SUCCESS;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_tbcat(c, v); }
+#endif

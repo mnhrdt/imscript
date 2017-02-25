@@ -156,7 +156,7 @@ static struct ann_pair *srmatch(
 
 // compute pairs using sift-nn (non-sym, initial segment, explicit)
 // heuristic, that starts with the first "top" keypoints to obtain an initial registration, and
-int main(int c, char *v[])
+int main_srmatch(int c, char *v[])
 {
 	if (c != 9) {
 		fprintf(stderr,"usage:\n\t"
@@ -216,3 +216,7 @@ int main(int c, char *v[])
 	if (pairs) free(pairs);
 	return EXIT_SUCCESS;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_srmatch(c, v); }
+#endif

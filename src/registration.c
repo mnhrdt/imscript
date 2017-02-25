@@ -179,7 +179,7 @@ void registration(float *out, float *left, float *right, int w, int h)
 
 
 // main function
-int main(int argc, char **argv)
+int main_registration(int argc, char **argv)
 {
 	// process input arguments
 	if (argc != 4) {
@@ -211,3 +211,7 @@ int main(int argc, char **argv)
 	free(out);
 	return 0;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_registration(c, v); }
+#endif

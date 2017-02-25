@@ -230,7 +230,7 @@ void apply_palette(uint8_t *y, float *x, int n, char *s, float m, float M)
 #include "iio.h"
 #include "xmalloc.c"
 
-int main(int c, char *v[])
+int main_palette(int c, char *v[])
 {
 	if (c != 4 && c != 5 && c != 6 ) {
 		fprintf(stderr, "usage:\n\t%s from to pal [in [out]]\n", *v);
@@ -255,4 +255,8 @@ int main(int c, char *v[])
 	free(y);
 	return 0;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_palette(c, v); }
+#endif
 #endif//PALETTE_MAIN

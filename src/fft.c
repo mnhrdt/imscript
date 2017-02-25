@@ -146,8 +146,7 @@ static void fft_inverse(float *y, float *x, int w, int h, int pd)
 	free(gc);
 }
 
-#ifndef OMIT_FFT_MAIN
-int main(int c, char *v[])
+int main_fft(int c, char *v[])
 {
 	if (c != 1 && c != 2 && c != 3 && c != 4) {
 		fprintf(stderr, "usage:\n\t%s {1|-1} [in [out]]\n", *v);
@@ -181,4 +180,7 @@ int main(int c, char *v[])
 	free(y);
 	return EXIT_SUCCESS;
 }
-#endif//OMIT_FFT_MAIN
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_fft(c, v); }
+#endif

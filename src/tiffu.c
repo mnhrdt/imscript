@@ -2628,7 +2628,7 @@ void my_tifferror(const char *module, const char *fmt, va_list ap)
 }
 
 #ifndef TIFFU_OMIT_MAIN
-int main(int c, char *v[])
+int main_tiffu(int c, char *v[])
 {
 	//TIFFSetWarningHandler(NULL);//suppress warnings
 	TIFFSetErrorHandler(my_tifferror);
@@ -2660,6 +2660,10 @@ int main(int c, char *v[])
 
 	goto err;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_tiffu(c, v); }
+#endif
 #endif//TIFFU_OMIT_MAIN
 #define TIFFU_C_INCLUDED
 // vim:set foldmethod=marker:
