@@ -53,7 +53,7 @@ static void interpolate_two_points(float out[2], float a[2], float b[2],
  *      v[0] ---- v[1]
  *
  */
-int marching_squares_cell(float (*segments)[2][2], float v[4], float t)
+static int marching_squares_cell(float (*segments)[2][2], float v[4], float t)
 {
 	int m = 0;
 	for (int i = 0; i < 4; i++)
@@ -77,7 +77,7 @@ int marching_squares_cell(float (*segments)[2][2], float v[4], float t)
 }
 
 
-float (*marching_squares_whole_image_float(int *n,
+static float (*marching_squares_whole_image_float(int *n,
 			float *image, int w, int h, float t))[2][2]
 {
 #define getpixel(x,w,i,j) (x)[(i)+(w)*(j)]

@@ -8,6 +8,7 @@
 #include <stdbool.h>
 
 #include "iio.h"
+#include "fail.c"
 #include "marching_squares.c"
 #include "marching_interpolation.c"
 #include "bicubic.c"
@@ -16,50 +17,6 @@
 #define FORJ(n) for(int j=0;j<(n);j++)
 #define FORL(n) for(int l=0;l<(n);l++)
 
-// print an error message and abort the program
-static void error(const char *fmt, ...)
-
-{
-	va_list argp;
-	fprintf(stderr, "\nERROR: ");
-	va_start(argp, fmt);
-	vfprintf(stderr, fmt, argp);
-	va_end(argp);
-	fprintf(stderr, "\n\n");
-
-#ifdef NDEBUG
-	exit(-1);
-#else
-	exit(*(int *)0x43);
-#endif//NDEBUG
-}
-
-//// always returns a valid pointer
-//static void *xmalloc(size_t size)
-//{
-//	if (size == 0)
-//		error("xmalloc: zero size");
-//	void *new = malloc(size);
-//	if (!new)
-//	{
-//		double sm = size / (0x100000 * 1.0);
-//		error("xmalloc: out of memory when requesting "
-//				"%zu bytes (%gMB)",//:\"%s\"",
-//				size, sm);//, strerror(errno));
-//	}
-//	return new;
-//}
-
-
-//// utility function: alloc a 2d matrix contiguously (wxh elements of size n)
-//static void *matrix_build(int w, int h, size_t n)
-//{
-//	size_t p = sizeof(void *);
-//	char *r = xmalloc(h*p + w*h*n);
-//	for (int i = 0; i < h; i++)
-//		*(void **)(r + i*p) = r + h*p + i*w*n;
-//	return r;
-//}
 
 // visualization parameters that can be applied to an arbitrary image
 struct closeup_params {
@@ -82,14 +39,6 @@ static int bound(int a, int x, int b)
 	return x;
 }
 
-//static float fbound(float a, float x, float b)
-//{
-//	assert(a <= b);
-//	if (x < a) return a;
-//	if (x > b) return b;
-//	return x;
-//}
-
 static float *crop(float *x, int w, int h, int pd, int c[4], int *ow, int *oh)
 {
 	int x0 = bound(0, c[0], w-1);
@@ -106,24 +55,6 @@ static float *crop(float *x, int w, int h, int pd, int c[4], int *ow, int *oh)
 	return y;
 }
 
-//static float (**crop(float (**x)[3], int w, int h, int c[4],
-//		int *ow, int *oh))[3]
-//{
-//	int x0 = bound(0, c[0], w-1);
-//	int y0 = bound(0, c[1], h-1);
-//	int xf = bound(x0+1, c[2], w);
-//	int yf = bound(y0+1, c[3], h);
-//	int cw = xf - x0;
-//	int ch = yf - y0;
-//	float (**y)[3] = matrix_build(cw, ch, sizeof**y);
-//	FORJ(ch) FORI(cw) FORL(3)
-//		y[j][i][l] = x[j+y0][i+x0][l];
-//	*ow = cw;
-//	*oh = ch;
-//	return y;
-//}
-
-
 static void assert_rgb(double t[3])
 {
 	for (int i = 0; i < 3; i++)
@@ -132,10 +63,10 @@ static void assert_rgb(double t[3])
 
 static void assert_hsv(double t[3])
 {
-	if (t[0] < 0 || t[0] >= 360) error("queca %g\n", t[0]);
+	if (t[0] < 0 || t[0] >= 360) fail("queca %g\n", t[0]);
 	assert(t[0] >= 0 && t[0] < 360);
 	if (!(t[1] >= 0 && t[1] <= 1))
-		error("CACA S = %g\n", t[1]);
+		fail("CACA S = %g\n", t[1]);
 	assert(t[1] >= 0 && t[1] <= 1);
 	assert(t[2] >= 0 && t[2] <= 1);
 }
@@ -300,7 +231,7 @@ static float interpolate_cell(float a, float b, float c, float d,
 	case 2: return interpolate_bilinear(a, b, c, d, x, y);
 	case -2: return interpolate_bilinear_fade(a, b, c, d, x, y);
 	case -3: return interpolate_bilinear_fadeinv(a, b, c, d, x, y);
-	default: error("caca de vaca");
+	default: fail("caca de vaca");
 	}
 	return -1;
 }
@@ -365,7 +296,7 @@ static float *zoom2(float *x, int w, int h, int pd, int n, int zt,
 }
 
 // draw a segment between two points
-void traverse_segment(int px, int py, int qx, int qy,
+static void traverse_segment(int px, int py, int qx, int qy,
 		void (*f)(int,int,void*), void *e)
 {
 	if (px == qx && py == qy)

@@ -3,8 +3,29 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+/* data structure and operations to maintain a finite set of points belonging
+ * to a finite set of disjoint squares (or cubes).  Points and regions are
+ * identified only by their inidices. */
 
-#include "ok_list.h"
+
+struct ok_list {
+	int number_of_regions;
+	int number_of_points;	// (including the removed points!)
+	int *r;		// gives the representative point of each region
+	int *p;		// gives the region that contains each point
+	int *plist;	// linked lists of points (by regions)
+	int *buf;	// buffer to return lists of points
+
+	// optional geometrical data useful when the regions are
+	// the rectangles of a grid:
+	float x0[3];
+	float dx[3];
+	int nx[3];
+	// even more optional: a pointer to the coordinates of the points
+//	float (*px)[3];
+};
+
+
 
 #include "fail.c"
 #include "xmalloc.c"
@@ -30,6 +51,7 @@
 #define INULL (-42)
 #define REMOVED (-4300)
 
+static
 void ok_display_tables(struct ok_list *l)
 {
 	printf("r:");
@@ -71,9 +93,11 @@ static void ok_assert_consistency(struct ok_list *l)
 		}
 	DEBUG("...ASSERTED!\n");
 }
+static
 void ok_hack_assert_consistency(struct ok_list *l){ok_assert_consistency(l);
 	/*fprintf(stderr,"...");*/}
 
+static
 void ok_init(struct ok_list *l, int nr, int np)
 {
 	l->number_of_regions = nr;
@@ -93,6 +117,7 @@ void ok_init(struct ok_list *l, int nr, int np)
 	//ok_assert_consistency(l);
 }
 
+static
 void ok_free(struct ok_list *l)
 {
 	xfree(l->r);
@@ -103,6 +128,7 @@ void ok_free(struct ok_list *l)
 }
 
 // TODO: optimize this so that it skips the removed elements
+static
 int ok_which_points(struct ok_list *l, int r)
 {
 	DEBUG("going to list the points of region %d\n", r);
@@ -126,6 +152,7 @@ int ok_which_points(struct ok_list *l, int r)
 	return cx;
 }
 
+static
 int ok_which_region(struct ok_list *l, int p)
 {
 	assert(p >= 0);
@@ -142,6 +169,7 @@ int ok_which_region(struct ok_list *l, int p)
 }
 
 //static
+static
 void ok_display(struct ok_list *l)
 {
 	printf("ok_list %p\n", (void *)l);
@@ -169,6 +197,7 @@ void ok_display(struct ok_list *l)
 
 //TODO: optimize this function so that it always leaves a non-removed element
 //as a representatitve
+static
 void ok_remove_point(struct ok_list *l, int p)
 {
 	assert(p >= 0);
@@ -189,6 +218,7 @@ void ok_remove_point(struct ok_list *l, int p)
 #endif
 }
 
+static
 void ok_add_point(struct ok_list *l, int r, int p)
 {
 	assert(r >= 0);
@@ -220,6 +250,7 @@ void ok_add_point(struct ok_list *l, int r, int p)
 //#ifdef USE_IMAGE_STRUCTURES
 
 // input: fill x0, dx and nx
+static
 void ok_init_grid(struct ok_list *l, int np)
 //float x0[3], float dx[3], int nx[3], int np)
 {
@@ -238,6 +269,7 @@ void ok_init_grid(struct ok_list *l, int np)
 }
 
 // fills buf[0], buf[1], buf[2] with integer coordinates of the region
+static
 int ok_regionindex(struct ok_list *l, float x[3])
 {
 
@@ -311,6 +343,7 @@ int ok_regionindex_neigs(ok_list *l, float x[3])
 }
 #else
 //THIS IS INCOMPREHENSIBLE
+static
 int ok_regionindex_neigs(struct ok_list *l, float x[3])
 {
 	DEBUG("OK_RIDX_N: treating point %f,%f,%f...\n", x[0], x[1], x[2]);
@@ -343,6 +376,7 @@ int ok_regionindex_neigs(struct ok_list *l, float x[3])
 }
 #endif
 
+static
 int ok_add_geo_point(struct ok_list *l, float x[3], int p)
 {
 	{
@@ -360,6 +394,7 @@ int ok_add_geo_point(struct ok_list *l, float x[3], int p)
 }
 //#endif /* USE_IMAGE_STRUCTURES */
 
+static
 void ok_svg_layer(void *ff, struct ok_list *l)
 {
 	FILE *f = ff;

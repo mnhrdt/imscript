@@ -42,7 +42,7 @@ static void edump(char *fname, long double *e, int n)
 	xfclose(f);
 }
 
-void fill_continuous_histogram_fake(long double (*bins)[2], int nbins,
+static void fill_continuous_histogram_fake(long double (*bins)[2], int nbins,
 		float min, float max, float *x, int w, int h)
 {
 	// initialize bins
@@ -78,7 +78,7 @@ struct quad {
 	int ij;
 };
 
-int compare_floats(const void *a, const void *b)
+static int compare_floats(const void *a, const void *b)
 {
 	const float *da = (const float *) a;
 	const float *db = (const float *) b;

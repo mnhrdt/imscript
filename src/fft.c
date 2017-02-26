@@ -26,8 +26,8 @@
 
 
 #ifndef USE_WISDOM
-void evoke_wisdom(void) {}
-void bequeath_wisdom(void) {}
+static void evoke_wisdom(void) {}
+static void bequeath_wisdom(void) {}
 #else//USE_WISDOM
 #include "fftwisdom.c"
 #endif//USE_WISDOM

@@ -29,7 +29,7 @@ static int compare_floats(const void *a, const void *b)
 	return (*da > *db) - (*da < *db);
 }
 
-int fill_histogram(long double (*h)[2], float *in_x, int n)
+static int fill_histogram(long double (*h)[2], float *in_x, int n)
 {
 	if (!n) return 0;
 	float *x = xmalloc(n * sizeof*x);
@@ -55,13 +55,15 @@ int fill_histogram(long double (*h)[2], float *in_x, int n)
 	return r;
 }
 
-void accumulate_histogram(long double (*h)[2], int n)
+static void accumulate_histogram(long double (*h)[2], int n)
 {
 	for (int i = 1; i < n; i++)
 		h[i][1] += h[i-1][1];
 }
 
-void dump_histogram(long double (*h)[2], int n)
+static void print_gnuplot_stats_string(long double (*)[2], int, float);
+
+static void dump_histogram(long double (*h)[2], int n)
 {
 	long double (*a)[2] = xmalloc(n*sizeof*a);
 	memcpy(a, h, n*sizeof*a);
@@ -81,7 +83,6 @@ void dump_histogram(long double (*h)[2], int n)
 		printf("unset key\n");
 	printf("plot \"-\" w impulses title \"histogram\", \"-\" w lines title \"accumulated histogram\"");
 	if (SHOWSTATS() > 0) {
-		void print_gnuplot_stats_string(long double (*)[2], int, float);
 		print_gnuplot_stats_string(h, n, 1/SHOWSTATS());
 	}
 	printf("\n");
@@ -122,7 +123,7 @@ int main_ghisto(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
-void print_gnuplot_stats_string(long double (*h)[2], int n, float bs)
+static void print_gnuplot_stats_string(long double (*h)[2], int n, float bs)
 {
 	long double mass = 0, avg = 0, var = 0;
 	for (int i = 0; i < n; i++)

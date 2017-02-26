@@ -14,6 +14,7 @@
 // 	nfit = 2 (number of points that determine a straight line)
 
 // instance of "ransac_error_evaluation_function"
+static
 float distance_of_point_to_straight_line(float *line, float *point, void *usr)
 {
 	float n = hypot(line[0], line[1]);
@@ -28,6 +29,7 @@ float distance_of_point_to_straight_line(float *line, float *point, void *usr)
 
 
 // instance of "ransac_model_generating_function"
+static
 int straight_line_through_two_points(float *line, float *points, void *usr)
 {
 	float ax = points[0];
@@ -49,6 +51,7 @@ int straight_line_through_two_points(float *line, float *points, void *usr)
 	return 1;
 }
 
+static
 int find_straight_line_by_ransac(bool *out_mask, float line[3],
 		float *points, int npoints,
 		int ntrials, float max_err)
@@ -142,6 +145,7 @@ double find_affinity(double *A, double *x, double *y, double *xp, double *yp)
 }
 
 // instance of "ransac_model_generating_function"
+static
 int affine_map_from_three_pairs(float *aff, float *pairs, void *usr)
 {
 	// call the function "find_affinity" from elsewhere
@@ -157,7 +161,7 @@ int affine_map_from_three_pairs(float *aff, float *pairs, void *usr)
 }
 
 // instance of "ransac_model_accepting_function"
-bool affine_map_is_reasonable(float *aff, void *usr)
+static bool affine_map_is_reasonable(float *aff, void *usr)
 {
 	float a = aff[0];
 	float b = aff[1];
@@ -173,6 +177,7 @@ bool affine_map_is_reasonable(float *aff, void *usr)
 	return true;
 }
 
+static
 int find_affinity_by_ransac(bool *out_mask, float affinity[6],
 		float *pairs, int npairs,
 		int ntrials, float max_err)
@@ -220,6 +225,7 @@ static float homographic_match_error(float *hom, float *pair, void *usr)
 
 
 // instance of "ransac_model_generating_function"
+static
 int homography_from_four(float *hom, float *pairs, void *usr)
 {
 	double a[2] = {pairs[0], pairs[1]};
@@ -286,6 +292,7 @@ static float fnorm(float *a, int n)
 
 #include "moistiv_epipolar.c"
 // instance of "ransac_model_generating_function"
+static
 int seven_point_algorithm(float *fm, float *p, void *usr)
 {
 	int K[7] = {0, 1, 2, 3, 4, 5, 6};
@@ -392,6 +399,7 @@ static float epipolar_error_triplet(float *fm, float *pair, void *usr)
 }
 
 // instance of "ransac_model_generating_function"
+static
 int two_seven_point_algorithms(float *fm, float *p, void *usr)
 {
 	// p has 42 numbers
@@ -455,6 +463,7 @@ static void mprod33(float *ab_out, float *a_in, float *b_in)
 		about[i][j] = ab[i][j];
 }
 
+static
 int find_fundamental_matrix_by_ransac(
 	bool *out_mask, float out_fm[9],
 		float *pairs, int npairs,
@@ -541,6 +550,7 @@ int find_fundamental_matrix_by_ransac(
 }
 
 // finds a pair of fundamental matrices
+static
 int find_fundamental_pair_by_ransac(bool *out_mask, float out_fm[18],
 		float *trips, int ntrips,
 		int ntrials, float max_err)

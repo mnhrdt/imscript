@@ -440,6 +440,7 @@ int FindCubicRoots(float coeff[4], float x[3])
 /* global (intermediate) variables for epipolar() */
 //float *w,**c,**v,a[4];
 
+static
 int moistiv_epipolar(float *m1, float *m2, int *k, float *z,
 		float F1[4][4], float F2[4][4])
 {

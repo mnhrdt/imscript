@@ -3,7 +3,7 @@ plambda: plambda.c smapa.h fail.c xmalloc.c random.c parsenumbers.c \
 vecov: vecov.c iio.h fail.c xmalloc.c random.c smapa.h pickopt.c
 morsi: morsi.c iio.h
 downsa: downsa.c iio.h fail.c xmalloc.c
-upsa: upsa.c iio.h marching_squares.c marching_interpolation.c \
+upsa: upsa.c iio.h fail.c marching_squares.c marching_interpolation.c \
  bicubic.c getpixel.c
 ntiply: ntiply.c iio.h
 censust: censust.c iio.h pickopt.c
@@ -31,22 +31,22 @@ pview: pview.c iio.h fail.c xmalloc.c xfopen.c parsenumbers.c \
 viewflow: viewflow.c iio.h fragments.c marching_squares.c
 flowarrows: flowarrows.c iio.h fragments.c getpixel.c smapa.h
 palette: palette.c fail.c xmalloc.c xfopen.c smapa.h iio.h
-blur: blur.c fail.c xmalloc.c smapa.h iio.h parsenumbers.c
-fft: fft.c iio.h fail.c xmalloc.c
-dct: dct.c iio.h
-dht: dht.c iio.h xmalloc.c fail.c
 ransac: ransac.c fail.c xmalloc.c xfopen.c random.c ransac_cases.c \
  vvector.h homographies.c moistiv_epipolar.c parsenumbers.c
 srmatch: srmatch.c fail.c xmalloc.c xfopen.c siftie.c parsenumbers.c \
- siftie.h smapa.h ok_list.c ok_list.h grid.c iio.h ransac.c random.c \
- ransac_cases.c vvector.h homographies.c moistiv_epipolar.c
+ smapa.h ok_list.c grid.c iio.h ransac.c random.c ransac_cases.c \
+ vvector.h homographies.c moistiv_epipolar.c
 tiffu: tiffu.c
 siftu: siftu.c siftie.c fail.c xmalloc.c xfopen.c parsenumbers.c \
- siftie.h smapa.h ok_list.c ok_list.h grid.c iio.h
+ smapa.h ok_list.c grid.c iio.h
 crop: crop.c fail.c xmalloc.c iio.h
 lrcat: lrcat.c iio.h xmalloc.c fail.c getpixel.c pickopt.c
 tbcat: tbcat.c iio.h smapa.h xmalloc.c fail.c getpixel.c pickopt.c
 fftshift: fftshift.c iio.h
 bmms: bmms.c xmalloc.c fail.c getpixel.c iio.h pickopt.c
 registration: registration.c iio.h
+blur: blur.c fail.c xmalloc.c smapa.h iio.h parsenumbers.c
+fft: fft.c iio.h fail.c xmalloc.c
+dct: dct.c iio.h
+dht: dht.c iio.h xmalloc.c fail.c
 iion: iion.c iio.h

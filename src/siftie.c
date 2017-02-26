@@ -8,7 +8,23 @@
 #include "xfopen.c"
 #include "parsenumbers.c"
 
-#include "siftie.h"
+#define SIFT_LENGTH 128
+struct sift_keypoint {
+	float pos[2], scale, orientation;
+	float affinity[6];
+	float id;
+	float sift[SIFT_LENGTH];
+};
+
+struct ann_pair {
+	int from, to;
+	float v[2];
+};
+
+struct ann_trip {
+	int froma, tob, toc;
+	float v[3];
+};
 
 #include "smapa.h"
 
@@ -21,7 +37,7 @@
 #include <kdtree.h>
 #endif
 
-void write_raw_sift(FILE *f, struct sift_keypoint *k)
+static void write_raw_sift(FILE *f, struct sift_keypoint *k)
 {
 	fprintf(f, "%g %g %g %g", k->pos[0], k->pos[1], k->scale,
 			k->orientation);
@@ -49,7 +65,7 @@ void write_raw_sift(FILE *f, struct sift_keypoint *k)
 //SMART_PARAMETER_SILENT(SIFT_OUTBIN,0)
 //SMART_PARAMETER_SILENT(SIFT_INBIN,0)
 
-void write_raw_sifts(FILE *f, struct sift_keypoint *k, int n)
+static void write_raw_sifts(FILE *f, struct sift_keypoint *k, int n)
 {
 	FORI(n) {
 //		if (BIN_OSIFT() > 0)
@@ -60,7 +76,7 @@ void write_raw_sifts(FILE *f, struct sift_keypoint *k, int n)
 	}
 }
 
-struct sift_keypoint *read_raw_sifts(FILE *f, int *no)
+static struct sift_keypoint *read_raw_sifts(FILE *f, int *no)
 {
 	int n, N = 132;
 	float *t = read_ascii_floats(f, &n);
@@ -87,7 +103,7 @@ struct sift_keypoint *read_raw_sifts(FILE *f, int *no)
 	return r-n;
 }
 
-struct sift_keypoint *read_raw_sifts_fname(char *fname, int *n)
+static struct sift_keypoint *read_raw_sifts_fname(char *fname, int *n)
 {
 	FILE *f = xfopen(fname, "r");
 	struct sift_keypoint *r = read_raw_sifts(f, n);
@@ -95,7 +111,7 @@ struct sift_keypoint *read_raw_sifts_fname(char *fname, int *n)
 	return r;
 }
 
-void write_raw_siftb(FILE *f, struct sift_keypoint *k)
+static void write_raw_siftb(FILE *f, struct sift_keypoint *k)
 {
 	float t[4] = {k->pos[0], k->pos[1], k->scale, k->orientation};
 	size_t r = fwrite(t, sizeof(*t), 4, f);
@@ -112,7 +128,7 @@ void write_raw_siftb(FILE *f, struct sift_keypoint *k)
 		fail("could not write SIFT descriptor table (r=%zu)", r);
 }
 
-void write_raw_siftsb(FILE *f, struct sift_keypoint *k, int n)
+static void write_raw_siftsb(FILE *f, struct sift_keypoint *k, int n)
 {
 	FORI(n)
 		write_raw_siftb(f, k+i);
@@ -165,7 +181,7 @@ static void *freadwhole(const char *fname, long *on)
 // sift descriptor saved length
 static const int SDSLEN = SIFT_LENGTH*1 + 4*sizeof(float);
 
-struct sift_keypoint *read_raw_siftsb(FILE *f, int *no)
+static struct sift_keypoint *read_raw_siftsb(FILE *f, int *no)
 {
 	long nn;
 	void *p = freadwhole_f(f, &nn);
@@ -193,15 +209,15 @@ struct sift_keypoint *read_raw_siftsb(FILE *f, int *no)
 
 SMART_PARAMETER(SIFT_BINARY,0)
 
-struct sift_keypoint *read_raw_sifts_gen(FILE *f, int *no)
+static struct sift_keypoint *read_raw_sifts_gen(FILE *f, int *no)
 {
 	return SIFT_BINARY() ? read_raw_siftsb(f, no) : read_raw_sifts(f, no);
 }
-void write_raw_sifts_gen(FILE *f, struct sift_keypoint *k, int n)
+static void write_raw_sifts_gen(FILE *f, struct sift_keypoint *k, int n)
 {
 	SIFT_BINARY() ? write_raw_siftsb(f, k, n) : write_raw_sifts(f, k, n);
 }
-void write_raw_sift_gen(FILE *f, struct sift_keypoint *k)
+static void write_raw_sift_gen(FILE *f, struct sift_keypoint *k)
 {
 	SIFT_BINARY() ? write_raw_siftb(f, k) : write_raw_sift(f, k);
 }
@@ -456,6 +472,7 @@ static int fancynearest_idx(struct sift_keypoint *q,
 	return besti;
 }
 
+static
 int (*siftlike_getpairs(
 		struct sift_keypoint *ka, int na, 
 		struct sift_keypoint *kb, int nb,
@@ -488,6 +505,7 @@ static void sort_annpairs(struct ann_pair *t, int n)
 
 // get two lists of points, and produce a list of pairs
 // (nearest match from a to b)
+static
 struct ann_pair *siftlike_get_annpairs(
 		struct sift_keypoint *ka, int na,
 		struct sift_keypoint *kb, int nb,
@@ -511,6 +529,7 @@ struct ann_pair *siftlike_get_annpairs(
 
 // get two lists of points, and produce a list of pairs
 // (nearest match from a to b)
+static
 struct ann_pair *siftlike_get_annpairs_lowe(
 		struct sift_keypoint *ka, int na,
 		struct sift_keypoint *kb, int nb,
@@ -543,6 +562,7 @@ struct ann_pair *siftlike_get_annpairs_lowe(
 
 // get two lists of points, and produce a list of pairs
 // (nearest match from a to b)
+static
 struct ann_pair *siftlike_get_annpairs_lowe2(
 		struct sift_keypoint *ka, int na,
 		struct sift_keypoint *kb, int nb,
@@ -587,6 +607,7 @@ struct ann_pair *siftlike_get_annpairs_lowe2(
 
 // get two lists of points, and produce a list of pairs
 // (first nearest matches)
+static
 struct ann_pair *siftlike_get_accpairs(
 		struct sift_keypoint *ka, int na,
 		struct sift_keypoint *kb, int nb,
@@ -617,6 +638,7 @@ struct ann_pair *siftlike_get_accpairs(
 
 // get two lists of points, and produce a list of pairs
 // (first nearest matches)
+static
 struct ann_pair *siftlike_get_accpairsrad(
 		struct sift_keypoint *ka, int na,
 		struct sift_keypoint *kb, int nb,
@@ -723,6 +745,7 @@ static int find_closest_in_grid(struct sift_keypoint *q,
 	return bestd < dmax ? besti : -1;
 }
 
+static
 struct ann_pair *compute_sift_matches_locally(int *onp,
 		struct sift_keypoint *ka, int na,
 		struct sift_keypoint *kb, int nb,
@@ -768,7 +791,7 @@ struct ann_pair *compute_sift_matches_locally(int *onp,
 	return p;
 }
 
-
+static
 struct ann_pair *compute_sift_matches(int *onp,
 		struct sift_keypoint *ka, int na,
 		struct sift_keypoint *kb, int nb,
@@ -796,25 +819,16 @@ struct ann_pair *compute_sift_matches(int *onp,
 static void get_bbx(double out_min[2], double out_max[2],
 		struct sift_keypoint *p, int np)
 {
-	out_min[0] = out_min[1] = 0;
-	out_max[0] = 3072;
-	out_max[1] = 2048;
-	//out_min[0] = out_min[1] = INFINITY;
-	//out_max[0] = out_max[1] = -INFINITY;
-	//for (int i = 0; i < np; i++)
-	//for (int l = 0; l < 2; l++)
-	//{
-	//	out_min[l] = fmin(out_min[l], p[i].pos[l]);
-	//	out_max[l] = fmax(out_max[l], p[i].pos[l]);
-	//}
+	out_min[0] = out_min[1] = INFINITY;
+	out_max[0] = out_max[1] = -INFINITY;
+	for (int i = 0; i < np; i++)
+	for (int l = 0; l < 2; l++)
+	{
+		out_min[l] = fmin(out_min[l], p[i].pos[l]);
+		out_max[l] = fmax(out_max[l], p[i].pos[l]);
+	}
 }
 
-//static void matrix_times_vector(double Ax[3], double A[9], double x[3])
-//{
-//	Ax[0] = A[0] * x[0] + A[1] * x[1] + A[2] * x[2];
-//	Ax[1] = A[3] * x[0] + A[4] * x[1] + A[5] * x[2];
-//	Ax[2] = A[6] * x[0] + A[7] * x[1] + A[8] * x[2];
-//}
 
 static void vector_times_matrix(double xA[3], double x[3], double A[9])
 {
@@ -909,7 +923,7 @@ static bool cut_line_with_rectangle(double out_a[2], double out_b[2],
 }
 
 // draw a segment between two points
-void traverse_segment(int px, int py, int qx, int qy,
+static void traverse_segment(int px, int py, int qx, int qy,
 		void (*f)(int,int,void*), void *e)
 {
 	if (px == qx && py == qy)
@@ -929,6 +943,7 @@ void traverse_segment(int px, int py, int qx, int qy,
 	}
 }
 
+static
 void traverse_segment_thick_precise(
 		double px, double py, double qx, double qy,
 		void (*f)(int,int,void*), void *e)
@@ -978,6 +993,7 @@ void traverse_segment_thick_precise(
 }
 
 // draw a segment between two points (somewhat anti-aliased)
+static
 void traverse_segment_thick(int px, int py, int qx, int qy,
 		void (*f)(int,int,void*), void *e)
 {
@@ -1033,12 +1049,14 @@ struct grille_traversal_state {
 	struct sift_keypoint *kb;
 };
 
+static
 float signed_distance_point_to_line(float l[3], float x[2])
 {
 	return (l[0] * x[0] + l[1] * x[1] + l[2]) / hypot(l[0], l[1]);
 }
 
 // add to the buffer the indexes of keypoints found in grille position (i,j)
+static
 void grille_traversal_function(int i, int j, void *ee)
 {
 	struct grille_traversal_state *e = ee;
@@ -1070,7 +1088,7 @@ void grille_traversal_function(int i, int j, void *ee)
 
 #include "iio.h"
 
-int insideP(int w, int h, int i, int j)
+static int insideP(int w, int h, int i, int j)
 {
 	return i>=0 && j>= 0 && i<w && j<h;
 }
@@ -1080,7 +1098,7 @@ struct plot_state {
 	int w, h, r, g, b;
 };
 
-void pixel_plotter(int i, int j, void *ee)
+static void pixel_plotter(int i, int j, void *ee)
 {
 	struct plot_state *e = ee;
 	if (insideP(e->w, e->h, i, j))
@@ -1091,6 +1109,7 @@ void pixel_plotter(int i, int j, void *ee)
 	}
 }
 
+static
 void overlay_red_thick_line(uint8_t *x, int w, int h, double a[2], double b[2])
 {
 	struct plot_state e[1];
@@ -1106,6 +1125,7 @@ void overlay_red_thick_line(uint8_t *x, int w, int h, double a[2], double b[2])
 			pixel_plotter, e);
 }
 
+static
 struct ann_pair *sift_fm_pairs(
 		struct sift_keypoint *ka, int na,
 		struct sift_keypoint *kb, int nb,
@@ -1262,6 +1282,7 @@ acabemaqui:
 
 // get three lists of points, and produce a list of matching triplets
 // (first nearest matches)
+static
 struct ann_trip *siftlike_get_triplets(
 		struct sift_keypoint *ka, int na,
 		struct sift_keypoint *kb, int nb,
@@ -1296,6 +1317,7 @@ struct ann_trip *siftlike_get_triplets(
 
 // get three lists of points, and produce a list of matching triplets
 // (first nearest matches)
+static
 struct ann_trip *siftlike_get_tripletsrad(
 		struct sift_keypoint *ka, int na,
 		struct sift_keypoint *kb, int nb,
@@ -1330,6 +1352,7 @@ struct ann_trip *siftlike_get_tripletsrad(
 
 // get two lists of points, and produce a list of pairs
 // (all nearest matches)
+static
 struct ann_pair *siftlike_get_allpairs(
 		struct sift_keypoint *ka, int na, 
 		struct sift_keypoint *kb, int nb,
@@ -1384,6 +1407,7 @@ static int pointer_to_int(void *p)
 // get two lists of points, and produce a list of pairs
 // (nearest match from a to b)
 #endif
+static
 struct ann_pair *siftlike_get_annpairs_kd(
 		struct sift_keypoint *ka, int na,
 		struct sift_keypoint *kb, int nb,
@@ -1429,6 +1453,7 @@ SMART_PARAMETER(PSIFT_DISTTHRE,-1)
 SMART_PARAMETER(PSIFT_LOWERATIO,-1)
 
 // mask pairs by using some thresholds
+static
 void siftlike_maskpairs(bool *mask, struct ann_pair *t, int n)
 {
 	FORI(n) mask[i] = true;
@@ -1463,6 +1488,7 @@ static float sift_d128(struct sift_keypoint *a, struct sift_keypoint *b)
 // using an efficient data structure for localizing them)
 // Right now, it is prohibitively slow for the common case of more than 10.000
 // points
+static
 void sift_remove_redundancy(bool *mask,
 		struct sift_keypoint *t, int n,
 		float dist_plane, float dist_sift)
@@ -1501,6 +1527,7 @@ int splitloc(int *t, int w, float rx, float ry, float ox, float oy, float *x)
 	return r;
 }
 
+static
 int siftsplit(struct sift_keypoint *p, int n,
 		float rx, float ry, float ox, float oy,
 		int (*mask)[5])
@@ -1540,6 +1567,7 @@ static void homographic_mapf(float y[2], float H[9], float x[2])
 	//y[1] = x[1];
 }
 
+static
 void siftaff(struct sift_keypoint *t, int n, float A[9])
 {
 	float det = A[0]*A[4] - A[1]*A[3];
@@ -1557,6 +1585,7 @@ void siftaff(struct sift_keypoint *t, int n, float A[9])
 	}
 }
 
+static
 void sifthom(struct sift_keypoint *t, int n, float H[9])
 {
 	// TODO XXX ERROR FIXME : update the scale and orientation accordingly!

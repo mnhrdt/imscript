@@ -30,7 +30,7 @@ struct statistics_float {
 #define STATISTIC_MEDIAN_BIAS 0
 #define STATISTIC_MIDDLE_BIAS -1
 
-int randombounds(int a, int b)
+static int randombounds(int a, int b)
 {
 	if (b < a)
 		return randombounds(b, a);
@@ -39,7 +39,7 @@ int randombounds(int a, int b)
 	return a + rand()%(b - a + 1);
 }
 
-int compare_floats(const void *a, const void *b)
+static int compare_floats(const void *a, const void *b)
 {
 	const float *da = (const float *) a;
 	const float *db = (const float *) b;

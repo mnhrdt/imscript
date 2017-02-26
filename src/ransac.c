@@ -38,7 +38,7 @@ typedef bool (ransac_model_accepting_function)(
 // API function: evaluate a given model over the data, and fill a mask with the
 // inliers (according to the given allowed error).  This function returns the
 // number of inliers.
-int ransac_trial(
+static int ransac_trial(
 		// output
 		bool *out_mask,    // array mask identifying the inliers
 
@@ -119,7 +119,7 @@ static void swap(void *a, void *b, size_t s)
 }
 
 // fisher-yates
-void shuffle(void *t, int n, size_t s)
+static void shuffle(void *t, int n, size_t s)
 {
 	char *c = t;
 
@@ -174,7 +174,7 @@ static void fill_random_indices(int *idx, int n, int a, int b)
 // by hand, and then the inliers of a model are defined as the data points
 // which fit the model up to the allowed error.  The RANSAC algorithm randomly
 // tries several models and keeps the one with the largest number of inliers.
-int ransac(
+static int ransac(
 		// output
 		//int *out_ninliers, // number of inliers
 		bool *out_mask,    // array mask identifying the inliers

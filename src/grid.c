@@ -15,6 +15,7 @@ struct grid {
 
 
 // fill a grid structure with the specified data
+static
 void grid_init(struct grid *g, int dim, float *x0, float *dx, int *n)
 {
 	if (dim < 2 || dim > 4) fail("bad grid dim %d", dim);
@@ -30,6 +31,7 @@ void grid_init(struct grid *g, int dim, float *x0, float *dx, int *n)
 
 
 // get the index of a cell, from its integer coordinates
+static
 int grid_index_of_cell(struct grid *g, int *i)
 {
 	// TODO write a proper "for" loop here
@@ -74,6 +76,7 @@ int locate_widened_interval_1d(int ox[2], float x0, float dx, int n, float x)
 }
 
 // compute the integer cell coordinates from the float coordinates of a point
+static
 void grid_locate_float_point(int *ox, struct grid *g, float *x)
 {
 	for (int i = 0; i < g->dim; i++)
@@ -81,6 +84,7 @@ void grid_locate_float_point(int *ox, struct grid *g, float *x)
 }
 
 // compute the index of the cell that contains a given point
+static
 int grid_locate(struct grid *g, float *x)
 {
 	int ix[g->dim];
@@ -90,6 +94,7 @@ int grid_locate(struct grid *g, float *x)
 
 // computes the indexes of the cells that may contain neighbors
 // of the given point
+static
 int grid_locate_overlapping(int *buf, struct grid *g, float *x)
 {
 	int ox[g->dim][2];

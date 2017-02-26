@@ -305,12 +305,9 @@ int main_viewflow(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
-#ifndef OMIT_MAIN
-int main(int c, char *v[])
-{
-	return main_viewflow(c, v);
-}
-#endif//OMIT_MAIN
+#ifndef HIDE_ALL_MAINS
+int main(int c, char *v[]) { return main_viewflow(c, v); }
+#endif//
 
 // TODO:
 // viewflow method "parlist" [in [out]]
