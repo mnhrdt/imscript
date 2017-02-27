@@ -34,6 +34,14 @@
 #define I_CAN_HAS_WHATEVER
 //#define I_CAN_KEEP_TMP_FILES
 
+#ifdef IIO_DISABLE_IMGLIBS
+#undef I_CAN_HAS_LIBPNG
+#undef I_CAN_HAS_LIBJPEG
+#undef I_CAN_HAS_LIBTIFF
+#undef I_CAN_HAS_LIBEXR
+#endif
+
+
 #define IIO_MAX_DIMENSION 20
 
 //

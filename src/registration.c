@@ -138,7 +138,9 @@ void find_displacement(int d[2], float *A, float *B, int w, int h, int scale)
 	float best = INFINITY;
 	float tbest[9];
 
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif
 	for (int n = 0; n < 9; n++)
 	{
 		int D[2] = {d[0] + neig[n][0], d[1] + neig[n][1]};

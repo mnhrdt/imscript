@@ -28,8 +28,10 @@ fontu: fontu.c xmalloc.c fail.c xfopen.c dataconv.c iio.h pickopt.c
 imprintf: imprintf.c iio.h
 pview: pview.c iio.h fail.c xmalloc.c xfopen.c parsenumbers.c \
  drawsegment.c pickopt.c smapa.h random.c
-viewflow: viewflow.c iio.h fragments.c marching_squares.c
-flowarrows: flowarrows.c iio.h fragments.c getpixel.c smapa.h
+viewflow: viewflow.c iio.h fail.c drawsegment.c colorcoordsf.c \
+ marching_squares.c
+flowarrows: flowarrows.c iio.h fail.c xmalloc.c drawsegment.c \
+ getpixel.c smapa.h
 palette: palette.c fail.c xmalloc.c xfopen.c smapa.h iio.h
 ransac: ransac.c fail.c xmalloc.c xfopen.c random.c ransac_cases.c \
  vvector.h homographies.c moistiv_epipolar.c parsenumbers.c
@@ -49,4 +51,8 @@ blur: blur.c fail.c xmalloc.c smapa.h iio.h parsenumbers.c
 fft: fft.c iio.h fail.c xmalloc.c
 dct: dct.c iio.h
 dht: dht.c iio.h xmalloc.c fail.c
+flambda: flambda.c smapa.h fail.c xmalloc.c random.c parsenumbers.c \
+ colorcoordsf.c fancy_image.h getpixel.c
+fancy_crop: fancy_crop.c fancy_image.h
+fancy_downsa: fancy_downsa.c fancy_image.h
 iion: iion.c iio.h

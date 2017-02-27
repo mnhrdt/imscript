@@ -692,7 +692,7 @@ static int vector_colorsign(float *r, float *a, int n)
 }
 
 // table of all functions (local and from math.h) {{{1
-struct predefined_function {
+static struct predefined_function {
 	void (*f)(void);
 	char *name;
 	int nargs;
@@ -2512,7 +2512,7 @@ static int eval_dim(struct plambda_program *p, struct fancy_image *val[])
 	return r;
 }
 
-int main_images(int c, char **v)
+static int main_images(int c, char **v)
 {
 	fprintf(stderr, "main images c = %d\n", c);
 	for (int i = 0; i < c; i++)
@@ -2762,7 +2762,7 @@ static int do_man(void)
 				"with images as variables\" flambda" MANPIPE);
 }
 
-int main(int c, char **v)
+int main_flambda(int c, char **v)
 {
 	if (c == 1) return print_help(*v, 0);
 	if (c == 2 && 0 == strcmp(v[1], "-h")) return print_help(*v,0);
@@ -2772,5 +2772,9 @@ int main(int c, char **v)
 
 	return main_images(c, v);
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_flambda(c, v); }
+#endif
 
 // vim:set foldmethod=marker:

@@ -971,7 +971,7 @@ void traverse_segment_thick_precise(
 			}
 		} else { // vertical
 			double slope = (qx - px); slope /= (qy - py);
-			assert(abs(qy - py) >= abs(qx - px));
+			assert(fabs(qy - py) >= fabs(qx - px));
 			assert(py <= qy);
 			assert(fabs(slope) <= 1);
 			for (int j = 0; j <= qy-py; j++) {
@@ -1003,7 +1003,7 @@ void traverse_segment_thick(int px, int py, int qx, int qy,
 		traverse_segment_thick(qx, qy, px, py, f, e);
 	else {
 		//fprintf(stderr, "tsthick (%d %d)-(%d %d)\n", px, py, qx, qy);
-		if (fabs(qx - px) > qy - py) { // horitzontal
+		if (abs(qx - px) > qy - py) { // horitzontal
 			float slope = (qy - py); slope /= (qx - px);
 			assert(px <= qx);
 			assert(fabs(slope) <= 1);

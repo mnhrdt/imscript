@@ -6,6 +6,7 @@
 #include <math.h>
 
 // draw a segment between two points
+static
 void traverse_segment(int px, int py, int qx, int qy,
 		void (*f)(int,int,void*), void *e)
 {
@@ -27,6 +28,7 @@ void traverse_segment(int px, int py, int qx, int qy,
 }
 
 // draw a segment between two points (somewhat anti-aliased)
+static
 void traverse_segment_aa(int px, int py, int qx, int qy,
 		void (*f)(int,int,float,void*), void *e)
 {
@@ -67,6 +69,7 @@ void traverse_segment_aa(int px, int py, int qx, int qy,
 }
 
 // draw a segment between two points (somewhat anti-aliased)
+static
 void traverse_segment_aa2(float px, float py, float qx, float qy,
 		void (*f)(int,int,float,void*), void *e)
 {
@@ -91,7 +94,7 @@ void traverse_segment_aa2(float px, float py, float qx, float qy,
 			}
 		} else { // vertical
 			float slope = (qx - px); slope /= (qy - py);
-			assert(abs(qy - py) >= abs(qx - px));
+			assert(fabs(qy - py) >= fabs(qx - px));
 			assert(py < qy);
 			assert(fabs(slope) <= 1);
 			for (int j = 0; j <= qy-py; j++) {

@@ -4,7 +4,9 @@
 #include <stdlib.h>
 #include "iio.h"
 
-#include "fragments.c"
+#include "fail.c"
+#include "xmalloc.c"
+#include "drawsegment.c"
 #include "getpixel.c"
 
 struct float_image {
@@ -109,7 +111,7 @@ int main_flowarrows(int c, char *v[])
 
 	int w, h, pd;
 	float *x = iio_read_image_float_vec(infile, &w, &h, &pd);
-	if (pd != 2) error("2D vector field expected");
+	if (pd != 2) fail("2D vector field expected");
 	float *y = xmalloc(w*h*sizeof*y);
 	for (int i = 0; i < w*h; i++)
 		y[i] = 255;

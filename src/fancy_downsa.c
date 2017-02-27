@@ -134,7 +134,7 @@ static void fancy_downsa(char *fname_out, char *fname_in, int nw, int nh, int m)
 }
 
 #include <stdio.h>
-int main(int c, char *v[])
+int main_fancy_downsa(int c, char *v[])
 {
 	if (c != 6) {
 		fprintf(stderr, "usage:\n\t"
@@ -152,3 +152,7 @@ int main(int c, char *v[])
 
 	return 0;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_fancy_downsa(c, v); }
+#endif

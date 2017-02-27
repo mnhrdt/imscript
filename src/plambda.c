@@ -691,7 +691,7 @@ static int vector_colorsign(float *r, float *a, int n)
 }
 
 // table of all functions (local and from math.h) {{{1
-struct predefined_function {
+static struct predefined_function {
 	void (*f)(void);
 	char *name;
 	int nargs;
@@ -2424,7 +2424,7 @@ static void add_hidden_variables(char *out, int maxplen, int newvars, char *in)
 
 SMART_PARAMETER_SILENT(SRAND,0)
 
-int main_calc(int c, char **v)
+static int main_calc(int c, char **v)
 {
 	if (c < 2) {
 		fprintf(stderr, "usage:\n\t%s v1 v2 ... \"plambda\"\n", *v);
@@ -2494,7 +2494,7 @@ static char *pick_option(int *c, char ***v, char *o, char *d)
 }
 
 #include "iio.h"
-int main_images(int c, char **v)
+static int main_images(int c, char **v)
 {
 	//fprintf(stderr, "main images c = %d\n", c);
 	//for (int i = 0; i < c; i++)
@@ -2756,7 +2756,7 @@ int main_plambda(int c, char **v)
 	if (c == 2 && 0 == strcmp(v[1], "--version")) return print_version();
 	if (c == 2 && 0 == strcmp(v[1], "--man")) return do_man();
 
-	int (*f)(int, char**) = (**v=='c' || c==2) ? main_calc : main_images;
+	int (*f)(int, char**) = (**v=='c' || c==2) ?  main_calc : main_images;
 	if (f == main_images && c > 2 && 0 == strcmp(v[1], "-c"))
 	{
 		for (int i = 1; i <= c; i++)

@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -7,17 +8,40 @@
 #include <string.h>
 
 #include "fancy_image.h"
-
 #include "iio.h"
+#include "xmalloc.c"
 
+// default setup: with TIFF and without GDAL
 #define FANCY_TIFF
+#undef FANCY_GDAL
+
+// act upon external definitions
+#ifdef FANCY_IMAGE_DISABLE_TIFF
+#undef FANCY_TIFF
+#endif
+
 
 #ifdef FANCY_TIFF
 #include "tiff_octaves_rw.c"
 #endif//FANCY_TIFF
 
 #ifdef FANCY_GDAL
+#include <gdal.h>
 #endif//FANCY_GDAL
+
+#ifndef MAX_OCTAVES
+#define MAX_OCTAVES 30
+#endif
+
+#ifndef SAMPLEFORMAT_UINT
+// definitions form tiff.h, reused here
+#define SAMPLEFORMAT_UINT  1
+#define SAMPLEFORMAT_INT  2
+#define SAMPLEFORMAT_IEEEFP  3
+#define SAMPLEFORMAT_VOID  4
+#define SAMPLEFORMAT_COMPLEXINT 5
+#define SAMPLEFORMAT_COMPLEXIEEEFP 6
+#endif//SAMPLEFORMAT_UINT
 
 // the following struct is an implementation detail,
 // it is only used on this file
@@ -41,13 +65,14 @@ struct FI {
 	int option_compressed;
 
 	// implementation details
-	bool tiffo;
-#ifdef FANCY_TIFF
-	struct tiff_octaves t[1];
 	float *x, *pyr_x[MAX_OCTAVES];
 	int pyr_w[MAX_OCTAVES], pyr_h[MAX_OCTAVES];
 	bool x_changed;
 	char x_filename[FILENAME_MAX];
+
+	bool tiffo;
+#ifdef FANCY_TIFF
+	struct tiff_octaves t[1];
 #endif
 
 	bool gdal;
@@ -66,6 +91,7 @@ static bool filename_corresponds_to_tiffo(char *filename)
 {
 	if (0 == strcmp(filename, "-"))
 		return false;
+#ifdef FANCY_TIFF
 	struct tiff_info ti[1];
 	disable_tiff_warnings_and_errors();
 	bool r = get_tiff_info_filename_e(ti, filename);
@@ -78,6 +104,9 @@ static bool filename_corresponds_to_tiffo(char *filename)
 		return ti->tiled;
 	}
 	return ti->tiled;
+#else
+	return false;
+#endif
 }
 
 // type of a "zoom-out" function
@@ -237,6 +266,7 @@ struct fancy_image *fancy_image_open(char *filename, char *options)
 
 	// if "c", do create the file
 	if (f->option_creat) {
+#ifdef FANCY_TIFF
 		if (filename_corresponds_to_tiffo(filename) || f->option_tw > 0)
 			create_zero_tiff_file(filename,
 					f->option_w, f->option_h,
@@ -245,12 +275,14 @@ struct fancy_image *fancy_image_open(char *filename, char *options)
 					f->option_fmt,
 					true, f->option_compressed);
 		else
+#endif//FANCY_TIFF
 			create_iio_file(filename, f->option_w, f->option_h,
 					f->option_spp);
 	}
 
 	// read the image
 	if (filename_corresponds_to_tiffo(filename)) {
+#ifdef FANCY_TIFF
 		f->tiffo = true;
 		tiff_octaves_init0(f->t, filename, f->megabytes,f->max_octaves);
 		if (f->option_write) f->t->option_write = true;
@@ -258,6 +290,9 @@ struct fancy_image *fancy_image_open(char *filename, char *options)
 		f->h = f->t->i->h;
 		f->pd = f->t->i->spp;
 		f->no = f->t->noctaves;
+#else
+		assert(false);
+#endif
 	} else {
 		f->tiffo = false;
 		f->x = iio_read_image_float_vec(filename, &f->w, &f->h, &f->pd);
@@ -300,14 +335,22 @@ int fancy_image_width_octave(struct fancy_image *fi, int octave)
 {
 	struct FI *f = (void*)fi;
 	if (octave < 0 || octave >= f->no) return 0;
+#ifdef FANCY_TIFF
 	return f->tiffo ? f->t->i[octave].w : f->pyr_w[octave];
+#else
+	return f->pyr_w[octave];
+#endif
 }
 
 int fancy_image_height_octave(struct fancy_image *fi, int octave)
 {
 	struct FI *f = (void*)fi;
 	if (octave < 0 || octave >= f->no) return 0;
+#ifdef FANCY_TIFF
 	return f->tiffo ? f->t->i[octave].h : f->pyr_h[octave];
+#else
+	return f->pyr_h[octave];
+#endif
 }
 
 // API: close a fancy image
@@ -315,9 +358,13 @@ void fancy_image_close(struct fancy_image *fi)
 {
 	struct FI *f = (void*)fi;
 
-	if (f->tiffo)
+	if (f->tiffo) {
+#ifdef FANCY_TIFF
 		tiff_octaves_free(f->t);
-	else {
+#else
+		assert(false);
+#endif
+	} else {
 		if ((f->option_write && f->x_changed) || f->option_creat)
 			iio_write_image_float_vec(f->x_filename, f->x,
 					f->w, f->h, f->pd);
@@ -329,7 +376,8 @@ void fancy_image_close(struct fancy_image *fi)
 	free(f);
 }
 
-// internal conversion function function
+#ifdef FANCY_TIFF
+// internal conversion function function (for libtiff)
 static float convert_sample_to_float(struct tiff_info *ti, void *p)
 {
 	switch(ti->fmt) {
@@ -350,6 +398,7 @@ static float convert_sample_to_float(struct tiff_info *ti, void *p)
 	}
 	return NAN;
 }
+#endif
 
 // API: get a sample from an image
 float fancy_image_getsample(struct fancy_image *fi, int i, int j, int l)
@@ -369,10 +418,14 @@ float fancy_image_getsample_oct(struct fancy_image *fi,
 	if (l >= f->pd) l = f->pd - 1;
 
 	if (f->tiffo) {
+#ifdef FANCY_TIFF
 		uint8_t *p_pixel = tiff_octaves_getpixel(f->t, octave, i, j);
 		if (!p_pixel) return NAN;
 		uint8_t *p_sample = p_pixel + (l * f->t->i->bps) / 8;
 		return convert_sample_to_float(f->t->i, p_sample);
+#else
+		assert(false);
+#endif
 	} else {
 		float *x = f->pyr_x[octave];
 		int    w = f->pyr_w[octave];
@@ -395,6 +448,7 @@ int fancy_image_setsample(struct fancy_image *fi, int i, int j, int l, float v)
 	if (l < 0 || l >= f->pd) return false;
 
 	if (f->tiffo) {
+#ifdef FANCY_TIFF
 		float p[f->pd];
 		// TODO: remove this silly loop
 		for (int k = 0; k < f->pd; k++)
@@ -402,6 +456,9 @@ int fancy_image_setsample(struct fancy_image *fi, int i, int j, int l, float v)
 		p[l] = v;
 		tiff_octaves_setpixel_float(f->t, i, j, p);
 		return true;
+#else
+		assert(false);
+#endif
 	} else {
 		int idx = (j * f->w + i) * f->pd + l;
 		f->x[idx] = v;
@@ -413,6 +470,7 @@ int fancy_image_leak_tiff_info(int *tw, int *th, int *fmt, int *bps,
 		struct fancy_image *fi)
 {
 	struct FI *f = (void*)fi;
+#ifdef FANCY_TIFF
 	if (f->tiffo) {
 		if (tw)  *tw = f->t->i->tw;
 		if (th)  *th = f->t->i->th;
@@ -420,6 +478,7 @@ int fancy_image_leak_tiff_info(int *tw, int *th, int *fmt, int *bps,
 		if (bps) *bps = f->t->i->bps;
 		return 1;
 	}
+#endif
 	return 0;
 }
 

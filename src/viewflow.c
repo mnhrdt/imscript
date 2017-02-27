@@ -18,7 +18,9 @@
 
 
 
-#include "fragments.c"
+#include "fail.c"
+#include "drawsegment.c"
+#include "colorcoordsf.c"
 #include "marching_squares.c"
 
 static void viewflow_pd(uint8_t (**y)[3], float (**x)[2], int w, int h, float m)
@@ -30,12 +32,11 @@ static void viewflow_pd(uint8_t (**y)[3], float (**x)[2], int w, int h, float m)
 		double a = atan2(v[1], -v[0]);
 		a = (a+M_PI)*(180/M_PI);
 		a = fmod(a, 360);
-		double hsv[3], rgb[3];
+		float hsv[3], rgb[3];
 		hsv[0] = a;
 		hsv[1] = r;
 		hsv[2] = r;
-		void hsv_to_rgb_doubles(double*, double*);
-		hsv_to_rgb_doubles(rgb, hsv);
+		hsv_to_rgb_floats(rgb, hsv);
 		FORL(3)
 			y[j][i][l] = 255*rgb[l];
 
@@ -56,12 +57,11 @@ static void viewflow_flat(uint8_t *py, float *px, int w, int h, float m)
 		double a = atan2(v[1], -v[0]);
 		a = (a+M_PI)*(180/M_PI);
 		a = fmod(a, 360);
-		double hsv[3], rgb[3];
+		float hsv[3], rgb[3];
 		hsv[0] = a;
 		hsv[1] = r;
 		hsv[2] = r;
-		void hsv_to_rgb_doubles(double*, double*);
-		hsv_to_rgb_doubles(rgb, hsv);
+		hsv_to_rgb_floats(rgb, hsv);
 		FORL(3)
 			y[j][i][l] = 255*rgb[l];
 
@@ -253,6 +253,17 @@ static void overlay_level_line_in_black(uint8_t (**y)[3],
 
 SMART_PARAMETER(NOVERLINES,51)
 
+static void *matrix_build(int w, int h, size_t n)
+{
+	size_t p = sizeof(void *);
+	char *r = xmalloc(h*p + w*h*n);
+	for (int i = 0; i < h; i++)
+		*(void **)(r + i*p) = r + h*p + i*w*n;
+	return r;
+}
+
+
+
 static void overlines(uint8_t (**y)[3], float (**x)[2], int w, int h, float s)
 {
 	assert(s > 0);
@@ -279,7 +290,7 @@ int main_viewflow(int c, char *v[])
 	int w, h, pd;
 	void *data = iio_read_image_float_matrix_vec(infile, &w, &h, &pd);
 	float (**flow)[pd] = data;
-	if (pd != 2) error("input is not a vector field");
+	if (pd != 2) fail("input is not a vector field");
 
 	uint8_t (**view)[3] = matrix_build(w, h, sizeof**view);
 

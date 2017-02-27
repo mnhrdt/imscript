@@ -492,7 +492,7 @@ static void disable_tiff_warnings_and_errors(void)
 	TIFFSetErrorHandler(NULL);
 }
 
-void tiff_octaves_init0(struct tiff_octaves *t, char *filepattern,
+static void tiff_octaves_init0(struct tiff_octaves *t, char *filepattern,
 		double megabytes, int max_octaves)
 {
 	//fprintf(stderr, "tiff octaves init \"%s\"(%gMB)\n", filepattern, megabytes);
@@ -550,6 +550,7 @@ void tiff_octaves_init0(struct tiff_octaves *t, char *filepattern,
 	}
 }
 
+static
 void tiff_octaves_init(struct tiff_octaves *t, char *filepattern,
 		double megabytes)
 {
@@ -578,6 +579,7 @@ static void re_write_tile(struct tiff_octaves *t, int tidx)
 }
 
 
+static
 void tiff_octaves_free(struct tiff_octaves *t)
 {
 	if (t->option_write)
@@ -640,6 +642,7 @@ static void notify_tile_access_octave(struct tiff_octaves *t, int o, int i)
 	t->a[o][i] = ++t->ax;
 }
 
+static
 void *tiff_octaves_gettile(struct tiff_octaves *t, int o, int i, int j)
 {
 	// sanitize input
@@ -671,6 +674,7 @@ void *tiff_octaves_gettile(struct tiff_octaves *t, int o, int i, int j)
 	return t->c[o][tidx];
 }
 
+static
 void *tiff_octaves_getpixel(struct tiff_octaves *t, int o, int i, int j)
 {
 	//fprintf(stderr, "t_o_g(%d, %d, %d)\n", o, i, j);
@@ -686,6 +690,7 @@ void *tiff_octaves_getpixel(struct tiff_octaves *t, int o, int i, int j)
 	return pixel_position + (char*)tile;
 }
 
+static
 void tiff_octaves_setpixel(struct tiff_octaves *t, int i, int j, void *p)
 {
 	if (i < 0 || i >= t->i->w) return;

@@ -35,7 +35,7 @@ static void fancy_crop(char *fname_out, char *fname_in,
 
 #include <stdio.h>
 #include <stdlib.h>
-int main(int c, char *v[])
+int main_fancy_crop(int c, char *v[])
 {
 	if (c != 7) {
 		fprintf(stderr, "usage:\n\t"
@@ -54,3 +54,7 @@ int main(int c, char *v[])
 
 	return 0;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_fancy_crop(c, v); }
+#endif
