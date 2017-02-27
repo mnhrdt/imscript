@@ -266,7 +266,7 @@ void nnint_split(float *x, int w, int h, int pd)
 int main_nnint(int c, char *v[])
 {
 	char *filename_mask = pick_option(&c, &v, "m", "");
-	int help_argument = (int)pick_option(&c, &v, "h", 0);
+	_Bool help_argument = pick_option(&c, &v, "h", 0);
 	if (help_argument || (c != 1 && c != 2 && c != 3)) {
 		fprintf(stderr, "usage:\n\t%s [in.tiff [out.tiff]]\n", *v);
 		//                          0  1        2

@@ -29,7 +29,7 @@ BIN = plambda vecov morsi downsa upsa ntiply censust dither \
 
 # default LDLIBS contains with everything
 IMAGE_LIBS = -ljpeg -ltiff -lpng -lz
-LDLIBS = -liio $(IMAGE_LIBS) -lfftw3f -lm
+LDLIBS = libiio.a $(IMAGE_LIBS) -lfftw3f -lm
 
 # if requested, remove image libraries
 ifeq ($(DISABLE_IMAGE_LIBS),yes)
@@ -65,10 +65,10 @@ libiio.a: $(OBJ)
 	$(AR) rc $@ $^
 
 # rule to build a single executable "im" containing all the programs
-im: im.c $(BIN:=.c)
+im: im.c $(BIN:=.c) libiio.a
 	@true > all_mains.inc
 	@for i in $(BIN); do printf "\tMAIN($$i)\n" >> all_mains.inc ; done
-	$(CC) $(CFLAGS) -DHIDE_ALL_MAINS $^ $(LDLIBS) -o $@
+	$(CC) $(CFLAGS) -DHIDE_ALL_MAINS im.c $(BIN:=.c) $(LDLIBS) -o $@
 
 
 # automatic generation of dependencies
