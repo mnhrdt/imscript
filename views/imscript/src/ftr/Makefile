@@ -11,10 +11,12 @@ CFLAGS = -march=native -O3 -ffast-math
 
 # variables
 OBJ = iio.o fancy_image.o ftr.o egm96.o
-BIN = viho fpan fpantiff rpcflip
+LIB = libiio.a
+BIN = viho fpan fpantiff rpcflip icrop
 
-# default LDLIBS contains with everything
-LDLIBS = -liiof -ljpeg -ltiff -lpng -lz -lm -lX11
+# default LDLIBS contains everything
+LDLIBS = $(LIB) -ljpeg -ltiff -lpng -lz -lm -lX11
+
 
 # rules
 
@@ -22,11 +24,12 @@ LDLIBS = -liiof -ljpeg -ltiff -lpng -lz -lm -lX11
 default: $(BIN)
 
 # rule to build all the individual executables
-$(BIN) : % : %.c libiiof.a
-	$(CC) $(CFLAGS) $< $(LDLIBS) -o $@
+$(BIN) : $(LIB)
+#$(BIN) : % : %.c $(LIB)
+#	$(CC) $(CFLAGS) $< $(LDLIBS) -o $@
 
-# rule to build the "iio" library interfaces, linkable with -liiof
-libiiof.a: $(OBJ)
+# rule to build the "iio" library interfaces, linkable with -liio
+$(LIB): $(OBJ)
 	$(AR) rc $@ $^
 
 # automatic generation of dependencies
@@ -37,6 +40,6 @@ libiiof.a: $(OBJ)
 
 # bureaucracy
 clean:
-	$(RM) *.a *.o $(BIN) im
+	$(RM) $(LIB) $(OBJ) $(BIN) im
 depend: .depend.mk
 .PHONY: default clean depend
