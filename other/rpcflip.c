@@ -23,10 +23,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#ifndef TIFFU_C_INCLUDED
-#define TIFFU_OMIT_MAIN
-#include "tiffu.c"
-#endif//TIFFU_C_INCLUDED
+#include "tiff_octaves_rw.c"
 #include "srtm4o.c"
 
 #define DONT_USE_TEST_MAIN
@@ -1189,8 +1186,8 @@ static void action_dump_view(struct FTR *f)
 	snprintf(fnamef, FILENAME_MAX, fmtf, pid, dump_view_counter);
 	struct pan_state *e = f->userdata;
 	struct pan_view  *v = obtain_view(e);
-	iio_save_image_uint8_vec(fnamei, v->display, v->dw, v->dh, 3);
-	iio_save_image_float_vec(fnamef, v->fdisplay, v->dw, v->dh, 3);
+	iio_write_image_uint8_vec(fnamei, v->display, v->dw, v->dh, 3);
+	iio_write_image_float_vec(fnamef, v->fdisplay, v->dw, v->dh, 3);
 	fprintf(stderr, "dumped rgb_8 view to file \"%s\"\n", fnamei);
 	fprintf(stderr, "dumped rgb_f view to file \"%s\"\n", fnamef);
 	dump_view_counter += 1;
@@ -1515,7 +1512,7 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 		struct pan_view *v = obtain_view(e);
 		char buf[FILENAME_MAX];
 		snprintf(buf, FILENAME_MAX, "%s/%s_%d.png", outdir, outnam, i);
-		iio_save_image_uint8_vec(buf, v->display, w, h, 3);
+		iio_write_image_uint8_vec(buf, v->display, w, h, 3);
 		action_select_view(f, i+1, w/2, h/2); // not parallelizable
 	}
 
@@ -1523,6 +1520,7 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 }
 
 // main {{{1
+#include "pickopt.c"
 int main_pan(int c, char *v[])
 {
 	TIFFSetWarningHandler(NULL);//suppress warnings

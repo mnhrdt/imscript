@@ -39,6 +39,7 @@ export CFLAGS = -march=native -O3
 
 all:
 	$(MAKE) -C src -j 3
+	$(MAKE) -C src/ftr -j 3
 	@for i in `$(MAKE) -s -C src list_bin`; do cp src/$$i bin ; done
 
 clean:

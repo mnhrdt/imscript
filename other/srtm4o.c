@@ -12,10 +12,11 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#ifndef TIFFU_C_INCLUDED
-#define TIFFU_OMIT_MAIN
-#include "tiffu.c"
-#endif//TIFFU_C_INCLUDED
+//#ifndef TIFFU_C_INCLUDED
+//#define TIFFU_OMIT_MAIN
+//#include "tiffu.c"
+//#endif//TIFFU_C_INCLUDED
+#include "tiff_octaves_rw.c"
 
 #define SRTM4_TILE_MEGABYTES 2
 
