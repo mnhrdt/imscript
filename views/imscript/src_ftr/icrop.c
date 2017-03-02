@@ -29,8 +29,16 @@ static void do_inline_crop_rgb(uint8_t *x, int *w, int *h, int c[4])
 }
 
 struct icrop2_state {
+	// input data
 	uint8_t *original_image;
-	int step, ox, oy;
+	int w, h;
+
+	// visualization data
+	int octave, offset_x, offset_y;
+
+	// interaction data
+	int step;   // step of the interaction (0/1 = before/after first click)
+	int px, py; // location of the pointer when in step 0
 };
 
 static int inbetween(int a, int b, int x)
@@ -44,8 +52,8 @@ void icrop2_motion(struct FTR *f, int b, int m, int x, int y)
 	uint8_t *o = e->original_image;
 
 	if (e->step == 0) {
-		e->ox = x;
-		e->oy = y;
+		e->px = x;
+		e->py = y;
 	}
 
 	for (int j = 0; j < f->h; j++)
@@ -54,7 +62,7 @@ void icrop2_motion(struct FTR *f, int b, int m, int x, int y)
 	{
 		int idx = 3*(j * f->w + i) + l;
 		int inside = (e->step == 0) ?  (i>=x && j >= y) :
-			inbetween(e->ox, x, i) && inbetween(e->oy, y, j);
+			inbetween(e->px, x, i) && inbetween(e->py, y, j);
 		f->rgb[idx] = inside ? o[idx] : o[idx]/2;
 	}
 
@@ -62,7 +70,7 @@ void icrop2_motion(struct FTR *f, int b, int m, int x, int y)
 }
 
 // interactive crop, just fancier
-int main_icrop(int c, char *v[])
+int main_icrop2_simple(int c, char *v[])
 {
 	// process input arguments
 	if (c != 2 && c != 1 && c != 3) {
@@ -79,9 +87,9 @@ int main_icrop(int c, char *v[])
 	uint8_t *x = *xx;
 
 	// show image in window
-	int win[2] = { 320, 200 };
+	int win[2] = { w, h};//320, 200 };
 	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, win[0], win[1]);
-	struct icrop2_state e = {x, 0, 0, 0};
+	struct icrop2_state e = {x,w,h, 0,0,0, 0,0,0};
 	f.userdata = &e;
 
 	// set handlers
@@ -105,4 +113,47 @@ int main_icrop(int c, char *v[])
 	return 0;
 }
 
-int main(int c, char *v[]) { return main_icrop(c, v); }
+int main_icrop2_panable(int c, char *v[])
+{
+	// process input arguments
+	if (c != 2 && c != 1 && c != 3) {
+		fprintf(stderr, "usage:\n\t%s [in [out]]\n", *v);
+		//                          0  1   2
+		return 1;
+	}
+	char *filename_in = c > 1 ? v[1] : "-";
+	char *filename_out = c > 2 ? v[2] : "-";
+
+	// read image
+	int w, h;
+	uint8_t (*xx)[3] = iio_read_image_uint8_rgb(filename_in, &w, &h);
+	uint8_t *x = *xx;
+
+	// show image in window
+	int win[2] = { w, h};//320, 200 };
+	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, win[0], win[1]);
+	struct icrop2_state e = {x,w,h, 0,0,0, 0,0,0};
+	f.userdata = &e;
+
+	// set handlers
+	ftr_set_handler(&f, "motion", icrop2_motion);
+
+	// read the two corners of the crop rectangle
+	int crop_param[4];
+	ftr_wait_for_mouse_click(&f, crop_param + 0, crop_param + 1);
+	e.step = 1;
+	ftr_wait_for_mouse_click(&f, crop_param + 2, crop_param + 3);
+
+	// perform the crop on the image data
+	do_inline_crop_rgb(x, &w, &h, crop_param);
+
+	// write outpuf file
+	iio_write_image_uint8_vec(filename_out, x, w, h, 3);
+
+	// cleanup and exit (optional)
+	ftr_close(&f);
+	free(x);
+	return 0;
+}
+
+int main(int c, char *v[]) { return main_icrop2_panable(c, v); }

@@ -54,7 +54,7 @@ iio.o         : override CFLAGS += $(IIO_FLAGS)
 # rules
 
 # default rule (builds everything)
-default: $(BIN) im
+default: im $(BIN)
 
 # rule to build all the individual executables
 $(BIN) : % : %.c libiio.a

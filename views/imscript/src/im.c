@@ -17,7 +17,10 @@ int main(int c, char *v[])
 	while (t[i].n)
 	{
 		if (c == 1)
-			fprintf(stderr, "%s\n", t[i].n);
+		{
+			fprintf(stderr, "%s\t", t[i].n);
+			t[i].f(1, v+1);
+		}
 		if (c > 1 && !strcmp(v[1], t[i].n))
 			return t[i].f(c - 1, v + 1);
 		i = i + 1;
