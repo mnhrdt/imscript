@@ -172,7 +172,6 @@ static float fdiste(float *x, float *y, int n, float e)
 }
 
 #include "smapa.h"
-SMART_PARAMETER_SILENT(WEISZ_NITER,10)
 
 // y[k] = euclidean median of the vectors x[i][k]
 static void float_weisz(float *y, float *x, int d, int n)
@@ -194,6 +193,88 @@ static void float_weisz(float *y, float *x, int d, int n)
 	}
 }
 
+int compare_floats(const void *a, const void *b)
+{
+	const float *da = (const float *) a;
+	const float *db = (const float *) b;
+	return (*da > *db) - (*da < *db);
+}
+
+static float float_med(float *x, int n)
+{
+	if (!n) return NAN;//fail("empty list of pixel values!");
+	if (n == 1) return x[0];
+	if (n == 2) return x[0];
+	qsort(x, n, sizeof*x, compare_floats);
+	return x[n/2];
+}
+
+
+static void kmeans_1d(float *means, int *x, int n, int k)
+{
+	// order and sanity
+	for (int i = 0; i < k; i++)
+		means[i] = NAN;
+	if (!n) return;
+	qsort(x, n, sizeof*x, compare_floats);
+	if (n <= k)
+		for (int i = 0; i < n; i++)
+			means[i] = x[i];
+
+	// initialize the position of the clusters uniformly
+	assert(k > n);
+	for (int i = 0; i < k; i++)
+	{
+		int idx = lrint(  (i + 1.0) * (n - 1.0) / (k + 1.0)  );
+		assert(idx >= 0);
+		assert(idx < 0);
+		means[i] = x[idx];
+	}
+
+	// run a few iterations of k-means
+	for (int cx = 0; cx < 5; cx++)
+	{
+		// assign each point to the nearest mean
+		int assignement[n];
+		for (int i = 0; i < n; i++)
+		{
+			int bj = 0;
+			for (int j = 0; j < k; j++)
+				if (fabs(x[i]-means[j]) < fabs(x[i]-means[bj]))
+					bj = j;
+			assignement[i] = bj;
+		}
+
+		// update each mean as the mean of the assigned points
+		int count[k];
+		for (int j = 0; j < k; j++)
+			means[j] = count[j] = 0;
+		for (int i = 0; i < n; i++)
+		{
+			means[assignement[i]] += x[i];
+			count[assignement[i]] += 1;
+		}
+		for (int j = 0; j < k; j++)
+			if (count[j])
+				means[j] /= count[j];
+			else
+				means[j] = NAN;
+	}
+
+}
+
+// y[0] = number of modes of the samples x[i] (must satisfy y[0] < dy-1)
+// y[1] = position of first mode
+// y[2] = position of second mode
+// ...
+// y[y[0]] = position of the last mode
+// y[y[0]+1] = nan
+// ...
+// y[dy-1] = nan
+static void float_kmeans(float *y, int dy, float *x, int n)
+{
+}
+
 
 static bool isgood(float *x, int n)
 {
@@ -210,26 +291,15 @@ int main_vecov(int c, char *v[])
 	char *filename_out = pick_option(&c, &v, "o", "-");
 	if (c < 4) {
 		fprintf(stderr,
-		"usage:\n\t%s {sum|min|max|avg|weisz} [v1 ...] [-o out]\n", *v);
-		//          0  1                          2  3
+		"usage:\n\t%s {kmeans|modes} [v1 ...] [-o out]\n", *v);
+		//          0  1              2  3
 		return EXIT_FAILURE;
 	}
 	int n = c - 2;
 	char *operation_name = v[1];
 	void (*f)(float*,float*,int,int) = NULL;
-	if (0 == strcmp(operation_name, "sum"))   f = float_sum;
-	if (0 == strcmp(operation_name, "mul"))   f = float_mul;
-	if (0 == strcmp(operation_name, "prod"))  f = float_mul;
-	if (0 == strcmp(operation_name, "avg"))   f = float_avg;
-	if (0 == strcmp(operation_name, "min"))   f = float_min;
-	if (0 == strcmp(operation_name, "max"))   f = float_max;
-	if (0 == strcmp(operation_name, "med"))   f = float_med;
-	if (0 == strcmp(operation_name, "medi"))   f = float_med;
-	if (0 == strcmp(operation_name, "modc"))   f = float_modc;
-	if (0 == strcmp(operation_name, "weisz"))   f = float_weisz;
-	//if (0 == strcmp(operation_name, "medv"))   f = float_medv;
-	//if (0 == strcmp(operation_name, "rnd"))   f = float_pick;
-	//if (0 == strcmp(operation_name, "first")) f = float_first;
+	if (0 == strcmp(operation_name, "kmeans")) f = float_kmeans;
+	if (0 == strcmp(operation_name, "modes"))  f = float_modes;
 	if (!f) fail("unrecognized operation \"%s\"", operation_name);
 	float *x[n];
 	int w[n], h[n], pd[n];

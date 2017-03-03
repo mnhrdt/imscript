@@ -164,6 +164,7 @@ static bool isgood_numeric(float x)
 int main_veco(int c, char *v[])
 {
 	int gpar = atoi(pick_option(&c, &v, "g", "1"));
+	char *filename_out = pick_option(&c, &v, "o", "-");
 	if (c < 4) {
 		fprintf(stderr,
 		"usage:\n\t%s {sum|min|max|avg|mul|med] [v1 ...] > out\n", *v);
@@ -215,7 +216,7 @@ int main_veco(int c, char *v[])
 				tmp[ngood++] = x[j][i];
 		y[i] = f(tmp, ngood);
 	}
-	iio_write_image_float("-", y, *w, *h);
+	iio_write_image_float(filename_out, y, *w, *h);
 	return EXIT_SUCCESS;
 }
 
