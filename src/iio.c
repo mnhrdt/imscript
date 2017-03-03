@@ -1177,6 +1177,21 @@ recover_broken_pixels_float(float *clear, float *broken, int n, int pd)
 		clear[pd*i + l] = broken[n*l + i];
 }
 
+
+static void break_pixels_uint8(uint8_t *broken, uint8_t *clear, int n, int pd)
+{
+	FORI(n) FORL(pd)
+		broken[n*l + i] = clear[pd*i + l];
+}
+
+static void
+recover_broken_pixels_uint8(uint8_t *clear, uint8_t *broken, int n, int pd)
+{
+	FORL(pd) FORI(n)
+		clear[pd*i + l] = broken[n*l + i];
+}
+
+
 static
 void repair_broken_pixels(void *clear, void *broken, int n, int pd, int sz)
 {
@@ -3042,7 +3057,6 @@ static void iio_write_image_as_csv(const char *filename, struct iio_image *x)
 	FILE *f = xfopen(filename, "w");
 	int w = x->sizes[0];
 	int h = x->sizes[1];
-	assert(x->sizes[2] == 1);
 	assert(x->pixel_dimension == 1);
 	assert(x->type == IIO_TYPE_FLOAT);
 	float *t = x->data;
@@ -4262,7 +4276,6 @@ void iio_write_image_int(char *filename, int *data, int w, int h)
 	iio_write_image_default(filename, x);
 }
 
-
 void iio_write_image_uint8_vec(char *filename, uint8_t *data,
 		int w, int h, int pd)
 {
@@ -4275,6 +4288,15 @@ void iio_write_image_uint8_vec(char *filename, uint8_t *data,
 	x->data = data;
 	x->contiguous_data = false;
 	iio_write_image_default(filename, x);
+}
+
+void iio_write_image_uint8_split(char *filename, uint8_t *data,
+		int w, int h, int pd)
+{
+	uint8_t *rdata = xmalloc(w*h*pd*sizeof*rdata);
+	recover_broken_pixels_uint8(rdata, data, w*h, pd);
+	iio_write_image_uint8_vec(filename, rdata, w, h, pd);
+	xfree(rdata);
 }
 
 void iio_write_image_uint16_vec(char *filename, uint16_t *data,

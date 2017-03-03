@@ -1,12 +1,12 @@
 # user-editable configuration
 
-# swap these two lines to change between debug and release
-CFLAGS = -g -Wall -Wextra
+# swap these two lines to change between debug and release (in vim= ddp)
+CFLAGS = -g -Wall -Wextra -Wno-unused
 CFLAGS = -march=native -Os
 
 # set the following variables to "yes" to disable some dependences
 DISABLE_IMAGE_LIBS = no
-DISABLE_FFTW3 = no
+DISABLE_FFTW3      = no
 
 # -- end of user-editable part
 
@@ -85,3 +85,5 @@ list_bin:
 	@echo $(BIN)
 depend: .depend.mk
 .PHONY: default clean depend list_bin
+
+

@@ -8,7 +8,7 @@ upsa: upsa.c iio.h fail.c marching_squares.c marching_interpolation.c \
 ntiply: ntiply.c iio.h
 censust: censust.c iio.h pickopt.c
 dither: dither.c iio.h
-qauto: qauto.c iio.h smapa.h
+qauto: qauto.c iio.h help_stuff.c pickopt.c
 qeasy: qeasy.c iio.h
 homwarp: homwarp.c extrapolators.c bilinear_interpolation.c \
  marching_interpolation.c bicubic_gray.c spline.c iio.h xmalloc.c fail.c \

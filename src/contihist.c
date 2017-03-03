@@ -452,6 +452,21 @@ void dump_histogram_noacc(long double (*h)[2], int n)
 	//free(a);
 }
 
+static void update_min_max_if_not_finite(float *m, float *M, float *x, int n)
+{
+	if (isfinite(*m) && isfinite(*M)) return;
+
+	float min = INFINITY;
+	float max = -INFINITY;
+	for (int i = 0; i < n; i++)
+	{
+		if (x[i] < min) min = x[i];
+		if (x[i] > max) max = x[i];
+	}
+	if (!isfinite(*m)) *m = min;
+	if (!isfinite(*M)) *M = max;
+}
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -462,6 +477,7 @@ int main_contihist(int c, char *v[])
 	if (c != 5) {
 		fprintf(stderr, "usage:\n\t%s nbins min max img.png\n", *v);
 		//                          0 1     2   3   4
+		return 1;
 	}
 	int nbins = atoi(v[1]);
 	float hmin = atof(v[2]);
@@ -475,8 +491,10 @@ int main_contihist(int c, char *v[])
 	// allocate space for the histogram data
 	long double bins[3+nbins][2];
 
+	update_min_max_if_not_finite(&hmin, &hmax, x, w*h);
+
 	// compute continuous histogram
-	fill_continuous_histogram(bins, nbins, hmin, hmax, x, w, h);
+	//fill_continuous_histogram(bins, nbins, hmin, hmax, x, w, h);
 	fill_continuous_histogram_simple(bins, nbins, hmin, hmax, x, w, h);
 
 	// dump histogram to stdout
