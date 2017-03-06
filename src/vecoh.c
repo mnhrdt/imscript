@@ -27,6 +27,7 @@ static float average_of_cluster_variances(
 		int *group, float *mean, int k,
 		float *x, int n)
 {
+	if (!k) return 0;
 	float var[k], cnt[k];
 	for (int i = 0; i < k; i++)
 		var[i] = cnt[i] = 0;
@@ -243,7 +244,8 @@ int main_vecoh(int c, char *v[])
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
-	for (int i = 0; i < *w * *h; i++) {
+	for (int i = 0; i < *w * *h; i++)
+	{
 		float tmp[n];
 		int ngood = 0;
 		for (int j = 0; j < n; j++)
@@ -251,7 +253,7 @@ int main_vecoh(int c, char *v[])
 				tmp[ngood] = x[j][i];
 				ngood += 1;
 			}
-		float_varkmeans(y + i*out_pd, out_pd, tmp, n, PRECISION());
+		float_varkmeans(y + i*out_pd, out_pd, tmp, ngood, PRECISION());
 		if (VECOH_VERBOSE() && 2*i == *w**h)
 		{ // if requested, print the computation at the central pixel
 			float *Y = y + i*out_pd;
