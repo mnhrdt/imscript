@@ -179,6 +179,26 @@ static int main_ktry(int c, char *v[])
 	return 0;
 }
 
+static int main_xtry(int c, char *v[])
+{
+	if(c<3)return fprintf(stderr,"usage:\n\tkmeans x1 ... xn\n");
+	int n = c - 1;
+	float x[n], y[n];
+	for (int i = 0; i < n; i++)
+		x[i] = atof(v[i+1]);
+	float_varkmeans(y, 10, x, n, PRECISION());
+	int k = y[0];
+	int group[n];
+	assign_each_point_to_nearest_mean(group, y+1, k, x, n);
+	float acv = average_of_cluster_variances(group, y+1, k, x, n);
+	fprintf(stderr, "racv = %g\t", sqrt(acv));
+	fprintf(stderr, "got %d centers (", k);
+	for (int i = 0; i < k; i++)
+		fprintf(stderr, "%g%c", y[1+i], i+1==k?')':' ');
+	puts("");
+	return 0;
+}
+
 //int main(int c, char **v) { return main_kmeans(c, v); }
 
 static bool isgood(float *x, int n)
@@ -194,6 +214,7 @@ static bool isgood(float *x, int n)
 int main_vecoh(int c, char *v[])
 {
 	if (pick_option(&c, &v, "t", 0)) return main_ktry(c, v);
+	if (pick_option(&c, &v, "x", 0)) return main_xtry(c, v);
 	char *filename_out = pick_option(&c, &v, "o", "-");
 	if (c < 4) {
 		fprintf(stderr,
