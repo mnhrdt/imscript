@@ -130,6 +130,7 @@ static void kmeans_1d(float *means, float *x, int n, int k)
 // y[dy-1] = nan
 static void float_kmeans(float *y, int dim_y, float *x, int n, int k)
 {
+	for (int i = 0; i < dim_y; i++) y[i] = NAN;
 	if (k >= dim_y) k = dim_y - 1;
 	float means[k];
 	kmeans_1d(means, x, n, k);
@@ -252,18 +253,17 @@ int main_vecoh(int c, char *v[])
 			}
 		float_varkmeans(y + i*out_pd, out_pd, tmp, n, PRECISION());
 		if (VECOH_VERBOSE() && 2*i == *w**h)
-		{
-			float *yi = y + i*out_pd;
+		{ // if requested, print the computation at the central pixel
+			float *Y = y + i*out_pd;
 			fprintf(stderr, "x = ");
 			for (int l = 0; l < n; l++)
 				fprintf(stderr, "%g%c",tmp[l],l==n-1?'\n':' ');
-			fprintf(stderr, "\tn = %g", yi[0]);
+			fprintf(stderr, "\tn = %g", Y[0]);
 			fprintf(stderr, "\ty = ");
-			for (int l = 0; l < yi[0]; l++)
-				fprintf(stderr, "%g%c",yi[1+l],*yi-1==l?'\n':' ');
+			for (int l = 0; l < Y[0]; l++)
+				fprintf(stderr,"%g%c",Y[1+l],*Y-1==l?'\n':' ');
 
 		}
-		//f(y + i**out_pd, tmp[0], *pd, ngood);
 	}
 	iio_write_image_float_vec(filename_out, y, *w, *h, out_pd);
 	free(y);

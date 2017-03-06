@@ -135,8 +135,8 @@ static char *help_string_long     =
 "\n"
 "Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>.\n"
 ;
-#include "help_stuff.c"
-#include "pickopt.c"
+#include "help_stuff.c" // some functions that expect the strings above
+#include "pickopt.c" // function to extract hyphenated command line options
 int main_qauto(int c, char *v[])
 {
 	// process "help" arguments
