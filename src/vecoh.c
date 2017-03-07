@@ -12,8 +12,7 @@
 
 #include "smapa.h"
 SMART_PARAMETER(PRECISION,10)
-SMART_PARAMETER_SILENT(KKK,2)
-SMART_PARAMETER_SILENT(VECOH_VERBOSE,0)
+SMART_PARAMETER_SILENT(NUMBER_OF_KMEANS_ITERATIONS,5)
 
 
 int compare_floats(const void *a, const void *b)
@@ -23,6 +22,7 @@ int compare_floats(const void *a, const void *b)
 	return (*da > *db) - (*da < *db);
 }
 
+// compute the avg of the variances of each cluster
 static float average_of_cluster_variances(
 		int *group, float *mean, int k,
 		float *x, int n)
@@ -50,6 +50,8 @@ static float average_of_cluster_variances(
 	return r / k;
 }
 
+// given a set of centroids,
+// assign the index of the nearest centroid to each point
 static void assign_each_point_to_nearest_mean(int *assign, float *mean,
 		int k, float *x, int n)
 {
@@ -86,9 +88,16 @@ static void kmeans_1d(float *means, float *x, int n, int k)
 		assert(idx < n);
 		means[i] = x[idx];
 	}
+	for (int i = 1; i < k; i++)
+		if (means[i-1] == means[i])
+		{
+			means[i-1] -= 0.01;
+			means[i] += 0.01;
+		}
 
 	// run a few iterations of k-means
-	for (int cx = 0; cx < 5; cx++)
+	int numit = NUMBER_OF_KMEANS_ITERATIONS();
+	for (int cx = 0; cx < numit; cx++)
 	{
 		// assign each point to the nearest mean
 		int assignement[n];
@@ -161,14 +170,19 @@ static void float_varkmeans(float *y, int dim_y, float *x, int n, float prec)
 	}
 }
 
-static int main_ktry(int c, char *v[])
+
+// main for debugging: try the k-means clustering for k=env(KKK)
+SMART_PARAMETER(KKK,2)
+static int main_ttry(int c, char *v[])
 {
 	if(c<3)return fprintf(stderr,"usage:\n\tkmeans x1 ... xn\n");
 	int n = c - 1;
-	float x[n], y[n];
+	int max_k = 20;
+	float x[n], y[max_k];
 	for (int i = 0; i < n; i++)
 		x[i] = atof(v[i+1]);
-	float_kmeans(y, 20, x, n, KKK());
+	int kkk = KKK();
+	float_kmeans(y, max_k, x, n, kkk);
 	int k = y[0];
 	int group[n];
 	assign_each_point_to_nearest_mean(group, y+1, k, x, n);
@@ -181,14 +195,16 @@ static int main_ktry(int c, char *v[])
 	return 0;
 }
 
+// main for debugging: try the k-estimation a given PRECISION
 static int main_xtry(int c, char *v[])
 {
 	if(c<3)return fprintf(stderr,"usage:\n\tkmeans x1 ... xn\n");
 	int n = c - 1;
-	float x[n], y[n];
+	int max_k = 20;
+	float x[n], y[max_k];
 	for (int i = 0; i < n; i++)
 		x[i] = atof(v[i+1]);
-	float_varkmeans(y, 10, x, n, PRECISION());
+	float_varkmeans(y, max_k, x, n, PRECISION());
 	int k = y[0];
 	int group[n];
 	assign_each_point_to_nearest_mean(group, y+1, k, x, n);
@@ -201,8 +217,7 @@ static int main_xtry(int c, char *v[])
 	return 0;
 }
 
-//int main(int c, char **v) { return main_kmeans(c, v); }
-
+// wether a floating point vector is good or not
 static bool isgood(float *x, int n)
 {
 	for (int i = 0; i < n; i++)
@@ -212,10 +227,11 @@ static bool isgood(float *x, int n)
 }
 
 #include "pickopt.c"
-
+SMART_PARAMETER_SILENT(VECOH_VERBOSE,0)
+// main main: compute the modes of a series of images
 int main_vecoh(int c, char *v[])
 {
-	if (pick_option(&c, &v, "t", 0)) return main_ktry(c, v);
+	if (pick_option(&c, &v, "t", 0)) return main_ttry(c, v);
 	if (pick_option(&c, &v, "x", 0)) return main_xtry(c, v);
 	char *filename_out = pick_option(&c, &v, "o", "-");
 	if (c < 4) {
