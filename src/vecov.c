@@ -208,7 +208,7 @@ static bool isgood(float *x, int n)
 int main_vecov(int c, char *v[])
 {
 	char *filename_out = pick_option(&c, &v, "o", "-");
-	if (c < 4) {
+	if (c < 3) {
 		fprintf(stderr,
 		"usage:\n\t%s {sum|min|max|avg|weisz} [v1 ...] [-o out]\n", *v);
 		//          0  1                          2  3

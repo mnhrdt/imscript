@@ -165,7 +165,7 @@ int main_veco(int c, char *v[])
 {
 	int gpar = atoi(pick_option(&c, &v, "g", "1"));
 	char *filename_out = pick_option(&c, &v, "o", "-");
-	if (c < 4) {
+	if (c < 3) {
 		fprintf(stderr,
 		"usage:\n\t%s {sum|min|max|avg|mul|med] [v1 ...] > out\n", *v);
 		//          0  1                          2  3

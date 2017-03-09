@@ -409,7 +409,7 @@ int main_vecoh(int c, char *v[])
 	if (pick_option(&c, &v, "t", 0)) return main_ttry(c, v);
 	if (pick_option(&c, &v, "x", 0)) return main_xtry(c, v);
 	char *filename_out = pick_option(&c, &v, "o", "-");
-	if (c < 4) {
+	if (c < 3) {
 		fprintf(stderr,
 		"usage:\n\t%s {kmeans|kmedians} [v1 ...] [-o out]\n", *v);
 		//          0  1              2  3
