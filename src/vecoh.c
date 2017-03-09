@@ -68,11 +68,18 @@ static float average_of_cluster_diq(
 				tx[tn++] = x[i];
 		assert(tn);
 		int a[2] = {(tn+1)/4-1, tn/4 };
-		if (!a[0]) a[0] = 1;
 		int b[2] = {(3*tn+1)/4-1, (3*tn)/4 };
-		fprintf(stderr, "\tq25(%d) = %d %d\tq75(%d) = %d %d\n",
-				tn, a[0], a[1], tn, b[0], b[1]);
+		//fprintf(stderr, "\tq25(%d) = %d %d\tq75(%d) = %d %d\n",
+		//		tn, a[0], a[1], tn, b[0], b[1]);
 		for (int i = 0; i < 2; i++) {
+			if (a[0] < 0) a[0] = 1;
+			if (a[1] < 0) a[1] = 1;
+			if (b[0] < 0) b[0] = 1;
+			if (b[1] < 0) b[1] = 1;
+			if (a[0] >= tn) a[0] = tn-1;
+			if (a[1] >= tn) a[1] = tn-1;
+			if (b[0] >= tn) b[0] = tn-1;
+			if (b[1] >= tn) b[1] = tn-1;
 			assert(a[i] >= 0); assert(b[i] >= 0);
 			assert(a[i] < tn); assert(b[i] < tn);
 		}
@@ -128,14 +135,14 @@ static
 void update_medians_of_each_group(float *m, int *g, int k, float *x, int n)
 {
 	for (int i = 0; i < n-1; i++)
-		assert(x[i] < x[i+1]);
-	fprintf(stderr, "\tupdating medians %d%d :\n", k, n);
-	fprintf(stderr, "\tx : ");
-	for (int i = 0; i < n; i++)
-		fprintf(stderr, "%g%c", x[i], i==n-1?'\n':' ');
-	fprintf(stderr, "\tg : ");
-	for (int i = 0; i < n; i++)
-		fprintf(stderr, "%d%c", g[i], i==n-1?'\n':' ');
+		assert(x[i] <= x[i+1]);
+	//fprintf(stderr, "\tupdating medians %d%d :\n", k, n);
+	//fprintf(stderr, "\tx : ");
+	//for (int i = 0; i < n; i++)
+	//	fprintf(stderr, "%g%c", x[i], i==n-1?'\n':' ');
+	//fprintf(stderr, "\tg : ");
+	//for (int i = 0; i < n; i++)
+	//	fprintf(stderr, "%d%c", g[i], i==n-1?'\n':' ');
 
 	for (int j = 0; j < k; j++)
 	{
@@ -150,8 +157,8 @@ void update_medians_of_each_group(float *m, int *g, int k, float *x, int n)
 			assert(a >= 0); assert(b >= 0);
 			assert(a < tn); assert(b < tn);
 			m[j] = (tx[a] + tx[b])/2;
-			fprintf(stderr, "\t\tnt a b m[%d] = %d %d %d %g\n",
-					j, tn, a, b, m[j]);
+			//fprintf(stderr, "\t\tnt a b m[%d] = %d %d %d %g\n",
+			//		j, tn, a, b, m[j]);
 		} else
 			m[j] = NAN;
 	}
@@ -304,20 +311,20 @@ static void float_xmedians(float *y, int dim_y, float *x, int n, float prec)
 {
 	for (int pre_k = 1; pre_k < dim_y; pre_k++)
 	{
-		fprintf(stderr,"xmedians of n = %d with pre_k = %d\n",n,pre_k);
+		//fprintf(stderr,"xmedians of n = %d with pre_k = %d\n",n,pre_k);
 		float_kmedians(y, dim_y, x, n, pre_k);
 		int k = y[0];
 		int group[n];
 		assign_each_point_to_nearest_center(group, y+1, k, x, n);
 		float acv = average_of_cluster_diq(group, y+1, k, x, n);
 		//float acv = average_of_cluster_variances(group, y+1, k, x, n);
-		fprintf(stderr, "...got k=%d acv=%g\n", k, acv);
-		for (int i = 0; i < n; i++)
-			fprintf(stderr, "...x[%d] = %g\n", i, x[i]);
-		for (int i = 0; i < n; i++)
-			fprintf(stderr, "...group[%d] = %d\n", i, group[i]);
-		for (int i = 0; i < 1+k; i++)
-			fprintf(stderr, "...y[%d] = %g\n", i, y[i]);
+		//fprintf(stderr, "...got k=%d acv=%g\n", k, acv);
+		//for (int i = 0; i < n; i++)
+		//	fprintf(stderr, "...x[%d] = %g\n", i, x[i]);
+		//for (int i = 0; i < n; i++)
+		//	fprintf(stderr, "...group[%d] = %d\n", i, group[i]);
+		//for (int i = 0; i < 1+k; i++)
+		//	fprintf(stderr, "...y[%d] = %g\n", i, y[i]);
 		if (acv < prec)
 			break;
 	}
@@ -370,8 +377,14 @@ static int main_xtry(int c, char *v[])
 	int k = y[0];
 	int group[n];
 	assign_each_point_to_nearest_center(group, y+1, k, x, n);
-	float acv = average_of_cluster_variances(group, y+1, k, x, n);
-	fprintf(stderr, "racv = %g\t", sqrt(acv));
+	if (f == float_xmeans) {
+		float acv = average_of_cluster_variances(group, y+1, k, x, n);
+		fprintf(stderr, "racv = %g\t", sqrt(acv));
+	}
+	if (f == float_xmedians) {
+		float acv = average_of_cluster_diq(group, y+1, k, x, n);
+		fprintf(stderr, "racv = %g\t", acv);
+	}
 	fprintf(stderr, "got %d centers (", k);
 	for (int i = 0; i < k; i++)
 		fprintf(stderr, "%g%c", y[1+i], i+1==k?')':' ');
