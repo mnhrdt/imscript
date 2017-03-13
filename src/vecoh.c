@@ -15,7 +15,7 @@ SMART_PARAMETER(PRECISION,10)
 SMART_PARAMETER_SILENT(NUMBER_OF_KMEANS_ITERATIONS,5)
 
 
-int compare_floats(const void *a, const void *b)
+static int compare_floats(const void *a, const void *b)
 {
 	const float *da = (const float *) a;
 	const float *db = (const float *) b;

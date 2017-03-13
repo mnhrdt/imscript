@@ -1,8 +1,8 @@
 #include <assert.h>
 #include <stdbool.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 #include "iio.h"
 
 #define xmalloc malloc
@@ -104,7 +104,7 @@ static void qauto(float *y, float *x, int w, int h, int pd,
 
 
 static char *help_string_name     = "qauto";
-static char *help_string_version  = "qauto 1.0\n\nWritten by eml\n";
+static char *help_string_version  = "qauto 1.0\n\nWritten by eml";
 static char *help_string_oneliner = "quantize an image into [0,255]";
 static char *help_string_usage    = "usage:\n\t"
 "qauto [-p 5] [-i] [-f]  [in [out]]";
@@ -130,21 +130,18 @@ static char *help_string_long     =
 " --help\t\tdisplay longer help message\n"
 "\n"
 "Examples:\n"
-" qauto in.tiff out.png\tQuantize an image by simplest color balance.\n"
-" qauto -i in.png out.png\tRemove color biases\n"
+" qauto in.tiff out.png          Quantize an image by simplest color balance.\n"
+" qauto -i in.png out.png        Remove color biases\n"
 "\n"
-"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>.\n"
+"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>."
 ;
-#include "help_stuff.c" // some functions that expect the strings above
-#include "pickopt.c" // function to extract hyphenated command line options
+#include "help_stuff.c" // functions that print the strings named above
+#include "pickopt.c"    // function to extract hyphenated command line options
 int main_qauto(int c, char *v[])
 {
 	// process "help" arguments
-	if (c == 2 && 0 == strcmp(v[1], "-?"))        return print_help(*v, 0);
-	if (c == 2 && 0 == strcmp(v[1], "-h"))        return print_help(*v, 1);
-	if (c == 2 && 0 == strcmp(v[1], "--help"))    return print_help(*v, 2);
-	if (c == 2 && 0 == strcmp(v[1], "--version")) return print_version();
-	if (c == 2 && 0 == strcmp(v[1], "--man"))     return do_man();
+	if (c == 2)
+		if_help_is_requested_print_it_and_exit_the_program(v[1]);
 
 	// extract named options
 	float parameter = atof(pick_option(&c, &v, "p", "5"));

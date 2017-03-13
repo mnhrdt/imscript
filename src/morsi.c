@@ -360,8 +360,58 @@ static int *build_Drec(float radius)
 #ifdef MORSI_TEST_MAIN
 #include <string.h>
 #include "iio.h"
+static char *help_string_name     = "morsi";
+static char *help_string_version  = "morsi 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "simple gray-scale morphology";
+static char *help_string_usage    = "usage:\n\t"
+"morsi {cross|square|disk5...} {erosion|dilation...} [in [out]]";
+static char *help_string_long     =
+"Morsi applies a gray-scale morphological operator to an image.\n"
+"\n"
+"You have to specify a structuring element and a morphological operation.\n"
+"There are no defaults.\n"
+"\n"
+"Usage: morsi ELEMENT OPERATION in out\n"
+"   or: morsi ELEMENT OPERATION in > out\n"
+"   or: cat in | morsi ELEMENT OPERATION > out\n"
+"\n"
+"Elements:\n"
+" cross       a cross of 5 pixels\n"
+" square      a square of 3x3 pixels\n"
+" diskR       a discrete disk of radius R (e.g., disk3.1)\n"
+" dyskR       the boundary of a discrete disk of radius R\n"
+" hrecW       a rectangle of size Wx1\n"
+" vrecH       a rectangle of size 1xH\n"
+" drecX       a 45-degree diagonal of X-pixels\n"
+" DrecX       a -45-degree diagonal of X-pixels\n"
+"\n"
+"Operations:\n"
+" erosion     min of neighboring pixels (smooth and darken)\n"
+" dilation    max of neighboring pixels (smooth and brighten)\n"
+" median      median of neighboring pixels (smooth)\n"
+" opening     erosion and dilation (remove small dark spots)\n"
+" closing     dilation and erosion (remove small bright spots)\n"
+" gradient    dilation minus erosion (find centered boundaries)\n"
+" igradient   image minus erosion (inner boundaries)\n"
+" egradient   dilation minus image (outer boundaries)\n"
+" laplacian   difference between outer and inner gradient (signed boundaries)\n"
+" enhance     image minus laplacian (sharpen boundaries and details)\n"
+" tophat      image minus opening (select bright blobs)\n"
+" bothat      closing minus image (select dark blobs)\n"
+" strange     closing minus opening (measure local oscillation)\n"
+"\n"
+"Examples:\n"
+" morsi cross erosion i.png o.png    Erode by a \"cross\" structuring element\n"
+" morsi disk4.2 median i.png o.png   Median filtering of radius 4.2\n"
+"\n"
+"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>."
+;
+#include "help_stuff.c"
 int main_morsi(int c, char **v)
 {
+	// process "help" arguments
+	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
+
 	// data for available structuring elements
 	int cross[] = {5,0,  0,0, -1,0, 0,0, 1,0, 0,-1, 0,1 };
 	int square[] = {9,0, 0,0, -1,-1,-1,0,-1,1, 0,-1,0,0,0,1, 1,-1,1,0,1,1};

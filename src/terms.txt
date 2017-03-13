@@ -1,0 +1,39 @@
+Your moral quality depends upon the terms used to describe your activities.
+
+
+A: program, algorithm, code
+B: module, project, application
+C: solution, framework, product
+
+A: function
+B: method
+C: domain logic
+
+A: writer, author
+B: copyright holder
+C: creator
+
+A: programmer, hacker, coder, code monkey, computer keyboard operator
+B: developer
+C: data scientist, software engineer, architect
+
+A: text file with columns separated by spaces or tabs
+B: csv
+C: spreadsheet
+
+A: text file
+B: yaml, markdown, json
+C: xml, binary files
+
+A: struct
+B: typedef struct
+C: class
+
+
+
+Majority of "A": evertything is OK.
+
+Majority of "C": everything is OK, inside your bubble.
+
+Majority of "B": you are an abject pragmaticist that should be bullied
+mercilessly until coming into reason.

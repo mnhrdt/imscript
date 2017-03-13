@@ -1,1 +1,1 @@
-../src/help_stuff.c
+../../../src/help_stuff.c

@@ -13,7 +13,7 @@ DISABLE_FFTW3      = no
 
 # variables
 OBJ = iio.o fancy_image.o
-BIN = plambda vecov morsi downsa upsa ntiply censust dither \
+BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither \
       qauto qeasy \
       homwarp synflow backflow flowinv \
       nnint bdint amle simpois \
