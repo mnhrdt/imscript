@@ -406,7 +406,8 @@ static char *help_string_long     =
 "\n"
 "Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>."
 ;
-#include "help_stuff.c"
+#include "help_stuff.c" // functions that print the strings named above
+
 int main_morsi(int c, char **v)
 {
 	// process "help" arguments

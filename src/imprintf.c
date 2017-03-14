@@ -738,8 +738,67 @@ static void imprintf_2d(FILE *f, char *fmt, float *x, int w, int h, int pd)
 	print_printable_data(f, p);
 }
 
+
+static char *help_string_name     = "imprintf";
+static char *help_string_version  = "imprintf 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "print formatted data about an image";
+static char *help_string_usage    = "usage:\n\t"
+"imprintf format [image]";
+static char *help_string_long     =
+"Imprintf prints formatted data about the given image.\n"
+"\n"
+"The format string is echoed to standard output, and printf-like\n"
+"conversions are performed---in the context of the given image.\n"
+"\n"
+"Usage: imprintf FORMAT image\n"
+"   or: cat image | imprintf FORMAT\n"
+"\n"
+"Format conversions:\n"
+" %w %h %c       width, height, pixel dimension\n"
+" %N             number of pixels (%w * %h)\n"
+" %n             number of samples (%w * %h * %c)\n"
+" %P[x,y]        all samples of pixel (x,y)\n"
+" %p[x,y,l]      lth sample of pixel (x,y)\n"
+" %i %m %a       smallest, median, largest sample\n"
+" %v %s %r %e    average, sum, root mean square, average abs of all samples\n"
+" %I %M %A       smallest, median, largest pixel\n"
+" %V %S          average, sum of all pixels\n"
+" %q[n] %Q[n]    nth sample, nth pixel percentile\n"
+" %k %K          number of different samples, pixels\n"
+" %y             quantity of infinite samples\n"
+" %Y             quantity of NaN samples\n"
+"\n"
+"Escaped characters and magic:\n"
+" \\%         literal %                       \n"
+" \\n         newline                         \n"
+" \\t         tab                             \n"
+" \\\\         backslash                       \n"
+" ~f[~F]     set number format to %F (default F=\"%g\")\n"
+" ~s[F]      set vector separation to F (default F=\", \")\n"
+" ~~         literal ~                       \n"
+"\n"
+"Predefined format strings:\n"
+" @0         \"%w %h\\n\"\n"
+" @1         \"%wx%h\\n\"\n"
+" @2         \"%wx%h %c\\n\"\n"
+" @3         \"%wx%h %c\\n\"\n"
+" @4         \"%wx%h[%i %v %a] %c[%I %V %A]\\n\"\n"
+" @5         \"%wx%h[%k] %c[%K]\\n\"\n"
+" @9         \"(everything)\\n\"\n"
+"\n"
+"Examples:\n"
+" imprintf \"%w %h\\n\" a.png                    print the image dimensions\n"
+" imprintf \"width=%w heigth=%h\\n\" a.png       use a fancier format string\n"
+" imprintf @9 a.png                           show table with all data\n"
+"\n"
+"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>."
+;
+#include "help_stuff.c" // functions that print the strings named above
+
 int main_imprintf(int c, char *v[])
 {
+	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
+
 	if (c != 2 && c != 3) {
 		fprintf(stderr, "usage:\n\t%s format [image]\n", *v);
 		//                          0 1       2

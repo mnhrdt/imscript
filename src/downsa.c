@@ -5,39 +5,16 @@
 #include <math.h>
 #include "iio.h"
 
-
-#ifndef M_PI
-#define M_PI		3.14159265358979323846	/* pi */
-#endif
-
-#ifndef ODDP
-#define ODDP(x) ((x)&1)
-#endif
-#ifndef EVENP
-#define EVENP(x) (!((x)&1))
-#endif
-
 #include "fail.c"
 #include "xmalloc.c"
+#include "random.c"
 
 struct statistics_float {
 	float min, max, median, average, sample, variance, middle, laverage;
 };
 
-//SMART_PARAMETER_INT(STATISTIC_MEDIAN_BIAS,0)
-//SMART_PARAMETER_SILENT(STATISTIC_MIDDLE_BIAS,-1)
-
 #define STATISTIC_MEDIAN_BIAS 0
 #define STATISTIC_MIDDLE_BIAS -1
-
-static int randombounds(int a, int b)
-{
-	if (b < a)
-		return randombounds(b, a);
-	if (b == a)
-		return b;
-	return a + rand()%(b - a + 1);
-}
 
 static int compare_floats(const void *a, const void *b)
 {
@@ -64,7 +41,7 @@ static void statistics_getf_spoilable(struct statistics_float *s, float *f,
 	s->min = f[0];
 	s->max = f[n-1];
 	s->median = f[n/2-1];
-	if (EVENP(n))
+	if (0 == n % 2)
 	{
 		int mtype = STATISTIC_MEDIAN_BIAS;
 		switch(mtype)
@@ -154,8 +131,37 @@ void downsa2d(float *oy, float *ox, int w, int h, int pd, int n, int ty)
 	}
 }
 
+static char *help_string_name     = "downsa";
+static char *help_string_version  = "downsa 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "zoom-out by combining NxN pixels into one";
+static char *help_string_usage    = "usage:\n\t"
+"downsa {i|e|a|v|r|n|f} N [in [out]]";
+static char *help_string_long     =
+"Downsa zooms-out an image by aggregation of NxN pixel values.\n"
+"\n"
+"Usage: downsa RULE n in out\n"
+"   or: downsa RULE n in > out\n"
+"   or: cat in | downsa RULE n > out\n"
+"\n"
+"Rules:\n"
+" i     minimum\n"
+" a     maximum\n"
+" e     median\n"
+" v     average\n"
+" f     first\n"
+" r     random choice among the NxN values\n"
+" n     quantity of non-NANs\n"
+"\n"
+"Examples:\n"
+" downsa a 2 stars.png small_stars.png              morphological zoom-out\n"
+" cat big.png | blur g 1.6 | downsa f 2 > small     well-sampled zoom-out\n"
+"\n"
+"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>.";
+#include "help_stuff.c" // functions that print the strings named above
+
 int main_downsa(int c, char *v[])
 {
+	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
 	if (c != 5 && c != 4 && c != 3) {
 		fprintf(stderr,"usage:\n\t%s {i|e|a|v|r|f} n [in [out]]\n", *v);
 		//                         0        1      2  3   4
