@@ -13,151 +13,6 @@
 #include "marching_interpolation.c"
 #include "bicubic.c"
 
-#define FORI(n) for(int i=0;i<(n);i++)
-#define FORJ(n) for(int j=0;j<(n);j++)
-#define FORL(n) for(int l=0;l<(n);l++)
-
-
-// visualization parameters that can be applied to an arbitrary image
-struct closeup_params {
-	float black;
-	float white;
-	int cropbox[4];
-	int zoom;
-	int zoomtype;
-	int number_of_level_lines;
-	float *levels;
-	char *level_type;
-};
-
-static int bound(int a, int x, int b)
-{
-	fprintf(stderr, "bound %d %d %d\n", a, x, b);
-	assert(a <= b);
-	if (x < a) return a;
-	if (x > b) return b;
-	return x;
-}
-
-static float *crop(float *x, int w, int h, int pd, int c[4], int *ow, int *oh)
-{
-	int x0 = bound(0, c[0], w-1);
-	int y0 = bound(0, c[1], h-1);
-	int xf = bound(x0+1, c[2]==-1?w:c[2], w);
-	int yf = bound(y0+1, c[3]==-1?h:c[3], h);
-	int cw = xf - x0;
-	int ch = yf - y0;
-	float *y = xmalloc(cw*ch*pd*sizeof*y);
-	FORJ(ch) FORI(cw) FORL(pd)
-		y[(i + j*cw)*pd + l] = x[(x0 + i + (y0 + j)*w)*pd + l];
-	*ow = cw;
-	*oh = ch;
-	return y;
-}
-
-static void assert_rgb(double t[3])
-{
-	for (int i = 0; i < 3; i++)
-		assert(t[i] >= 0 && t[i] <= 1);
-}
-
-static void assert_hsv(double t[3])
-{
-	if (t[0] < 0 || t[0] >= 360) fail("queca %g\n", t[0]);
-	assert(t[0] >= 0 && t[0] < 360);
-	if (!(t[1] >= 0 && t[1] <= 1))
-		fail("CACA S = %g\n", t[1]);
-	assert(t[1] >= 0 && t[1] <= 1);
-	assert(t[2] >= 0 && t[2] <= 1);
-}
-
-static void rgb_to_hsv_doubles(double *out, double *in)
-{
-	assert_rgb(in);
-	double r, g, b, h, s, v, M, m;
-	r = in[0]; g = in[1]; b = in[2];
-
-	//printf("rgb %g,%g,%g...\n", r, g, b);
-
-	if (g >= r && g >= b) {
-		M = g;
-		m = fmin(r, b);
-		h = M == m ? 0 : 60*(b-r)/(M-m)+120;
-	}
-	else if (b >= g && b >= r) {
-		M = b;
-		m = fmin(r, b);
-		h = M == m ? 0 : 60*(r-g)/(M-m)+240;
-	}
-	else {
-		assert(r >= g && r >= b);
-		M = r;
-		if (g >= b) {
-			m = b;
-			h = M == m ? 0 : 60*(g-b)/(M-m)+0;
-		} else {
-			m = g;
-			h = M == m ? 0 : 60*(g-b)/(M-m)+360;
-		}
-	}
-
-	s = M == 0 ? 0 : (M - m)/M;
-	v = M;
-	h = fmod(h, 360);
-
-	//printf("\thsv %g,%g,%g\n", h, s, v);
-	out[0] = h; out[1] = s; out[2] = v;
-	assert_hsv(out);
-}
-
-static void get_hsv(float *outh, float *outs, float *outv, float x[3])
-{
-	double din[3] = {x[0]/255.0, x[1]/255.0, x[2]/255.0};
-	double dout[3];
-	rgb_to_hsv_doubles(dout, din);
-	if (outh) *outh = 255.0*dout[0]/360.0;
-	if (outs) *outs = 255.0*dout[1];
-	if (outv) *outv = 255.0*dout[2];
-}
-
-static float get_rgb_intensity(float x[3])
-{
-	return 0.299 * x[0] + 0.587 * x[1] + 0.114 * x[2];
-}
-
-// TODO: add more scalarization options here: CIELABs, XYZ, PCA ...
-static float *scalar(float *x, int w, int h, int pd, char *level_type)
-{
-	if (pd == 1) return x;
-	float *y = xmalloc(w * h * pd * sizeof*y);
-	if (false) { ;
-	} else if (pd == 3 && 0 == strcmp(level_type, "h")) {
-		FORI(w*h) get_hsv(y+i, NULL, NULL, x + i*pd);
-	} else if (pd == 3 && 0 == strcmp(level_type, "s")) {
-		FORI(w*h) get_hsv(NULL, y+i, NULL, x + i*pd);
-	} else if (pd == 3 && 0 == strcmp(level_type, "v")) {
-		FORI(w*h) get_hsv(NULL, NULL, y+i, x + i*pd);
-	} else if (pd == 3 && 0 == strcmp(level_type, "i")) {
-		FORI(w*h) y[i] = get_rgb_intensity(x + i*pd);
-	} else if (pd == 3 && 0 == strcmp(level_type, "r")) {
-		FORI(w*h) y[i] = x[i*pd];
-	} else if (pd == 3 && 0 == strcmp(level_type, "g")) {
-		FORI(w*h) y[i] = x[i*pd + 1];
-	} else if (pd == 3 && 0 == strcmp(level_type, "b")) {
-		FORI(w*h) y[i] = x[i*pd + 2];
-	} else if (isdigit(level_type[0])) {
-		int c = bound(0, atoi(level_type), pd-1);
-		FORI(w*h) y[i] = x[i*pd + c];
-	} else {
-		FORI(w*h) {
-			float m = 0;
-			FORL(pd) m += x[i*pd + l];
-			y[i] = m/pd;
-		}
-	}
-	return y;
-}
-
 static float getsample(float *x, int w, int h, int pd, int i, int j, int l)
 {
 	if (i < 0) i = 0;
@@ -239,15 +94,13 @@ static float interpolate_cell(float a, float b, float c, float d,
 static void interpolate_vec(float *out, float *x, int w, int h, int pd,
 		float p, float q, int m)
 {
-	//if (p < 0 || q < 0 || p+1 >= w || q+1 >= h) {
-	//	FORL(pd) out[l] = 0;
-	//} else
-		if (m == 3) {
+	if (m == 3) {
 		bicubic_interpolation(out, x, w, h, pd, p, q);
 	} else {
 		int ip = floor(p);
 		int iq = floor(q);
-		FORL(pd) {
+		for (int l = 0; l < pd; l++)
+		{
 			float a = getsample(x, w, h, pd, ip  , iq  , l);
 			float b = getsample(x, w, h, pd, ip  , iq+1, l);
 			float c = getsample(x, w, h, pd, ip+1, iq  , l);
@@ -265,179 +118,18 @@ float *zoom(float *x, int w, int h, int pd, int n, int zt,
 	int W = n*w;// - n;
 	int H = n*h;// - n;
 	float *y = xmalloc(W*H*pd*sizeof*y), nf = n;
-	FORJ(H) FORI(W) {
+	for (int j = 0; j < H; j++)
+	for (int i = 0; i < W; i++)
+	{
 		float tmp[pd];
 		interpolate_vec(tmp, x, w, h, pd, i/nf, j/nf, zt);
-		FORL(pd)
+		for (int l = 0; l < pd; l++)
 			setsample(y, W, H, pd, i, j, l, tmp[l]);
 	}
 
 	*ow = W;
 	*oh = H;
 	return y;
-}
-
-static float *zoom2(float *x, int w, int h, int pd, int n, int zt,
-		int *ow, int *oh)
-{
-	int W = n*w;// - n + 1;
-	int H = n*h;// - n + 1;
-	float *y = xmalloc(W*H*pd*sizeof*y), nf = n;
-	FORJ(H) FORI(W) {
-		float tmp[pd];
-		interpolate_vec(tmp, x, w, h, pd, i/nf, j/nf, zt);
-		FORL(pd)
-			setsample(y, W, H, pd, i, j, l, tmp[l]);
-	}
-
-	*ow = W;
-	*oh = H;
-	return y;
-}
-
-// draw a segment between two points
-static void traverse_segment(int px, int py, int qx, int qy,
-		void (*f)(int,int,void*), void *e)
-{
-	if (px == qx && py == qy)
-		f(px, py, e);
-	else if (qx + qy < px + py) // bad quadrants
-		traverse_segment(qx, qy, px, py, f, e);
-	else {
-		if (abs(qx - px) > qy - py) { // horitzontal
-			float slope = (qy - py); slope /= (qx - px);
-			assert(px < qx);
-			assert(fabs(slope) <= 1);
-			for (int i = 0; i < qx-px; i++)
-				f(i+px, lrint(py + i*slope), e);
-		} else { // vertical
-			float slope = (qx - px); slope /= (qy - py);
-			assert(abs(qy - py) >= abs(qx - px));
-			assert(py < qy);
-			assert(fabs(slope) <= 1);
-			for (int j = 0; j <= qy-py; j++)
-				f(lrint(px+j*slope), j+py, e);
-		}
-	}
-}
-
-static int hack_width;
-static int hack_height;
-
-static void red_fpixel(int x, int y, void *ii)
-{
-	if (x < 0 || y < 0 || x > hack_width || y > hack_height) return;
-	//float (**i)[3] = ii;
-	//i[y][x][0] = 255;
-	//i[y][x][1] = 0;
-	//i[y][x][2] = 0;
-	float *i = ii;
-	setsample(i, hack_width, hack_height, 3, x, y, 0, 255);
-	setsample(i, hack_width, hack_height, 3, x, y, 1, 0);
-	setsample(i, hack_width, hack_height, 3, x, y, 2, 0);
-}
-
-static void overlay_level_line_in_red(float *y, int n,
-		float *x, int w, int h, float t)
-{
-	hack_width = n*(w-1)+1;
-	hack_height = n*(h-1)+1;
-	int ns;
-	float (*s)[2][2] = marching_squares_whole_image_float(&ns, x, w, h, t);
-	for (int i = 0; i < ns; i++) {
-		traverse_segment(n*s[i][0][0], n*s[i][0][1],
-				n*s[i][1][0], n*s[i][1][1],
-				red_fpixel, y);
-	}
-	free(s);
-}
-
-static float *closeup(float *x, int w, int h, int pd, struct closeup_params *p,
-		int *ow, int *oh, int *opd)
-{
-	// crop the image
-	int cw, ch;
-	float *cx = crop(x, w, h, pd, p->cropbox, &cw, &ch);
-	iio_write_image_float_vec("/tmp/cropped.png", cx, cw, ch, pd);
-
-	// compute the scalar channel
-	float *scx = scalar(cx, cw, ch, pd, p->level_type);
-	iio_write_image_float_vec("/tmp/scalar.png", scx, cw, ch, 1);
-
-	// compute the zoomed image
-	int zcw, zch;
-	float *zcx = cx;
-	//if (p->zoom > 1)
-		zcx = zoom(cx, cw, ch, pd, p->zoom, p->zoomtype, &zcw, &zch);
-
-	// create output image
-	int out_w = zcw, out_h = zch, out_pd = pd;
-	float *out_x = zcx;
-	if (p->number_of_level_lines > 0 && pd == 3)
-		out_x = zcx;
-	if (p->number_of_level_lines > 0 && pd != 3) {
-		out_pd = 3;
-		out_x = xmalloc(out_w * out_h * 3 * sizeof*out_x);
-		FORJ(out_h) FORI(out_w) FORL(out_pd) {
-			float g = l<pd ?
-				getsample(zcx,zcw,zch,pd, i,j,l) :
-				getsample(zcx,zcw,zch,pd, i,j,pd-1);
-			setsample(out_x,out_w,out_h,out_pd, i,j,l, g);
-		}
-	}
-
-	// adjust contrast of output image
-	if (p->white || p->black) {
-		FORJ(out_h) FORI(out_w) FORL(out_pd) {
-			float g = getsample(out_x,out_w,out_h,out_pd, i,j,l);
-			g = floor(255 * (g - p->black)/(p->white - p->black));
-			if (g < 0) g = 0;
-			if (g > 255) g = 255;
-			setsample(out_x,out_w,out_h,out_pd, i,j,l, g);
-		}
-	}
-
-	// overlay level lines of "scalar" on output image
-	//if (p->number_of_level_lines) {
-	//}
-	FORI(p->number_of_level_lines) {
-		assert(out_pd == 3);
-		//fprintf(stderr, "pzoom = %d\n", p->zoom);
-		//fprintf(stderr, "cw = %d\n", cw);
-		//fprintf(stderr, "out_w = %d\n", out_w);
-		assert(p->zoom*(cw - 1) + 1 == out_w);
-		assert(p->zoom*(ch - 1) + 1 == out_h);
-		float lev = p->levels[i];
-		overlay_level_line_in_red(out_x, p->zoom, scx, cw, ch, lev);
-	}
-
-	// free temporary stuff
-
-	*ow = out_w;
-	*oh = out_h;
-	*opd = out_pd;
-
-	return out_x;
-}
-
-//static int parse_integers(int *t, int nmax, const char *s)
-//{
-//	int i = 0, w;
-//	while (i < nmax && 1 == sscanf(s, "%d %n", t + i, &w)) {
-//		i += 1;
-//		s += w;
-//	}
-//	return i;
-//}
-
-static int parse_floats(float *t, int nmax, const char *s)
-{
-	int i = 0, w;
-	while (i < nmax && 1 == sscanf(s, "%g %n", t + i, &w)) {
-		i += 1;
-		s += w;
-	}
-	return i;
 }
 
 int main_upsa(int c, char *v[])
@@ -445,7 +137,7 @@ int main_upsa(int c, char *v[])
 	if (c < 3 || c > 5) {
 		fprintf(stderr, "usage:\n\t%s zoomf zoomtype [in [out]]\n", *v);
 		//                            1     2         3   4
-		return EXIT_FAILURE;
+		return 1;
 	}
 
 	int zf = atoi(v[1]);
@@ -464,7 +156,7 @@ int main_upsa(int c, char *v[])
 	free(x);
 	free(y);
 
-	return EXIT_SUCCESS;
+	return 0;
 }
 
 #ifndef HIDE_ALL_MAINS
