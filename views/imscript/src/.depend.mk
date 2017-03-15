@@ -1,8 +1,11 @@
 plambda: plambda.c smapa.h fail.c xmalloc.c random.c parsenumbers.c \
  colorcoordsf.c getpixel.c iio.h
 vecov: vecov.c iio.h fail.c xmalloc.c random.c smapa.h pickopt.c
-morsi: morsi.c iio.h
-downsa: downsa.c iio.h fail.c xmalloc.c
+veco: veco.c iio.h fail.c xmalloc.c random.c pickopt.c
+vecoh: vecoh.c iio.h fail.c xmalloc.c random.c modes_detector.c smapa.h \
+ pickopt.c
+morsi: morsi.c iio.h help_stuff.c
+downsa: downsa.c iio.h fail.c xmalloc.c random.c help_stuff.c
 upsa: upsa.c iio.h fail.c marching_squares.c marching_interpolation.c \
  bicubic.c getpixel.c
 ntiply: ntiply.c iio.h
@@ -12,7 +15,7 @@ qauto: qauto.c iio.h help_stuff.c pickopt.c
 qeasy: qeasy.c iio.h
 homwarp: homwarp.c extrapolators.c bilinear_interpolation.c \
  marching_interpolation.c bicubic_gray.c spline.c iio.h xmalloc.c fail.c \
- parsenumbers.c pickopt.c
+ parsenumbers.c help_stuff.c pickopt.c
 synflow: synflow.c iio.h xmalloc.c fail.c synflow_core.c getpixel.c \
  marching_interpolation.c vvector.h homographies.c smapa.h
 backflow: backflow.c iio.h fail.c xmalloc.c getpixel.c bicubic.c \
@@ -25,7 +28,7 @@ simpois: simpois.c cleant_cgpois.c minicg.c smapa.h iio.h pickopt.c
 ghisto: ghisto.c iio.h xmalloc.c fail.c smapa.h
 contihist: contihist.c xfopen.c fail.c xmalloc.c iio.h
 fontu: fontu.c xmalloc.c fail.c xfopen.c dataconv.c iio.h pickopt.c
-imprintf: imprintf.c iio.h
+imprintf: imprintf.c iio.h help_stuff.c
 pview: pview.c iio.h fail.c xmalloc.c xfopen.c parsenumbers.c \
  drawsegment.c pickopt.c smapa.h random.c
 viewflow: viewflow.c iio.h fail.c drawsegment.c colorcoordsf.c \

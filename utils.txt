@@ -23,6 +23,8 @@ CORE: generic tools for image processing
 	morsi:    elementary gray-level morphological operations
 	simpois:  poisson and bilaplacian iterative solvers
 	imgerr:   compare two images (obsoleted by plambda+imprintf)
+	qeasy:    quantize an image into [0,255], hand-selected saturation
+	qauto:    quantize an image into [0,255], automatic saturation
 	iion:     copy (useful for converting between formats)
 
 

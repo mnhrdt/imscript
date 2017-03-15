@@ -364,9 +364,10 @@ static int main_xtry(int c, char *v[])
 
 	char * operation_name = v[1];
 	void (*f)(float*,int,float*,int,float) = NULL;
-	if (0 == strcmp(operation_name, "kmeans"))   f = float_xmeans;
-	if (0 == strcmp(operation_name, "kmedians")) f = float_xmedians;
-	if (!f) return fprintf(stderr, "unrecognized operation \"%s\"\n",
+	if (0==strcmp(operation_name,"kmeans"))    f=float_xmeans;
+	if (0==strcmp(operation_name,"kmedians"))  f=float_xmedians;
+	if (0==strcmp(operation_name,"contrario")) f=acontrario_modes_detector;
+	if (!f) return fprintf(stderr, "xunrecognized operation \"%s\"\n",
 				operation_name);
 
 	int n = c - 2;
@@ -418,10 +419,6 @@ int main_vecoh(int c, char *v[])
 	}
 	int n = c - 2;
 	char *operation_name = v[1];
-	//void (*f)(float*,float*,int,int) = NULL;
-	//if (0 == strcmp(operation_name, "kmeans")) f = float_kmeans;
-	//if (0 == strcmp(operation_name, "modes"))  f = float_modes;
-	//if (!f) fail("unrecognized operation \"%s\"", operation_name);
 	float *x[n];
 	int w[n], h[n], pd[n];
 	for (int i = 0; i < n; i++)
@@ -432,9 +429,9 @@ int main_vecoh(int c, char *v[])
 	}
 
 	void (*f)(float*,int,float*,int,float) = NULL;
-	if (0 == strcmp(operation_name, "kmeans"))   f = float_xmeans;
-	if (0 == strcmp(operation_name, "kmedians")) f = float_xmedians;
-	if (0 == strcmp(operation_name, "contrario")) f = acontrario_modes_detector;
+	if (0==strcmp(operation_name, "kmeans"))    f=float_xmeans;
+	if (0==strcmp(operation_name, "kmedians"))  f=float_xmedians;
+	if (0==strcmp(operation_name, "contrario")) f=acontrario_modes_detector;
 	if (!f) return fprintf(stderr, "unrecognized operation \"%s\"\n",
 				operation_name);
 
