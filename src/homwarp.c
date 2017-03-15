@@ -54,6 +54,8 @@ int homwarp(float *X, int W, int H, double M[9], float *x,
 	if (o == 0) u = nearest_neighbor_interpolator;
 	if (o == 1) u = marching_interpolation_at;
 	if (o == 2) u = bilinear_interpolation_at;
+	if (o ==-2) u = quilez3_interpolation_at;
+	if (o ==-4) u = quilez5_interpolation_at;
 
 	for (int j = 0; j < H; j++)
 	for (int i = 0; i < W; i++)
@@ -70,7 +72,7 @@ int shomwarp(float *X, int W, int H, double M[9], float *x,
 		int w, int h, int o)
 {
 	// if low order-interpolation, evaluate right away
-	if (o == 0 || o == 1 || o == 2 || o == -3)
+	if (o == 0 || o == 1 || o == 2 || o == -2 || o == -3)
 		return homwarp(X, W, H, M, x, w, h, o);
 
 	// otherwise, pre-filtering is required
@@ -92,14 +94,69 @@ int shomwarp(float *X, int W, int H, double M[9], float *x,
 	return 0;
 }
 
+// now begins the main function of the CLI interface
+static char *help_string_name     = "homwarp";
+static char *help_string_version  = "homwarp 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "warp an image by an homography";
+static char *help_string_usage    = "usage:\n\t"
+"homwarp [-i] [-o ORDER] HOMOGRAPHY [W H [in [out]]]";
+static char *help_string_long     =
+"Homwarp resamples an image according to an homography.\n"
+"\n"
+"A new image is created whose pixel values are sampled at the positions\n"
+"specified by an homographic transform.  No fancy filtering is performed,\n"
+"thus this program is not appropriate for zooming-out images as it will\n"
+"introduce a lot of aliasing.\n"
+"\n"
+"The only required parameter is HOMOGRAPHY, which is a string that specifies\n"
+"the homographic transform (either a single string with 8 numbers or a\n"
+"filename that contains them).  Optionally, the user can also specify the\n"
+"desired width and height of the output image (by default, the same as the\n"
+"input image), and the input/output files (by default, stdin/stdout).\n"
+"\n"
+"Usage: homwarp HOMOGRAPHY < in > out\n"
+"   or: homwarp HOMOGRAPHY WIDTH HEIGHT < in > out\n"
+"   or: homwarp HOMOGRAPHY WIDTH HEIGTH in > out\n"
+"   or: homwarp HOMOGRAPHY WIDTH HEIGTH in out\n"
+"\n"
+"Options:\n"
+" -i        use the inverse homography\n"
+" -o ORDER  choose a different interpolation method (default = -3)\n"
+" -h        display short help message\n"
+" --help    display longer help message\n"
+"\n"
+"Homography:\n"
+" \"a b p c d q r s t\"\tread the 9 coefficients of the matrix from a string\n"
+" homography.txt\tread the 9 coefficients of the matrix from a file\n"
+"\n"
+"Order:\n"
+" 0\tnearest neighbor interpolation\n"
+" 1\tpiecewise linear interpolation\n"
+" 2\tbilinear interpolation\n"
+" -3\tbicubic interpolation\n"
+" -2\tcubic faded bilinear interpolation (a la Inigo Quilez)\n"
+" -4\tquintic faded bilinear interpolation (a la Inigo Quilez)\n"
+" 3,5,7\tspline of order 3,5 or 7\n"
+"\n"
+"Examples:\n"
+" homwarp \"1 0 X 0 1 Y 0 0 1\" W H < in > out\tcrop at (X,Y) of size WxH\n"
+" homwarp \"-1 0 640 0 1 0 0 0 1\" < in > out\thoriz. flip of a 640x480 image\n"
+" homwarp \"[-1,0,640;0,1,0;0,0,1];\" < in > out\tnon-numeric chars. are ignored\n"
+" homwarp homography.txt < in > out          \tread homography from file\n"
+"\n"
+"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>."
+;
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "iio.h"
 #include "xmalloc.c"
 #include "parsenumbers.c"
+#include "help_stuff.c"
 #include "pickopt.c"
 int main_homwarp(int c, char *v[])
 {
+	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
 	bool do_invert = pick_option(&c, &v, "i", NULL);
 	int order = atoi(pick_option(&c, &v, "o", "-3"));
 	if (c != 2 && c != 4 && c != 5 && c != 6)

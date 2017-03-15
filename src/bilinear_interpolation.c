@@ -9,6 +9,18 @@ static float evaluate_bilinear_cell(float a, float b, float c, float d,
 	return r;
 }
 
+// http://www.iquilezles.org/www/articles/texture/texture.htm
+static float quilez_fade_cubic(float x)
+{
+	return x * x * (3 - 2 * x);
+}
+
+static float quilez_fade_quintic(float x)
+{
+	return x * x * x * (6 * x * x - 15 * x + 10);
+}
+
+
 //static float getsample(float *fx, int w, int h, int pd, int i, int j, int l)
 //{
 //	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
@@ -65,5 +77,33 @@ static float bilinear_interpolation_at(float *x, int w, int h, float p, float q)
 	float c = getsamplec(x, w, h, 1, ip  , iq+1, 0);
 	float d = getsamplec(x, w, h, 1, ip+1, iq+1, 0);
 	float r = evaluate_bilinear_cell(a, b, c, d, p-ip, q-iq);
+	return r;
+}
+
+static float quilez3_interpolation_at(float *x, int w, int h, float p, float q)
+{
+	int ip = p;
+	int iq = q;
+	float a = getsamplec(x, w, h, 1, ip  , iq  , 0);
+	float b = getsamplec(x, w, h, 1, ip+1, iq  , 0);
+	float c = getsamplec(x, w, h, 1, ip  , iq+1, 0);
+	float d = getsamplec(x, w, h, 1, ip+1, iq+1, 0);
+	float fp = quilez_fade_cubic(p - ip);
+	float fq = quilez_fade_cubic(q - iq);
+	float r = evaluate_bilinear_cell(a, b, c, d, fp, fq);
+	return r;
+}
+
+static float quilez5_interpolation_at(float *x, int w, int h, float p, float q)
+{
+	int ip = p;
+	int iq = q;
+	float a = getsamplec(x, w, h, 1, ip  , iq  , 0);
+	float b = getsamplec(x, w, h, 1, ip+1, iq  , 0);
+	float c = getsamplec(x, w, h, 1, ip  , iq+1, 0);
+	float d = getsamplec(x, w, h, 1, ip+1, iq+1, 0);
+	float fp = quilez_fade_quintic(p - ip);
+	float fq = quilez_fade_quintic(q - iq);
+	float r = evaluate_bilinear_cell(a, b, c, d, fp, fq);
 	return r;
 }

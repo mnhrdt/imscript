@@ -24,6 +24,6 @@ static void if_help_is_requested_print_it_and_exit_the_program(char *s)
 	if (!strcmp(s, "--help"))    exit(0*puts(help_string_long));
 	if (!strcmp(s, "--version")) exit(0*puts(help_string_version));
 	if (!strcmp(s, "--man"))     exit(do_man(0));
-	if (!strcmp(s, "--rawman"))  exit(do_man(1));
+	if (!strcmp(s, "--manraw"))  exit(do_man(1));
 }
 
