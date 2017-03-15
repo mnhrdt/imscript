@@ -9,6 +9,7 @@
 #include "fail.c"
 #include "xmalloc.c"
 #include "random.c"
+#include "modes_detector.c"
 
 #include "smapa.h"
 SMART_PARAMETER(PRECISION,10)
@@ -411,8 +412,8 @@ int main_vecoh(int c, char *v[])
 	char *filename_out = pick_option(&c, &v, "o", "-");
 	if (c < 3) {
 		fprintf(stderr,
-		"usage:\n\t%s {kmeans|kmedians} [v1 ...] [-o out]\n", *v);
-		//          0  1              2  3
+		"usage:\n\t%s {kmeans|kmedians|contrario} [v1 ...] [-o out]\n", *v);
+		//          0  1                            2  3
 		return 1;
 	}
 	int n = c - 2;
@@ -433,6 +434,7 @@ int main_vecoh(int c, char *v[])
 	void (*f)(float*,int,float*,int,float) = NULL;
 	if (0 == strcmp(operation_name, "kmeans"))   f = float_xmeans;
 	if (0 == strcmp(operation_name, "kmedians")) f = float_xmedians;
+	if (0 == strcmp(operation_name, "contrario")) f = acontrario_modes_detector;
 	if (!f) return fprintf(stderr, "unrecognized operation \"%s\"\n",
 				operation_name);
 
