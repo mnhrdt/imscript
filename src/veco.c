@@ -144,30 +144,62 @@ static float float_pick(float *x, int n)
 
 typedef bool (*isgood_t)(float);
 
-static bool isgood_finite(float x)
-{
-	return isfinite(x);
-}
+static bool isgood_finite(float x) { return isfinite(x); }
+static bool isgood_always(float x) { return true; }
+static bool isgood_numeric(float x) { return !isnan(x); }
+static bool isgood_nonzero(float x) { return x != 0; }
+static bool isgood_positive(float x) { return x >= 0; }
+static bool isgood_negative(float x) { return x < 0; }
 
-static bool isgood_always(float x)
-{
-	return true;
-}
-
-static bool isgood_numeric(float x)
-{
-	return !isnan(x);
-}
-
+static char *help_string_name     = "veco";
+static char *help_string_version  = "veco 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "combine several scalar images into one";
+static char *help_string_usage    = "usage:\n\t"
+"veco {sum|min|max|mul|med|...} in1 in2 ... {> out|-o out}";
+static char *help_string_long     =
+"Veco combines several scalar images by a pixelwise operation\n"
+"\n"
+"Usage: veco OPERATION in1 in2 in3 ... > out\n"
+"   or: veco OPERATION in1 in2 in3 ... -o out\n"
+"\n"
+"Options:\n"
+" -o file      use a named output file instead of stdout\n"
+" -g GOODNESS  use a specific GOODNESS criterion for discarding samples\n"
+"\n"
+"Operations:\n"
+" min          minimum value of the good samples\n"
+" max          maximum value of the good samples\n"
+" avg          average of the good samples\n"
+" sum          sum of the good samples\n"
+" med          medoid of the good samples (the central sample, rounding down)\n"
+" medv         median of the good samples (average of 1 or 2 central samples)\n"
+" mod          mode of the good samples (the value that appears more times)\n"
+" cnt          number of good samples\n"
+" mul,prod     product of all good samples\n"
+" first        the first good sample\n"
+" rnd          a randomly chosen good sample\n"
+"Goodness criteria:\n"
+" numeric      whether the sample is not NAN, this is the default\n"
+" finite       whether the sample is a finite number\n"
+" always       consider all samples regardless of their value\n"
+" nonzero      whether the sample is numeric and not 0 or -0\n"
+" positive     whether the sample is >= 0\n"
+"\n"
+"Examples:\n"
+" veco avg i*.png -o avg.png     Compute the average of a bunch of images\n"
+"\n"
+"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>."
+;
+#include "help_stuff.c"
 #include "pickopt.c"
-
 int main_veco(int c, char *v[])
 {
-	int gpar = atoi(pick_option(&c, &v, "g", "1"));
+	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
+	char *goodness =     pick_option(&c, &v, "g", "numeric");
 	char *filename_out = pick_option(&c, &v, "o", "-");
 	if (c < 3) {
 		fprintf(stderr,
-		"usage:\n\t%s {sum|min|max|avg|mul|med] [v1 ...] > out\n", *v);
+		"usage:\n\t%s {sum|min|max|avg|mul|med} [v1 ...] > out\n", *v);
 		//          0  1                          2  3
 		return EXIT_FAILURE;
 	}
@@ -194,10 +226,12 @@ int main_veco(int c, char *v[])
 	}
 	if (!f) fail("unrecognized operation \"%s\"", operation_name);
 	bool (*isgood)(float) = NULL;
-	if (0 == gpar) isgood = isgood_finite;
-	if (1 == gpar) isgood = isgood_numeric;
-	if (2 == gpar) isgood = isgood_always;
-	if (!isgood) fail("unrecognized goodness %d", gpar);
+	if (0 == strcmp(goodness, "finite"))   isgood = isgood_finite;
+	if (0 == strcmp(goodness, "numeric"))  isgood = isgood_numeric;
+	if (0 == strcmp(goodness, "always"))   isgood = isgood_always;
+	if (0 == strcmp(goodness, "nonzero"))  isgood = isgood_nonzero;
+	if (0 == strcmp(goodness, "positive")) isgood = isgood_positive;
+	if (!isgood) fail("unrecognized goodness \"%s\"", goodness);
 	float *x[n];
 	int w[n], h[n];
 	for (int i = 0; i < n; i++)
