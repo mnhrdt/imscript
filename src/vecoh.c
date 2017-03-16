@@ -56,7 +56,7 @@ static float average_of_cluster_diq(
 		int *group, float *mean, int k,
 		float *x, int n)
 {
-	mean;
+	(void)mean;
 	if (!k) return 0;
 	float q25[k], q75[k];
 
