@@ -11,6 +11,7 @@
 #include "random.c"
 #include "modes_detector.c"
 
+// TODO: remove these environment variables, use explicit options instead
 #include "smapa.h"
 SMART_PARAMETER(PRECISION,10)
 SMART_PARAMETER_SILENT(NUMBER_OF_KMEANS_ITERATIONS,5)
@@ -403,11 +404,44 @@ static bool isgood(float *x, int n)
 	return true;
 }
 
+static char *help_string_name     = "vecoh";
+static char *help_string_version  = "vecoh 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "pixelwise clustering of scalar images";
+static char *help_string_usage    = "usage:\n\t"
+"vecoh {kmeans|kmedians|contrario} in1 in2 ... {> out|-o out}";
+static char *help_string_long     =
+"Vecov computes pixelwise clusters defined by several scalar images.\n"
+"\n"
+"The input is a collection of scalar (gray-level) images of the same size.\n"
+"The output is a single image of 8-dimensional pixels.  The components of\n"
+"output pixels are organized as follows:\n"
+"x[0]=number of modes, x[1]=first mode, x[2]=second mode or NAN, etc.\n"
+"\n"
+"Usage: vecoh OPERATION in1 in2 in3 ... > out\n"
+"   or: vecoh OPERATION in1 in2 in3 ... -o out\n"
+"\n"
+"Options:\n"
+" -o file      use a named output file instead of stdout\n"
+" -x NUMS      instead of images, compute clustering of the given numbers\n"
+"\n"
+"Operations:\n"
+" kmeans          shortest vector in euclidean norm\n"
+" kmedians          longest vector in euclidean norm\n"
+" contrario          average of vectors\n"
+"\n"
+"Examples:\n"
+" vecoh avg i*.png -o avg.png     Compute the average of a bunch of images\n"
+"\n"
+"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>."
+;
+
+#include "help_stuff.c"
 #include "pickopt.c"
 SMART_PARAMETER_SILENT(VECOH_VERBOSE,0)
 // main main: compute the modes of a series of images
 int main_vecoh(int c, char *v[])
 {
+	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
 	if (pick_option(&c, &v, "t", 0)) return main_ttry(c, v);
 	if (pick_option(&c, &v, "x", 0)) return main_xtry(c, v);
 	char *filename_out = pick_option(&c, &v, "o", "-");

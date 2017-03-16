@@ -203,10 +203,42 @@ static bool isgood(float *x, int n)
 	return true;
 }
 
+static char *help_string_name     = "vecov";
+static char *help_string_version  = "vecov 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "combine several vector images into one";
+static char *help_string_usage    = "usage:\n\t"
+"vecov {sum|avg|med|weisz|modc|...} in1 in2 ... {> out|-o out}";
+static char *help_string_long     =
+"Vecov combines several vector-valued images by a pixelwise operation\n"
+"\n"
+"Usage: vecov OPERATION in1 in2 in3 ... > out\n"
+"   or: vecov OPERATION in1 in2 in3 ... -o out\n"
+"\n"
+"Options:\n"
+" -o file      use a named output file instead of stdout\n"
+"\n"
+"Operations:\n"
+" min          shortest vector in euclidean norm\n"
+" max          longest vector in euclidean norm\n"
+" avg          average of vectors\n"
+" sum          sum of vectors\n"
+" med          medoid of vectors\n"
+" weisz        geometric median (by weszfeld algorithm)\n"
+" modc         componentwise mode (with 256 bins of size 1)\n"
+" mul          componentwise product of vectors\n"
+"\n"
+"Examples:\n"
+" veco avg i*.png -o avg.png     Compute the average of a bunch of images\n"
+"\n"
+"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>."
+;
+
+#include "help_stuff.c"
 #include "pickopt.c"
 
 int main_vecov(int c, char *v[])
 {
+	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
 	char *filename_out = pick_option(&c, &v, "o", "-");
 	if (c < 3) {
 		fprintf(stderr,
