@@ -88,7 +88,7 @@ static void fill_palette_with_nodes(struct palette *p, float *n, int nn)
 		int idxnext = factor * (i+1);
 		assert(idxi <= idxnext);
 		assert(idxnext < PALSAMPLES);
-		for (int j = 0; j < (idxnext-idxi); j++)
+		for (int j = 0; j <= (idxnext-idxi); j++)
 		{
 			float a = j*1.0/(idxnext - idxi);
 			p->t[3*(idxi+j)+0] = (1-a)*n[4*i+1] + a*n[4*(i+1)+1];
@@ -115,6 +115,17 @@ static float nodes_cocoterrain[] = {
 	5,   0, 255,   0, // green
 	6, 170,  84,   0, // brown
 	7, 255, 255, 255, // white
+};
+
+static float nodes_dem[] = {
+      0       ,  0       , 96.9994  , 70.9997  ,  
+      2.6010  , 16.0012  ,121.9997  , 46.9990 ,
+      26.0100 , 231.9990 , 215.0007 , 125.0010,
+      62.4495 , 160.9993 ,  67.0012 ,        0,
+      88.4595 , 158.0006 ,        0 ,        0,
+      145.7070,  109.9993,  109.9993,  109.9993,
+      208.1565,  255.0000,  255.0000,  255.0000,
+      255.0000,  255.0000,  255.0000,  255.0000,
 };
 
 static float nodes_nice[] = {
@@ -169,6 +180,9 @@ static void fill_palette(struct palette *p, char *s, float m, float M)
 	else if (0 == strcmp(s, "cocoterrain")) {
 		set_node_positions_linearly(nodes_cocoterrain, 7, m, M);
 		fill_palette_with_nodes(p, nodes_cocoterrain, 7);
+   } else if (0 == strcmp(s, "dem")) {
+		set_node_positions_linearly(nodes_dem, 8, m, M);
+		fill_palette_with_nodes(p, nodes_dem, 8);
 	} else if (0 == strcmp(s, "nice")) {
 		set_node_positions_linearly(nodes_nice, 3, m, M);
 		fill_palette_with_nodes(p, nodes_nice, 3);
