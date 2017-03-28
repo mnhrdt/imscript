@@ -98,6 +98,10 @@ static void fill_palette_with_nodes(struct palette *p, float *n, int nn)
 	}
 	p->m = n[0];
 	p->M = n[4*(nn-1)];
+
+	// dirty hack: copy the penultimate position of the palette to the last
+	for (int j = 0; j < 3; j++)
+		p->t[3*(PALSAMPLES-1)+j] = p->t[3*(PALSAMPLES-2)+j];
 }
 
 static void set_node_positions_linearly(float *n, int nn, float m, float M)
