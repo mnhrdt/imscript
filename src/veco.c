@@ -94,6 +94,41 @@ static float float_mod(float *x, int n)
 	return mi;
 }
 
+static float float_harmonic(float *x, int n)
+{
+	long double r = 0;
+	for (int i = 0; i < n; i++)
+		r += 1/x[i];
+	return n/r;
+}
+
+static float float_euclidean(float *x, int n)
+{
+	long double r = 0;
+	for (int i = 0; i < n; i++)
+		r = hypot(r, x[i]);
+	return r/sqrt(n);
+}
+
+static float float_geometric(float *x, int n)
+{
+	long double r = 1;
+	for (int i = 0; i < n; i++)
+		r *= x[i];
+	return pow(r, 1.0/n);
+}
+
+static float float_holder(float *x, int n)
+{
+	static float p = 1;
+	if (n == -1)
+		p = *x;
+	long double r = 0;
+	for (int i = 0; i < n; i++)
+		r += pow(x[i], p);
+	return pow(r/n, 1/p);
+}
+
 #ifndef EVENP
 #define EVENP(x) (!((x)&1))
 #endif
@@ -165,6 +200,7 @@ static char *help_string_long     =
 "Options:\n"
 " -o file      use a named output file instead of stdout\n"
 " -g GOODNESS  use a specific GOODNESS criterion for discarding samples\n"
+" -x NUMS      instead of images, combine the given numbers\n"
 "\n"
 "Operations:\n"
 " min          minimum value of the good samples\n"
@@ -175,9 +211,14 @@ static char *help_string_long     =
 " medv         median of the good samples (average of 1 or 2 central samples)\n"
 " mod          mode of the good samples (the value that appears more times)\n"
 " cnt          number of good samples\n"
-" mul,prod     product of all good samples\n"
+" mul          product of all good samples\n"
 " first        the first good sample\n"
 " rnd          a randomly chosen good sample\n"
+" qX           Xth percentile\n"
+" HP           Pth Holder norm\n"
+" euc          euclidean (quadratic) norm\n"
+" geo          geometric mean\n"
+" har          harmonic mean\n"
 "Goodness criteria:\n"
 " numeric      whether the sample is not NAN, this is the default\n"
 " finite       whether the sample is a finite number\n"
@@ -195,6 +236,7 @@ static char *help_string_long     =
 int main_veco(int c, char *v[])
 {
 	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
+	bool use_numbers =   pick_option(&c, &v, "x", 0);
 	char *goodness =     pick_option(&c, &v, "g", "numeric");
 	char *filename_out = pick_option(&c, &v, "o", "-");
 	if (c < 3) {
@@ -218,10 +260,18 @@ int main_veco(int c, char *v[])
 	if (0 == strcmp(operation_name, "medi"))   f = float_med;
 	if (0 == strcmp(operation_name, "medv"))   f = float_medv;
 	if (0 == strcmp(operation_name, "rnd"))   f = float_pick;
+	if (0 == strcmp(operation_name, "euc"))   f = float_euclidean;
+	if (0 == strcmp(operation_name, "geo"))   f = float_geometric;
+	if (0 == strcmp(operation_name, "har"))   f = float_harmonic;
 	if (0 == strcmp(operation_name, "first")) f = float_first;
 	if (*operation_name == 'q') {
 		float p = atof(1 + operation_name);
 		f = float_percentile;
+		f(&p, -1);
+	}
+	if (*operation_name == 'M') {
+		float p = atof(1 + operation_name);
+		f = float_holder;
 		f(&p, -1);
 	}
 	if (!f) fail("unrecognized operation \"%s\"", operation_name);
@@ -232,25 +282,38 @@ int main_veco(int c, char *v[])
 	if (0 == strcmp(goodness, "nonzero"))  isgood = isgood_nonzero;
 	if (0 == strcmp(goodness, "positive")) isgood = isgood_positive;
 	if (!isgood) fail("unrecognized goodness \"%s\"", goodness);
-	float *x[n];
-	int w[n], h[n];
-	for (int i = 0; i < n; i++)
-		x[i] = iio_read_image_float(v[i+2], w + i, h + i);
-	for (int i = 0; i < n; i++) {
-		if (w[i] != *w || h[i] != *h)
-			fail("%dth image size mismatch\n", i);
-	}
-	float (*y) = xmalloc(*w * *h * sizeof*y);
-	for (int i = 0; i < *w * *h; i++)
-	{
+	if (use_numbers) {
+		float x[n];
+		for (int i = 0; i < n; i++)
+			x[i] = atof(v[i+2]);
 		float tmp[n];
 		int ngood = 0;
-		for (int j = 0; j < n; j++)
-			if (isgood(x[j][i]))
-				tmp[ngood++] = x[j][i];
-		y[i] = f(tmp, ngood);
+		for (int i = 0; i < n; i++)
+			if (isgood(x[i]))
+				tmp[ngood++] = x[i];
+		float y = f(tmp, ngood);
+		printf("%g\n", y);
+	} else {
+		float *x[n];
+		int w[n], h[n];
+		for (int i = 0; i < n; i++)
+			x[i] = iio_read_image_float(v[i+2], w + i, h + i);
+		for (int i = 0; i < n; i++) {
+			if (w[i] != *w || h[i] != *h)
+				fail("%dth image size mismatch\n", i);
+		}
+		float (*y) = xmalloc(*w * *h * sizeof*y);
+		for (int i = 0; i < *w * *h; i++)
+		{
+			float tmp[n];
+			int ngood = 0;
+			for (int j = 0; j < n; j++)
+				if (isgood(x[j][i]))
+					tmp[ngood++] = x[j][i];
+			y[i] = f(tmp, ngood);
+		}
+		iio_write_image_float(filename_out, y, *w, *h);
 	}
-	iio_write_image_float(filename_out, y, *w, *h);
 	return EXIT_SUCCESS;
 }
 
