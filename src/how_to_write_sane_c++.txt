@@ -2,7 +2,7 @@
 
 BASIC HYGIENE
 
-H0. use C++14
+H0. use C++14 (or more modern)
 H1. never use the following keywords: new delete
 H2. never use the following keywords: throw try catch
 H3. never use the following keywords: class

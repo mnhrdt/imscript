@@ -122,11 +122,49 @@ static float float_holder(float *x, int n)
 {
 	static float p = 1;
 	if (n == -1)
-		p = *x;
+		return p = *x;
 	long double r = 0;
 	for (int i = 0; i < n; i++)
 		r += pow(x[i], p);
 	return pow(r/n, 1/p);
+}
+
+static float float_pargmin(float *x, int n)
+{
+	static float p = 2;
+	if (n == -1)
+		return p = *x;
+	float m = float_avg(x, n);
+	float w[n];
+	for (int i = 0; i < n; i++)
+		w[i] = pow(fabs(x[i] - m), p-2);
+	for (int j = 0; j < 15; j++)
+	{
+		long double a = 0;
+		long double b = 0;
+		for (int i = 0; i < n; i++)
+		{
+			a += w[i] * x[i];
+			b += w[i];
+		}
+		m = a / b;
+	}
+	return m;
+}
+
+static float float_lehmer(float *x, int n)
+{
+	static float p = 2;
+	if (n == -1)
+		return p = *x;
+	long double a = 0;
+	long double b = 0;
+	for (int i = 0; i < n; i++)
+	{
+		a += pow(x[i], p);
+		b += pow(x[i], p-1);
+	}
+	return a / b;
 }
 
 #ifndef EVENP
@@ -215,10 +253,12 @@ static char *help_string_long     =
 " first        the first good sample\n"
 " rnd          a randomly chosen good sample\n"
 " qX           Xth percentile\n"
-" HP           Pth Holder norm\n"
-" euc          euclidean (quadratic) norm\n"
-" geo          geometric mean\n"
-" har          harmonic mean\n"
+" MP           Pth power mean\n"
+" VP           minimizer of P-norm (M1=V2, etc)\n"
+" LP           P-Lehmer mean\n"
+" euc          euclidean norm (M2)\n"
+" geo          geometric mean (M0)\n"
+" har          harmonic mean (M-1)\n"
 "Goodness criteria:\n"
 " numeric      whether the sample is not NAN, this is the default\n"
 " finite       whether the sample is a finite number\n"
@@ -228,6 +268,7 @@ static char *help_string_long     =
 "\n"
 "Examples:\n"
 " veco avg i*.png -o avg.png     Compute the average of a bunch of images\n"
+" veco M0 -x 1 2 3               Compute the geometric mean of three numbers\n"
 "\n"
 "Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>."
 ;
@@ -272,6 +313,19 @@ int main_veco(int c, char *v[])
 	if (*operation_name == 'M') {
 		float p = atof(1 + operation_name);
 		f = float_holder;
+		f(&p, -1);
+		if (p == 0)         f = float_geometric;
+		if (p == INFINITY)  f = float_max;
+		if (p == -INFINITY) f = float_min;
+	}
+	if (*operation_name == 'V') {
+		float p = atof(1 + operation_name);
+		f = float_pargmin;
+		f(&p, -1);
+	}
+	if (*operation_name == 'L') {
+		float p = atof(1 + operation_name);
+		f = float_lehmer;
 		f(&p, -1);
 	}
 	if (!f) fail("unrecognized operation \"%s\"", operation_name);
