@@ -178,7 +178,7 @@ static float float_medv(float *x, int n)
 	if (n == 2) return (x[0] + x[1])/2;
 	qsort(x, n, sizeof*x, compare_floats);
 	if (EVENP(n))
-		return (x[n/2] + x[1+n/2])/2;
+		return (x[n/2] + x[-1+n/2])/2;
 	else
 		return x[n/2];
 }
@@ -259,6 +259,7 @@ static char *help_string_long     =
 " euc          euclidean norm (M2)\n"
 " geo          geometric mean (M0)\n"
 " har          harmonic mean (M-1)\n"
+"\n"
 "Goodness criteria:\n"
 " numeric      whether the sample is not NAN, this is the default\n"
 " finite       whether the sample is a finite number\n"
