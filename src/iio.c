@@ -1184,6 +1184,12 @@ static void break_pixels_uint8(uint8_t *broken, uint8_t *clear, int n, int pd)
 		broken[n*l + i] = clear[pd*i + l];
 }
 
+static void break_pixels_double(double *broken, double *clear, int n, int pd)
+{
+	FORI(n) FORL(pd)
+		broken[n*l + i] = clear[pd*i + l];
+}
+
 static void
 recover_broken_pixels_uint8(uint8_t *clear, uint8_t *broken, int n, int pd)
 {
@@ -3633,6 +3639,17 @@ uint16_t *iio_read_image_uint16_vec(const char *fname, int *w, int *h, int *pd)
 	*pd = x->pixel_dimension;
 	iio_convert_samples(x, IIO_TYPE_UINT16);
 	return x->data;
+}
+
+// API 2D
+double *iio_read_image_double_split(const char *fname, int *w, int *h, int *pd)
+{
+	double *r = iio_read_image_double_vec(fname, w, h, pd);
+	if (!r) return rfail("could not read image");
+	double *rbroken = xmalloc(*w**h**pd*sizeof*rbroken);
+	break_pixels_double(rbroken, r, *w**h, *pd);
+	xfree(r);
+	return rbroken;
 }
 
 // API 2D

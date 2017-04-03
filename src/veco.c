@@ -129,25 +129,37 @@ static float float_holder(float *x, int n)
 	return pow(r/n, 1/p);
 }
 
+static float EEE(float *x, int n, float p, float m)
+{
+	long double r = 0;
+	for (int i = 0; i < n; i++)
+		r += pow(fabs(x[i] - m),  p);
+	return r;
+}
+
 static float float_pargmin(float *x, int n)
 {
 	static float p = 2;
 	if (n == -1)
 		return p = *x;
-	float m = float_avg(x, n);
-	float w[n];
-	for (int i = 0; i < n; i++)
-		w[i] = pow(fabs(x[i] - m), p-2);
-	for (int j = 0; j < 15; j++)
+	if (p < 1) return NAN;
+	long double mo = 0;
+	long double m = float_avg(x, n);
+	for (int j = 0; j < 25; j++)
 	{
+		fprintf(stderr, "m = %g     E(m,%g)=%g\n", (double)m, p, EEE(x,n,p,m));
 		long double a = 0;
 		long double b = 0;
 		for (int i = 0; i < n; i++)
 		{
-			a += w[i] * x[i];
-			b += w[i];
+			long double w = pow(fabs(x[i] - m), p - 2);
+			fprintf(stderr, "\tw = |%g - %g|^%g = %g\n", x[i], (double)m, p-2, (double)w);
+			a += w * x[i];
+			b += w;
 		}
 		m = a / b;
+		if (fabs(mo - m) < fabs(m)*1e-6) break;
+		mo = m;
 	}
 	return m;
 }
@@ -165,6 +177,36 @@ static float float_lehmer(float *x, int n)
 		b += pow(x[i], p-1);
 	}
 	return a / b;
+}
+
+static float float_gini(float *x, int n)
+{
+	static float p = 3;
+	static float q = 2;
+	if (n == -1) {
+		p = x[0];
+		q = x[1];
+		return p*q;
+	}
+	if (p == q) {
+		long double a = 1;
+		long double b = 0;
+		for (int i = 0; i < n; i++)
+		{
+			a *= pow(x[i], pow(x[i], p));
+			b += pow(x[i], p);
+		}
+		return pow(a, 1/b);
+	} else {
+		long double a = 0;
+		long double b = 0;
+		for (int i = 0; i < n; i++)
+		{
+			a += pow(x[i], p);
+			b += pow(x[i], q);
+		}
+		return pow(a / b, 1 / (p - q));
+	}
 }
 
 #ifndef EVENP
@@ -254,8 +296,9 @@ static char *help_string_long     =
 " rnd          a randomly chosen good sample\n"
 " qX           Xth percentile\n"
 " MP           Pth power mean\n"
-" VP           minimizer of P-norm (M1=V2, etc)\n"
+" FP           Fréchet typical position, or minimizer of P-norm (M1=V2, etc)\n"
 " LP           P-Lehmer mean\n"
+" GP,Q         Gini's mean with parameters P and Q\n"
 " euc          euclidean norm (M2)\n"
 " geo          geometric mean (M0)\n"
 " har          harmonic mean (M-1)\n"
@@ -319,7 +362,7 @@ int main_veco(int c, char *v[])
 		if (p == INFINITY)  f = float_max;
 		if (p == -INFINITY) f = float_min;
 	}
-	if (*operation_name == 'V') {
+	if (*operation_name == 'F') {
 		float p = atof(1 + operation_name);
 		f = float_pargmin;
 		f(&p, -1);

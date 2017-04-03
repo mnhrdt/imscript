@@ -176,7 +176,6 @@ static void fill_random_indices(int *idx, int n, int a, int b)
 // tries several models and keeps the one with the largest number of inliers.
 static int ransac(
 		// output
-		//int *out_ninliers, // number of inliers
 		bool *out_mask,    // array mask identifying the inliers
 		float *out_model,  // model parameters
 

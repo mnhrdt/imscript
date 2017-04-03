@@ -214,6 +214,7 @@
 //
 // TODO LIST                                                               {{{2
 //
+//	* better functions for handling complex numbers
 //	* implement shunting-yard algorithm to admit infix notation
 //	* handle 3D and nD images
 //	* merge colonvars and magicvars (the only difficulty lies in naming)
@@ -383,11 +384,19 @@ static void complex_product(float *xy, float *x, float *y)
 	xy[1] = x[0]*y[1] + x[1]*y[0];
 }
 
+static void complex_division(float *xy, float *x, float *y)
+{
+	float yn = y[0]*y[0] + y[1]*y[1];
+	xy[0] = (  x[0]*y[0] + x[1]*y[1] ) / yn;
+	xy[1] = ( -x[0]*y[1] + x[1]*y[0] ) / yn;
+}
+
 static void complex_exp(float *y, float *x)
 {
 #ifdef __STDC_IEC_559_COMPLEX__
 	*(complex float *)y = cexp(*(complex float *)x);
 #else
+	assert(false); // this is a wrong implementation!
 	y[0] = exp(x[0]) * cos(x[1]);
 	y[1] = exp(x[0]) * sin(x[1]);
 #endif
@@ -808,6 +817,7 @@ static struct predefined_function {
 #endif
 	REGISTER_FUNCTIONN(complex_exp,"cexp", -2),
 	REGISTER_FUNCTIONN(complex_product,"cprod", -3),
+	REGISTER_FUNCTIONN(complex_division,"cdiv", -3),
 	REGISTER_FUNCTIONN(matrix_product,"mprod",-5),
 	REGISTER_FUNCTIONN(vector_product,"vprod",-5),
 	REGISTER_FUNCTIONN(scalar_product,"sprod",-5),

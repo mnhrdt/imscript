@@ -93,6 +93,7 @@ void *iio_read_image_float_matrix_vec(const char *fnam, int *w, int *h, int *pd)
 //
 double *iio_read_image_double(const char *fname, int *w, int *h);
 double *iio_read_image_double_vec(const char *fname, int *w, int *h, int *pd);
+double *iio_read_image_double_split(const char *fname, int *w, int *h, int *pd);
 
 
 // All these functions are boring  variations, and they are defined at the
@@ -170,6 +171,7 @@ uint16_t *iio_read_image_uint16_vec(const char *fname, int *w, int *h, int *pd);
 void iio_write_image_float_vec       (char*, float*        , int, int, int);
 void iio_write_image_float_split     (char*, float*        , int, int, int);
 void iio_write_image_double_vec      (char*, double*       , int, int, int);
+void iio_write_image_double_split    (char*, double*       , int, int, int);
 void iio_write_image_float           (char*, float*        , int, int     );
 void iio_write_image_double          (char*, double*       , int, int     );
 void iio_write_image_int             (char*, int*          , int, int     );
