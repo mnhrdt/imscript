@@ -4079,7 +4079,7 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 				|| (typ==IIO_TYPE_UINT8&&x->pixel_dimension==2)
 		   )
 		{
-			if (typ == IIO_TYPE_FLOAT) {
+			if (typ == IIO_TYPE_FLOAT || typ == IIO_TYPE_DOUBLE) {
 				void *old_data = x->data;
 				x->data = xmalloc(nsamp*sizeof(float));
 				memcpy(x->data, old_data, nsamp*sizeof(float));
