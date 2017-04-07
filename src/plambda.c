@@ -2652,6 +2652,7 @@ verbosity>0?
 " x[0]\t\tvalue of first component of pixel (i,j)\n"
 " x[1]\t\tvalue of second component of pixel (i,j)\n"
 " x(1,2)[3]\tvalue of fourth component of pixel (i+1,j+2)\n"
+"\n"
 "Comma modifiers (pre-defined local operators):\n"
 " a,x\tx-derivative of the image a\n"
 " a,y\ty-derivative\n"

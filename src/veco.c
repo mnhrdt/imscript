@@ -129,41 +129,6 @@ static float float_holder(float *x, int n)
 	return pow(r/n, 1/p);
 }
 
-static float EEE(float *x, int n, float p, float m)
-{
-	long double r = 0;
-	for (int i = 0; i < n; i++)
-		r += pow(fabs(x[i] - m),  p);
-	return r;
-}
-
-static float float_pargmin(float *x, int n)
-{
-	static float p = 2;
-	if (n == -1)
-		return p = *x;
-	if (p < 1) return NAN;
-	long double mo = 0;
-	long double m = float_avg(x, n);
-	for (int j = 0; j < 25; j++)
-	{
-		fprintf(stderr, "m = %g     E(m,%g)=%g\n", (double)m, p, EEE(x,n,p,m));
-		long double a = 0;
-		long double b = 0;
-		for (int i = 0; i < n; i++)
-		{
-			long double w = pow(fabs(x[i] - m), p - 2);
-			fprintf(stderr, "\tw = |%g - %g|^%g = %g\n", x[i], (double)m, p-2, (double)w);
-			a += w * x[i];
-			b += w;
-		}
-		m = a / b;
-		if (fabs(mo - m) < fabs(m)*1e-6) break;
-		mo = m;
-	}
-	return m;
-}
-
 static float float_lehmer(float *x, int n)
 {
 	static float p = 2;
@@ -238,6 +203,57 @@ static float float_percentile(float *x, int n)
 	assert(i < n);
 	return x[i];
 }
+
+static float EEE(float *x, int n, float p, float m)
+{
+	long double r = 0;
+	for (int i = 0; i < n; i++)
+		r += pow(fabs(x[i] - m),  p);
+	return r;
+}
+
+static float float_pargmin(float *x, int n)
+{
+	static float p = 2;
+	if (n == -1)
+		return p = *x;
+	if (p < 1) return NAN;
+	long double mo = 0;
+	long double m = float_avg(x, n);
+	for (int j = 0; j < 25; j++)
+	{
+		fprintf(stderr, "m = %g     E(m,%g)=%g\n", (double)m, p, EEE(x,n,p,m));
+		long double a = 0;
+		long double b = 0;
+		for (int i = 0; i < n; i++)
+		{
+			long double w = pow(fabs(x[i] - m), p - 2);
+			fprintf(stderr, "\tw = |%g - %g|^%g = %g\n", x[i], (double)m, p-2, (double)w);
+			a += w * x[i];
+			b += w;
+		}
+		m = a / b;
+		if (fabs(mo - m) < fabs(m)*1e-6) break;
+		mo = m;
+	}
+	if (1) {
+		float mt[5];
+		mt[0] = float_min(x, n);
+		mt[1] = float_avg(x, n);
+		mt[2] = float_max(x, n);
+		mt[3] = float_medv(x, n);
+		mt[4] = (mt[0] + mt[2])/2;
+		fprintf(stderr,"E_%g(min=\t%g)\t%g\n",p,mt[0],EEE(x,n,p,mt[0]));
+		fprintf(stderr,"E_%g(avg=\t%g)\t%g\n",p,mt[1],EEE(x,n,p,mt[1]));
+		fprintf(stderr,"E_%g(max=\t%g)\t%g\n",p,mt[2],EEE(x,n,p,mt[2]));
+		fprintf(stderr,"E_%g(med=\t%g)\t%g\n",p,mt[3],EEE(x,n,p,mt[3]));
+		fprintf(stderr,"E_%g(cen=\t%g)\t%g\n",p,mt[4],EEE(x,n,p,mt[4]));
+		fprintf(stderr,"E_%g( m =\t%g)\t%g\n",p,(double)m,EEE(x,n,p,m));
+	}
+	fprintf(stderr, " = %g     E(m,%g)=%g\n", (double)m, p, EEE(x,n,p,m));
+	return m;
+}
+
 
 static float float_first(float *x, int n)
 {
