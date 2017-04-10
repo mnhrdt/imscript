@@ -117,7 +117,7 @@
 #define FORK(n) for(int k=0;k<(int)(n);k++)
 #define FORL(n) for(int l=0;l<(int)(n);l++)
 
-#define IIO_SHOW_DEBUG_MESSAGES
+//#define IIO_SHOW_DEBUG_MESSAGES
 #ifdef IIO_SHOW_DEBUG_MESSAGES
 #  define IIO_DEBUG(...) do {\
 	fprintf(stderr,"DEBUG(%s:%d:%s): ",__FILE__,__LINE__,__PRETTY_FUNCTION__);\
@@ -703,6 +703,32 @@ static void inplace_reorient(struct iio_image *x, int orientation)
 	if (toupper(orx) > toupper(ory))
 		inplace_transpose(x);
 }
+
+static void inplace_trim(struct iio_image *x,
+		int trim_left, int trim_bottom, int trim_right, int trim_top)
+{
+	assert(2 == x->dimension);
+	int ps = x->pixel_dimension * iio_image_sample_size(x); // pixel_size
+	int w = x->sizes[0];
+	int h = x->sizes[1];
+	int nw = w - trim_left - trim_right; // new width
+	int nh = h - trim_bottom - trim_top; // new height
+	assert(nw > 0 && nh > 0);
+	char *old_data = x->data;
+	char *new_data = xmalloc(nw * nh * ps);
+	for (int j = 0; j < nh; j++)
+	for (int i = 0; i < nw; i++)
+		memcpy(
+			new_data + ps * (j*nw+i),
+			old_data + ps * ((j+trim_top)*w+(i+trim_left)),
+			ps
+		);
+	x->sizes[0] = nw;
+	x->sizes[1] = nh;
+	x->data = new_data;
+	xfree(old_data);
+}
+
 
 
 // data conversion                                                          {{{1
@@ -2354,9 +2380,11 @@ static int read_beheaded_pds(struct iio_image *x,
 	n = fread(x->data, size, 1, f);
 	if (n != 1) { free(x->data); return 3; }
 
-	// if necessary, transpose data
+	// if necessary, transpose and trim data
 	if (flip_h) inplace_flip_horizontal(x);
 	if (flip_v) inplace_flip_vertical(x);
+	if (crop_left || crop_right)
+		inplace_trim(x, crop_left, 0, crop_right, 0);
 
 	// return
 	return 0;
