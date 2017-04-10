@@ -117,7 +117,7 @@
 #define FORK(n) for(int k=0;k<(int)(n);k++)
 #define FORL(n) for(int l=0;l<(int)(n);l++)
 
-//#define IIO_SHOW_DEBUG_MESSAGES
+#define IIO_SHOW_DEBUG_MESSAGES
 #ifdef IIO_SHOW_DEBUG_MESSAGES
 #  define IIO_DEBUG(...) do {\
 	fprintf(stderr,"DEBUG(%s:%d:%s): ",__FILE__,__LINE__,__PRETTY_FUNCTION__);\
@@ -2281,6 +2281,7 @@ static int read_beheaded_pds(struct iio_image *x,
 	int n, nmax = 1000, cx = 0;
 	char line[nmax], key[nmax], value[nmax];
 	int rbytes = -1, w = -1, h = -1, spp = 1, bps = 1, obj = -1;
+	int crop_left = 0, crop_right = 0;
 	int sfmt = SAMPLEFORMAT_UINT;
 	bool in_object = false;
 	bool flip_h = false, flip_v = false, allturn = false;
@@ -2290,6 +2291,8 @@ static int read_beheaded_pds(struct iio_image *x,
 		if (!*key || !*value) continue;
 		IIO_DEBUG("PDS \"%s\" = \"%s\"\n", key, value);
 		if (!strcmp(key, "RECORD_BYTES")) rbytes = atoi(value);
+		if (!strcmp(key, "RECORD_TYPE"))
+			if (strstr(value, "UNDEFINED")) rbytes = 1;
 		if (!strcmp(key, object_id))      obj = atoi(value);
 		if (!strcmp(key, "OBJECT") && !strcmp(value, object_id+1))
 			in_object = true;
@@ -2307,11 +2310,14 @@ static int read_beheaded_pds(struct iio_image *x,
 			flip_h = allturn !=! strcmp(value, "RIGHT");
 		if (!strcmp(key, "LINE_DISPLAY_DIRECTION"))
 			flip_v = allturn !=! strcmp(value, "DOWN");
+		if (!strcmp(key, "LINE_PREFIX_BYTES")) crop_left = atoi(value);
+		if (!strcmp(key, "LINE_SUFFIX_BYTES")) crop_right = atoi(value);
 		// TODO: support the 8 possible rotations and orientations
 		// (RAW-equivalents: xy xY Xy XY yx yX Yx YX)
 		if (!strcmp(key, "END_OBJECT") && !strcmp(value, object_id+1))
 			break;
 	}
+	w = w + crop_left + crop_right;
 
 	IIO_DEBUG("rbytes = %d\n", rbytes);
 	IIO_DEBUG("object_id = %s\n", object_id);
