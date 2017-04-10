@@ -3981,6 +3981,7 @@ static bool string_suffix(const char *s, const char *suf)
 // an attempt at designing it.
 static void iio_write_image_default(const char *filename, struct iio_image *x)
 {
+	IIO_DEBUG("going to write into filename \"%s\"\n", filename);
 	int typ = normalize_type(x->type);
 	if (x->dimension != 2) fail("de moment només escrivim 2D");
 	//if (raw_prefix(fname)) {
@@ -4020,6 +4021,8 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 #ifdef I_CAN_HAS_LIBTIFF
 	if (x->pixel_dimension != 1 && x->pixel_dimension != 3 && x->pixel_dimension != 4 && x->pixel_dimension != 2 )
 	{
+		IIO_DEBUG("strange case (pd=%d), forcing tiff format\n",
+				x->pixel_dimension);
 		iio_write_image_as_tiff_smarter(filename, x);
 		return;
 	}
@@ -4048,6 +4051,7 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 				|| string_suffix(filename, ".TIF")
 		   )
 		{
+			IIO_DEBUG("tiff extension detected\n");
 			iio_write_image_as_tiff_smarter(filename, x);
 			return;
 		}
@@ -4055,6 +4059,7 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 	if (true) {
 		char *tiffname = strstr(filename, "TIFF:");
 		if (tiffname == filename) {
+			IIO_DEBUG("TIFF prefix detected\n");
 			iio_write_image_as_tiff_smarter(filename+5, x);
 			return;
 		}
@@ -4064,20 +4069,12 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 	if (true) {
 		char *pngname = strstr(filename, "PNG:");
 		if (pngname == filename) {
-			if (typ == IIO_TYPE_FLOAT) {
+			IIO_DEBUG("PNG prefix detected\n");
+			if (typ != IIO_TYPE_UINT8) {
 				void *old_data = x->data;
-				x->data = xmalloc(nsamp*sizeof(float));
-				memcpy(x->data, old_data, nsamp*sizeof(float));
-				iio_convert_samples(x, IIO_TYPE_UINT8);
-				iio_write_image_default(filename, x);//recursive
-				xfree(x->data);
-				x->data = old_data;
-				return;
-			}
-			if (typ == IIO_TYPE_INT || typ == IIO_TYPE_UINT32) {
-				void *old_data = x->data;
-				x->data = xmalloc(nsamp*sizeof(int));
-				memcpy(x->data, old_data, nsamp*sizeof(int));
+				int ss = iio_image_sample_size(x);
+				x->data = xmalloc(nsamp*ss);
+				memcpy(x->data, old_data, nsamp*ss);
 				iio_convert_samples(x, IIO_TYPE_UINT8);
 				iio_write_image_default(filename, x);//recursive
 				xfree(x->data);
@@ -4091,10 +4088,12 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 	if (true) {
 		char *pngname = strstr(filename, "PNG16:");
 		if (pngname == filename) {
+			IIO_DEBUG("PNG16 prefix detected\n");
 			if (typ != IIO_TYPE_UINT16) {
 				void *old_data = x->data;
-				x->data = xmalloc(nsamp*sizeof(float));
-				memcpy(x->data, old_data, nsamp*sizeof(float));
+				int ss = iio_image_sample_size(x);
+				x->data = xmalloc(nsamp*ss);
+				memcpy(x->data, old_data, ss);
 				iio_convert_samples(x, IIO_TYPE_UINT16);
 				iio_write_image_default(filename, x);//recursive
 				xfree(x->data);
@@ -4111,22 +4110,16 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 				|| string_suffix(filename, ".PNG")
 				|| (typ==IIO_TYPE_UINT8&&x->pixel_dimension==4)
 				|| (typ==IIO_TYPE_UINT8&&x->pixel_dimension==2)
+				|| (typ==IIO_TYPE_UINT8&&x->pixel_dimension==1)
+				|| (typ==IIO_TYPE_UINT8&&x->pixel_dimension==3)
 		   )
 		{
-			if (typ == IIO_TYPE_FLOAT || typ == IIO_TYPE_DOUBLE) {
+			IIO_DEBUG("png extension detected or 8bint thing\n");
+			if (typ != IIO_TYPE_UINT8) {
 				void *old_data = x->data;
-				x->data = xmalloc(nsamp*sizeof(float));
-				memcpy(x->data, old_data, nsamp*sizeof(float));
-				iio_convert_samples(x, IIO_TYPE_UINT8);
-				iio_write_image_default(filename, x);//recursive
-				xfree(x->data);
-				x->data = old_data;
-				return;
-			}
-			if (typ == IIO_TYPE_INT || typ == IIO_TYPE_UINT32) {
-				void *old_data = x->data;
-				x->data = xmalloc(nsamp*sizeof(int));
-				memcpy(x->data, old_data, nsamp*sizeof(int));
+				int ss = iio_image_sample_size(x);
+				x->data = xmalloc(nsamp*ss);
+				memcpy(x->data, old_data, nsamp*ss);
 				iio_convert_samples(x, IIO_TYPE_UINT8);
 				iio_write_image_default(filename, x);//recursive
 				xfree(x->data);
