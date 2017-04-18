@@ -73,6 +73,44 @@ static float float_cnt(float *x, int n)
 	return n;
 }
 
+static float float_logavg(float *x, int n)
+{
+	long double r = 0;
+	for (int i = 0; i < n; i++)
+		r += log(x[i]);
+	return n?exp(r/n):0;
+}
+
+static float float_logsumexp(float *x, int n)
+{
+	long double r = 0;
+	for (int i = 0; i < n; i++)
+		r += exp(x[i]);
+	return n?log(r/n):0;
+}
+
+static float float_std(float *x, int n)
+{
+	float m = float_avg(x, n);
+	long double r = 0;
+	for (int i = 0; i < n; i++)
+		r += (x[i] - m) * (x[i] - m);
+	return sqrt(r/n);
+}
+
+static float float_iqd(float *x, int n)
+{
+	if (!n) return NAN;//fail("empty list of pixel values!");
+	if (n == 1) return 0;
+	qsort(x, n, sizeof*x, compare_floats);
+	if (n == 2) return x[1] - x[0];
+	if (n == 3) return x[2] - x[0];
+	if (n == 4) return x[2] - x[1];
+	int a = round(0.25 * (n-1));
+	int b = round(0.75 * (n-1));
+	return x[b] - x[a];
+}
+
 static float float_mod(float *x, int n)
 {
 	float h[0x100];
@@ -318,6 +356,10 @@ static char *help_string_long     =
 " euc          euclidean norm (M2)\n"
 " geo          geometric mean (M0)\n"
 " har          harmonic mean (M-1)\n"
+" lav          logarithmic average\n"
+" lse          log-sum-exp (a.k.a. soft max)\n"
+" std          standard deviation\n"
+" iqd          interquartile distance\n"
 "\n"
 "Goodness criteria:\n"
 " numeric      whether the sample is not NAN, this is the default\n"
@@ -364,6 +406,10 @@ int main_veco(int c, char *v[])
 	if (0 == strcmp(operation_name, "euc"))   f = float_euclidean;
 	if (0 == strcmp(operation_name, "geo"))   f = float_geometric;
 	if (0 == strcmp(operation_name, "har"))   f = float_harmonic;
+	if (0 == strcmp(operation_name, "lav"))   f = float_logavg;
+	if (0 == strcmp(operation_name, "lse"))   f = float_logsumexp;
+	if (0 == strcmp(operation_name, "std"))   f = float_std;
+	if (0 == strcmp(operation_name, "iqd"))   f = float_iqd;
 	if (0 == strcmp(operation_name, "first")) f = float_first;
 	if (*operation_name == 'q') {
 		float p = atof(1 + operation_name);
