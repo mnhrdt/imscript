@@ -11,6 +11,8 @@ position and resolution can be extracted instantaneously, allowing
 continuous navigation of the scale space.  The data structure is very
 simple: each octave of the scale space pyramid is stored as a
 collection of small tiles that can be accessed individually.
+We also propose the simplest possible C API that allows access to
+this structure.
 
 
 1. INTRODUCTION
@@ -41,8 +43,8 @@ this context, we can distinguish three size ranges of image data:
 
 These are sociotechnical distinctions, whose precise definition
 depends on the context and the device used.  The goal of this article
-is to describe how to deal efficiently with large images, that fit on
-disk but do not fit on RAM memory.
+is to describe how to deal efficiently with large images, i.e. those
+that fit on disk but do not fit on RAM memory.
 
 
 
@@ -50,7 +52,17 @@ disk but do not fit on RAM memory.
 
 3. ALGORITHMS
 
-4. IMPLEMENTATION USING LIBTIFF
+4. C API
+
+Since an image is an array of numbers, the simplest C API for reading
+an image should be to return an array of numbers, thus:
+
+  // read an image and allocate all the data into an array of float
+  float *read_image(const char *filename, int *width, int *height);
+
+Unfortunately, 
+
+5. IMPLEMENTATION USING LIBTIFF
 
 
 

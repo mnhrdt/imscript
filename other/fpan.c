@@ -10,7 +10,7 @@
 #ifndef FTR_BACKEND
 #define FTR_BACKEND 'x'
 #endif
-#include "ftr.c"
+#include "ftr.h"
 
 #include "xmalloc.c"
 
@@ -367,8 +367,8 @@ void key_handler_print(struct FTR *f, int k, int m, int x, int y)
 
 void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
-	fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
-			k, isalpha(k)?k:' ', m, x, y);
+	//fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
+	//		k, isalpha(k)?k:' ', m, x, y);
 
 	//if (k == '+') action_increase_zoom(f, f->w/2, f->h/2);
 	//if (k == '-') action_decrease_zoom(f, f->w/2, f->h/2);

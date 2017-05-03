@@ -1455,6 +1455,17 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 	// TODO: consider the missing cases (run through PerlMagick's format database)
 
 	IIO_DEBUG("fmt  = %d\n", fmt);
+
+	// deal with complex issues
+	if (fmt == SAMPLEFORMAT_COMPLEXINT || fmt == SAMPLEFORMAT_COMPLEXIEEEFP)
+	{
+		IIO_DEBUG("complex TIFF!\n");
+		spp *= 2;
+		bps /= 2;
+	}
+	if (fmt == SAMPLEFORMAT_COMPLEXINT   ) fmt = SAMPLEFORMAT_INT;
+	if (fmt == SAMPLEFORMAT_COMPLEXIEEEFP) fmt = SAMPLEFORMAT_IEEEFP;
+
 	// set appropriate size and type flags
 	if (fmt == SAMPLEFORMAT_UINT) {
 		if (1 == bps) fmt_iio = IIO_TYPE_UINT1;
@@ -2279,7 +2290,7 @@ static void pds_parse_line(char *key, char *value, char *line)
 }
 
 #ifndef SAMPLEFORMAT_UINT
-// definitions form tiff.h, needed for pds
+// definitions from tiff.h, needed also for pds
 #define SAMPLEFORMAT_UINT  1
 #define SAMPLEFORMAT_INT  2
 #define SAMPLEFORMAT_IEEEFP  3
@@ -2352,6 +2363,7 @@ static int read_beheaded_pds(struct iio_image *x,
 	IIO_DEBUG("h = %d\n", h);
 	IIO_DEBUG("bps = %d\n", bps);
 	IIO_DEBUG("spp = %d\n", spp);
+	IIO_DEBUG("sfmt = %d\n", sfmt);
 
 	// identify the sample type
 	int typ = -1;

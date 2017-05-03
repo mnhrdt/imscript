@@ -132,10 +132,10 @@ int main(int c, char *v[])
 		float r = histomodev(binsize, binphase, x, n, &rc);
 		printf("%g (%d)\n", r, rc);
 	} else {
-		int w = 1024;
+		int w = 4096;
 		float *t = malloc(2*w*w*sizeof*t);
-		float first_phase = -binphase;
-		float last_phase = binphase;
+		float first_phase = -binsize/2;
+		float last_phase = binsize/2;
 		float first_size = binsize/w;
 		float last_size = binsize;
 		fprintf(stderr, "phases(j) from %g to %g\n", first_phase, last_phase);
