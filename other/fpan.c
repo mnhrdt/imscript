@@ -30,8 +30,8 @@ static float *read_image_float_rgb(char *fname, int *w, int *h)
 			y[3*i+0] = y[3*i+1] = y[3*i+2] = x[i];
 			break;
 		case 2:
-			y[3*i+0] = x[2*i+0];
-			y[3*i+1] = y[3*i+2] = x[2*i+1];
+			y[3*i+0] = x[2*i+0];            // R=x
+			y[3*i+1] = y[3*i+2] = x[2*i+1]; // G=B=y
 			break;
 		default:
 			assert(pd > 3);

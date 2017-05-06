@@ -8,7 +8,7 @@
 #include "tiffu.c"
 
 #ifndef FTR_BACKEND
-#define FTR_BACKEND 'x'
+#define FTR_BACKEND 'f'
 #endif
 #include "ftr.c"
 
