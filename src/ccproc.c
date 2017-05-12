@@ -397,20 +397,19 @@ static void reorder_boundaries(int *bdsize,
 	for (int i = 0; i < r; i++)
 	{
 		int *ti = all + first[i];
-		int topo = size[i] - 1; // index of top non-boundary element
-		// vector: ti[0] ti[1] ... ti[topo-1]
-		for (int j = 0; j < size[i]; j++)
+		int a = 0;
+		int b = size[i];
+		// vector: ti[0] ti[1] ... ti[b-1]
+		while (a < b)
 		{
-			int ij = ti[j];
-			if (!idx_boundaryingP(idx, w, h, ij))
-			{
-				// XXX TODO: correct the following bug:
-				if (j == topo) break;
-				topo -= 1;
-				swapi(ti, topo, j);
+			if (idx_boundaryingP(idx, w, h, ti[a]))
+				a = a + 1;
+			else {
+				b = b - 1;
+				swapi(ti, a, b);
 			}
 		}
-		bdsize[i] = topo;
+		bdsize[i] = a;
 	}
 }
 
