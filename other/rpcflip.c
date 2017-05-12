@@ -1181,24 +1181,6 @@ static void action_shift_so(struct FTR *f, int dso)
 	request_repaints(f);
 }
 
-static void action_dump_view(struct FTR *f)
-{
-	static int dump_view_counter = 0;
-	int pid = getpid();
-	char fnamei[FILENAME_MAX], fnamef[FILENAME_MAX];
-	char *fmti = "/tmp/rpcflip_dump_%d_%d.png";
-	char *fmtf = "/tmp/rpcflip_dump_%d_%d.tiff";
-	snprintf(fnamei, FILENAME_MAX, fmti, pid, dump_view_counter);
-	snprintf(fnamef, FILENAME_MAX, fmtf, pid, dump_view_counter);
-	struct pan_state *e = f->userdata;
-	struct pan_view  *v = obtain_view(e);
-	iio_write_image_uint8_vec(fnamei, v->display, v->dw, v->dh, 3);
-	iio_write_image_float_vec(fnamef, v->fdisplay, v->dw, v->dh, 3);
-	fprintf(stderr, "dumped rgb_8 view to file \"%s\"\n", fnamei);
-	fprintf(stderr, "dumped rgb_f view to file \"%s\"\n", fnamef);
-	dump_view_counter += 1;
-}
-
 static void action_toggle_srtm4_base(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
@@ -1360,6 +1342,44 @@ static void action_cycle_view(struct FTR *f, int d, int x, int y)
 	action_select_view(f, new, x, y);
 }
 
+static void action_dump_view(struct FTR *f)
+{
+	static int dump_view_counter = 0;
+	int pid = getpid();
+	char fnamei[FILENAME_MAX], fnamef[FILENAME_MAX];
+	char *fmti = "/tmp/rpcflip_dump_%d_%d.png";
+	char *fmtf = "/tmp/rpcflip_dump_%d_%d.tiff";
+	snprintf(fnamei, FILENAME_MAX, fmti, pid, dump_view_counter);
+	snprintf(fnamef, FILENAME_MAX, fmtf, pid, dump_view_counter);
+	struct pan_state *e = f->userdata;
+	struct pan_view  *v = obtain_view(e);
+	iio_write_image_uint8_vec(fnamei, v->display, v->dw, v->dh, 3);
+	iio_write_image_float_vec(fnamef, v->fdisplay, v->dw, v->dh, 3);
+	fprintf(stderr, "dumped rgb_8 view to file \"%s\"\n", fnamei);
+	fprintf(stderr, "dumped rgb_f view to file \"%s\"\n", fnamef);
+	dump_view_counter += 1;
+}
+
+static void action_dump_collection(struct FTR *f)
+{
+	static int collection_counter = 0;
+	struct pan_state *e = f->userdata;
+	for (int i = 0; i < e->nviews; i++)
+	{
+		action_select_view(f, i, f->w/2, f->h/2);
+		pan_repaint(e, f->w, f->h);
+		int pid = getpid();
+		char fname[FILENAME_MAX];
+		char *fmt = "/tmp/rpcflip_collection_%d_%d_%d.png";
+		snprintf(fname, FILENAME_MAX, fmt, pid, collection_counter, i);
+		struct pan_view  *v = obtain_view(e);
+		fprintf(stderr, "going to dum rgb_8 view(%d %d) to file \"%s\"\n", v->dw, v->dh, fname);
+		iio_write_image_uint8_vec(fname, v->display, v->dw, v->dh, 3);
+	}
+	collection_counter += 1;
+}
+
+
 
 // CALLBACK: pan_button_handler {{{1
 static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
@@ -1419,6 +1439,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == '6') action_shift_so(f, -1);
 	if (k == '7') action_shift_so(f, +1);
 	if (k == 't') action_dump_view(f);
+	if (k == '5') action_dump_collection(f);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
