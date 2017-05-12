@@ -1,5 +1,4 @@
 #include <assert.h>
-#include "abstract_dsf.h"
 
 // API
 void adsf_assert_consistency(int *t, int n)

@@ -8,41 +8,52 @@
 #include "abstract_dsf.c"
 #include "xmalloc.c"
 
-//static void img_debug(float *x, int w, int h, int pd, const char *fmt, ...);
-//static void img_debug_int(int *x, int w, int h, int pd, const char *fmt, ...);
-
+// equivalence relations of floats
+//
+// A function of this signature is the most important imput parameter.  It is
+// used to decide whether neighboring pixels belong to the same connected
+// component or not.
 typedef int (*float_equivalence_relation_t)(float,float);
 
+
+// three example equivalence relations are provided:
+
+// wheter the two floats are equal
 int float_equality(float a, float b)
 {
 	return a == b;
 }
 
+// whether two floats are equal, or are both null
 int floatnan_equality(float a, float b)
 {
 	if (isnan(a) && isnan(b)) return true;
 	return a == b;
 }
 
+// whether they are both nan or both non-nan
 int float_eq_isnan(float a, float b)
 {
 	return isnan(a) == isnan(b);
 }
 
-static int compare_pair(const void *aa, const void *bb)
+
+// function to sort int vectors with increasing first component
+static int compare_pair_increasing(const void *aa, const void *bb)
 {
 	const int *a = (const int *)aa;
 	const int *b = (const int *)bb;
 	return (*a > *b) - (*a < *b);
 }
 
-static int ncompare_pair(const void *aa, const void *bb)
+// function to sort int vectors with decreasing first component
+static int compare_pair_decreasing(const void *aa, const void *bb)
 {
-	const int *a = (const int *)aa;
-	const int *b = (const int *)bb;
-	return (*a < *b) - (*a > *b);
+	return -compare_pair_increasing(aa, bb);
 }
 
+// given an image of indexes, whether a given pixel is at a boundary
+// of a region of pixels of the same index
 static bool idx_boundaryingP(int *idxs, int w, int h, int idx)
 {
 	int i = idx % w;
@@ -63,6 +74,7 @@ static void swapi(int *t, int i, int j)
 	t[j] = tmp;
 }
 
+// whether a point is inside the image domain
 static bool insideP(int w, int h, int i, int j)
 {
 	return i >= 0 && j >= 0 && i < w && j < h;
@@ -74,6 +86,7 @@ static bool insideP(int w, int h, int i, int j)
 //	2: (-1, 0)
 //	3: ( 0, 1)
 
+// get the neighbor of pixel (i,j) in the direction dir
 static void get_neighbour(int *ni, int *nj, int i, int j, int dir)
 {
 	*ni = i;
@@ -86,6 +99,7 @@ static void get_neighbour(int *ni, int *nj, int i, int j, int dir)
 	}
 }
 
+// whether an edge (i,j,dir) is at the boundary of an eq-region
 static bool pix_boundaryingP(float *x, int w, int h,
 		float_equivalence_relation_t eq, int i, int j, int dir)
 {
@@ -245,7 +259,7 @@ int ccproc_old(
 		int t = tmpi[j];
 		pair[2*t + 0] += 1;
 	}
-	qsort(pair, r, 2*sizeof*pair, ncompare_pair);
+	qsort(pair, r, 2*sizeof*pair, compare_pair_decreasing);
 	for (int i = 0; i < r; i++)
 	{
 		int ir = pair[2*i + 1];
@@ -268,7 +282,7 @@ int ccproc_old(
 		ipair[2*i + 0] = tmpi[rep[i]];
 		ipair[2*i + 1] = i;
 	}
-	qsort(ipair, w*h, 2*sizeof*ipair, compare_pair);
+	qsort(ipair, w*h, 2*sizeof*ipair, compare_pair_increasing);
 	for (int i = 0; i < w*h; i++)
 		out_all[i] = ipair[2*i+1];
 
@@ -280,7 +294,7 @@ int ccproc_old(
 			out_first[rcx++] = i;
 	assert(rcx == r);
 
-	// verify consistence
+	// verify consistency
 	for (int i = 0; i < r; i++)
 	for (int j = 0; j < out_size[i]; j++)
 		assert(out_idx[out_all[out_first[i] + j]] == i);
@@ -288,21 +302,15 @@ int ccproc_old(
 	// reorder out_all so that boundarying points come first
 	for (int i = 0; i < r; i++)
 	{
-		int *ti = out_all + out_first[i];
-		int topo = out_size[i] - 1; // index of top non-boundary element
-		// vector: ti[0] ti[1] ... ti[topo-1]
-		for (int j = 0; j < out_size[i]; j++)
-		{
-			int idx = ti[j];
-			if (!idx_boundaryingP(out_idx, w, h, idx))
-			{
-				// XXX TODO: correct the following bug:
-				if (j == topo) break;
-				topo -= 1;
-				swapi(ti, topo, j);
-			}
-		}
-		out_bdsize[i] = topo;
+		int *t = out_all + out_first[i];
+		int a = 0;
+		int b = out_size[i];
+		while (a < b)
+			if (idx_boundaryingP(out_idx, w, h, t[a]))
+				a = a + 1;
+			else
+				swapi(t, a, --b);
+		out_bdsize[i] = a;
 	}
 
 	// cleanup and exit
@@ -311,6 +319,74 @@ int ccproc_old(
 	free(rep);
 	free(tmpi);
 	return r;
+}
+
+int ccproc_miniold(
+		int *out_size,          // total size of each CC
+		int *out_bdsize,        // boundary size of each CC
+		int *out_all,           // array of all the indexes, connected
+		int *out_first,         // array of first indexes of each CC
+		int *out_idx,           // image with the indices of each region
+		float *x, int w, int h, // input image
+		float_equivalence_relation_t eq
+	  )
+{
+	if (!eq) eq = floatnan_equality;          // set equivalence relation
+	int *rep   = xmalloc(  w*h*sizeof*rep);   // representatives
+	int *pair  = xmalloc(2*w*h*sizeof*pair);  // pairs
+	int *tmpi  = xmalloc(  w*h*sizeof*tmpi);  // indexes
+	int *ipair = xmalloc(2*w*h*sizeof*ipair); // inverse pairs
+	for (int i = 0; i < w*h; i++) rep[i] = i; // set representatives
+	adsf_begin(rep, w*h);                     // init dsf
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++) {  // for each pixel (i,j)
+		int p0 = j*w + i;      // index of       (i,j)
+		int p1 = j*w + i+1;    // index of pixel (i+1,j)
+		int p2  = (j+1)*w + i; // index of pixel (i,j+1)
+		if (i+1 < w && eq(x[p0], x[p1]))adsf_union(rep, w*h, p0, p1);
+		if (j+1 < h && eq(x[p0], x[p2])) adsf_union(rep, w*h, p0, p2);
+	}
+	for (int i = 0; i < w*h; i++) rep[i] = adsf_find(rep, w*h, i);
+	int R = 0; // number of regions (output value of this function)
+	for (int i = 0; i < w*h; i++) if (rep[i] == i) R += 1;
+	for (int i = 0; i < R; i++) pair[2*i + 0] = 0;
+	int rcx = 0;
+	for (int i = 0; i < w*h; i++)
+		if (rep[i] == i) {
+			tmpi[i] = rcx;
+			pair[2*rcx + 1] = i; // representative
+			rcx += 1;
+		}
+	for (int i = 0; i < w*h; i++) pair[2*tmpi[rep[i]] + 0] += 1;
+	qsort(pair, R, 2*sizeof*pair, compare_pair_decreasing);
+	for (int i = 0; i <  R ; i++) tmpi[pair[2*i+1]] = i;
+	for (int i = 0; i <  R ; i++) out_size[i] = pair[2*i + 0];
+	for (int i = 0; i < w*h; i++) out_idx[i] = tmpi[rep[i]];
+	for (int i = 0; i < w*h; i++) ipair[2*i + 0] = tmpi[rep[i]];
+	for (int i = 0; i < w*h; i++) ipair[2*i + 1] = i;
+	qsort(ipair, w*h, 2*sizeof*ipair, compare_pair_increasing);
+	for (int i = 0; i < w*h; i++) out_all[i] = ipair[2*i+1];
+	out_first[0] = 0;
+	rcx = 1;
+	for (int i = 1; i < w*h; i++)
+		if (rep[out_all[i-1]] != rep[out_all[i]])
+			out_first[rcx++] = i;
+	for (int i = 0; i < R; i++) {
+		int *t = out_all + out_first[i];
+		int a = 0;
+		int b = out_size[i];
+		while (a < b)
+			if (idx_boundaryingP(out_idx, w, h, t[a]))
+				a = a + 1;
+			else
+				swapi(t, a, --b);
+		out_bdsize[i] = a;
+	}
+	free(ipair);
+	free(pair);
+	free(rep);
+	free(tmpi);
+	return R;
 }
 
 static int compute_representatives(int *rep, float *x, int w, int h,
@@ -363,7 +439,7 @@ void compute_pos_and_idx(int *pos, int *idx, int *rep, int w, int h, int r)
 		int t = idx[j];
 		pos[2*t + 0] += 1;
 	}
-	qsort(pos, r, 2*sizeof*pos, ncompare_pair);
+	qsort(pos, r, 2*sizeof*pos, compare_pair_decreasing);
 	for (int i = 0; i < r; i++)
 	{
 		int ir = pos[2*i + 1];
@@ -382,7 +458,7 @@ static void reverse_indexes(int *out_all, int *idx, int *rep, int n)
 		ipair[2*i + 0] = idx[rep[i]];
 		ipair[2*i + 1] = i;
 	}
-	qsort(ipair, n, 2*sizeof*ipair, compare_pair);
+	qsort(ipair, n, 2*sizeof*ipair, compare_pair_increasing);
 
 	// fill-in table of all indices
 	for (int i = 0; i < n; i++)
@@ -396,19 +472,15 @@ static void reorder_boundaries(int *bdsize,
 {
 	for (int i = 0; i < r; i++)
 	{
-		int *ti = all + first[i];
+		int *t = all + first[i];
 		int a = 0;
 		int b = size[i];
-		// vector: ti[0] ti[1] ... ti[b-1]
+		// vector: t[0] t[1] ... t[b-1]
 		while (a < b)
-		{
-			if (idx_boundaryingP(idx, w, h, ti[a]))
+			if (idx_boundaryingP(idx, w, h, t[a]))
 				a = a + 1;
-			else {
-				b = b - 1;
-				swapi(ti, a, b);
-			}
-		}
+			else
+				swapi(t, a, --b);
 		bdsize[i] = a;
 	}
 }
@@ -421,7 +493,7 @@ void assert_consistency(int *idx, int *all, int *size, int *first, int r)
 		assert(idx[all[first[i] + j]] == i);
 }
 
-// core functoin
+// core function
 int ccproc(
 		int *out_size,          // total size of each CC
 		int *out_bdsize,        // boundary size of each CC
@@ -464,7 +536,7 @@ int ccproc(
 			out_first[cx++] = i;
 	assert(cx == r);
 
-	// verify consistence
+	// verify consistency
 	assert_consistency(out_idx, out_all, out_size, out_first, r);
 
 	// reorder out_all so that boundarying points come first
@@ -478,7 +550,7 @@ int ccproc(
 	return r;
 }
 
-int ccproc_mini(
+int ccproc_mini( // minified version of the function above
 	int *o_size, int *o_bdsize, int *o_all, int *o_first, int *o_idx,
 	float *x, int w, int h, float_equivalence_relation_t eq)
 {
@@ -560,7 +632,7 @@ int main(int c, char *v[])
 		if (i > 100) break;
 	}
 
-	// verify consistence
+	// verify consistency
 	int totsize = 0;
 	for (int i = 0; i < r; i++)
 	{

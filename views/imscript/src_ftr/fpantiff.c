@@ -30,6 +30,7 @@ struct pan_state {
 
 	// 3. silly options
 	bool infrared;
+	bool slog;
 	unsigned char *preview;
 	int pw, ph;
 	bool do_preview;
@@ -85,6 +86,13 @@ static int mod(int n, int p)
 	return r;
 }
 
+static float slog(float x)
+{
+	if (fabs(x) <= 1) return 0;
+	if (x > 1) return log(x);
+	if (x < -1) return -log(-x);
+}
+
 // evaluate the value a position (p,q) in image coordinates
 static void pixel(float *out, struct pan_state *e, double p, double q)
 {
@@ -103,7 +111,7 @@ static void pixel(float *out, struct pan_state *e, double p, double q)
 	//	factor = 1 << e->octave;
 	//else
 	//	factor = 1.0 / ( 1 << - e->octave );
-	
+
 
 	int fmt = e->t->i->fmt;
 	int bps = e->t->i->bps;
@@ -123,8 +131,19 @@ static void pixel(float *out, struct pan_state *e, double p, double q)
 			double o4 = from_sample_to_double(pix + 3*ss, fmt, bps);
 			out[1] = 0.9*out[1] + 0.1 * o4;
 		}
+	} else if (spp == 2) {
+		out[1] = from_sample_to_double(pix + ss, fmt, bps);
+		if (e->infrared) {
+			out[0] = hypot(out[0], out[1]);
+			out[1] = out[2] = out[0];
+		} else {
+			out[2] = out[1];
+		}
 	} else
 		out[1] = out[2] = out[0];
+	if (e->slog)
+		for (int i = 0; i < 3; i++)
+			out[i] = slog(out[i]);
 }
 
 static void action_print_value_under_cursor(struct FTR *f, int x, int y)
@@ -349,6 +368,16 @@ static void action_toggle_infrared(struct FTR *f)
 	f->changed = 1;
 }
 
+static void action_toggle_slog(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+
+	e->slog = !e->slog;
+
+	f->changed = 1;
+}
+
+
 static void dump_preview(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
@@ -471,6 +500,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 			k, isalpha(k)?k:' ', m, x, y);
 
 	if (k == 'i') action_toggle_infrared(f);
+	if (k == 'l') action_toggle_slog(f);
 	if (k == '+') action_decrease_octave(f, f->w/2, f->h/2);
 	if (k == '-') action_increase_octave(f, f->w/2, f->h/2);
 	if (k == '1') action_change_zoom_to_factor(f, x, y, 1);
@@ -569,6 +599,7 @@ int main_pan(int c, char *v[])
 	e->w = 700;
 	e->h = 500;
 	e->infrared = 4 == e->t->i->spp;
+	e->slog = false;
 	e->preview = NULL;
 	e->do_preview = false;
 	e->a = 1;

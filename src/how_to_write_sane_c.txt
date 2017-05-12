@@ -1,0 +1,355 @@
+
+
+BASIC HYGIENE
+
+H0. use C11 (or newer)
+H1. do not use deprecated features (old-style declarations, trigraphs, gets,...)
+H2. never use the following keywords: const inline register short "long long"
+H3. never use the following includes: wchar.h wctype.h
+H4. do not use casts
+H5. do not typedef structs
+H6. do not typedef pointer types
+H7. POSIX features are OK, but hidden behind macros so that the code compiles
+    without them (producing either slower binaries or error messages at runtime)
+H8. OPENMP pragmata, includes and functions are hidden behind _OPENMP checks
+H9. SSE and AVX stuff is also hidden behind macros, and semantically redundant
+
+
+
+NAMING
+
+N0. mixed-case symbols are forbidden
+N1. all local variables are single letters (like in the rest of mathematics)
+    - exception: letters like "alpha", "beta" (gcc does not yet grok UTF8)
+    - exception: variations of a single letter like "x_in", "x_out"
+N2. all global variables are self-documenting and have the form "global_*"
+N3. all the symbols exposed by a translation unit share a prefix ending in _
+N4. exposed function names are long, self-documenting and lowercase
+N5. static functions may have shorter names and, if short enough, be uppercase
+N6. struct tags are lowercase
+N7. macros are uppercase
+N8. struct members are lowercase
+
+
+
+FORMATTING
+
+F0. indent with 1 tab or with 8 spaces (but not both on the same file)
+F1. the maximum line width is 80 (1 indentation level counts as 8)
+F2. functions have at most 20 or 25 lines, unless they have some symmetry
+F3. no declaration without initialization
+    - exception: when the initialization is via a reference on the next line
+F4. max about 7 variables in scope at the same time
+
+
+
+COMMENTING
+
+C0. comment data, not code
+C1. each declaration on a separate line, with a descriptive comment
+C2. the arguments of a function go on separate lines, with descriptive comments
+C3. static functions with obvious arguments may be declared in one line
+C4. avoid comments if possible: change "// compute stuff" to "compute_stuff();"
+C5. do not include license boilerplate at the top of each file
+
+
+
+STYLE
+
+S0. do not be afraid of the C language, master all the available features
+S1. do not cast: either use implicit conversions or write conversion functions
+S2. local variables are pronouns, comments are the names (see also N1 and F0)
+S3. unsigned types are only used for bit fields
+S4. all loops are exactly of the form "for (int i=0; i<n; i++)"
+    - n is a constant or a variable whose value can be estimated at compile-time
+S5. strive to make the body of each loop a single statement
+S6. non-tail recursion is only allowed if the depth is O(log(input size))
+S7. use pointers to VLA for simple array arithmetic
+S8. use "goto" only for function cleanup code, allowing a single exit point
+S9. use "while" only when an alternative using "for" is contrived
+S10. use many small functions that are called only once
+S11. strive to avoid call diamonds
+S12. try not to increment pointers (p++), better use p[i] and then increment i
+S13. do not compose calls, use temporary variables for the intermediate results
+S99. design things to be non-scalable
+S100. write the less general code that solves the problem
+
+
+
+
+ENUMS, STRUCTS, TYPEDEFS
+
+E0. use enums to list all the possible cases of a switch statement
+E1. use typedefs for basic types (e.g. float) that you want to abstract away
+E2. use typedefs to declare pointers to functions
+E3. do not use typedefs for anything else
+E4. use structs to hold related variables together
+E5. use structs to represent abstract data types
+E6. do not use structs for anything else
+E7. structs only need member functions if those functions are supposed to change
+E8. avoid getters and setters, access the struct fields directly
+E9. the most important data structures are arrays of numbers
+E10. other important structures are arrays of pointers to functions, use them!
+
+
+
+INTERFACE
+
+I0. separate interface and implementation
+I1. the interface is easy on the user and hard on the programmer
+I2. the interface does not expose macros, typedefs nor structs
+I3. the interface only exposes functions of plain data types
+I4. each file must be compilable stand-alone producing a useful CLI program
+I5. each file must be compilable with others as a single translation unit
+I6. use macros to enable different usages of the same file
+I7. the interface does not allocate memory: it fills-in a user-given array
+I8. allocate memory only inside main(), then you do not need to free it!
+I9. prefer a single large file than several smaller files
+    - exception: an archive of many functions that you want to link separately
+I10. foo.c never includes foo.h
+I11. do not use include guards (this helps to avoid diamonds)
+
+
+
+REFERENCES
+
+R0. K&R
+R1. Notes on programmin in C, Rob Pike, 1989
+R2. the MISRA C style guide
+R3. the JPL C style gude
+R4. the Linux kernel coding style
+
+
+
+
+
+EXAMPLES
+
+
+X0. The following construction should be avoided:
+
+	int num_vertices;
+	int num_edges;
+
+Use instead:
+
+	int n; // number of edges in the graph
+	int m; // number of vertices in the graph
+
+
+X1. The following construction should be avoided:
+
+	void my_function(...)
+	{
+		// declare the eschaton
+		do_stuff_1;
+		do_stuff_2;
+		do_stuff_3;
+
+		// immanentize the eschaton
+		do_more_stuff_1;
+		do_more_stuff_2;
+		do_more_stuff_3;
+
+		// mount the golden apple
+		yet_more_stuff_1;
+		yet_more_stuff_2;
+		yet_more_stuff_3;
+	}
+
+Use instead:
+
+	static void declare_the_eschaton(...)
+	{
+		do_stuff_1;
+		do_stuff_2;
+		do_stuff_3;
+	}
+
+	static void immanentize_the_eschaton(...)
+	{
+		do_more_stuff_1;
+		do_more_stuff_2;
+		do_more_stuff_3;
+	}
+
+	satic void mount_the_golden_apple(...)
+	{
+		yet_more_stuff_1;
+		yet_more_stuff_2;
+		yet_more_stuff_3;
+	}
+
+	void my_function(...)
+	{
+		declare_the_eschaton(...);
+		immanentize_the_eschaton(...);
+		mount_the_golden_apple(...);
+	}
+
+
+X2. The following construction should be avoided:
+
+	for (int i = 0; i < n; i++)
+	{
+		do_stuff_1;
+		do_stuff_2;
+		do_stuff_3;
+	}
+
+Use instead:
+
+	for (int i = 0; i < n; i++)
+		do_all_stuff(..., i);
+
+where "do_all_stuff" is a static function declared nearby.
+
+
+X3. The following type of construction should be avoiced:
+
+	// structure to store a graph as a list of vertex pairs
+	struct graph {
+		int number_of_vertices;
+		int number_of_edges;
+		int (*table_of_edges)[2];
+		float *vertex_values;
+		float *edge_weights;
+	};
+
+	// getters and setters
+
+	int graph_get_num_edges(struct graph *g)
+	{
+		return g->number_of_edges;
+	}
+
+	int graph_get_num_vertices(struct graph *g)
+	{
+		return g->number_of_vertices;
+	}
+
+	int graph_edge_from(struct graph *g, int e)
+	{
+		return g->table_of_edges[e][0];
+	}
+
+	int graph_edge_to(struct graph *g, int e)
+	{
+		return g->table_of_edges[e][1];
+	}
+
+	float graph_get_vertex_value(struct graph *g, int v)
+	{
+		return g->vertex_values[v];
+	}
+
+	void graph_set_vertex_value(struct graph *g, int v, float x)
+	{
+		g->vertex_values[v] = x;
+	}
+
+	float graph_get_edge_weight(struct graph *g, int v)
+	{
+		return g->edge_weights[v];
+	}
+
+	void graph_set_edge_weight(struct graph *g, int v, float x)
+	{
+		g->edge_weights[v] = x;
+	}
+
+	// serious functions on graphs
+
+	void graph_process(struct graph *g)
+	{
+		...
+	}
+
+	void my_function(...)
+	{
+		struct graph *g = graph_read_from_file("filename.txt");
+		graph_process(g);
+		int m = graph_get_num_edges(g);
+		for (int i = 0; i < m; i++)
+		{
+			int a = graph_edge_from(g, i);
+			int b = graph_edge_to(g, i);
+			float v_a = graph_get_vertex_value(g, a);
+			float v_b = graph_get_vertex_value(g, b);
+			float w_i = exp(fabs(v_a - v_b));
+			graph_set_edge_weight(g, i, w_i);
+		}
+	}
+
+Use instead:
+
+	// structure to store a graph as a list of vertex pairs
+	struct graph {
+		int n;       // number of vertices
+		int m;       // number of edges
+		int *e;      // table of edges (vertex index pairs)
+		float *v;    // vertex values
+		float *w;    // edge weights
+	};
+
+	// serious functions on graphs
+
+	void graph_process(struct graph *g)
+	{
+		...
+	}
+
+	float compute_weight(float x, float y)
+	{
+		return exp(fabs(x-y));
+	}
+
+	void my_function(...)
+	{
+		struct graph g;
+		graph_read_from_file(&g, "filename.txt");
+		graph_process(&g);
+		for (int i = 0; i < g.m; i++)
+		{
+			int *e = g->e + 2*i; // ith edge
+			int a = e[0];        // ith edge origin vertex
+			int b = e[1];        // ith edge destination vertex
+			float v_a = g.v[a];  // value of origin vertex
+			float v_b = g.v[b];  // value of destination vertex
+			g.w[i] = compute_weight(v_a, v_b);
+		}
+	}
+
+Notice that the second code is much simpler (good!), less general (good!), much
+shorter (good!), less prone to trivial errors (good!) and just as readable.
+
+There are some possible variations of the second code.  For example, if you
+dilike taking references and prefer acessing struct fields by "->" instead of
+".", or if you want to use fewer temporary variables, you can do
+
+	void my_function(...)
+	{
+		struct graph g[1];
+		graph_read_from_file(g, "filename.txt");
+		graph_process(g);
+		for (int i = 0; i < g->m; i++)
+		{
+			int *e = g->e + 2*i; // ith edge
+			g->w[i] = compute_weight(g->v[e[0]], g->v[e[1]]);
+		}
+	}
+
+or even, if you like this sort of thing (god forbid!)
+
+	void my_function(...)
+	{
+		struct graph g[1];
+		graph_read_from_file(g, "filename.txt");
+		graph_process(g);
+		for (int *e = g->e; e < g->e + 2*g->m; e += 2)
+			g->w[i] = compute_weight(g->v[e[0]], g->v[e[1]]);
+	}
+
+This kind of code is simply not possible when you are forced to use getters and
+setters.  Notice that since the "graph" struct is only visible on this file,
+the documentation of the fields is readily available.

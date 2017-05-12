@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -36,6 +37,7 @@ static bool size_is_admissible(double *size, int nsizes, int sidx, int x)
 		return size[sidx-1] < x;
 	return size[sidx-1] < x && x <= size[sidx];
 }
+static int floats_are_equal(float x, float y) { return x == y; }
 int main(int c, char *v[])
 {
 	if (c != 2)
@@ -69,7 +71,8 @@ int main(int c, char *v[])
 	int r = ccproc(out_size, out_bdsize, out_all, out_first, out_idx,
 			x, w, h,
 			//float_eq_isnan
-			floatnan_equality
+			//floatnan_equality
+			floats_are_equal
 			);
 
 	fprintf(stderr, "r = %d\n", r);

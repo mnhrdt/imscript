@@ -102,6 +102,7 @@ struct pan_state {
 	int interpolation_order;
 	int image_rotation_status;
 	int qauto;
+	int log_scale;
 	int show_srtm4, so;
 	int srtm4_base;
 };
@@ -266,6 +267,7 @@ static void init_state(struct pan_state *e,
 	e->interpolation_order = 0;
 	e->image_rotation_status = 0;
 	e->qauto = 0;
+	e->log_scale = 0;
 	e->show_srtm4 = 0;
 	e->so = 0;
 	e->srtm4_base = 0;
@@ -1017,8 +1019,12 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 			float c[3];
 			pixel(c, v, p[0], p[1], o, interp);
 			float *cc = v->fdisplay + 3 * (j * v->dw + i);
-			for (int l = 0; l < 3; l++)
-				cc[l] = e->a * c[l] + e->b;
+			if (!e->log_scale)
+				for (int l = 0; l < 3; l++)
+					cc[l] = e->a * c[l] + e->b;
+			else
+				for (int l = 0; l < 3; l++)
+					cc[l] = e->a*(32*log2(c[l]+1)-1) + e->b;
 		} else { // diff mode
 			int va = e->current_view;
 			int vb = good_modulus(e->current_view+1,e->nviews);
@@ -1208,7 +1214,14 @@ static void action_toggle_diff_mode(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
 	e->diff_mode = !e->diff_mode;
+	request_repaints(f);
+}
 
+static void action_toggle_log_scale(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->log_scale = !e->log_scale;
+	fprintf(stderr, "log scale = %s\n", e->log_scale?"YES":"NO");
 	request_repaints(f);
 }
 
@@ -1415,6 +1428,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == ' ') action_cycle_view(f, 1, x, y);
 	if (k == '\b') action_cycle_view(f, -1, x, y);
 	if (k == '\'') action_toggle_diff_mode(f);
+	if (k == 'y') action_toggle_log_scale(f);
 	if (k == 'r') action_cycle_rotation_status(f);
 	if (k == 'c') action_cycle_contrast(f, +1);
 	if (k == 'C') action_cycle_contrast(f, -1);
