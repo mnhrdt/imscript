@@ -553,18 +553,18 @@ static const char *iio_strtyp(int type)
 #undef M
 }
 
-static int iio_inttyp(const char *typename)
+static int iio_inttyp(const char *type_name)
 {
-	int n = strlen(typename);
+	int n = strlen(type_name);
 	char utyp[n+1]; utyp[n] = '\0';
 	for (int i = 0; i < n; i++)
-		utyp[i] = toupper(typename[i]);
+		utyp[i] = toupper(type_name[i]);
 #define M(t) if(!strcmp(utyp,#t))return IIO_TYPE_ ## t
 	M(INT8); M(UINT8); M(INT16); M(UINT16); M(INT32); M(UINT32); M(INT64);
 	M(UINT64); M(FLOAT); M(DOUBLE); M(LONGDOUBLE); M(HALF); M(UINT1);
 	M(UINT2); M(UINT4); M(CHAR); M(SHORT); M(INT); M(LONG); M(LONGLONG);
 #undef M
-	fail("unrecognized typename \"%s\"", typename);
+	fail("unrecognized typename \"%s\"", type_name);
 }
 
 static const char *iio_strfmt(int format)
