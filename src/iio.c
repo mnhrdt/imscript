@@ -3088,20 +3088,22 @@ static void iio_write_image_as_pfm(const char *filename, struct iio_image *x)
 }
 
 // ASC writer                                                               {{{2
-//static void iio_write_image_as_asc(const char *filename, struct iio_image *x)
-//{
-//	FILE *f = xfopen(filename, "w");
-//	int w = x->sizes[0];
-//	int h = x->sizes[1];
-//	int d = x->sizes[2];
-//	int pd = x->pixel_dimension;
-//	float *t = x->data;
-//	fprintf(f, "%d %d %d %d\n", w, h, d, pd);
-//	for (int i = 0; i < w*h*d*pd; i++)
-//		fprintf(f, "%a\n", t[i]);
-//	fwrite(x->data, w * h * x->pixel_dimension * sizeof(float), 1 ,f);
-//	xfclose(f);
-//}
+static void iio_write_image_as_asc(const char *filename, struct iio_image *x)
+{
+	assert(x->type == IIO_TYPE_FLOAT);
+	assert(x->dimension == 2);
+	FILE *f = xfopen(filename, "w");
+	int w = x->sizes[0];
+	int h = x->sizes[1];
+	int pd = x->pixel_dimension;
+	fprintf(f, "%d %d 1 %d\n", w, h, pd);
+	float *t = xmalloc(w*h*pd*sizeof*t);
+	break_pixels_float(t, x->data, w*h, pd);
+	for (int i = 0; i < w*h*pd; i++)
+		fprintf(f, "%a\n", t[i]);
+	xfree(t);
+	xfclose(f);
+}
 
 // CSV writer                                                               {{{2
 static void iio_write_image_as_csv(const char *filename, struct iio_image *x)
@@ -4028,6 +4030,10 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 	if (string_suffix(filename, ".mw") && typ == IIO_TYPE_UINT8
 				&& x->pixel_dimension == 1) {
 		iio_write_image_as_rim_cimage(filename, x);
+		return;
+	}
+	if (string_suffix(filename, ".asc") && typ == IIO_TYPE_FLOAT) {
+		iio_write_image_as_asc(filename, x);
 		return;
 	}
 #ifdef I_CAN_HAS_LIBTIFF
