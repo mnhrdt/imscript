@@ -19,9 +19,10 @@ int main(int c, char *v[])
 	{
 		if (c == 1)
 		{
-			fprintf(stderr, "%s\t", t[i].n);
-			char *newv[] = {v[0], "-?", 0};
-			t[i].f(1, newv);
+			char *newv[] = {t[i].n, "--help-oneliner", 0};
+			printf("%s\t", t[i].n);
+			//fflush(stdout);
+			//t[i].f(2, newv);
 		}
 		if (c > 1 && !strcmp(v[1], t[i].n))
 			return t[i].f(c - 1, v + 1);
