@@ -1,5 +1,7 @@
 	MAIN(plambda)
 	MAIN(vecov)
+	MAIN(veco)
+	MAIN(vecoh)
 	MAIN(morsi)
 	MAIN(downsa)
 	MAIN(upsa)
