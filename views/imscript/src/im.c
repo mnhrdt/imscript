@@ -20,7 +20,7 @@ int main(int c, char *v[])
 		if (c == 1)
 		{
 			char *newv[] = {t[i].n, "--help-oneliner", 0};
-			printf("%s\t", t[i].n);
+			printf("%s\n", t[i].n);
 			//fflush(stdout);
 			//t[i].f(2, newv);
 		}
