@@ -65,17 +65,17 @@ static char *help_string_long     =
 #include <stdlib.h>
 #include "help_stuff.c" // functions that print the strings named above
 #include "iio.h"
-int main_flip(int c, char *v[])
+int main_imflip(int c, char *v[])
 {
 	// process "help" arguments
 	if (c == 2)
 		if_help_is_requested_print_it_and_exit_the_program(v[1]);
 
 	// get positional arguments
-	if (c != 3 && c != 2 && c != 1) {
+	if (c != 2 && c != 3 && c != 4) {
 		fprintf(stderr, "usage:\n\t"
 			"%s {leftright|topdown|transpose} [in [out]]\n", *v);
-		//                0  1   2
+		//        0 1                              2   3
 		return 1;
 	}
 	char *op = v[1];
@@ -101,6 +101,7 @@ int main_flip(int c, char *v[])
 		if (!strcmp(op, "bottomup"))  flip_topdown  (Y, wh, X, w, h);
 		if (!strcmp(op, "updown"))    flip_topdown  (Y, wh, X, w, h);
 		if (!strcmp(op, "ud"))        flip_topdown  (Y, wh, X, w, h);
+		if (!strcmp(op, "td"))        flip_topdown  (Y, wh, X, w, h);
 		if (!strcmp(op, "tb"))        flip_topdown  (Y, wh, X, w, h);
 		if (!strcmp(op, "bu"))        flip_topdown  (Y, wh, X, w, h);
 		if (!strcmp(op, "transpose")) flip_transpose(Y, wh, X, w, h);
@@ -118,5 +119,5 @@ int main_flip(int c, char *v[])
 }
 
 #ifndef HIDE_ALL_MAINS
-int main(int c, char **v) { return main_flip(c, v); }
+int main(int c, char **v) { return main_imflip(c, v); }
 #endif
