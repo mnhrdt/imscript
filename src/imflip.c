@@ -36,7 +36,57 @@ static void flip_transpose(float *X, int *WH, float *x, int w, int h)
 		X[j*W+i] = x[i*w+j];
 }
 
-// TODO: add straight angle rotations
+static void flip_r90(float *X, int *WH, float *x, int w, int h)
+{
+	int W = WH[0] = h;
+	int H = WH[1] = w;
+
+	for (int j = 0; j < H; j++)
+	for (int i = 0; i < W; i++)
+		X[j*W+i] = x[i*w+(w-1-j)];
+}
+
+static void flip_r270(float *X, int *WH, float *x, int w, int h)
+{
+	int W = WH[0] = h;
+	int H = WH[1] = w;
+
+	for (int j = 0; j < H; j++)
+	for (int i = 0; i < W; i++)
+		X[j*W+i] = x[(h-1-i)*w+j];
+}
+
+static void flip_r180(float *X, int *WH, float *x, int w, int h)
+{
+	int W = WH[0] = w;
+	int H = WH[1] = h;
+
+	for (int j = 0; j < H; j++)
+	for (int i = 0; i < W; i++)
+		X[j*W+i] = x[(h-1-j)*w+(w-1-i)];
+}
+
+static void flip_posetrans(float *X, int *WH, float *x, int w, int h)
+{
+	int W = WH[0] = h;
+	int H = WH[1] = w;
+
+	for (int j = 0; j < H; j++)
+	for (int i = 0; i < W; i++)
+		X[j*W+i] = x[(w-1-i)*w+(h-1-j)];
+}
+
+static void flip_identity(float *X, int *WH, float *x, int w, int h)
+{
+	int W = WH[0] = w;
+	int H = WH[1] = h;
+
+	for (int j = 0; j < H; j++)
+	for (int i = 0; i < W; i++)
+		X[j*W+i] = x[j*w + i];
+}
+
+// note: all 8 elements of the D8 are covered now
 
 
 static char *help_string_name     = "imflip";
@@ -61,6 +111,7 @@ static char *help_string_long     =
 "\n"
 "Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>."
 ;
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "help_stuff.c" // functions that print the strings named above
@@ -78,7 +129,7 @@ int main_imflip(int c, char *v[])
 		//        0 1                              2   3
 		return 1;
 	}
-	char *op = v[1];
+	char *op = v[1]; if (*op) *op = tolower(*op);
 	char *filename_in = c > 2 ? v[2] : "-";
 	char *filename_out = c > 3 ? v[3] : "-";
 
@@ -92,6 +143,14 @@ int main_imflip(int c, char *v[])
 	{
 		float *X = x + l*w*h;
 		float *Y = y + l*w*h;
+		if (!strcmp(op, "1"))         flip_identity(Y, wh, X, w, h);
+		if (!strcmp(op, "x"))         flip_leftright(Y, wh, X, w, h);
+		if (!strcmp(op, "y"))         flip_topdown  (Y, wh, X, w, h);
+		if (!strcmp(op, "r"))         flip_r90      (Y, wh, X, w, h);
+		if (!strcmp(op, "rr"))        flip_r180     (Y, wh, X, w, h);
+		if (!strcmp(op, "rrr"))       flip_r270     (Y, wh, X, w, h);
+		if (!strcmp(op, "t"))         flip_transpose(Y, wh, X, w, h);
+		if (!strcmp(op, "z"))         flip_posetrans(Y, wh, X, w, h);
 		if (!strcmp(op, "leftright")) flip_leftright(Y, wh, X, w, h);
 		if (!strcmp(op, "rightleft")) flip_leftright(Y, wh, X, w, h);
 		if (!strcmp(op, "lr"))        flip_leftright(Y, wh, X, w, h);
@@ -106,11 +165,12 @@ int main_imflip(int c, char *v[])
 		if (!strcmp(op, "bu"))        flip_topdown  (Y, wh, X, w, h);
 		if (!strcmp(op, "transpose")) flip_transpose(Y, wh, X, w, h);
 		if (!strcmp(op, "trans"))     flip_transpose(Y, wh, X, w, h);
-		if (!strcmp(op, "t"))         flip_transpose(Y, wh, X, w, h);
-		//if (!strcmp(op, "r90"))       flip_r90      (Y, wh, X, w, h);
-		//if (!strcmp(op, "r-90"))      flip_rm90     (Y, wh, X, w, h);
-		//if (!strcmp(op, "r270"))      flip_rm90     (Y, wh, X, w, h);
-		//if (!strcmp(op, "r180"))      flip_r180     (Y, wh, X, w, h);
+		if (!strcmp(op, "posetrans")) flip_posetrans(Y, wh, X, w, h);
+		if (!strcmp(op, "r90"))       flip_r90      (Y, wh, X, w, h);
+		if (!strcmp(op, "r-90"))      flip_r270     (Y, wh, X, w, h);
+		if (!strcmp(op, "rm90"))      flip_r270     (Y, wh, X, w, h);
+		if (!strcmp(op, "r270"))      flip_r270     (Y, wh, X, w, h);
+		if (!strcmp(op, "r180"))      flip_r180     (Y, wh, X, w, h);
 	}
 
 	// save and exit
