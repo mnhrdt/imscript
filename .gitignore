@@ -1,5 +1,3 @@
-src/*.o
+*.o
+*.a
 bin/*
-stuff/lena.png
-views/bursts/bin/*
-views/bursts/test/tmp/*

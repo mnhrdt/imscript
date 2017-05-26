@@ -1,0 +1,92 @@
+This repository has too many programs.  There are a few important,
+"core" programs intermingled with dozens of silly, irrelevant or very
+specific utils.
+
+This file gives a list of the relevant programs.
+
+
+CORE: generic tools for image processing
+
+	plambda:  apply an expression with images as variables
+	blur:     convolution by a positive kernel
+	downsa:   zoom out
+	upsa:     zoom in
+	ntiply:   replicate pixels
+	crop:     extract a sub-image
+	fft/iift: discrete fourier transform of an image, and its inverse
+	dct:      discrete cosine transform of an image (self-inverse)
+	dht:      discrete hartley transform of an image (self-inverse)
+	imprintf: print info and statistics of an image
+	fontu:    overlay a text in an image
+	veco:     accumulate values over a list of gray images
+	vecov:    accumulate values over a list of multispectral images
+	morsi:    elementary gray-level morphological operations
+	simpois:  poisson and bilaplacian iterative solvers
+	imgerr:   compare two images (obsoleted by plambda+imprintf)
+	qeasy:    quantize an image into [0,255], hand-selected saturation
+	qauto:    quantize an image into [0,255], automatic saturation
+	iion:     copy (useful for converting between formats)
+
+
+NO-CORE: more specific tasks
+
+	tiffu:    various mini-utils for dealing with TIFF files
+	siftu:    various mini-utils for dealing with sift points
+	ransac:   compute robust models from data points
+	srmatch:  successive multi-scale matching of sift keypoints
+	amle:     infinity-laplacian equation
+	nnint:    nearest-neighbor interpolation
+	bdint:    boundary aggregation interpolation
+	elap:     laplace interpolation (mostly obsoleted by simpois)
+	distance: image of distances to a set of points
+	deframe:  projective crop (defined by 4 points in the image)
+	cdeint:   deinterlace a video frame
+
+
+FLOW: utils for producing or transforming vector fields
+
+	synflow:    generate a parametric synthetic vector field
+	backflow:   warp an image by a vector field
+	flowinv:    compute the inverse vector field
+	flowdiv:    compute the divergence of a vector field
+	flowgrad:   compute the gradient of a vector field
+	flow_ms:    multi-scale optical flow
+	lk,hs,tvl1: different flavors of optical flow
+
+
+VIS: utils for data visualization
+
+	viewflow:   color code for a vector field
+	flowarrows: display a vector field using arrows
+	ghisto:     gray-level histogram (to be piped to gnuplot)
+	chisto:     color histograms
+	pview:      plot points and lines given by ascii numbers
+
+
+WANTED: not yet implemented/ported from qnm
+
+	fderiv:    partial derivatives of various types and schemes
+	ccfilt:    compute connected components of a binary image
+	ccbound:   compute boundaries of connected components
+	ccdist:    distance transform
+	cctree:    compute upper/lower/shape tree of a given image
+	ccreco:    reconstruct an image from its tree
+
+GUI: utils with an interactive user interface
+
+	fpan:      visualize an image, with interactive panning and contrast
+	fpantiff:  visualize a huge TIFF image in realtime
+	icrop2:    pipeable interactive crop
+	powerkill: paint in black in the frequency domain
+	rpcflip:   visualize satellite images and their RPC
+	viho:      interactive deformation of an image by an homography
+	vnav:      navigate a borehole image and apply the dip picker transform
+	vhough:    explore the hough transform space side-by-side
+	dosdo:     explore the frequency domain side-by-side
+	epiview:   visualize epipolar lines of a fundamental matrix
+
+
+
+
+
+# vim:set tw=69 filetype=text:
