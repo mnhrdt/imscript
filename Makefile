@@ -27,5 +27,11 @@ clean:
 	$(RM) $(OBJ) $(LIB) $(BIN)
 .PHONY: default clean
 
-# hacks (compatibility hacks for old compilers)
+# unit test (end-to-end)
+test: bin/plambda bin/imprintf
+	bin/plambda zero:512x512 "randg randg randl randg randg 5 njoin" \
+	| bin/plambda - "split rot del hypot" | bin/imprintf "%s%e%r%i%a\n" \
+	| grep -q 3775241.440161.730120.0037888911.8794
+
+# hacks (compatibility flags for old compilers)
 -include src/make.hacks.mk
