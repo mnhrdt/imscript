@@ -6,6 +6,7 @@
 //
 //
 // This is not a terminal emulator.
+//
 // It does not have a concept of "tty" or "session", or other bullshit.
 // This is just a program that shows the output of another program as
 // characters drawn on a rectangular window.
@@ -14,7 +15,11 @@
 // The goal of this program is to be as simple as possible and fulfill the
 // required task; there is no concern for efficiency.
 // The only (inevitable) legacy is that old vt100 control sequences are used.
-// This is to avoid having to define an essentially arbitrari terminfo.
+// This is to avoid having to define an essentially arbitrary terminfo.
+//
+// This should come as fresh air in the world of bloated programs such as
+// xterm, rxvt, or st.  Even the leanest of these programs (st) relies on huge
+// dependences like libfreetype and obnoxious concepts such as pty.
 //
 
 #include "ftr.c"
@@ -25,15 +30,15 @@
 // a terminal is just a 80x25 matrix of characters, with some options
 struct terminal {
 	// essential data
-	int w, h; // size in characters (always 80x25)
-	int *letters;    // unicode points
+	int w, h;        // size in characters (always 80x25)
+	int *letters;    // table of W*H unicode points
 
 	// ancillary
 	int cursorx, cursory;
 	int kerning;
 	int spacing;
 	struct bitmap_font font[1];
-	int *attributes; // colors and whatnot
+	int *attributes; // colors and whatnot (table of W*H)
 
 	// output of the program running inside the terminal at this moment
 	FILE *stream;
@@ -62,7 +67,7 @@ void term_puts(struct terminal *t, char *s)
 	}
 }
 
-// todo: do not use this function
+// todo: do not call directly this function
 void term_add_char_under_cursor(struct terminal *t, int c)
 {
 	if (t->cursorx >= 0 && t->cursorx < t->w)
@@ -70,14 +75,14 @@ void term_add_char_under_cursor(struct terminal *t, int c)
 		t->letters[t->cursory * t->w + t->cursorx] = c;
 }
 
-// todo: do not use this function
+// todo: do not call directly this function
 void term_new_line(struct terminal *t)
 {
 	t->cursory += 1;
 	t->cursorx = 0;
 }
 
-// todo: do not use this function
+// todo: do not call directly this function
 void term_advance_cursor(struct terminal *t)
 {
 	if (t->cursorx < t->w -1)

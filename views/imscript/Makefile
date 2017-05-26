@@ -1,5 +1,5 @@
 # user-editable configuration (with reasonable defaults)
-CFLAGS ?= -march=native -Os
+CFLAGS ?= -march=native -O3
 
 # required libraries
 LDLIBS = -ljpeg -ltiff -lpng -lz -lfftw3f -lm
@@ -32,7 +32,7 @@ bin/% : src/%.c $(LIB)
 bin/% : src_ftr/%.c $(LIB_FTR)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS_FTR)
 
-$(LIB) : $(LIB)($(OBJ))
+$(LIB)     : $(LIB)($(OBJ))
 $(LIB_FTR) : $(LIB_FTR)($(OBJ_FTR))
 
 # bureaucracy
