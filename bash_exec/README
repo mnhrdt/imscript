@@ -1,0 +1,37 @@
+******************* one4many INTRO *******************
+If you don't want to install all these executables in your bin, there's no need to. For that, you might prefer to regroup all the proposed programs in one (which will be the only one in your bin). This is just a caller that will simulate having all the proposed software as options.
+
+REMARK: The caller script in your bin will have autocompletion with <Tab>.
+
+******************* Setting up *******************
+Let's say that you have compiled imscript at "/Sources/imscript". 
+Now, you would like to modify one line in the file imscript.bash:
+
+(-) binpath="/path2bin" 
+(+) binpath="/Sources/imscript/bin" 
+
+Then, copy
+
+imscript.bash -> /usr/bin/imscript
+imscript.autocompletion -> /etc/bash_completion.d/imscript
+
+and finally, either re-login or type in your active terminal:
+
+. /etc/bash_completion.d/imscript
+
+
+******************* Usage (examples) *******************
+
+Listing all the software provided by Enric:
+imscript <Tab><Tab>
+
+Three way of calling Enric's programs:
+
+(Explicit)
+imscript plambda complex_image.tif "vnorm" -o image_intensity.tif
+
+(Redirecting stdout to file)
+imscript plambda snap_crop_vnorm.tif "vnorm" > image_intensity.tif
+
+(Pipelines)
+cat complex_image.tif | imscript plambda - "vnorm" -o image_intensity.tif

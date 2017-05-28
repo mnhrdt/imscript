@@ -1,0 +1,24 @@
+shopt -s globstar
+_imscript() 
+{
+    local cur prev opts
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    opts=$(ls /home/rdguez-mariano/Sources/imscript/bin/)
+
+  if [ $COMP_CWORD -eq 1 ]; then
+        COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+        return 0
+  else
+        cur=${cur//\\ / }
+        # Expand tilder to $HOME
+        [[ ${cur} == "~/"* ]] && cur=${cur/\~/$HOME}
+        # Show completion if path exist (and escape spaces)
+        compopt -o filenames
+        local files=("${cur}"*)
+        [[ -e ${files[0]} ]] && COMPREPLY=( "${files[@]// /\ }" )
+        return 0
+  fi
+}
+complete -F _imscript imscript

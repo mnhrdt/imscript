@@ -334,7 +334,8 @@ static char *help_string_long     =
 "Options:\n"
 " -o file      use a named output file instead of stdout\n"
 " -g GOODNESS  use a specific GOODNESS criterion for discarding samples\n"
-" -x NUMS      instead of images, combine the given numbers\n"
+" -x NUMBERS   instead of images, combine the given numbers\n"
+" -c IMAGE     operate over the columns of a single image\n"
 "\n"
 "Operations:\n"
 " min          minimum value of the good samples\n"
@@ -380,6 +381,7 @@ int main_veco(int c, char *v[])
 {
 	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
 	bool use_numbers =   pick_option(&c, &v, "x", 0);
+	bool by_columns =    pick_option(&c, &v, "c", 0);
 	char *goodness =     pick_option(&c, &v, "g", "numeric");
 	char *filename_out = pick_option(&c, &v, "o", "-");
 	if (c < 3) {
@@ -453,6 +455,20 @@ int main_veco(int c, char *v[])
 				tmp[ngood++] = x[i];
 		float y = f(tmp, ngood);
 		printf("%g\n", y);
+	} else if (n == 1 && by_columns) {
+		int w, h;
+		float *x = iio_read_image_float(v[2], &w, &h);
+		float *y = xmalloc(w * sizeof*y);
+		for (int i = 0; i < w; i++)
+		{
+			float tmp[h];
+			int ngood = 0;
+			for (int j = 0; j < h; j++)
+				if (isgood(x[j*w+i]))
+					tmp[ngood++] = x[j*w+i];
+			y[i] = f(tmp, ngood);
+		}
+		iio_write_image_float(filename_out, y, w, 1);
 	} else {
 		float *x[n];
 		int w[n], h[n];
