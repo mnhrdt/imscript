@@ -1,1 +1,0 @@
-../src/fancy_image.c
