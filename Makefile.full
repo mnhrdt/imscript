@@ -1,0 +1,31 @@
+# this file adds new targets to the default makefile
+include Makefile.minimal
+
+OBJ_FTR = $(OBJ) src_ftr/ftr.o src_ftr/egm96.o
+LIB_FTR = src_ftr/libftr.a
+BIN_FTR = viho fpan fpantiff rpcflip icrop
+BIN_LEG = histomodev
+
+BIN_FTR := $(addprefix bin/,$(BIN_FTR))
+BIN_LEG := $(addprefix bin/,$(BIN_LEG))
+
+LDLIBS_FTR = $(LDLIBS) -lX11
+
+OBJ_ALL = $(OBJ) $(OBJ_FTR)
+LIB_ALL = $(LIB) $(LIB_FTR)
+BIN_ALL = $(BIN) $(BIN_FTR) $(BIN_LEG)
+
+
+full: $(BIN_ALL)
+
+bin/% : src_ftr/%.c $(LIB_FTR)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS_FTR)
+
+bin/% : src_legacy/%.c $(LIB)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
+
+$(LIB_FTR) : $(LIB_FTR)($(OBJ_FTR))
+
+clean-full:
+	$(RM) $(OBJ_ALL) $(LIB_ALL) $(BIN_ALL)
+.PHONY: full clean-full
