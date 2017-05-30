@@ -1,10 +1,6 @@
-# user-editable configuration (with reasonable defaults)
 CFLAGS ?= -march=native -Os
-
-# required libraries
 LDLIBS = -ljpeg -ltiff -lpng -lz -lfftw3f -lm
 
-# variables
 OBJ = src/iio.o src/fancy_image.o
 LIB = src/libiio.a
 BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
@@ -15,23 +11,22 @@ BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
 
 BIN := $(addprefix bin/,$(BIN))
 
-# default target
 default: $(BIN)
 
-# rules
-bin/% : src/%.c $(LIB)
+bin/%  : src/%.c $(LIB)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
 
 $(LIB) : $(LIB)($(OBJ))
+
+
+
+
+# END OF CORE PART, THE REST OF THIS FILE IS NOT ESSENTIAL
 
 # bureaucracy
 clean:
 	$(RM) $(OBJ) $(LIB) $(BIN)
 .PHONY: default clean
-
-# END OF CORE PART, THE REST OF THIS FILE IS NOT ESSENTIAL
-
-
 
 # unit test (end-to-end)
 ifeq ($(MAKECMDGOALS),test)
