@@ -20,7 +20,7 @@
 
 #define OMIT_MAIN_FONTU
 #include "fontu.c"
-#include "fonts/xfont9x15.c"
+#include "fonts/xfont_9x15.c"
 
 // VISUALIZATION:
 // * A single window split in half.
@@ -97,7 +97,7 @@ static void img_debug(float *x, int w, int h, int pd, const char *fmt, ...)
 	vsnprintf(fname, FILENAME_MAX, fmt, ap);
 	va_end(ap);
 	fprintf(stderr, "IMG_DEBUG(%dx%d,%d) \"%s\"\n", w, h, pd, fname);
-	iio_save_image_float_vec(fname, x, w, h, pd);
+	iio_write_image_float_vec(fname, x, w, h, pd);
 }
 
 static void action_offset_viewport(struct FTR *f, int dx, int dy)
@@ -323,7 +323,7 @@ static void action_save_shot(struct FTR *f)
 	static int shot_counter = 1;
 	char fname[FILENAME_MAX];
 	snprintf(fname, FILENAME_MAX, "/tmp/vnav_shot_%d.png", shot_counter);
-	iio_save_image_uint8_vec(fname, f->rgb, f->w, f->h, 3);
+	iio_write_image_uint8_vec(fname, f->rgb, f->w, f->h, 3);
 	fprintf(stderr, "saved shot \"%s\"\n", fname);
 	shot_counter += 1;
 }
@@ -601,7 +601,7 @@ int main_pan(int c, char *v[])
 	e->x_w = e->f_w = BAD_BOUND(100, e->w, 700);
 	e->contrast_mode = 0;
 	e->head_up_display = true;
-	e->font = *xfont9x15;
+	e->font = *xfont_9x15;
 	e->font = reformat_font(e->font, UNPACKED);
 
 	// open window

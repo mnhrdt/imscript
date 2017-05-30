@@ -50,7 +50,7 @@ static unsigned char *read_image_uint8_rgb(char *fname, int *w, int *h)
 
 static void write_image_uint8_rgb(char *fname, unsigned char *x, int w, int h)
 {
-	iio_save_image_uint8_vec(fname, x, w, h, 3);
+	iio_write_image_uint8_vec(fname, x, w, h, 3);
 }
 
 

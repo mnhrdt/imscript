@@ -21,7 +21,7 @@
 
 #define OMIT_MAIN_FONTU
 #include "fontu.c"
-#include "fonts/xfont9x15.c"
+#include "fonts/xfont_9x15.c"
 
 // VISUALIZATION:
 // * A single window split in half.
@@ -360,7 +360,7 @@ static void action_save_shot(struct FTR *f)
 	static int shot_counter = 1;
 	char fname[FILENAME_MAX];
 	snprintf(fname, FILENAME_MAX, "/tmp/epiview_shot_%d.png", shot_counter);
-	iio_save_image_uint8_vec(fname, f->rgb, f->w, f->h, 3);
+	iio_write_image_uint8_vec(fname, f->rgb, f->w, f->h, 3);
 	fprintf(stderr, "saved shot \"%s\"\n", fname);
 	shot_counter += 1;
 }
@@ -581,7 +581,7 @@ int main_pan(int c, char *v[])
 	e->dip_abc[0] = NAN;
 	e->head_up_display = false;
 	e->lock_transform = false;
-	e->font = *xfont9x15;
+	e->font = *xfont_9x15;
 	e->font = reformat_font(e->font, UNPACKED);
 
 	// open window

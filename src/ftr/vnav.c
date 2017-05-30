@@ -67,7 +67,7 @@
 #define M_LN10 2.30258509299404568402
 #endif /* !M_LN10 */
 
-#include "simpois.c"
+#include "minisimpois.c"
 
 #define OMIT_BLUR_MAIN
 #include "blur.c"
@@ -77,8 +77,7 @@
 
 #define OMIT_MAIN_FONTU
 #include "fontu.c"
-#define FONT_BDF_FILE "/home/coco/.fonts2/9x15.bdf"
-#include "xfont9x15.c"
+#include "fonts/xfont_9x15.c"
 
 #include "seconds.c"
 
@@ -262,7 +261,7 @@ static void img_debug(float *x, int w, int h, int pd, const char *fmt, ...)
 	vsnprintf(fname, FILENAME_MAX, fmt, ap);
 	va_end(ap);
 	fprintf(stderr, "IMG_DEBUG(%dx%d,%d) \"%s\"\n", w, h, pd, fname);
-	iio_save_image_float_vec(fname, x, w, h, pd);
+	iio_write_image_float_vec(fname, x, w, h, pd);
 }
 
 
@@ -1213,7 +1212,7 @@ static void action_save_shot(struct FTR *f)//{{{2
 	static int shot_counter = 1;
 	char fname[FILENAME_MAX];
 	snprintf(fname, FILENAME_MAX, "/tmp/vnav_shot_%d.png", shot_counter);
-	iio_save_image_uint8_vec(fname, f->rgb, f->w, f->h, 3);
+	iio_write_image_uint8_vec(fname, f->rgb, f->w, f->h, 3);
 	fprintf(stderr, "saved shot \"%s\"\n", fname);
 	shot_counter += 1;
 }
@@ -1225,12 +1224,12 @@ static void action_save_fancy_shot(struct FTR *f)//{{{2
 	char fname[FILENAME_MAX];
 	{ // screenshot
 		snprintf(fname, FILENAME_MAX, "/tmp/vnav_shot_%d.png", scx);
-		iio_save_image_uint8_vec(fname, f->rgb, f->w, f->h, 3);
+		iio_write_image_uint8_vec(fname, f->rgb, f->w, f->h, 3);
 		fprintf(stderr, "saved shot \"%s\"\n", fname);
 	}
 	{ // data shot
 		snprintf(fname, FILENAME_MAX, "/tmp/vnav_dshot_%d.tiff", scx);
-		iio_save_image_float(fname, e->strip, e->strip_w, e->strip_h);
+		iio_write_image_float(fname, e->strip, e->strip_w, e->strip_h);
 	}
 	{ // gradient shot
 		snprintf(fname, FILENAME_MAX, "/tmp/vnav_gshot_%d.tiff", scx);
@@ -1246,7 +1245,7 @@ static void action_save_fancy_shot(struct FTR *f)//{{{2
 			g[j][i][0] = Z/hypot(1, Z);
 			g[j][i][1] = -1/hypot(1, Z);
 		}
-		iio_save_image_float_vec(fname, gg, e->strip_w, e->strip_h, 2);
+		iio_write_image_float_vec(fname, gg, e->strip_w, e->strip_h, 2);
 		free(gg);
 	}
 	scx += 1;
@@ -1874,7 +1873,7 @@ int main_pan(int c, char *v[])
 	e->randomized = 0;
 	e->autocontrast = true;
 	//font_fill_from_bdf(&e->font, FONT_BDF_FILE);
-	e->font = *xfont9x15;
+	e->font = *xfont_9x15;
 	e->font = reformat_font(e->font, UNPACKED);
 	e->tensor = 1;
 	e->ntensor = 9;
