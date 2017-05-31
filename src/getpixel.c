@@ -1,6 +1,8 @@
 #ifndef GETPIXEL_C
 #define GETPIXEL_C
 
+#include <stdlib.h>
+
 typedef float (*getsample_operator)(float*,int,int,int,int,int,int);
 //typedef void (*setsample_operator)(float*,int,int,int,int,int,int,float);
 
@@ -126,6 +128,7 @@ float getsample_constant(float *x, int w, int h, int pd, int i, int j, int l)
 		return value;
 	return x[(i+j*w)*pd + l];
 }
+
 
 // test for inclusion of stdlib.h and string.h
 #if defined(EXIT_SUCCESS)
