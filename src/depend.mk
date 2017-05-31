@@ -52,7 +52,7 @@ fftshift: fftshift.c iio.h
 imflip: imflip.c help_stuff.c iio.h
 bmms: bmms.c xmalloc.c fail.c getpixel.c iio.h pickopt.c
 registration: registration.c iio.h
-blur: blur.c fail.c xmalloc.c smapa.h iio.h parsenumbers.c
+blur: blur.c fail.c xmalloc.c smapa.h help_stuff.c parsenumbers.c iio.h
 fft: fft.c iio.h fail.c xmalloc.c
 dct: dct.c iio.h
 dht: dht.c iio.h xmalloc.c fail.c

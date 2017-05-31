@@ -53,10 +53,9 @@ libiio.a: $(OBJ)
 
 
 # automatic generation of dependencies
-.depend.mk: $(MAKEFILE_LIST)
-#	-$(CC) -MM $(BIN:=.c) > .depend.mk
-	-$(CC) -MM $(BIN:=.c) | sed 's/\.o:/:/' > .depend.mk
--include .depend.mk
+depend.mk: $(MAKEFILE_LIST)
+	-$(CC) -MM $(BIN:=.c) | sed 's/\.o:/:/' > depend.mk
+-include depend.mk
 
 
 # bureaucracy
