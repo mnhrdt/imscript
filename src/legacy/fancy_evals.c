@@ -1,4 +1,4 @@
-#include "fancy_image.c"
+#include "fancy_image.h"
 #include <stdio.h>
 int main(int c, char *v[])
 {

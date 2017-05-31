@@ -165,7 +165,7 @@ int hs_init_stopping(float *u, float *v,
 int main(int argc, char *argv[])
 {
 	if (argc != 8 && argc != 9)
-		exit(fpiintf(stderr, "usage:\n\t%s niter alpha i m a b f\n",
+		exit(fprintf(stderr, "usage:\n\t%s niter alpha i m a b f\n",
 					*argv));
 	int niter = atoi(argv[1]);
 	float alpha = atof(argv[2]);

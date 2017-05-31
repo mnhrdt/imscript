@@ -5,19 +5,6 @@
 #include <string.h>
 
 
-// utility function that always returns a valid pointer to memory
-static void *xmalloc(size_t n)
-{
-	void *new = malloc(n);
-	if (!new)
-	{
-		fprintf(stderr, "xmalloc: can not malloc %zu bytes\n", n);
-		exit(1);
-	}
-	return new;
-}
-
-
 // the type of a "getpixel" function
 typedef float (*getpixel_operator)(float*,int,int,int,int);
 
@@ -96,6 +83,8 @@ static float perform_one_iteration(float *x, int w, int h,
 }
 
 
+#include "xmalloc.c"
+
 // build a mask of the NAN positions on image "x"
 // the output "mask[i][2]" contains the two coordinates of the ith masked pixel
 static int (*build_mask(int *out_nmask, float *x, int w, int h))[2]
@@ -164,7 +153,9 @@ static int cpair_rev(const void *aa, const void *bb)
 	return cpair(bb, aa);
 }
 
-void fill_distance_fast(float *distimage, int width, int height, float *points, int npoints);
+//void fill_distance_fast(float *distimage, int width, int height, float *points, int npoints);
+#define OMIT_DISTANCE_MAIN
+#include "distance.c"
 
 static void reorder_mask(int (*m)[2], int n, float *x, int w, int h, char *opt)
 {

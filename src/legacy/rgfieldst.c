@@ -45,6 +45,8 @@ static double random_normal(void)
 	return y1;
 }
 
+#define OMIT_GBLUR_MAIN
+#include "gblur.c"
 
 void fill_random_fields(float *f, int w, int h, int d,
 		float sigma, float eta[6])
@@ -52,7 +54,6 @@ void fill_random_fields(float *f, int w, int h, int d,
 	for (int i = 0; i < w * h * d * 2; i++)
 		f[i] = sigma*random_normal();
 
-	void gblur3dm(float *,float *,int, int, int, int, float v[6]);
 	gblur3dm(f, f, w, h, d, 2, eta);
 }
 

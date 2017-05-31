@@ -2,7 +2,7 @@
 
 # swap these two lines to change between debug and release (in vim= ddp)
 CFLAGS = -g -Wall -Wextra -Wno-unused
-CFLAGS = -march=native -Os
+CFLAGS = -march=native -O3
 
 # set the following variables to "yes" to disable some dependences
 DISABLE_IMAGE_LIBS = no

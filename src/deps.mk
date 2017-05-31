@@ -61,3 +61,4 @@ flambda.o: flambda.c smapa.h fail.c xmalloc.c random.c parsenumbers.c \
 fancy_crop.o: fancy_crop.c fancy_image.h
 fancy_downsa.o: fancy_downsa.c fancy_image.h
 iion.o: iion.c iio.h
+iion_u16.o: iion_u16.c iio.h

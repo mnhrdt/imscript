@@ -22,10 +22,10 @@ Jérémy Anger
 
 CODE STOLEN FROM:
 
-David Tschumperlé (X11 interfacing)
+Daniel Atkinson (linear algebra, ccmath)
 Lionel Moisan, Pascal Monasse (fundamental matrices, splines)
 Javier Sánchez (optical flow)
-Daniel Atkinson (linear algebra, ccmath)
+David Tschumperlé (X11 interfacing)
 Linas Vepstas (vvector.h)
 
 
