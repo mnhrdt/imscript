@@ -1,4 +1,4 @@
-CFLAGS ?= -march=native -Os
+CFLAGS ?= -march=native -O3
 LDLIBS = -ljpeg -ltiff -lpng -lz -lfftw3f -lm
 
 OBJ = src/iio.o src/fancy_image.o
@@ -54,7 +54,7 @@ endif
 OBJ_FTR = $(OBJ) src/ftr/ftr.o src/ftr/egm96.o
 LIB_FTR = src/ftr/libftr.a
 
-BIN_FTR = viho fpan fpantiff rpcflip icrop
+BIN_FTR = viho fpan fpantiff rpcflip icrop powerkill dosdo epiview vnav
 BIN_LEG = $(shell cat src/legacy/all_mains)
 
 BIN_FTR := $(addprefix bin/,$(BIN_FTR))
