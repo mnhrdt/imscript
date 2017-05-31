@@ -25,7 +25,7 @@ BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither \
       bmms registration \
       blur fft dct dht \
       flambda fancy_crop fancy_downsa \
-      iion
+      iion iion_u16
 
 # default LDLIBS contains with everything
 IMAGE_LIBS = -ljpeg -ltiff -lpng -lz

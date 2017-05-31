@@ -289,6 +289,7 @@ void bmfm_fancy(float *disp,         // output disparities image (dx, dy)
 	free(P);
 }
 
+#define MAIN_BMFM
 #ifdef MAIN_BMFM
 
 #include <stdio.h>

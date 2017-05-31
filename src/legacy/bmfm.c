@@ -118,6 +118,7 @@ void bmfm(float *disp, float *a, float *b, int w, int h, int pd, double fm[9])
 	free(p);
 }
 
+#define MAIN_BMFM
 #ifdef MAIN_BMFM
 
 #include <stdio.h>

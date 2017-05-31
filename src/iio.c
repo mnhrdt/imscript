@@ -774,7 +774,7 @@ static void convert_datum(void *dest, void *src, int dest_fmt, int src_fmt)
 	case CC(I2,I6): *( int32_t*)dest = *( int16_t*)src; break;
 
 	// different size unsigned integers (3 lossy, 3 lossless)
-	case CC(U8,U6): *( uint8_t*)dest = *(uint16_t*)src; break;//iw810
+	case CC(U8,U6): *( uint8_t*)dest = T8(*(uint16_t*)src); break;//iw810
 	case CC(U8,U2): *( uint8_t*)dest = *(uint32_t*)src; break;//iw810
 	case CC(U6,U2): *(uint16_t*)dest = *(uint32_t*)src; break;//iw810
 	case CC(U6,U8): *(uint16_t*)dest = *( uint8_t*)src; break;
@@ -3100,7 +3100,7 @@ static void iio_write_image_as_asc(const char *filename, struct iio_image *x)
 	float *t = xmalloc(w*h*pd*sizeof*t);
 	break_pixels_float(t, x->data, w*h, pd);
 	for (int i = 0; i < w*h*pd; i++)
-		fprintf(f, "%a\n", t[i]);
+		fprintf(f, "%.9g\n", t[i]);
 	xfree(t);
 	xfclose(f);
 }
