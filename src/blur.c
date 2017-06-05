@@ -472,39 +472,54 @@ void blur_2d(float *y, float *x, int w, int h, int pd,
 
 #ifdef MAIN_BLUR
 
-static int print_version(void)
-{
-	printf("blur 1.0\n\n"
-	"Written by Enric Meinhardt-Llopis\n");
-	return 0;
-}
-
-static int print_help(void)
-{
-	printf(
-	"Smooth a 2D image using the selected kernel\n"
-	"\n"
-	"Usage: blur KERNEL SIZE [input [output]]\n"
-	"\n"
-	"Options:\n"
-	"\tKERNEL\tthe name of the kernel.\n\tPossible values: "
-	"gaussian, laplace, cauchy, disk, square\n\n"
-	"\tSIZE\tthe width of the kernel\n"
-	"\n"
-	"Examples:\n"
-	"blur gaussian 1.6 in.png out.png\n"
-	"\n"
-	"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>.\n"
-	);
-	return 0;
-}
-
-#include "iio.h"
+static char *help_string_name     = "blur";
+static char *help_string_version  = "blur 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "smooth a 2D image using the selected kernel";
+static char *help_string_usage    = "usage:\n\t"
+"qauto [-p 5] [-i] [-f]  [in [out]]";
+static char *help_string_long     =
+"Blur convolves the input image by the requested positive kernel\n"
+"Only the first letter of the kernel name is considered.\n"
+"If the name of the kernel is uppercase, it subtracts the result\n"
+"from the original image.\n"
+"\n"
+"Usage: blur KERNEL SIZE in.tiff out.tiff\n"
+"   or: blur KERNEL SIZE in.tiff > out.tiff\n"
+"   or: cat in.tiff | blur KERNEL SIZE > out.tiff\n"
+"\n"
+"Kernels:\n"
+" square    a square block of the given radius\n"
+" disk      a rasterized disk of the given radius\n"
+" gauss     a Gaussian kernel of the given variance\n"
+" laplace   a Laplace kernel of the given variance\n"
+" cauchy    a Cauchy kernel of the given scale\n"
+" q         Log-cauchy kernel\n"
+" u         \"good-caucy\"\n"
+" p         powerlaw\n"
+" a         pareto\n"
+" i         inverse distance (useful for Shepard interpolation)\n"
+" y         inverse distance (with different parameter normalization)\n"
+" r         Land\n"
+" z         inverse log-distance\n"
+" t         r^2 log(r)  (useful for biharmonic interpolation)\n"
+" o         log(r)\n"
+"\n"
+"Examples:\n"
+" blur g 1.6                              Smooth an image by a slight amount\n"
+" blur C 1 | qauto                        Linear retinex\n"
+" plambda - \"x,l -1 *\" | blur i 0.25    Laplacian square root\n"
+" plambda - \"x,l\" | blur z 0.25 | plambda - \"0 >\"      Linear dithering\n"
+"\n"
+"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>.\n"
+;
+#include "help_stuff.c"
 #include "parsenumbers.c"
+#include "iio.h"
 int main_blur(int c, char *v[])
 {
-	if (c == 2 && 0 == strcmp(v[1], "--version")) return print_version();
-	if (c == 2 && 0 == strcmp(v[1], "--help")) return print_help();
+	if (c == 2)
+		if_help_is_requested_print_it_and_exit_the_program(v[1]);
+
 	if (c != 5 && c != 3 && c != 4) {
 		fprintf(stderr, "usage:\n\t"
 				"%s kernel \"params\" [in [out]]\n", *v);

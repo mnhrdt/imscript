@@ -774,7 +774,7 @@ static void convert_datum(void *dest, void *src, int dest_fmt, int src_fmt)
 	case CC(I2,I6): *( int32_t*)dest = *( int16_t*)src; break;
 
 	// different size unsigned integers (3 lossy, 3 lossless)
-	case CC(U8,U6): *( uint8_t*)dest = *(uint16_t*)src; break;//iw810
+	case CC(U8,U6): *( uint8_t*)dest = T8(*(uint16_t*)src); break;//iw810
 	case CC(U8,U2): *( uint8_t*)dest = *(uint32_t*)src; break;//iw810
 	case CC(U6,U2): *(uint16_t*)dest = *(uint32_t*)src; break;//iw810
 	case CC(U6,U8): *(uint16_t*)dest = *( uint8_t*)src; break;
@@ -921,14 +921,13 @@ static void *convert_data(void *src, int n, int dest_fmt, int src_fmt)
 	char *r = xmalloc(n * dest_width);
 	// NOTE: the switch inside "convert_datum" should be optimized
 	// outside of this loop
-	FORI(n) {
-		void *to  = i * dest_width + r;
-		void *from = i * src_width + (char *)src;
+	for (int i = 0; i < n; i++)
+	{
+		void *to   = i * dest_width + r;
+		void *from = i * src_width  + (char *)src;
 		convert_datum(to, from, dest_fmt, src_fmt);
 	}
 	xfree(src);
-	if (dest_fmt == IIO_TYPE_INT16)
-		IIO_DEBUG("first short sample = %d\n", *(int16_t*)r);
 	return r;
 }
 
@@ -3100,7 +3099,7 @@ static void iio_write_image_as_asc(const char *filename, struct iio_image *x)
 	float *t = xmalloc(w*h*pd*sizeof*t);
 	break_pixels_float(t, x->data, w*h, pd);
 	for (int i = 0; i < w*h*pd; i++)
-		fprintf(f, "%a\n", t[i]);
+		fprintf(f, "%.9g\n", t[i]);
 	xfree(t);
 	xfclose(f);
 }
@@ -4111,7 +4110,7 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 				void *old_data = x->data;
 				int ss = iio_image_sample_size(x);
 				x->data = xmalloc(nsamp*ss);
-				memcpy(x->data, old_data, ss);
+				memcpy(x->data, old_data, nsamp*ss);
 				iio_convert_samples(x, IIO_TYPE_UINT16);
 				iio_write_image_default(filename, x);//recursive
 				xfree(x->data);

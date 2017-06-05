@@ -1,16 +1,9 @@
 language: c
 
-#addons:
-#  apt:
-#    packages:
-#      - libfftw3-dev
-#      - libgsl0-dev
-
 matrix:
   include:
     - os: linux
     - os: osx
 
 script:
-#  - make
   - make test

@@ -1,0 +1,34 @@
+PROPOSAL FOR SLCON 2016
+-----------------------
+
+TITLE: Suckless Image Processing
+
+ABSTRACT:
+An image is an array of numbers.  Since arrays of numbers are
+natively represented in C, this language is well-suited for image
+processing algorithms.  Moreover, many complex image processing
+algorithms are often pipelines of simple, independent steps.  Thus,
+the UNIX programming environment is an ideal platform for image
+processing, where several simple programs written in C share
+information through UNIX pipes.  In this talk, we will see many
+examples of simple image processing utilities (blur, local maxima
+detection, interpolation, warping, pointwise algebraic expressions,
+morphological filters, block matching, optical flow, image fusion)
+and how they are naturally combined to perform advanced image
+techniques;  in the selected example, an show object removal
+technique based on the combination of several images.  An important
+issue, with far-reaching philosophical consequences, is the data
+format written through the pipes.  We explain why the farbfeld image
+format---proposed by the suckless community---is inappropriate in
+general, because of the need to represent negative and floating-point
+pixel values.
+
+LINKS:
+Image reading/writing library: https://github.com/mnhrdt/iio
+Image processing tools: https://github.com/mnhrdt/imscript
+Window interaction: http://dev.ipol.im/~coco/website/ftr.html
+(note, the content of these links may change before SLCON 2016)
+
+
+
+# vim:set tw=69 filetype=text spell spelllang=en:
