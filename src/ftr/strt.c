@@ -1,1 +1,1 @@
-../legacy/strt.c
+../strt.c

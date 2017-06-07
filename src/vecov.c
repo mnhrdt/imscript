@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,6 +43,27 @@ static void float_mul(float *y, float *xx, int d, int n)
 		y[k] = 1;
 		for (int i = 0; i < n; i++)
 			y[k] *= x[i][k];
+	}
+}
+
+// y[k] = complex_prod_i x[i][k]
+static void float_cprod(float *y, float *xx, int d, int n)
+{
+	if (d != 2)
+		fail("complex multiplication only for"
+			       " 2-dimensional pixels (got d=%d)", d);
+	assert(d == 2);
+	float (*x)[2] = (void*)xx;
+	y[0] = 1;
+	y[1] = 0;
+	for (int i = 0; i < n; i++)
+	{
+		float a = x[i][0];
+		float b = x[i][1];
+		float p = y[0];
+		float q = y[1];
+		y[0] = a*p - b*q;
+		y[1] = a*q + b*p;
 	}
 }
 
@@ -252,6 +274,8 @@ int main_vecov(int c, char *v[])
 	if (0 == strcmp(operation_name, "sum"))   f = float_sum;
 	if (0 == strcmp(operation_name, "mul"))   f = float_mul;
 	if (0 == strcmp(operation_name, "prod"))  f = float_mul;
+	if (0 == strcmp(operation_name, "cprod")) f = float_cprod;
+	if (0 == strcmp(operation_name, "cmul"))  f = float_cprod;
 	if (0 == strcmp(operation_name, "avg"))   f = float_avg;
 	if (0 == strcmp(operation_name, "min"))   f = float_min;
 	if (0 == strcmp(operation_name, "max"))   f = float_max;
