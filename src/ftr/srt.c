@@ -25,7 +25,7 @@
 #include "ftr.c"
 #define OMIT_MAIN_FONTU
 #include "fontu.c" // todo: cherry-pick the required fontu functions
-#include "xfont9x15.c"
+#include "fonts/xfont_10x20.c"
 
 // a terminal is just a 80x25 matrix of characters, with some options
 struct terminal {
@@ -51,50 +51,71 @@ struct terminal {
 // 4. unless "canonicalized", keyboard events are also dumped into the state
 // machine
 
-// affect the terminal state from the given string
-//
-// (The terminal is a finite state machine.  This is the only function
-// that can be used to edit the state.)
-void term_puts(struct terminal *t, char *s)
-{
-	while (1)
-	{
-		int c = *s++;
-		if (!c) break;
-		if (c == '\n') {
-		///etc
-		}
-	}
-}
 
-// todo: do not call directly this function
-void term_add_char_under_cursor(struct terminal *t, int c)
+// actions
+
+void term_action_put_char_under_cursor(struct terminal *t, int c)
 {
 	if (t->cursorx >= 0 && t->cursorx < t->w)
 	if (t->cursory >= 0 && t->cursory < t->h)
 		t->letters[t->cursory * t->w + t->cursorx] = c;
 }
 
-// todo: do not call directly this function
-void term_new_line(struct terminal *t)
+void term_action_new_line(struct terminal *t)
 {
 	t->cursory += 1;
 	t->cursorx = 0;
 }
 
-// todo: do not call directly this function
-void term_advance_cursor(struct terminal *t)
+void term_action_cursor_dxy(struct terminal *t, int dx, int dy)
+{
+	t->cursorx += dx;
+	t->cursory += dy;
+	fprintf(stderr, "CURSOR dxy (%d %d), now is (%d %d)\n", dx, dy,
+			t->cursorx, t->cursory);
+}
+
+void term_action_advance_cursor(struct terminal *t)
 {
 	if (t->cursorx < t->w -1)
 		t->cursorx += 1;
 	else
-		term_new_line(t);
+		term_action_new_line(t);
+}
+
+// affect the terminal state from the given string
+//
+// (The terminal is a finite state machine.  This is the only function
+// that can be used to edit the state.  All changes go thru calls to
+// functions of the form "term_action_*".)
+void term_puts(struct terminal *t, char *s)
+{
+	while (1)
+	{
+		int c = *s++;
+		if (!c) break;
+		else if (c == '\n')
+			term_action_new_line(t);
+		else if (c == 0x1b) {
+			c = *s++;
+			if (!c) break;
+			if (c == 'A') term_action_cursor_dxy(t,  0, -1);
+			if (c == 'B') term_action_cursor_dxy(t,  0,  1);
+			if (c == 'C') term_action_cursor_dxy(t,  1,  0);
+			if (c == 'D') term_action_cursor_dxy(t, -1,  0);
+		}
+		else {
+			term_action_put_char_under_cursor(t, c);
+			term_action_advance_cursor(t);
+		}
+	}
 }
 
 static void
 put_char_in_rgb_image(uint8_t *rgb, int w, int h, struct bitmap_font *f,
 		int posx, int posy, uint8_t *fg, uint8_t *bg, int c)
 {
+	if (!c) return;
 	if (c > 0 && c < f->number_of_glyphs)
 		for (int i = 0; i < f->width; i++)
 		for (int j = 0; j < f->height; j++)
@@ -115,6 +136,11 @@ void term_bitmap(uint8_t *rgb, int w, int h, struct terminal *t)
 	int ox = t->font->width  + t->kerning;
 	int oy = t->font->height + t->spacing;
 
+	// size consistency check
+	if (w != ox * t->w || h != oy * t->h)
+		fprintf(stderr, "WARNING: (%d,%d) != (%d,%d)\n",
+				w, h, ox*t->w, oy*t->h);
+
 	// clear rgb buffer
 	for (int i = 0; i < 3 * w * h; i++)
 		rgb[i] = 0;
@@ -125,7 +151,7 @@ void term_bitmap(uint8_t *rgb, int w, int h, struct terminal *t)
 	{
 		int c = t->letters[j * t->w + i];
 		int a = t->attributes[j * t->w + i];
-		uint8_t fg[3] = {255, 255, 255};
+		uint8_t fg[3] = {205, 205, 205};
 		uint8_t bg[3] = {0, 0, 0};
 		put_char_in_rgb_image(rgb,w,h, t->font, i*ox,j*oy, fg,bg, c);
 	}
@@ -148,6 +174,13 @@ void term_bitmap(uint8_t *rgb, int w, int h, struct terminal *t)
 	}
 }
 
+static char *global_table_of_keycodes_to_consolecodes[0x2000] = {
+	[FTR_KEY_UP]    = "A",
+	[FTR_KEY_DOWN]  = "B",
+	[FTR_KEY_RIGHT] = "C",
+	[FTR_KEY_LEFT]  = "D",
+};
+
 #include <ctype.h>
 static void term_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
@@ -156,32 +189,30 @@ static void term_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if  (k == '\033')
 		ftr_notify_the_desire_to_stop_this_loop(f, 1);
 
-	// todo: do not echo the keys directly, sent to the terminal input
-	// stream, just like the output of the program
+	if (k >= 0x2000) {
+		fprintf(stderr, "WARNING: rejected key %d\n", k);
+		return;
+	}
 
-	struct terminal *t = f->userdata;
+	// 1. prepare a buffer representing this key
+	char buf[0x10] = {0};
 
-	// todo: whatever happens here, push the
-	if (k == FTR_KEY_LEFT ) t->cursorx -= 1;
-	if (k == FTR_KEY_RIGHT) t->cursorx += 1;
-	if (k == FTR_KEY_UP   ) t->cursory -= 1;
-	if (k == FTR_KEY_DOWN ) t->cursory += 1;
+	// TODO: build a table of keys and strings (about 2000 entries)
+	char *tk = global_table_of_keycodes_to_consolecodes[k];
+	if (k < 0x2000 && tk && tk[0] == 0x1b)
+		strcpy(buf, tk);
 
-	if (isprint(k) || k==' ') {
+	if (isprint(k) || k==' ' || k=='\n')
+	{
 		if (m & FTR_MASK_SHIFT && isalpha(k))
 			k = toupper(k);
-		term_add_char_under_cursor(t, k);
-		term_advance_cursor(t);
+		buf[0] = k;
 	}
 
-	if (k == '\b' && t->cursorx > 0)
-	{
-		t->cursorx -= 1;
-		term_add_char_under_cursor(t, ' ');
-	}
 
-	if (k == '\n')
-		term_new_line(t);
+	// 2. dump this buffer into the state machine
+	struct terminal *t = f->userdata;
+	term_puts(t, buf);
 
 	f->changed = 1;
 }
@@ -202,14 +233,15 @@ int main()
 	t->h = 25;
 	t->kerning = 0;
 	t->spacing = 0;
-	t->font[0] = reformat_font(*xfont9x15, UNPACKED);
-	t->letters = malloc(sizeof(int) * t->w * t->h);
-	t->attributes = malloc(sizeof(int) * t->w * t->h);
+	t->font[0] = reformat_font(*xfont_10x20, UNPACKED);
+	fprintf(stderr, "NUMBER_OF_GLYPHS = %d\n", t->font->number_of_glyphs);
+	t->letters    = calloc(t->w * t->h, sizeof*t->letters);
+	t->attributes = calloc(t->w * t->h, sizeof*t->attributes);
 	t->cursorx = t->cursory = 0;
 	int w = (t->w + t->kerning) * t->font->width;
 	int h = (t->h + t->spacing) * t->font->height;
 
-	term_puts(t, "");
+	term_puts(t, "abc");
 
 	struct FTR f = ftr_new_window(w, h);
 	f.userdata = t;

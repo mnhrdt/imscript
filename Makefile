@@ -34,13 +34,12 @@ test: bin/plambda bin/imprintf
 
 
 # hack (compatibility flags for old compilers)
-
+#
 # The following conditional statement appends "-std=gnu99" to CFLAGS when the
 # compiler does not define __STDC_VERSION__.  The idea is that many older
 # compilers are able to compile standard C when given that option.
 # This hack seems to work for all versions of gcc, clang and icc.
-CVERSION = $(shell $(CC) $(CFLAGS) -dM -E - < /dev/null | grep __STDC_VERSION__)
-ifeq ($(CVERSION),)
+ifeq (,$(shell $(CC) $(CFLAGS) -dM -E -< /dev/null | grep __STDC_VERSION_))
 CFLAGS := $(CFLAGS) -std=gnu99
 endif
 
@@ -49,34 +48,34 @@ endif
 
 # exotic targets, not built by default
 # FTR: interactive tools, require X11 or freeglut
-# LEG: "legacy" tools, or those requiring GSL
+# MSC: "misc" tools, or those requiring GSL
 
 OBJ_FTR = $(OBJ) src/ftr/ftr.o src/ftr/egm96.o
 LIB_FTR = src/ftr/libftr.a
 
 BIN_FTR = viho fpan fpantiff rpcflip icrop powerkill dosdo epiview vnav
-BIN_LEG = $(shell cat src/legacy/all_mains)
+BIN_MSC = $(shell cat src/misc/all_mains)
 
 BIN_FTR := $(addprefix bin/,$(BIN_FTR))
-BIN_LEG := $(addprefix bin/,$(BIN_LEG))
+BIN_MSC := $(addprefix bin/,$(BIN_MSC))
 
 LDLIBS_FTR = $(LDLIBS) -lX11
-LDLIBS_LEG = $(LDLIBS) -lgsl -lgslcblas
+LDLIBS_MSC = $(LDLIBS) -lgsl -lgslcblas
 
 OBJ_ALL = $(OBJ) $(OBJ_FTR)
 LIB_ALL = $(LIB) $(LIB_FTR)
-BIN_ALL = $(BIN) $(BIN_FTR) $(BIN_LEG)
+BIN_ALL = $(BIN) $(BIN_FTR) $(BIN_MSC)
 
-full  : default ftr legacy
+full  : default ftr misc
 ftr   : $(BIN_FTR)
-legacy: $(BIN_LEG)
+misc  : $(BIN_MSC)
 
 
 bin/% : src/ftr/%.c $(LIB_FTR)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS_FTR)
 
-bin/% : src/legacy/%.c $(LIB)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS_LEG)
+bin/% : src/misc/%.c $(LIB)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS_MSC)
 
 $(LIB_FTR) : $(LIB_FTR)($(OBJ_FTR))
 
@@ -85,4 +84,4 @@ $(LIB_FTR) : $(LIB_FTR)($(OBJ_FTR))
 # bureaucracy
 clean:
 	$(RM) $(OBJ_ALL) $(LIB_ALL) $(BIN_ALL)
-.PHONY: default full ftr legacy clean
+.PHONY: default full ftr misc clean

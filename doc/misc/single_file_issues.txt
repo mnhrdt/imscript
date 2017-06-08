@@ -25,7 +25,7 @@ Thus, the source code for program "foo" is contained on file "foo.c".
                 return 0;
         }
 
-To compile this file, you run "cc foo.c -o foo".
+To compile this file, you run "cc foo.c -o foo" or simply "make foo".
 
 In an ideal world---in UNIX heaven---this would be the end of it.  The program
 "foo", whose source code is on file "foo.c", does one thing and does it well.

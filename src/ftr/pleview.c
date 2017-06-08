@@ -1,5 +1,6 @@
 // icc -std=c99 -Ofast pleview.c iio.o -o pleview -lglut -lGL -ltiff -lm
 #include <assert.h>
+#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,7 +9,7 @@
 #include "tiffu.c"
 
 #ifndef FTR_BACKEND
-#define FTR_BACKEND 'f'
+#define FTR_BACKEND 'x'
 #endif
 #include "ftr.c"
 
@@ -91,7 +92,7 @@ static int insideP(int w, int h, int x, int y)
 	return x >= 0 && y >= 0 && x < w && y < h;
 }
 
-static float getgreen(float c[4])
+static double getgreen(double c[4])
 {
 	return c[1] * 0.6 + c[3] * 0.2;
 }

@@ -51,7 +51,8 @@ static void viewflow_flat(uint8_t *py, float *px, int w, int h, float m)
 		float *v = x[j][i];
 		double r = hypot(v[0], v[1]);
 		if (r > 1e8 || !isfinite(r)) {
-			FORL(3) y[j][i][l] = 255; continue;
+			FORL(3) y[j][i][l] = 255;
+			continue;
 		}
 		r = r>m ? 1 : r/m;
 		double a = atan2(v[1], -v[0]);

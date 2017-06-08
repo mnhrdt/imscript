@@ -1,0 +1,182 @@
+First read the MISRA and JPL guides.  Those are serious and important, but not
+very detailed.
+
+Then read the linux kernel coding style and let it grow into you.
+
+Numerics code has *slightly* different restrictions than systems code, and they
+are outlined below.  The main difference is that numerics code is simpler: you
+just deal with numbers and arrays of numbers.  There are no fancy structures.
+
+
+
+NAMING
+
+Local and automatic variable names are single letters
+  - exception: greek letters like "alpha", "beta" (gcc does not yet grok UTF8)
+  - exception: single-letter declinations like "x_in" "x_out"
+
+Except for loop indices, the declaration of each variable name always has a
+comment to explain its meaning.
+
+        int n, // number of vertexs in the graph
+        int m, // number of edges in the graph
+
+Note that this applies to local variables and function arguments.
+
+Rationale: local variable names are pronouns.  The comments next to their
+declaration are the name they refer to.
+
+Global variables have long and obnoxious names of the form "global_*".  Their
+name must be so explicit that any possible comment is ridiculously redundant.
+
+        char *global_variable_containing_the_name_of_the_last_opened_file;
+        int global_variable_to_toggle_verbose_debugging_messages;
+
+Rationale: obnoxious names for global variables are an eye-sore to the beauty
+of the code, thus implicitly discouraged.  In the rare cases when they are
+used, it is very clear that something fishy is going on when you read the code.
+
+Externally visible functions have long and well-thought names.
+
+Local functions may have sorter names.
+
+If a translation unit exposes several functions, they all share a prefix.
+
+
+FORMATTING
+
+Code is poetry; formatting is the rythm.  Thus, formatting is an arbitrary,
+non-semantic, restriction that must be strictly respected.  A sonnet has
+exactly 14 verses, and all the verses are iambic pentameters.  Likewise, if you
+force arbitrary restrictions upon your code it gains poetic significance.  More
+importantly, it becomes easier to read.
+
+Our arbitrary rules are the following:
+
+Indent with tabs, or with 8 spaces (but not both in the same file).
+
+The maximum line width is 80 (1 indent counts as 8).
+
+The functions have 20 or at most 25 lines, unless they have some symmetry (like
+a long list of switch cases), or the labels for a finite-state machine.
+
+There are no more than 10 variables in scope at any time.
+
+Variables are always initialized upon declaration.
+  - exception: when the variable is filled-in by a function on the next line
+
+There are only two allowed control structures: recursion and "for" loops.
+"While" loops and "do-while" loops are not used.
+
+Recursion is only allowed if the depth can be trivally proved to be logarithmic
+on the size of a input parameter.
+
+For loops are always exactly of the form "for (int i = 0; i < n; i++)".
+      - the index is a single letter variable
+      - the number of iterations is n, a single letter variable or a constant
+      - the count goes from 0 to n, no other forms are possible
+
+The body of "for" is a single statement
+
+Rationale: there are two forms of "for"
+
+        for (int i = 0; i < n; i++)
+                statement;
+
+        for (int i = 0; i < n; i++)
+        {
+                statement1;
+                statement2;
+                ...
+        }
+
+This duplicity is confusing and prone to errors.  A common, and very
+reasonable, convention consists in allowing only the second form, thus solving
+the confunsion.  We propose the other solution.  This has the following
+desirable properties:
+  - it avoids confusion of the two cases (just like the other convention)
+  - the code is forced to be simpler
+  - it forces the creation of small functions that are called a single time
+
+
+Rationale of the formatting rules:
+
+Our rules are intended to force the programmer to write code composed of many
+local functions that are only called a single time.  These functions should
+have long and descriptive names, and need no comment.  For example, if you find
+yourself doing something like this:
+
+        void my_function(...)
+        {
+                // declare the eschaton
+                do_stuff_1;
+                do_stuff_2;
+                do_stuff_3;
+
+                // immanentize the eschaton
+                do_more_stuff_1;
+                do_more_stuff_2;
+                do_more_stuff_3;
+
+                // mount the golden apple
+                yet_more_stuff_1;
+                yet_more_stuff_2;
+                yet_more_stuff_3;
+       }
+
+and end up with a long funciton with too many variables, then the rules above
+will force you to rewrite your code in the following form, in order to respect
+the rules:
+
+        static void declare_the_eschaton(...)
+        {
+                do_stuff_1;
+                do_stuff_2;
+                do_stuff_3;
+        }
+
+        static void immanentize_the_eschaton(...)
+        {
+                do_more_stuff_1;
+                do_more_stuff_2;
+                do_more_stuff_3;
+        }
+
+        satic void mount_the_golden_apple(...)
+        {
+                yet_more_stuff_1;
+                yet_more_stuff_2;
+                yet_more_stuff_3;
+        }
+
+        void my_function(...)
+        {
+                declare_the_eschaton(...);
+                immanentize_the_eschaton(...);
+                mount_the_golden_apple(...);
+        }
+
+This is an improvement.  While the total line count is (slightly) higher, this
+form allows for tighter scope of local variables, less comments, and thus more
+readable code.  Notice in particular that the comments have been changed to
+function names.  This is a very good general principle, that allows for
+self-documenting code.
+
+MAXIM: whenever you find yourself commenting a piece of code, remove the
+comment symbol "//", turn the exact text of the comment into a function call,
+and put the code inside the defintion of the function.
+Thus, you change this
+
+        // perform some computations
+        fist_computation;
+        second_computation;
+        third_computation;
+
+To this
+
+       perform_some_computation(...);
+
+where the function performs the required computation elsewhere.
+
+
+
