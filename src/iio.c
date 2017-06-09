@@ -4125,10 +4125,10 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 		if (false
 				|| string_suffix(filename, ".png")
 				|| string_suffix(filename, ".PNG")
-				|| (typ==IIO_TYPE_UINT8&&x->pixel_dimension==4)
-				|| (typ==IIO_TYPE_UINT8&&x->pixel_dimension==2)
-				|| (typ==IIO_TYPE_UINT8&&x->pixel_dimension==1)
-				|| (typ==IIO_TYPE_UINT8&&x->pixel_dimension==3)
+			//	|| (typ==IIO_TYPE_UINT8&&x->pixel_dimension==4)
+			//	|| (typ==IIO_TYPE_UINT8&&x->pixel_dimension==2)
+			//	|| (typ==IIO_TYPE_UINT8&&x->pixel_dimension==1)
+			//	|| (typ==IIO_TYPE_UINT8&&x->pixel_dimension==3)
 		   )
 		{
 			IIO_DEBUG("png extension detected or 8bint thing\n");
