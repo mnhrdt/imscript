@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <unistd.h> // for getpid only
 
 #include "tiff_octaves_rw.c"
 #include "srtm4o.c"
