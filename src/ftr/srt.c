@@ -22,7 +22,7 @@
 // dependences like libfreetype and obnoxious concepts such as pty.
 //
 
-#include "ftr.c"
+#include "ftr.h"
 #define OMIT_MAIN_FONTU
 #include "fontu.c" // todo: cherry-pick the required fontu functions
 #include "fonts/xfont_10x20.c"

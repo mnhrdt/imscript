@@ -32,10 +32,7 @@
 //double srtm4o(double,double,int);
 double egm96(double,double);
 
-#ifndef FTR_BACKEND
-#define FTR_BACKEND 'x'
-#endif
-#include "ftr.c"
+#include "ftr.h"
 
 #include "iio.h"
 #include "xmalloc.c"

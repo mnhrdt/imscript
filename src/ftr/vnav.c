@@ -48,10 +48,7 @@
 #define TIFFU_OMIT_MAIN
 #include "tiffu.c"
 
-#ifndef FTR_BACKEND
-#define FTR_BACKEND 'x'
-#endif
-#include "ftr.c"
+#include "ftr.h"
 
 #define WHEEL_FACTOR 1.4
 #define STEP_NFA_MODGRAD 1.25
