@@ -12,10 +12,7 @@
 #include <stdint.h>
 #include "iio.h"
 
-#ifndef FTR_BACKEND
-#define FTR_BACKEND 'x'
-#endif
-#include "ftr.c"
+#include "ftr.h"
 
 #define WHEEL_FACTOR 1.4
 

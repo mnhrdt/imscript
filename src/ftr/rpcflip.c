@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <unistd.h> // for getpid only
 
 #include "tiff_octaves_rw.c"
 #include "srtm4o.c"
@@ -32,10 +33,7 @@
 //double srtm4o(double,double,int);
 double egm96(double,double);
 
-#ifndef FTR_BACKEND
-#define FTR_BACKEND 'x'
-#endif
-#include "ftr.c"
+#include "ftr.h"
 
 #include "iio.h"
 #include "xmalloc.c"
