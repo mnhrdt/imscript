@@ -58,7 +58,7 @@ STYLE
 
 S0. do not be afraid of the C language, master all the available features
 S1. do not cast: either use implicit conversions or write conversion functions
-S2. local variables are pronouns, comments are the names (see also N1 and F0)
+S2. local variables are pronouns, comments are the names (see N1 and C1)
 S3. unsigned types are only used for bit fields
 S4. all loops are exactly of the form "for (int i=0; i<n; i++)"
     - n is a constant or a variable whose value can be estimated at compile-time
