@@ -27,9 +27,9 @@ void exterior_product(double *xy, double *x, double *y, int (*t)[4],
 // O^1 = < dx, dy, dz >
 // O^2 = < dyz, dzx, dxy >
 // O^3 = < dxyz >
-enum basis_O1_R3 { D3_x , D3_y , D3_z  };
-enum basis_O2_R3 { D3_yz, D3_zx, D3_xy };
-enum basis_O3_R3 { D3_xyz              };
+enum { D3_x , D3_y , D3_z  };
+enum { D3_yz, D3_zx, D3_xy };
+enum { D3_xyz              };
 
 // ^ : O^1 x O^1 -> O^2  (R^3 x R^3 -> R^3)
 void exterior_product_3_3_3(double xy[3], double x[3], double y[3])
@@ -70,10 +70,10 @@ void exterior_star_3(double y[3], double x[3])
 // O^3 = (4) < dyzt, dzxt, dxyt, dxyz >
 // O^4 = (1) < dxyzt >
 
-enum basis_O1_R4 { D4_x  , D4_y  , D4_z  , D4_t   }; // 4
-enum basis_O3_R4 { D4_yzt, D4_zxt, D4_xyt, D4_xyz }; // 4
-enum basis_O2_R4 { D4_yz, D4_zx, D4_xy, D4_xt, D4_yt, D4_zt }; // 6
-enum basis_O4_R4 { D4_xyzt };  // 1
+enum { D4_x  , D4_y  , D4_z  , D4_t   }; // 4
+enum { D4_yzt, D4_zxt, D4_xyt, D4_xyz }; // 4
+enum { D4_yz, D4_zx, D4_xy, D4_xt, D4_yt, D4_zt }; // 6
+enum { D4_xyzt };  // 1
 
 // ^ : O^1 x O^1 -> O^2  (R^4 x R^4 -> R^6)
 void exterior_product_6_4_4(double xy[6], double x[4], double y[4])
@@ -110,6 +110,8 @@ void exterior_star_4_2(double xy[1], double x[6], double y[6]);
 // O^5 = (1)  < dxypqt >
 //
 
+// The beauty of this algorithm is that *all* the complexity is hidden
+// into variable names.  The values of these variables are arbitrary integers.
 enum { D5_x   , D5_y   , D5_p   , D5_q   , D5_t    };
 enum { D5_ypqt, D5_xqpt, D5_xyqt, D5_yxpt, D5_xypq };
 enum { D5_xy ,D5_xp ,D5_xq ,D5_xt ,D5_yp ,D5_yq ,D5_yt ,D5_pq ,D5_pt ,D5_qt  };
@@ -168,11 +170,11 @@ void exterior_product_5_10_10(double xy[5], double x[10], double y[10])
 void exterior_product_1_5_5(double xy[1], double x[5], double y[5])
 {
 	int t[][4] = {
-		{ D5_x, D5_x, D5_xypqt, 1 },
-		{ D5_y, D5_y, D5_xypqt, 1 },
-		{ D5_p, D5_p, D5_xypqt, 1 },
-		{ D5_q, D5_q, D5_xypqt, 1 },
-		{ D5_t, D5_t, D5_xypqt, 1 }
+		{ D5_x, D5_ypqt, D5_xypqt, 1 },
+		{ D5_y, D5_xqpt, D5_xypqt, 1 },
+		{ D5_p, D5_xyqt, D5_xypqt, 1 },
+		{ D5_q, D5_yxpt, D5_xypqt, 1 },
+		{ D5_t, D5_xypq, D5_xypqt, 1 }
 	};
 	exterior_product(xy, x, y, t, 1, 5, 0);
 }
@@ -180,10 +182,15 @@ void exterior_product_1_5_5(double xy[1], double x[5], double y[5])
 // ^ : O^2 x O^3 -> O^5  (R^10 x R^10  -> R   )
 void exterior_product_1_10_10(double xy[1], double x[10], double y[10]);
 
-
+//
+//
+// end of functions
+//
+//
 
 //#define EXTERIOR_ALGEBRA_MAIN
 #ifdef EXTERIOR_ALGEBRA_MAIN
+// silly consistency checks
 #include <stdio.h>
 #include "random.c"
 void cross_product(double xy[3], double x[3], double y[3])

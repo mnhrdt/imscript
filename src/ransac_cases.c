@@ -652,7 +652,7 @@ int find_fundamental_pair_by_ransac(bool *out_mask, float out_fm[18],
 // affine fundamental matrix
 // 	datadim = 4 (coordinates of each pair)
 // 	modeldim = 9 (fundamental matrix)
-// 	nfit = 4 (seven-point algorithm)
+// 	nfit = 4 (four-point algorithm, explicit formula)
 
 
 // instance of "ransac_model_generating_function"
