@@ -386,7 +386,12 @@ int main_cases(int c, char *v[])
 		model_evaluation = epipolar_error;
 		model_generation = seven_point_algorithm;
 		//model_acceptation = fundamental_matrix_is_reasonable;
-
+	} else if (0 == strcmp(model_id, "fma")) { // affine fundamental matrix
+		datadim = 4;
+		modeldim = 9;
+		nfit = 4;
+		model_evaluation = epipolar_error;
+		model_generation = affine_fundamental_matrix;
 	} else if (0 == strcmp(model_id, "fmn")) { // fundamental matrix
 		int main_hack_fundamental_matrix(int,char*[]);
 		return main_hack_fundamental_matrix(c-1, v+1);

@@ -351,7 +351,7 @@ static float epipolar_euclidean_error(float *fm, float *pair, void *usr)
 		       fm[1]*p[0] + fm[4]*p[1] + fm[7],
 		       fm[2]*p[0] + fm[5]*p[1] + fm[8]};
 	float npf = hypot(pf[0], pf[1]);
-	if (npf == 0)  // the epipolar line is (0, 0, 1), ie the line at infinity
+	if (npf == 0) // the epipolar line is (0, 0, 1), ie the line at infinity
 		return INFINITY;
 	else {
 		pf[0] /= npf; pf[1] /= npf; pf[2] /= npf;
@@ -654,7 +654,6 @@ int find_fundamental_pair_by_ransac(bool *out_mask, float out_fm[18],
 // 	modeldim = 9 (fundamental matrix)
 // 	nfit = 4 (four-point algorithm, explicit formula)
 
-
 // instance of "ransac_model_generating_function"
 #include "exterior_algebra.c"
 static int affine_fundamental_matrix(float *fm, float *p, void *usr)
@@ -672,7 +671,10 @@ static int affine_fundamental_matrix(float *fm, float *p, void *usr)
 	fm[0] = 0   ; fm[1] = 0   ; fm[2] = z[0];
 	fm[3] = 0   ; fm[4] = 0   ; fm[5] = z[1];
 	fm[6] = z[2]; fm[7] = z[3]; fm[8] = z[4];
+	return 1;
 }
+
+
 
 
 
