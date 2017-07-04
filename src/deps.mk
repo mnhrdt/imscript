@@ -38,10 +38,11 @@ flowarrows.o: flowarrows.c iio.h fail.c xmalloc.c drawsegment.c \
  getpixel.c smapa.h
 palette.o: palette.c fail.c xmalloc.c xfopen.c smapa.h iio.h
 ransac.o: ransac.c fail.c xmalloc.c xfopen.c random.c ransac_cases.c \
- vvector.h homographies.c moistiv_epipolar.c parsenumbers.c
+ vvector.h homographies.c moistiv_epipolar.c exterior_algebra.c \
+ parsenumbers.c
 srmatch.o: srmatch.c fail.c xmalloc.c xfopen.c siftie.c parsenumbers.c \
  smapa.h ok_list.c grid.c iio.h ransac.c random.c ransac_cases.c \
- vvector.h homographies.c moistiv_epipolar.c
+ vvector.h homographies.c moistiv_epipolar.c exterior_algebra.c
 tiffu.o: tiffu.c
 siftu.o: siftu.c siftie.c fail.c xmalloc.c xfopen.c parsenumbers.c \
  smapa.h ok_list.c grid.c iio.h

@@ -354,6 +354,11 @@ static double quantize_easy(double x, double a, double b)
 	return quantize_255(255.0*(x-a)/(b-a));
 }
 
+static double unquantize_easy(double x, double a, double b)
+{
+	return a + (x/255) * (b - a);
+}
+
 static double range(double x, double a, double b)
 {
 	return (x-a)/(b-a);
@@ -762,6 +767,7 @@ static struct predefined_function {
 	REGISTER_FUNCTION(remainder,2),
 	REGISTER_FUNCTIONN(quantize_255,"q255",1),
 	REGISTER_FUNCTIONN(quantize_easy,"qe",3),
+	REGISTER_FUNCTIONN(unquantize_easy,"iqe",3),
 	REGISTER_FUNCTIONN(range,"range",3),
 	REGISTER_FUNCTIONN(bound_double,"bound",3),
 	REGISTER_FUNCTIONN(pow,"^",2),

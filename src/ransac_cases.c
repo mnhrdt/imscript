@@ -269,6 +269,7 @@ int homography_from_four(float *hom, float *pairs, void *usr)
 //}
 
 
+
 // ************************************
 // ************************************
 // ************************************
@@ -350,7 +351,7 @@ static float epipolar_euclidean_error(float *fm, float *pair, void *usr)
 		       fm[1]*p[0] + fm[4]*p[1] + fm[7],
 		       fm[2]*p[0] + fm[5]*p[1] + fm[8]};
 	float npf = hypot(pf[0], pf[1]);
-	if (npf == 0)  // the epipolar line is (0, 0, 1), ie the line at infinity
+	if (npf == 0) // the epipolar line is (0, 0, 1), ie the line at infinity
 		return INFINITY;
 	else {
 		pf[0] /= npf; pf[1] /= npf; pf[2] /= npf;
@@ -647,6 +648,34 @@ int find_fundamental_pair_by_ransac(bool *out_mask, float out_fm[18],
 	free(tripsn);
 	return n_inliers;
 }
+
+// affine fundamental matrix
+// 	datadim = 4 (coordinates of each pair)
+// 	modeldim = 9 (fundamental matrix)
+// 	nfit = 4 (four-point algorithm, explicit formula)
+
+// instance of "ransac_model_generating_function"
+#include "exterior_algebra.c"
+static int affine_fundamental_matrix(float *fm, float *p, void *usr)
+{
+	double x[4][5] = {
+		{p[0],  p[1],  p[2],  p[3],  1},
+		{p[4],  p[5],  p[6],  p[7],  1},
+		{p[8],  p[9],  p[10], p[11], 1},
+		{p[12], p[13], p[14], p[15], 1}
+	};
+	double y[2][10], z[5];
+	exterior_product_10_5_5(y[0], x[0], x[1]);
+	exterior_product_10_5_5(y[1], x[2], x[3]);
+	exterior_product_5_10_10(z, y[0], y[1]);
+	fm[0] = 0   ; fm[1] = 0   ; fm[2] = z[0];
+	fm[3] = 0   ; fm[4] = 0   ; fm[5] = z[1];
+	fm[6] = z[2]; fm[7] = z[3]; fm[8] = z[4];
+	return 1;
+}
+
+
+
 
 
 // ************************************

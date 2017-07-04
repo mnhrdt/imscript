@@ -1,5 +1,5 @@
 # user-editable configuration
-CFLAGS ?= -march=native -Os
+CFLAGS ?= -march=native -O3
 
 # required libraries
 LDLIBS  = -lfftw3f -lm -ljpeg -ltiff -lpng -lz
