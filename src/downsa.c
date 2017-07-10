@@ -26,6 +26,16 @@ static int compare_floats(const void *a, const void *b)
 static void statistics_getf_spoilable(struct statistics_float *s, float *f,
 		int n)
 {
+	if (n == 0) {
+		s->min = INFINITY;
+		s->max = -INFINITY;
+		s->median = NAN;
+		s->average = 0;
+		s->sample = NAN;
+		s->variance = NAN;
+		s->middle = NAN;
+		s->laverage = NAN;
+	}
 	s->middle = f[n/2-1];
 	int mt = STATISTIC_MEDIAN_BIAS;
 	int mi = STATISTIC_MIDDLE_BIAS;

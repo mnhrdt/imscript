@@ -53,7 +53,7 @@ endif
 OBJ_FTR = $(OBJ) src/ftr/ftr.o src/ftr/egm96.o
 LIB_FTR = src/ftr/libftr.a
 
-BIN_FTR = viho fpan fpantiff rpcflip icrop powerkill dosdo epiview vnav
+BIN_FTR = viho fpan fpantiff rpcflip icrop powerkill dosdo epiview vnav fpanflip
 BIN_MSC = $(shell cat src/misc/all_mains)
 
 BIN_FTR := $(addprefix bin/,$(BIN_FTR))
