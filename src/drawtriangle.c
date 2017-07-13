@@ -41,7 +41,7 @@ static void split_triangle_horizontally(
 }
 
 // traverse a triangle whose first side is horizontal
-static void traverse_flat_bot_triangle(
+static void traverse_flat_triangle(
 		float abc[3][2],          // coordinates of the three points
 		void (*f)(int,int,void*), // function to apply to each pixel
 		void *e                   // passed to f
