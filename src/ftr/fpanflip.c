@@ -7,10 +7,7 @@
 
 #include "iio.h"
 
-#ifndef FTR_BACKEND
-#define FTR_BACKEND 'x'
-#endif
-#include "ftr.c"
+#include "ftr.h"
 
 #include "xmalloc.c"
 

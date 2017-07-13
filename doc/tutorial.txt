@@ -1,0 +1,116 @@
+IMSCRIPT TUTORIAL
+=================
+
+Imscript is a collection of simple programs for doing image
+processing in a unix environment.
+
+0. Philosophy
+-------------
+
+This is just vanilla unix philosophy with some specificities for
+images:
+
+	- each program does one thing and does it well
+	- programs work together
+	- offer mechanism, not policy
+	- images are arrays of numbers, representable by text files
+
+Notice that imscript programs will read any common image format, but
+will only write asc, pnm, png, and tiff.
+
+1. Overview
+-----------
+
+1.1. Filters: read one image and write one image of the same size
+	- blur: convolve an image by a shift-invariant user-specified kernel
+	- morsi: apply a morphological operation with a user-specified element
+	- qeasy: re-scale the dynamic range of an image
+	- qauto: re-scale the dynamic range of an image, automatically
+	- palette: colorize a grayscale image using a palette
+	- dither: binarize an image by error diffusion
+	- iion: copy named input to named output (useful to change file format)
+
+1.2. Accumulators: combine several images into one
+	- plambda: apply an arbitrary pixel-wise expression, given explicitly
+	- veco: generic pixel-wise expressions for gray images, gray output
+	- vecov: generic pixel-wise expressions for color images, color output
+	- vecoh: generic pixel-wise operations for gray images, color output
+	- tbcat: concatenate two image (top-bottom)
+	- lrcat: concatenate two image (left-right)
+
+1.3. Queries: extract data from one image
+	- imprintf: print a formatted string of image data
+	- ghisto: common histogram
+	- contihist: continuous histogram
+	- viewflow:  represent a vector field using a color code
+	- flowarrows: represent a vector field using arrows
+
+1.4. Interpolators: fill-in the holes of one image
+	- nnint: nearest neighbor interpolation
+	- bdint: interpolation from the boundary of each hole
+	- simpois: poisson, laplace and biharmonic interpolators
+	- amle: absolutely minimizing lipschitz extension
+
+1.5. Rescalers: produce an image of different size or shape
+	- downsa: zoom out by combining blocks of pixels
+	- upsa: zoom in by interpolation inside cells
+	- ntiply: zoom in by pixel replication
+	- imflip: rotate or transpose the image domain
+	- homwarp: apply an arbitrary homography to the image domain
+
+1.6. Frequecy domains:
+	- fft: discrete Fourier transform (direct)
+	- ifft: discrete Fourier transform (inverse)
+	- dct: discrete cosine transform
+	- dht: discrete Hartley transform
+
+1.7. Point processing:
+	- pview: display points or matches as an image
+	- ransac: generic ransac implementation
+	- srmatch: multi-scale sift matching for registration
+	- plyflatten: project 3D points into a 2.5D representation
+	- colormesh: build 3D mesh from calibrated 2.5D representation
+	- ijmesh: build 3D mesh from non-calibrated 2.5D representation
+
+1.8. Multi-program suites:
+	- siftu: operations for sift keypoints
+	- tiffu: operations for tiff files
+	- fontu: operations for bitmapped fonts
+
+1.9. Miscellaneous:
+	- synflow: generate a synthetic optical flow field
+	- ccproc: connected component filtering
+	- ihough2: generic hough transform (for straight lines)
+	- tdip: cylindrical hough transform (for sinusoids)
+	- rpc_pm: patch match in the altitude domain
+	- distance: distance function to a given set of points
+	- sdistance: signed distance to the boundaries of a binary image
+	- ppsmooth: periodic + smooth image decomposition
+	- pmba2: poor man bundle adjustment
+	- tcregistration: register two images by translation
+
+1.10. Interactive programs:
+	- fpan: display an image with panning, zooming, and contrast changes
+	- fpantiff: like fpan, but understands image pyramids
+	- rpcflip: display several calibrated satellite images
+	- powerkill: fourier-domain band-pas filter editor
+	- epiview: visualize the epipolar geometry between two images
+	- viho: interactive homographic visualization
+	- dosdo: look at an image and its fourier transform
+	- icrop: interactive crop
+	- vnav: visualize cylindrical images
+
+
+2. Examples
+-----------
+
+3. Tutorial
+-----------
+
+The most important operation in image processing is looking at the
+image.  There are hundreds of programs for that.  We suggest
+"display" from imagemagick, "v.py" by gfacciol or "fpan" that is
+inside 
+
+
+# vim:set tw=69 filetype=text spell spelllang=en:
