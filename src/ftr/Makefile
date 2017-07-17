@@ -1,4 +1,4 @@
-CFLAGS ?= -march=native -O3 -DFTR_BACKEND='x'
+CFLAGS ?= -march=native -O3
 
 LDLIBS  = -ljpeg -ltiff -lpng -lfftw3f -lz -lm -lX11
 

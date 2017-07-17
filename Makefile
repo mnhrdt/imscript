@@ -2,7 +2,6 @@ CFLAGS ?= -march=native -O3
 LDLIBS = -ljpeg -ltiff -lpng -lz -lfftw3f -lm
 
 OBJ = src/iio.o src/fancy_image.o
-LIB = src/libiio.a
 BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
       qeasy homwarp synflow backflow flowinv nnint bdint amle simpois ghisto \
       contihist fontu imprintf pview viewflow flowarrows palette ransac blur \
@@ -13,10 +12,8 @@ BIN := $(addprefix bin/,$(BIN))
 
 default: $(BIN)
 
-bin/%  : src/%.c $(LIB)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)
-
-$(LIB) : $(LIB)($(OBJ))
+bin/%  : src/%.o $(OBJ)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 
 
@@ -45,13 +42,11 @@ endif
 
 
 
-
 # exotic targets, not built by default
 # FTR: interactive tools, require X11 or freeglut
 # MSC: "misc" tools, or those requiring GSL
 
-OBJ_FTR = $(OBJ) src/ftr/ftr.o src/ftr/egm96.o
-LIB_FTR = src/ftr/libftr.a
+OBJ_FTR = src/iio.o src/ftr/ftr.o src/ftr/egm96.o
 
 BIN_FTR = viho fpan fpantiff rpcflip icrop powerkill dosdo epiview vnav fpanflip
 BIN_MSC = $(shell cat src/misc/all_mains)
@@ -63,7 +58,6 @@ LDLIBS_FTR = $(LDLIBS) -lX11
 LDLIBS_MSC = $(LDLIBS) -lgsl -lgslcblas
 
 OBJ_ALL = $(OBJ) $(OBJ_FTR)
-LIB_ALL = $(LIB) $(LIB_FTR)
 BIN_ALL = $(BIN) $(BIN_FTR) $(BIN_MSC)
 
 full  : default ftr misc
@@ -71,17 +65,17 @@ ftr   : $(BIN_FTR)
 misc  : $(BIN_MSC)
 
 
-bin/% : src/ftr/%.c $(LIB_FTR)
+bin/% : src/ftr/%.o $(OBJ_FTR)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS_FTR)
 
-bin/% : src/misc/%.c $(LIB)
+bin/% : src/misc/%.o $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS_MSC)
 
-$(LIB_FTR) : $(LIB_FTR)($(OBJ_FTR))
 
 
 
 # bureaucracy
 clean:
-	$(RM) $(OBJ_ALL) $(LIB_ALL) $(BIN_ALL)
+	$(RM) $(OBJ_ALL) $(BIN_ALL)
 .PHONY: default full ftr misc clean
+.PRECIOUS: $(OBJ_ALL)
