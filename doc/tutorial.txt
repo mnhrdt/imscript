@@ -104,6 +104,38 @@ will only write asc, pnm, png, and tiff.
 2. Examples
 -----------
 
+Gaussian blur of different sizes:
+
+blur gaussian 1 lenak.png lenak_g1.png
+blur gaussian 3 lenak.png lenak_g3.png
+blur gaussian 8 lenak.png lenak_g8.png
+
+
+Gaussian blur with different boundary conditions:
+
+blur -n gaussian 2 lenak.png lenak_gn.png
+blur -z gaussian 2 lenak.png lenak_gz.png
+blur -s gaussian 2 lenak.png lenak_gs.png
+
+
+Blur with different kernels of the "same" width:
+
+blur gaussian 3 lenak.png lenak_g3.png
+blur laplace  3 lenak.png lenak_l3.png
+blur disk     3 lenak.png lenak_d3.png
+blur cauchy   3 lenak.png lenak_i3.png
+blur inverse  3 lenak.png lenak_i3.png
+
+
+Morphological operations with a cross structuring element:
+
+morsi cross erosion  lenak.png lenak_erosion.png
+morsi cross dilation lenak.png lenak_dilation.png
+...
+
+
+Morphological operation with 
+
 3. Tutorial
 -----------
 

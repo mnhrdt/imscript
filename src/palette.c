@@ -264,6 +264,7 @@ SMART_PARAMETER(PLEGEND_MARGIN_BOTTOM,12)
 SMART_PARAMETER(PLEGEND_TICKWIDTH,3)
 SMART_PARAMETER(PLEGEND_TEXT_XOFFSET,4)
 SMART_PARAMETER(PLEGEND_TEXT_YOFFSET,0)
+SMART_PARAMETER(PLEGEND_NTICKS,3)
 void save_legend(char *filename_legend, char *palette_id, float m, float M)
 {
 	// palette and font structs
@@ -316,13 +317,17 @@ void save_legend(char *filename_legend, char *palette_id, float m, float M)
 	}
 
 	// ticks and numbers
-	int nticks = 3;
-	float ticks[3][2] = {  // table with tick values and positions
+	float ticks[][2] = {  // table with tick values and positions
 		{M, p_j-1},
 		{m, q_j},
-		{(m+M)/2, (p_j+q_j)/2}
+		{(m+M)/2, (p_j+q_j)/2},
+		{(3*m+M)/4, (3*p_j+q_j)/4},
+		{(m+3*M)/4, (p_j+3*q_j)/4}
 		// TODO: put more ticks (?)
 	};
+	int nticks = PLEGEND_NTICKS();
+	if (nticks != 2 && nticks != 3 && nticks != 5)
+		nticks = 2;
 	for (int k = 0; k < nticks; k++)
 	{
 		float x = ticks[k][0]; // tick value

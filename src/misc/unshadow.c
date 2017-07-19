@@ -19,12 +19,13 @@ void unshadow(float *xx, int w, int h)
 
 #ifdef USE_UNSHADOW_MAIN
 #include <stdio.h>
+#include <stdbool.h>
 #include "iio.h"
 #include "pickopt.c"
 int main(int c, char *v[])
 {
 	char *filename_mask = pick_option(&c, &v, "m", "");
-	int help_argument = (int)pick_option(&c, &v, "h", 0);
+	bool help_argument = pick_option(&c, &v, "h", 0);
 	if (help_argument || (c != 1 && c != 2 && c != 3)) {
 		fprintf(stderr, "usage:\n\t%s [in.tiff [out.tiff]]\n", *v);
 		//                          0  1        2
