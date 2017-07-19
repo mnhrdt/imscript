@@ -2502,7 +2502,7 @@ static int read_beheaded_vrt(struct iio_image *x,
 	if (!sl) return 1;
 	cx += xml_get_numeric_attr(&w, line, "Dataset", "rasterXSize");
 	cx += xml_get_numeric_attr(&h, line, "Dataset", "rasterYSize");
-	if (!(w*h)) return 2;
+	if (!w || !h) return 2;
 	if (cx != 2) return 3;
 	x->dimension = 2;
 	x->sizes[0] = w;

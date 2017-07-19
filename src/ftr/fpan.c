@@ -487,8 +487,8 @@ static void free_pyramid(struct pan_state *e)
 		free(e->pyr_rgb[s]);
 }
 
-#define BAD_MIN(a,b) a<b?a:b
 
+#define BAD_MIN(a,b) a<b?a:b
 int main_pan(int c, char *v[])
 {
 	// process input arguments
@@ -518,7 +518,7 @@ int main_pan(int c, char *v[])
 	ftr_close(&f);
 	free(e->frgb);
 	free_pyramid(e);
-	return r;
+	return r - 1;
 }
 
 int main(int c, char *v[])

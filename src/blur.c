@@ -478,7 +478,7 @@ static char *help_string_oneliner = "smooth a 2D image using the selected kernel
 static char *help_string_usage    = "usage:\n\t"
 "qauto [-p 5] [-i] [-f]  [in [out]]";
 static char *help_string_long     =
-"Blur convolves the input image by the requested positive kernel\n"
+"Blur convolves the input image by the requested positive kernel.\n"
 "Only the first letter of the kernel name is considered.\n"
 "If the name of the kernel is uppercase, it subtracts the result\n"
 "from the original image.\n"
@@ -508,6 +508,7 @@ static char *help_string_long     =
 " -z        zero boundary\n"
 " -s        symmetrized boundary\n"
 " -n        normal boundary (periodic)\n"
+"\n"
 "Examples:\n"
 " blur g 1.6                              Smooth an image by a slight amount\n"
 " blur C 1 | qauto                        Linear retinex\n"

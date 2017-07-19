@@ -91,6 +91,7 @@ static float slog(float x)
 	if (fabs(x) <= 1) return 0;
 	if (x > 1) return log(x);
 	if (x < -1) return -log(-x);
+	return NAN;
 }
 
 // evaluate the value a position (p,q) in image coordinates

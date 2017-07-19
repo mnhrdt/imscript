@@ -116,7 +116,7 @@ static void add_redline(uint8_t *x, int w, int h, int from[2], int to[2])
 
 static void get_colour(uint8_t rgb[4], char *colour)
 {
-	struct caca { char *name; char r; char g; char b; } t[] = {
+	struct caca { char *name; uint8_t r; uint8_t g; uint8_t b; } t[] = {
 		{"red", 255, 0, 0},
 		{"green", 0, 128, 0},
 		{"gray", 127, 127, 127},
