@@ -122,14 +122,14 @@ static float nodes_cocoterrain[] = {
 };
 
 static float nodes_dem[] = {
-      0       ,  0       , 96.9994  , 70.9997  ,  
-      2.6010  , 16.0012  ,121.9997  , 46.9990 ,
-      26.0100 , 231.9990 , 215.0007 , 125.0010,
-      62.4495 , 160.9993 ,  67.0012 ,        0,
-      88.4595 , 158.0006 ,        0 ,        0,
-      145.7070,  109.9993,  109.9993,  109.9993,
-      208.1565,  255.0000,  255.0000,  255.0000,
-      255.0000,  255.0000,  255.0000,  255.0000,
+	0       ,  0       , 96.9994  , 70.9997  ,
+	2.6010  , 16.0012  ,121.9997  , 46.9990 ,
+	26.0100 , 231.9990 , 215.0007 , 125.0010,
+	62.4495 , 160.9993 ,  67.0012 ,        0,
+	88.4595 , 158.0006 ,        0 ,        0,
+	145.7070,  109.9993,  109.9993,  109.9993,
+	208.1565,  255.0000,  255.0000,  255.0000,
+	255.0000,  255.0000,  255.0000,  255.0000,
 };
 
 static float nodes_nice[] = {
@@ -184,7 +184,7 @@ static void fill_palette(struct palette *p, char *s, float m, float M)
 	else if (0 == strcmp(s, "cocoterrain")) {
 		set_node_positions_linearly(nodes_cocoterrain, 7, m, M);
 		fill_palette_with_nodes(p, nodes_cocoterrain, 7);
-   } else if (0 == strcmp(s, "dem")) {
+	} else if (0 == strcmp(s, "dem")) {
 		set_node_positions_linearly(nodes_dem, 8, m, M);
 		fill_palette_with_nodes(p, nodes_dem, 8);
 	} else if (0 == strcmp(s, "nice")) {
@@ -255,28 +255,32 @@ void apply_palette(uint8_t *y, float *x, int n, char *s, float *m, float *M)
 #include "fonts/xfonts_all.c"
 
 
-SMART_PARAMETER(PLEGEND_WIDTH,128)
+SMART_PARAMETER(PLEGEND_WIDTH,64)
 SMART_PARAMETER(PLEGEND_HEIGHT,256)
-SMART_PARAMETER(PLEGEND_MARGIN_LEFT,32)
-SMART_PARAMETER(PLEGEND_MARGIN_RIGHT,64)
-SMART_PARAMETER(PLEGEND_MARGIN_TOP,32)
-SMART_PARAMETER(PLEGEND_MARGIN_BOTTOM,32)
+SMART_PARAMETER(PLEGEND_MARGIN_LEFT,12)
+SMART_PARAMETER(PLEGEND_MARGIN_RIGHT,34)
+SMART_PARAMETER(PLEGEND_MARGIN_TOP,12)
+SMART_PARAMETER(PLEGEND_MARGIN_BOTTOM,12)
 SMART_PARAMETER(PLEGEND_TICKWIDTH,3)
+SMART_PARAMETER(PLEGEND_TEXT_XOFFSET,4)
+SMART_PARAMETER(PLEGEND_TEXT_YOFFSET,0)
 void save_legend(char *filename_legend, char *palette_id, float m, float M)
 {
-	struct palette p[1];
-	fill_palette(p, palette_id, m, M);
-	struct bitmap_font f = reformat_font(*xfont_7x14B, UNPACKED);
+	// palette and font structs
+	struct bitmap_font f[1] = {reformat_font(*xfont_7x14B, UNPACKED)};
+	struct palette     p[1]; fill_palette(p, palette_id, m, M);
 
+	// sizes, margins and positions
 	int w = PLEGEND_WIDTH();
 	int h = PLEGEND_HEIGHT();
 	int m_l = PLEGEND_MARGIN_LEFT();
 	int m_r = PLEGEND_MARGIN_RIGHT();
 	int m_t = PLEGEND_MARGIN_TOP();
 	int m_b = PLEGEND_MARGIN_BOTTOM();
-	int p_i = w - m_r;
-	int p_j = h - m_b;
-
+	int p_i = m_l;     // left   boundary of colored part;
+	int p_j = m_t;     // top    boundary of colored part
+	int q_i = w - m_r; // right  boundary of colored part
+	int q_j = h - m_b; // bottom boundary of colored part
 
 	// image with the legend
 	uint8_t *rgb = malloc(3*w*h);
@@ -285,50 +289,60 @@ void save_legend(char *filename_legend, char *palette_id, float m, float M)
 	for (int i = 0; i < 3*w*h; i++)
 		rgb[i] = 255;
 
+	// transformation "x -> alpha * j + beta" from positions to values
+	float alpha = (M - m) / (p_j - q_j);
+	float beta  = m - alpha * q_j;
+
 	// fill legend colors
-	for (int j = m_t; j < h - m_b; j++)
-	for (int i = m_l; i < w - m_r; i++)
+	for (int j = p_j; j < q_j; j++)
+	for (int i = p_i; i < q_i; i++)
 	{
-		float x = m + ((M - m) * (j - m_t)) / (p_j - m_t);
-		if (i == 64)
-			fprintf(stderr, "j=%d x=%g\n", j, x);
+		//float x = m + ((M - m) * (j - p_j)) / (q_j - p_j);
+		float x = alpha * j + beta;
+		if (i == 64) fprintf(stderr, "j=%d x=%g\n", j, x);
 		get_palette_color(rgb + 3*(j*w+i), p, x);
 	}
 
 	// border (1-pix black border)
 	for (int l = 0; l < 3; l++) {
-		for (int j = m_t; j < h - m_b; j++) {
-			rgb[3*(j*w+m_l-1)+l] = 0;
-			rgb[3*(j*w+p_i+0)+l] = 0;
+		for (int j = p_j; j < q_j; j++) {
+			rgb[3*(j*w+p_i-1)+l] = 0;
+			rgb[3*(j*w+q_i+0)+l] = 0;
 		}
-		for (int i = m_l; i < w - m_r; i++) {
-			rgb[3*((m_t-1)*w+i)+l] = 0;
-			rgb[3*((p_j+0)*w+i)+l] = 0;
+		for (int i = p_i-1; i < q_i; i++) {
+			rgb[3*((p_j-1)*w+i)+l] = 0;
+			rgb[3*((q_j+0)*w+i)+l] = 0;
 		}
 	}
 
-	// ticks
+	// ticks and numbers
 	int nticks = 3;
-	float ticks[3][2] = {
-		{m, m_t-1},
-		{M, p_j},
-		{(m+M)/2, (m_t+p_j)/2}
+	float ticks[3][2] = {  // table with tick values and positions
+		{M, p_j-1},
+		{m, q_j},
+		{(m+M)/2, (p_j+q_j)/2}
+		// TODO: put more ticks (?)
 	};
 	for (int k = 0; k < nticks; k++)
 	{
-		float x = ticks[k][0];
-		int   j = ticks[k][1];
-		for (int i = p_i; i < p_i+1+PLEGEND_TICKWIDTH(); i++)
+		float x = ticks[k][0]; // tick value
+		int   j = ticks[k][1]; // tick position inside the legend
+
+		// draw tick
+		for (int i = q_i; i < q_i+1+PLEGEND_TICKWIDTH(); i++)
 		for (int l = 0; l < 3; l++)
 			rgb[3*(j*w+i)+l] = 0;
+
+		// draw number associated to this tick
 		char buf[0x100];
 		uint8_t bg[3] = { 255, 255, 255}, fg[3] = {0, 0, 0};
 		snprintf(buf, sizeof buf, "%g", x);
-		int pos_i = p_i + 7;
-		int pos_j = j - f.height/2;
-		put_string_in_rgb_image(rgb,w,h, pos_i, pos_j, fg,bg,0,&f,buf);
+		int pos_i = q_i + PLEGEND_TICKWIDTH() + PLEGEND_TEXT_XOFFSET();
+		int pos_j = j - f->height/2 + PLEGEND_TEXT_YOFFSET();
+		put_string_in_rgb_image(rgb,w,h, pos_i, pos_j, fg,bg,0,f,buf);
 	}
 
+	// save legend into file
 	iio_write_image_uint8_vec(filename_legend, rgb, w, h, 3);
 	free(rgb);
 }
