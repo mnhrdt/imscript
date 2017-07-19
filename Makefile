@@ -1,5 +1,5 @@
 CFLAGS ?= -march=native -O3
-LDLIBS = -ljpeg -ltiff -lpng -lz -lfftw3f -lm
+override LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm
 
 OBJ = src/iio.o src/fancy_image.o
 BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
@@ -66,10 +66,10 @@ misc  : $(BIN_MSC)
 
 
 bin/% : src/ftr/%.o $(OBJ_FTR)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS_FTR)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS_FTR)
 
 bin/% : src/misc/%.o $(OBJ)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS_MSC)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS_MSC)
 
 
 

@@ -514,12 +514,15 @@ static char *help_string_long     =
 ;
 #include "help_stuff.c"
 #include "parsenumbers.c"
+#include "pickopt.c"
 #include "iio.h"
 int main_blur(int c, char *v[])
 {
 	if (c == 2)
 		if_help_is_requested_print_it_and_exit_the_program(v[1]);
 
+	bool boundary_symmetric = pick_option(&c, &v, "s", NULL);
+	bool boundary_zero      = pick_option(&c, &v, "z", NULL);
 	if (c != 5 && c != 3 && c != 4) {
 		fprintf(stderr, "usage:\n\t"
 				"%s kernel \"params\" [in [out]]\n", *v);
@@ -543,7 +546,34 @@ int main_blur(int c, char *v[])
 	float *x = iio_read_image_float_vec(filename_in, &w, &h, &pd);
 	float *y = xmalloc(w*h*pd*sizeof*y);
 
-	blur_2d(y, x, w, h, pd, kernel_id, param, nparams);
+	if (boundary_symmetric || boundary_zero) {
+		int ww = 2*w, hh = 2*h;
+		float *xx = xmalloc(ww*hh*pd*sizeof*xx);
+		float *yy = xmalloc(ww*hh*pd*sizeof*xx);
+		for (int j = 0; j < h; j++)
+		for (int i = 0; i < w; i++)
+		for (int l = 0; l < pd; l++)
+		{
+			float g = x[(j*w+i)*pd+l];
+			float g0 = boundary_zero ? 0 : g;
+			int si = 2*w - i - 1;
+			int sj = 2*h - j - 1;
+			xx[( j*ww +  i)*pd+l] = g;
+			xx[(sj*ww +  i)*pd+l] = g0;
+			xx[( j*ww + si)*pd+l] = g0;
+			xx[(sj*ww + si)*pd+l] = g0;
+		}
+		blur_2d(yy, xx, ww, hh, pd, kernel_id, param, nparams);
+		iio_write_image_float_vec("bullshit_xx.tif", xx, ww, hh, pd);
+		iio_write_image_float_vec("bullshit_yy.tif", yy, ww, hh, pd);
+		for (int j = 0; j < h; j++)
+		for (int i = 0; i < w; i++)
+		for (int l = 0; l < pd; l++)
+			y[(j*w+i)*pd+l] = yy[(j*ww+i)*pd+l];
+		free(xx);
+		free(yy);
+	} else
+		blur_2d(y, x, w, h, pd, kernel_id, param, nparams);
 
 	iio_write_image_float_vec(filename_out, y, w, h, pd);
 	free(x);
