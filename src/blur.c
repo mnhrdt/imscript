@@ -564,8 +564,6 @@ int main_blur(int c, char *v[])
 			xx[(sj*ww + si)*pd+l] = g0;
 		}
 		blur_2d(yy, xx, ww, hh, pd, kernel_id, param, nparams);
-		iio_write_image_float_vec("bullshit_xx.tif", xx, ww, hh, pd);
-		iio_write_image_float_vec("bullshit_yy.tif", yy, ww, hh, pd);
 		for (int j = 0; j < h; j++)
 		for (int i = 0; i < w; i++)
 		for (int l = 0; l < pd; l++)
