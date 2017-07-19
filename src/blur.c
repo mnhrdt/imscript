@@ -504,6 +504,10 @@ static char *help_string_long     =
 " t         r^2 log(r)  (useful for biharmonic interpolation)\n"
 " o         log(r)\n"
 "\n"
+"Options:\n"
+" -z        zero boundary\n"
+" -s        symmetrized boundary\n"
+" -n        normal boundary (periodic)\n"
 "Examples:\n"
 " blur g 1.6                              Smooth an image by a slight amount\n"
 " blur C 1 | qauto                        Linear retinex\n"
@@ -522,6 +526,7 @@ int main_blur(int c, char *v[])
 		if_help_is_requested_print_it_and_exit_the_program(v[1]);
 
 	bool boundary_symmetric = pick_option(&c, &v, "s", NULL);
+	bool boundary_normal    = pick_option(&c, &v, "n", NULL);
 	bool boundary_zero      = pick_option(&c, &v, "z", NULL);
 	if (c != 5 && c != 3 && c != 4) {
 		fprintf(stderr, "usage:\n\t"
@@ -546,7 +551,7 @@ int main_blur(int c, char *v[])
 	float *x = iio_read_image_float_vec(filename_in, &w, &h, &pd);
 	float *y = xmalloc(w*h*pd*sizeof*y);
 
-	if (boundary_symmetric || boundary_zero) {
+	if (boundary_symmetric || boundary_zero || boundary_normal) {
 		int ww = 2*w, hh = 2*h;
 		float *xx = xmalloc(ww*hh*pd*sizeof*xx);
 		float *yy = xmalloc(ww*hh*pd*sizeof*xx);
@@ -556,8 +561,8 @@ int main_blur(int c, char *v[])
 		{
 			float g = x[(j*w+i)*pd+l];
 			float g0 = boundary_zero ? 0 : g;
-			int si = 2*w - i - 1;
-			int sj = 2*h - j - 1;
+			int si = boundary_normal ? w+i : 2*w - i - 1;
+			int sj = boundary_normal ? h+j : 2*h - j - 1;
 			xx[( j*ww +  i)*pd+l] = g;
 			xx[(sj*ww +  i)*pd+l] = g0;
 			xx[( j*ww + si)*pd+l] = g0;
