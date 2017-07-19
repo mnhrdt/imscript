@@ -77,6 +77,6 @@ bin/% : src/misc/%.o $(OBJ)
 
 # bureaucracy
 clean:
-	$(RM) $(OBJ_ALL) $(BIN_ALL)
+	$(RM) $(BIN_ALL) src/*.o src/ftr/*.o src/misc/*.o
 .PHONY: default full ftr misc clean
-.PRECIOUS: $(OBJ_ALL)
+.PRECIOUS: %.o

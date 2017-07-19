@@ -13,11 +13,11 @@
 //#ifdef FTR_BACKEND
 //#
 //#  if FTR_BACKEND == FTR_BACKEND_X11
-//#    include "ftr_x11.c"
+#    include "ftr_x11.c"
 //#  endif
 //#
 //#   if FTR_BACKEND == FTR_BACKEND_FREEGLUT
-#    include "ftr_freeglut.c"
+//#    include "ftr_freeglut.c"
 //#   endif
 //#
 //#else
