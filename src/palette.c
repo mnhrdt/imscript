@@ -75,13 +75,13 @@ static void fill_palette_with_nodes(struct palette *p, float *n, int nn)
 {
 	if (nn < 2) fail("at least 2 nodes required");
 	float factor = (PALSAMPLES-1.0)/(nn-1.0);
-	fprintf(stderr, "1pfnnm1 = %g\n", 1 + factor*(nn-1));
+	//fprintf(stderr, "1pfnnm1 = %g\n", 1 + factor*(nn-1));
 	assert(PALSAMPLES == round(1+factor*(nn-1)));
 	for (int i = 0; i < nn-1; i++)
 	{
 		float posi = n[4*i];
 		float posnext = n[4*(i+1)];
-		fprintf(stderr, "fwpn node %d : %g %g\n", i, posi, posnext);
+		//fprintf(stderr, "fwpn node %d : %g %g\n", i, posi, posnext);
 		if (posi > posnext)
 			fail("palette nodes must be in increasing order");
 		int idxi = factor * i;
@@ -228,28 +228,113 @@ static void get_min_max(float *min, float *max, float *x, int n)
 	if (max) *max = M+PALMAXEPS();
 }
 
-void apply_palette(uint8_t *y, float *x, int n, char *s, float m, float M)
+void apply_palette(uint8_t *y, float *x, int n, char *s, float *m, float *M)
 {
-	if (!isfinite(m)) get_min_max(&m, 0, x, n);
-	if (!isfinite(M)) get_min_max(0, &M, x, n);
+	if (!isfinite(*m)) get_min_max(m, 0, x, n);
+	if (!isfinite(*M)) get_min_max(0, M, x, n);
 
 	struct palette p[1];
-	fill_palette(p, s, m, M);
+	fill_palette(p, s, *m, *M);
 
-	fprint_palette(stderr, p);
+	//fprint_palette(stderr, p);
 
 	for (int i = 0; i < n; i++)
 		get_palette_color(y + 3*i, p, x[i]);
 }
+
 
 #define PALETTE_MAIN
 
 #ifdef PALETTE_MAIN
 #include "iio.h"
 #include "xmalloc.c"
+#include "pickopt.c"
 
+#define OMIT_MAIN_FONTU
+#include "fontu.c"
+#include "fonts/xfonts_all.c"
+
+
+SMART_PARAMETER(PLEGEND_WIDTH,128)
+SMART_PARAMETER(PLEGEND_HEIGHT,256)
+SMART_PARAMETER(PLEGEND_MARGIN_LEFT,32)
+SMART_PARAMETER(PLEGEND_MARGIN_RIGHT,64)
+SMART_PARAMETER(PLEGEND_MARGIN_TOP,32)
+SMART_PARAMETER(PLEGEND_MARGIN_BOTTOM,32)
+SMART_PARAMETER(PLEGEND_TICKWIDTH,3)
+void save_legend(char *filename_legend, char *palette_id, float m, float M)
+{
+	struct palette p[1];
+	fill_palette(p, palette_id, m, M);
+	struct bitmap_font f = reformat_font(*xfont_7x14B, UNPACKED);
+
+	int w = PLEGEND_WIDTH();
+	int h = PLEGEND_HEIGHT();
+	int m_l = PLEGEND_MARGIN_LEFT();
+	int m_r = PLEGEND_MARGIN_RIGHT();
+	int m_t = PLEGEND_MARGIN_TOP();
+	int m_b = PLEGEND_MARGIN_BOTTOM();
+	int p_i = w - m_r;
+	int p_j = h - m_b;
+
+
+	// image with the legend
+	uint8_t *rgb = malloc(3*w*h);
+
+	// fill background
+	for (int i = 0; i < 3*w*h; i++)
+		rgb[i] = 255;
+
+	// fill legend colors
+	for (int j = m_t; j < h - m_b; j++)
+	for (int i = m_l; i < w - m_r; i++)
+	{
+		float x = m + ((M - m) * (j - m_t)) / (p_j - m_t);
+		if (i == 64)
+			fprintf(stderr, "j=%d x=%g\n", j, x);
+		get_palette_color(rgb + 3*(j*w+i), p, x);
+	}
+
+	// border (1-pix black border)
+	for (int l = 0; l < 3; l++) {
+		for (int j = m_t; j < h - m_b; j++) {
+			rgb[3*(j*w+m_l-1)+l] = 0;
+			rgb[3*(j*w+p_i+0)+l] = 0;
+		}
+		for (int i = m_l; i < w - m_r; i++) {
+			rgb[3*((m_t-1)*w+i)+l] = 0;
+			rgb[3*((p_j+0)*w+i)+l] = 0;
+		}
+	}
+
+	// ticks
+	int nticks = 3;
+	float ticks[3][2] = {
+		{m, m_t-1},
+		{M, p_j},
+		{(m+M)/2, (m_t+p_j)/2}
+	};
+	for (int k = 0; k < nticks; k++)
+	{
+		float x = ticks[k][0];
+		int   j = ticks[k][1];
+		for (int i = p_i; i < p_i+1+PLEGEND_TICKWIDTH(); i++)
+		for (int l = 0; l < 3; l++)
+			rgb[3*(j*w+i)+l] = 0;
+		char buf[0x100];
+		uint8_t bg[3] = { 255, 255, 255}, fg[3] = {0, 0, 0};
+		snprintf(buf, sizeof buf, "%g", x);
+		int pos_i = p_i + 7;
+		int pos_j = j - f.height/2;
+		put_string_in_rgb_image(rgb,w,h, pos_i, pos_j, fg,bg,0,&f,buf);
+	}
+
+	iio_write_image_uint8_vec(filename_legend, rgb, w, h, 3);
+	free(rgb);
+}
 int main_palette(int c, char *v[])
 {
+	char *filename_legend = pick_option(&c, &v, "l", "");
 	if (c != 4 && c != 5 && c != 6 ) {
 		fprintf(stderr, "usage:\n\t%s from to pal [in [out]]\n", *v);
 		//                         0  1    2   3    4   5
@@ -265,9 +350,12 @@ int main_palette(int c, char *v[])
 	float *x = iio_read_image_float(filename_in, &w, &h);
 	uint8_t *y = xmalloc(3*w*h);
 
-	apply_palette(y, x, w*h, palette_id, from, to);
+	apply_palette(y, x, w*h, palette_id, &from, &to);
 
 	iio_write_image_uint8_vec(filename_out, y, w, h, 3);
+
+	if (*filename_legend)
+		save_legend(filename_legend, palette_id, from, to);
 
 	free(x);
 	free(y);
