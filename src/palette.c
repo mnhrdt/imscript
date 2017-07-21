@@ -204,6 +204,14 @@ static void fill_palette(struct palette *p, char *s, float m, float M)
 
 static void get_palette_color(uint8_t *rgb, struct palette *p, float x)
 {
+	if (isnan(x)) {
+		rgb[0] = rgb[1] = rgb[2] = 0;
+		return;
+	}
+	if (!isfinite(x)) {
+		rgb[0] = rgb[1] = rgb[2] = 255;
+		return;
+	}
 	int ix = round((PALSAMPLES-1)*(x - p->m)/(p->M - p->m));
 	if (ix < 0) ix = 0;
 	if (ix >= PALSAMPLES) ix = PALSAMPLES - 1;
@@ -258,7 +266,7 @@ void apply_palette(uint8_t *y, float *x, int n, char *s, float *m, float *M)
 SMART_PARAMETER(PLEGEND_WIDTH,64)
 SMART_PARAMETER(PLEGEND_HEIGHT,256)
 SMART_PARAMETER(PLEGEND_MARGIN_LEFT,12)
-SMART_PARAMETER(PLEGEND_MARGIN_RIGHT,34)
+SMART_PARAMETER(PLEGEND_MARGIN_RIGHT,36)
 SMART_PARAMETER(PLEGEND_MARGIN_TOP,12)
 SMART_PARAMETER(PLEGEND_MARGIN_BOTTOM,12)
 SMART_PARAMETER(PLEGEND_TICKWIDTH,3)
