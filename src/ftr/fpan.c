@@ -1,4 +1,4 @@
-// icc -std=c99 -Ofast fpan.c iio.o -o fpan -lglut -lGL -ltiff -ljpeg -lpng -lz -lm
+// cc -Ofast fpan.c iio.o -o fpan -lX11 -ltiff -ljpeg -lpng -lz -lm
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -334,11 +334,13 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 // update offset variables by dragging
 static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 {
+	//fprintf(stderr, "motion b=%d m=%d (%d %d)\n", b, m, x, y);
+
 	static double ox = 0, oy = 0;
 
-	if (m == FTR_BUTTON_LEFT)   action_offset_viewport(f, x - ox, y - oy);
-	if (m == FTR_BUTTON_MIDDLE) action_print_value_under_cursor(f, x, y);
-	if (m == FTR_MASK_SHIFT)    action_center_contrast_at_point(f, x, y);
+	if (m & FTR_BUTTON_LEFT)   action_offset_viewport(f, x - ox, y - oy);
+	if (m & FTR_BUTTON_MIDDLE) action_print_value_under_cursor(f, x, y);
+	if (m & FTR_MASK_SHIFT)    action_center_contrast_at_point(f, x, y);
 
 	ox = x;
 	oy = y;
@@ -347,11 +349,12 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 {
 	//fprintf(stderr, "button b=%d m=%d\n", b, m);
-	if (b == FTR_BUTTON_UP && m == FTR_MASK_SHIFT) {
+
+	if (b == FTR_BUTTON_UP && m & FTR_MASK_SHIFT) {
 		action_contrast_span(f, 1/1.3); return; }
-	if (b == FTR_BUTTON_DOWN && m == FTR_MASK_SHIFT) {
+	if (b == FTR_BUTTON_DOWN && m & FTR_MASK_SHIFT) {
 		action_contrast_span(f, 1.3); return; }
-	if (b == FTR_BUTTON_RIGHT && m == FTR_MASK_CONTROL) {
+	if (b == FTR_BUTTON_RIGHT && m & FTR_MASK_CONTROL) {
 		action_reset_zoom_only(f, x, y); return; }
 	if (b == FTR_BUTTON_MIDDLE) action_print_value_under_cursor(f, x, y);
 	if (b == FTR_BUTTON_DOWN)   action_increase_zoom(f, x, y);
@@ -488,7 +491,7 @@ static void free_pyramid(struct pan_state *e)
 }
 
 
-#define BAD_MIN(a,b) a<b?a:b
+#define BAD_MIN(a,b) a<=b?a:b
 int main_pan(int c, char *v[])
 {
 	// process input arguments
