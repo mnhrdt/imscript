@@ -2773,13 +2773,16 @@ int main_plambda(int c, char **v)
 	if (c == 2 && 0 == strcmp(v[1], "--version")) return print_version();
 	if (c == 2 && 0 == strcmp(v[1], "--man")) return do_man();
 
-	int (*f)(int, char**) = (**v=='c' || c==2) ?  main_calc : main_images;
-	if (f == main_images && c > 2 && 0 == strcmp(v[1], "-c"))
-	{
+	int (*f)(int, char**) = **v=='c' ?  main_calc : main_images;
+	if (f == main_images && c > 2 && 0 == strcmp(v[1], "-c")) {
 		for (int i = 1; i <= c; i++)
 			v[i] = v[i+1];
 		f = main_calc;
 		c -= 1;
+	}
+	if (f == main_images && c == 2) {
+		char *vv[3] = { v[0], "-", v[1] };
+		return f(3, vv);
 	}
 	return f(c,v);
 }
