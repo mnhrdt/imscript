@@ -1,4 +1,4 @@
-// icc -std=c99 -Ofast fpantiff.c iio.o -o fpantiff -lglut -lGL -ltiff -lm
+// cc -O3 fpantiff.c iio.o ftr.o -o fpantiff -lX11 -ltiff -lm -lpng -ljpeg
 #include <assert.h>
 #include <ctype.h>
 #include <math.h>

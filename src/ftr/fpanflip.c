@@ -1,4 +1,4 @@
-// c99 -O3 fpanflip.c iio.o -o fpanflip -lglut -lGL -ltiff -ljpeg -lpng -lz -lm
+// cc -O3 fpanflip.c iio.o ftr.o -o fpanflip -lX11 -ltiff -ljpeg -lpng -lz -lm
 #include <assert.h>
 #include <ctype.h>
 #include <math.h>

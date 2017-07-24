@@ -1,4 +1,4 @@
-// icc -std=c99 -Ofast pleview.c iio.o -o pleview -lglut -lGL -ltiff -lm
+// cc -O3 pleview.c iio.o ftr.o -o pleview -lX11 -ltiff -lm -lpng -ljpeg
 #include <assert.h>
 #include <ctype.h>
 #include <math.h>

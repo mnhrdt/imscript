@@ -1,5 +1,5 @@
 // vnav: a borehole sinusoid explorer                            {{{1
-// gcc-6 -std=c99 -O3 vnav.c iio.o -o vnav -lX11 -ltiff -lpng -lfftw3f -ljpeg -lm
+// cc -O3 vnav.c iio.o -o vnav -lX11 -ltiff -lpng -lfftw3f -ljpeg -lm
 //
 // A program for visualizing borehole images of size 361xN, where N is huge.
 //

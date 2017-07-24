@@ -1,4 +1,4 @@
-// gcc -std=c99 -g dosdo.c iio.o -o dosdo -lX11 -ltiff -lpng -lfftw3f
+// cc -O3 dosdo.c iio.o -o dosdo -lX11 -ltiff -lpng -lfftw3f
 //
 // A program for visualizing the spatial and frequential domain of an image
 #include <assert.h>

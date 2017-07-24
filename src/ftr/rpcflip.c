@@ -2,17 +2,14 @@
 //
 // A "Nadir" viewer for pleiades images, based on vflip by Gabriele Facciolo
 //
-// c99 -O3 rpcflip.c iio.o -o rpcflip -lX11 -ltiff -lm
+// cc -O3 rpcflip.c iio.o ftr.o egm96.o -o rpcflip -lX11 -ltiff -lm -ljpeg -lpng
 //
 // TODO:
 //
-// 1. transparent detection of the 12 significant bits on the 16 bit smaples
-// 2. automatic contrast adjust à la qauto
-// 3. setup base_h automatically using the SRTM4
-// 4. draw epipolar curves
-// 5. load an arbitrary DEM
-// 6. view the DEM (and the SRTM4)
-// 7. reorganize coordinate changes to simplify the code
+// 1. draw epipolar curves
+// 2. load an arbitrary DEM
+// 3. view the DEM (and the SRTM4)
+// 4. reorganize coordinate changes to simplify the code
 //
 
 // #includes {{{1
@@ -1377,6 +1374,59 @@ static void action_dump_collection(struct FTR *f)
 	collection_counter += 1;
 }
 
+static void action_dump_raw(struct FTR *f)
+{
+	static int raw_view_counter = 0;
+	int pid = getpid();
+	char fname_pan[FILENAME_MAX], fname_msi[FILENAME_MAX];
+	char *fmt_pan = "/tmp/rpcflip_raw_pan_%d_%d.tiff";
+	char *fmt_msi = "/tmp/rpcflip_raw_msi_%d_%d.tiff";
+	snprintf(fname_pan, FILENAME_MAX, fmt_pan, pid, raw_view_counter);
+	snprintf(fname_msi, FILENAME_MAX, fmt_msi, pid, raw_view_counter);
+	struct pan_state *e = f->userdata;
+	struct pan_view  *v = obtain_view(e);
+	float *buf_pan = xmalloc(1 * v->dw * v->dh * sizeof(float));
+	float *buf_msi = xmalloc(4 * v->dw * v->dh * sizeof(float));
+	for (int j = 0; j < v->dh; j++)
+	for (int i = 0; i < v->dw; i++)
+	{
+		// basically, redo the function "pan_repaint"
+		static
+		void (*win_to_img)(double p[2],struct pan_state*,double,double);
+		win_to_img = window_to_image_apm;
+		if (e->image_space)      win_to_img = window_to_image_apm;
+		else if (e->force_exact) win_to_img = window_to_image_ex;
+		int o = obtain_octave(e);
+		int interp = e->interpolation_order;
+		if (!e->image_space) continue;
+		double p[2];
+		win_to_img(p, e, i, j);
+		if (p[0]<0 || p[1]<0 || p[0]>=v->w || p[1]>=v->h)
+			continue;
+		float pc = (p[0] + v->rgbiox) / 4;
+		float qc = (p[1] + v->rgbioy) / 4;
+		float g = 0, c[4] = {0, 0, 0, 0};
+		if (i == 2) tiffo_getpixel_float_bilinear(&g,v->tg,0,p[0],p[1]);
+		else if(i==3)tiffo_getpixel_float_bicubic(&g,v->tg,0,p[0],p[1]);
+		else tiffo_getpixel_float_1              (&g,v->tg,0,p[0],p[1]);
+		if (!v->gray_only) {
+		if (i == 2) tiffo_getpixel_float_bilinear(c,v->tc,0,pc,qc);
+		else if(i==3)tiffo_getpixel_float_bicubic(c,v->tc,0,pc,qc);
+		else       tiffo_getpixel_float_1        (c,v->tc,0,pc,qc);
+		}
+		buf_pan[i+j*v->dw] = g;
+		for (int l = 0; l < 4; l++)
+			buf_msi[(i+j*v->dw)*4+l] = c[l];
+	}
+	iio_write_image_float_vec(fname_pan, buf_pan, v->dw, v->dh, 1);
+	if (!v->gray_only)
+	iio_write_image_float_vec(fname_msi, buf_msi, v->dw, v->dh, 4);
+	fprintf(stderr, "dumped raw pan to file \"%s\"\n", fname_pan);
+	if (!v->gray_only)
+	fprintf(stderr, "dumped raw msi to file \"%s\"\n", fname_msi);
+	raw_view_counter += 1;
+}
+
 
 
 // CALLBACK: pan_button_handler {{{1
@@ -1438,6 +1488,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == '7') action_shift_so(f, +1);
 	if (k == 't') action_dump_view(f);
 	if (k == '5') action_dump_collection(f);
+	if (k == ';') action_dump_raw(f);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
@@ -1603,8 +1654,8 @@ int main_pan(int c, char *v[])
 		return pan_non_interactive(e, command_string);
 
 	// open window
-	struct FTR f = ftr_new_window(320, 320);
-	//struct FTR f = ftr_new_window(800, 600);
+	//struct FTR f = ftr_new_window(320, 320);
+	struct FTR f = ftr_new_window(800, 600);
 	f.userdata = e;
 	f.changed = 1;
 	ftr_set_handler(&f, "key"   , pan_key_handler);
