@@ -1,27 +1,72 @@
-IMSCRIPT TUTORIAL
-=================
+<html>
+	<head>
+		<style>
+body {max-width: 66em;}
+.gallery {position:relative;width:auto;height:400px}
+.gallery .index{padding:0;margin:0;width:11em;list-style:none}
+.gallery .index li{margin:0;padding:0} 
+.gallery .index a{display:block;background-color:#eee;border:1px solid #fff;text-decoration:none;width:13em;padding:5px}
+.gallery .index a span{display:block;position:absolute;left:-9999px;top:0;padding-left:2em}
+.gallery .index li:first-child a span{left:12em;z-index:99}
+.gallery .index a:hover{ border: 1px solid #888888;}
+.gallery .index a:hover span{left:12em;z-index:100}
+.gallery .index a span img{ /*width: 80%;*/ }
+.gallery .index a span { white-space:nowrap; }
+		</style>
 
-Imscript is a collection of simple programs for doing image
-processing in a unix environment.
+		<title>imscript tutorial</title>
+	</head>
 
-0. Philosophy
--------------
+	<body>
+		<h1>imscript tutorial</h1>
 
-This is just vanilla unix philosophy with some specificities for
-images:
 
-	- each program does one thing and does it well
-	- programs work together
-	- offer mechanism, not policy
-	- images are arrays of numbers, representable by text files
+		<p>
+		Imscript is a collection of simple programs for doing image
+		processing in a Unix environment.
+		</p>
 
-Notice that imscript programs will read any common image format, but
-will only write asc, pnm, png, and tiff.
+		<h2>0. Philosophy</h2>
 
-1. Overview
------------
+		<p>
+		This is just vanilla unix philosophy with some specificities for
+		images:
+		</p>
+
+		<ul>
+			<li>each program does one thing and does it well</li>
+			<li>programs work together</li>
+			<li>offer mechanism, not policy</li>
+			<li>images are arrays of numbers, representable by text files</li>
+		</ul>
+
+		<p>
+		Notice that imscript programs will read any common image format, but
+		will only write asc, pnm, png, and tiff.
+		</p>
+
+		<h2>1. Overview</h2>
+
+		<!--
+		<ol>
+			<li><b>Filters:</b> read one image and write one image of the same size</li>
+				<ul>
+					<li><code>blur</code>: convolve an image by a shift-invariant user-specified kernel</li>
+					<li><code>morsi</code>: apply a morphological operation with a user-specified element</li>
+					<li><code>qeasy</code>: re-scale the dynamic range of an image</li>
+					<li><code>qauto</code>: re-scale the dynamic range of an image, automatically</li>
+					<li><code>palette</code>: colorize a grayscale image using a palette</li>
+					<li><code>dither</code>: binarize an image by error diffusion</li>
+					<li><code>iion</code>: copy named input to named output (useful to change file format)</li>
+				</ul>
+			</li>
+		</ol>
+		-->
+
+<pre>
 
 1.1. Filters: read one image and write one image of the same size
+
 	- blur: convolve an image by a shift-invariant user-specified kernel
 	- morsi: apply a morphological operation with a user-specified element
 	- qeasy: re-scale the dynamic range of an image
@@ -99,19 +144,44 @@ will only write asc, pnm, png, and tiff.
 	- dosdo: look at an image and its fourier transform
 	- icrop: interactive crop
 	- vnav: visualize cylindrical images
+</pre>
 
 
-2. Examples
------------
+<h2>2. Examples</h2>
 
-Gaussian blur of different sizes:
+<h3>2.1. Filters</h3>
 
-blur gaussian 1 lenak.png lenak_g1.png
-blur gaussian 3 lenak.png lenak_g3.png
-blur gaussian 8 lenak.png lenak_g8.png
+Gaussian blur of different sizes
 
+<!--
+SCRIPT: blur gaussian 1 lenak.png lenak_g1.png
+SCRIPT: blur gaussian 3 lenak.png lenak_g3.png
+SCRIPT: blur gaussian 8 lenak.png lenak_g8.png
+SCRIPT: blur gaussian -n 2 lenak.png lenak_gn.png
+SCRIPT: blur gaussian -z 2 lenak.png lenak_gz.png
+SCRIPT: blur gaussian -s 2 lenak.png lenak_gs.png
+-->
+
+<div class="gallery" style="height:256px">
+	<ul class="index">
+		<li><a href="#">input image    <span><img src="f/lenak.png" /></span></a></li>
+		<li><a href="#">blur gaussian 1<span><img src="f/lenak_g1.png" /></span></a></li>
+		<li><a href="#">blur gaussian 3<span><img src="f/lenak_g3.png" /></span></a></li>
+		<li><a href="#">blur gaussian 8<span><img src="f/lenak_g8.png" /></span></a></li>
+	</ul>
+</div>
 
 Gaussian blur with different boundary conditions:
+<div class="gallery" style="height:256px">
+	<ul class="index">
+		<li><a href="#">input image       <span><img src="f/lenak.png" /></span></a></li>
+		<li><a href="#">blur -n gaussian 2<span><img src="f/lenak_gn.png" /></span></a></li>
+		<li><a href="#">blur -z gaussian 2<span><img src="f/lenak_gz.png" /></span></a></li>
+		<li><a href="#">blur -s gaussian 2<span><img src="f/lenak_gs.png" /></span></a></li>
+	</ul>
+</div>
+
+<!--
 
 blur -n gaussian 2 lenak.png lenak_gn.png
 blur -z gaussian 2 lenak.png lenak_gz.png
@@ -135,14 +205,11 @@ morsi cross dilation lenak.png lenak_dilation.png
 
 
 Morphological operation with 
-
-3. Tutorial
------------
-
-The most important operation in image processing is looking at the
-image.  There are hundreds of programs for that.  We suggest
-"display" from imagemagick, "v.py" by gfacciol or "fpan" that is
-inside 
+-->
 
 
-# vim:set tw=69 filetype=text spell spelllang=en:
+	</body>
+</html>
+
+<!-- vim: ts=2 sw=2 spell spelllang=en
+-->
