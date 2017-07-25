@@ -132,8 +132,31 @@ float *zoom(float *x, int w, int h, int pd, int n, int zt,
 	return y;
 }
 
+float *zoom_with_offset(float *x, int w, int h, int pd, int n, int zt,
+		int *ow, int *oh, float dx, float dy)
+{
+	int W = n*w;// - n;
+	int H = n*h;// - n;
+	float *y = xmalloc(W*H*pd*sizeof*y), nf = n;
+	for (int j = 0; j < H; j++)
+	for (int i = 0; i < W; i++)
+	{
+		float tmp[pd];
+		interpolate_vec(tmp, x, w, h, pd, (i-dx)/nf, (j-dy)/nf, zt);
+		for (int l = 0; l < pd; l++)
+			setsample(y, W, H, pd, i, j, l, tmp[l]);
+	}
+
+	*ow = W;
+	*oh = H;
+	return y;
+}
+
+#include "pickopt.c"
 int main_upsa(int c, char *v[])
 {
+	float off_x = atof(pick_option(&c, &v, "x", "0"));
+	float off_y = atof(pick_option(&c, &v, "y", "0"));
 	if (c < 3 || c > 5) {
 		fprintf(stderr, "usage:\n\t%s zoomf zoomtype [in [out]]\n", *v);
 		//                            1     2         3   4
@@ -149,7 +172,7 @@ int main_upsa(int c, char *v[])
 	float *x = iio_read_image_float_vec(filename_in, &w, &h, &pd);
 
 	int ow, od;
-	float *y = zoom(x, w, h, pd, zf, zt, &ow, &od);
+	float *y = zoom_with_offset(x,w,h,pd, zf, zt, &ow,&od, off_x,off_y);
 
 	iio_write_image_float_vec(filename_out, y, ow, od, pd);
 
