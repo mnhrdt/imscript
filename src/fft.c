@@ -129,6 +129,52 @@ static void fft_direct(float *y, float *x, int w, int h, int pd)
 	free(gc);
 }
 
+static void fft_2dfloat_loc(fftwf_complex *fx, float *x, int w, int h, int lw)
+{
+	// set background to 0
+	for (int i = 0; i < w*h; i++)
+		fx[i] = 0;
+
+	// compute the fft of all fitting square windows
+	for (int oy = 0; oy+lw < h; oy += lw)
+	for (int ox = 0; ox+lw < w; ox += lw)
+	{
+		float x_loc[lw*lw];
+		fftwf_complex fx_loc[lw*lw], sfx_loc[lw*lw];
+		for (int j = 0; j < lw; j++)
+		for (int i = 0; i < lw; i++)
+			x_loc[j*lw+i] = x[(j+oy)*w+i+ox];
+		fft_2dfloat(fx_loc, x_loc, lw, lw);
+		for (int j = 0; j < lw; j++)
+		for (int i = 0; i < lw; i++)
+		{
+			int ii = (i + lw/2) % lw;
+			int jj = (j + lw/2) % lw;
+			sfx_loc[j*lw+i] = fx_loc[jj*lw+ii];
+		}
+		for (int j = 0; j < lw; j++)
+		for (int i = 0; i < lw; i++)
+			fx[(j+oy)*w+i+ox] = sfx_loc[j*lw+i];
+	}
+}
+
+static void fft_direct_loc(float *y, float *x, int w, int h, int pd, int lw)
+{
+	float *c = xmalloc(w*h*sizeof*c);
+	fftwf_complex *gc = xmalloc(w*h*sizeof*gc);
+	FORL(pd) {
+		FORI(w*h)
+			c[i] = x[i*pd + l];
+		fft_2dfloat_loc(gc, c, w, h, lw);
+		FORI(w*h) {
+			y[2*(i*pd + l)+0] = crealf(gc[i]);
+			y[2*(i*pd + l)+1] = cimagf(gc[i]);
+		}
+	}
+	free(c);
+	free(gc);
+}
+
 static void fft_inverse(float *y, float *x, int w, int h, int pd)
 {
 	int pdh = pd/2;
@@ -146,8 +192,10 @@ static void fft_inverse(float *y, float *x, int w, int h, int pd)
 	free(gc);
 }
 
+#include "pickopt.c"
 int main_fft(int c, char *v[])
 {
+	int localization = atoi(pick_option(&c, &v, "l", "0"));
 	if (c != 1 && c != 2 && c != 3 && c != 4) {
 		fprintf(stderr, "usage:\n\t%s {1|-1} [in [out]]\n", *v);
 		//                          0  1      2   3
@@ -170,10 +218,17 @@ int main_fft(int c, char *v[])
 
 	float *y = xmalloc(w*h*pdout*sizeof*y);
 
-	if (direction < 0)
-		fft_inverse(y, x, w, h, pd);
-	else
-		fft_direct(y, x, w, h, pd);
+	if (localization) {
+		if (direction < 0)
+			fail("cannot inverse loc");
+		else
+			fft_direct_loc(y, x, w, h, pd, localization);
+	} else {
+		if (direction < 0)
+			fft_inverse(y, x, w, h, pd);
+		else
+			fft_direct(y, x, w, h, pd);
+	}
 
 	iio_write_image_float_vec(out, y, w, h, pdout);
 	free(x);
