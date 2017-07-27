@@ -299,7 +299,7 @@ void ppsmooth_split(float *y, float *x, int w, int h, int pd)
 		ppsmooth(y + l*w*h, x + l*w*h, w, h);
 }
 
-
+#ifdef OMIT_PPSMOOTH_MAIN
 #include <stdio.h>
 #include <stdlib.h>
 #include "iio.h"
@@ -356,3 +356,4 @@ int main(int c, char *v[])
 
 	return 0;
 }
+#endif//OMIT_PPSMOOTH_MAIN

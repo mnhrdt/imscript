@@ -151,15 +151,16 @@ body {max-width: 66em;}
 
 <h3>2.1. Filters</h3>
 
+<p>
 Gaussian blur of different sizes
 
 <!--
 SCRIPT: blur gaussian 1 lenak.png lenak_g1.png
 SCRIPT: blur gaussian 3 lenak.png lenak_g3.png
 SCRIPT: blur gaussian 8 lenak.png lenak_g8.png
-SCRIPT: blur gaussian -n 2 lenak.png lenak_gn.png
-SCRIPT: blur gaussian -z 2 lenak.png lenak_gz.png
-SCRIPT: blur gaussian -s 2 lenak.png lenak_gs.png
+SCRIPT: blur gaussian -n 5 lenak.png lenak_gn.png
+SCRIPT: blur gaussian -z 5 lenak.png lenak_gz.png
+SCRIPT: blur gaussian -s 5 lenak.png lenak_gs.png
 -->
 
 <div class="gallery" style="height:256px">
@@ -170,16 +171,43 @@ SCRIPT: blur gaussian -s 2 lenak.png lenak_gs.png
 		<li><a href="#">blur gaussian 8<span><img src="f/lenak_g8.png" /></span></a></li>
 	</ul>
 </div>
+</p>
 
+<p>
 Gaussian blur with different boundary conditions:
 <div class="gallery" style="height:256px">
 	<ul class="index">
 		<li><a href="#">input image       <span><img src="f/lenak.png" /></span></a></li>
-		<li><a href="#">blur -n gaussian 2<span><img src="f/lenak_gn.png" /></span></a></li>
-		<li><a href="#">blur -z gaussian 2<span><img src="f/lenak_gz.png" /></span></a></li>
-		<li><a href="#">blur -s gaussian 2<span><img src="f/lenak_gs.png" /></span></a></li>
+		<li><a href="#">blur gaussian 5 -n<span><img src="f/lenak_gn.png" /></span></a></li>
+		<li><a href="#">blur gaussian 5 -z<span><img src="f/lenak_gz.png" /></span></a></li>
+		<li><a href="#">blur gaussian 5 -s<span><img src="f/lenak_gs.png" /></span></a></li>
 	</ul>
 </div>
+</p>
+
+<!--
+SCRIPT: blur gaussian 5 lenak.png lenak_g.png
+SCRIPT: blur laplace  5 lenak.png lenak_l.png
+SCRIPT: blur disk     5 lenak.png lenak_d.png
+SCRIPT: blur square  11 lenak.png lenak_s.png
+SCRIPT: blur cauchy   2 lenak.png lenak_c.png
+SCRIPT: blur inverse  1 lenak.png | qeasy 100 160 - lenak_i.png
+-->
+
+<p>
+Blur with different kernels of the "same" width:
+<div class="gallery" style="height:256px">
+	<ul class="index">
+		<li><a href="#">input image    <span><img src="f/lenak.png" /></span></a></li>
+		<li><a href="#">blur gaussian 5<span><img src="f/lenak_g.png" /></span></a></li>
+		<li><a href="#">blur laplace 5 <span><img src="f/lenak_l.png" /></span></a></li>
+		<li><a href="#">blur disk 5    <span><img src="f/lenak_d.png" /></span></a></li>
+		<li><a href="#">blur square 11 <span><img src="f/lenak_s.png" /></span></a></li>
+		<li><a href="#">blur cauchy 2  <span><img src="f/lenak_c.png" /></span></a></li>
+		<li><a href="#">blur inverse 1 <span><img src="f/lenak_i.png" /></span></a></li>
+	</ul>
+</div>
+</p>
 
 <!--
 
