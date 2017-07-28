@@ -276,8 +276,8 @@ static void action_move_roi(struct FTR *f, int x, int y)
 	struct pan_state *e = f->userdata;
 	if (e->roi)
 	{
-		e->roi_x = x;
-		e->roi_y = y;
+		e->roi_x = x - e->roi_w / 2;
+		e->roi_y = y - e->roi_w / 2;
 		f->changed = 1;
 	}
 }
@@ -357,7 +357,7 @@ static bool insideP(int w, int h, int i, int j)
 #define OMIT_BLUR_MAIN
 #include "blur.c"
 
-#define OMIT_PPMOOTH_MAIN
+#define OMIT_PPSMOOTH_MAIN
 #include "ppsmooth.c"
 
 static void ppsmooth_vec(float *y, float *x, int w, int h, int pd)
@@ -411,7 +411,7 @@ static void transform_roi_buffers(float *y, float *x, int n)
 	float x_p[3*n*n];
 	ppsmooth_vec(x_p, x, n, n, 3);
 	//float *x_p = x;
-	for (int i = 0; i < 3*n*n; i++) y[i] = x_p[i]; return;
+	//for (int i = 0; i < 3*n*n; i++) y[i] = x_p[i]; return;
 	float *c = xmalloc(n*n*sizeof*c);
 	float *ys = xmalloc(n*n*sizeof*c);
 	fftwf_complex *fc = fftwf_xmalloc(n*n*sizeof*fc);
