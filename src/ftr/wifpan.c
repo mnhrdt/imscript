@@ -1,7 +1,6 @@
 // cc -Ofast wifpan.c iio.o -o wifpan -lX11 -ltiff -ljpeg -lpng -lz -lm
 #include <assert.h>
 #include <math.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -63,7 +62,7 @@ struct pan_state {
 	int pyr_w[MAX_PYRAMID_LEVELS], pyr_h[MAX_PYRAMID_LEVELS];
 
 	// 4. roi
-	bool roi;
+	int roi; // 0=nothing 1=dftwindow 2=rawfourier 3=ppsmooth
 	int roi_x, roi_y, roi_w;
 };
 
@@ -205,8 +204,9 @@ static void action_reset_zoom_and_position(struct FTR *f)
 	e->offset_y = 0;
 	e->a = 1;
 	e->b = 0;
+	e->bbb[0] = e->bbb[1] = e->bbb[2];
 
-	e->roi = false;
+	e->roi = 0;
 	e->roi_x = f->w / 2;
 	e->roi_y = f->h / 2;
 	e->roi_w = 73; // must be odd
@@ -246,27 +246,21 @@ static void action_qauto(struct FTR *f)
 	f->changed = 1;
 }
 
-static void action_toggle_roi(struct FTR *f, int x, int y)
+static void action_toggle_roi(struct FTR *f, int x, int y, int dir)
 {
 	struct pan_state *e = f->userdata;
-	e->roi = !e->roi;
+	e->roi = (e->roi + (dir?-1:1)) % 4;
+	fprintf(stderr, "ROI SWITCH(%d) = %d\n", dir, e->roi);
 	e->roi_x = x;
 	e->roi_y = y;
 	f->changed = 1;
 }
 
-static void action_roi_embiggen(struct FTR *f)
+static void action_roi_embiggen(struct FTR *f, int d)
 {
 	struct pan_state *e = f->userdata;
-	e->roi_w += 2;
-	f->changed = 1;
-}
-
-static void action_roi_shrink(struct FTR *f)
-{
-	struct pan_state *e = f->userdata;
-	e->roi_w -= 2;
-	if (e->roi_w < 5) e->roi_w = 5;
+	e->roi_w += d;
+	fprintf(stderr, "ROI %d\n", e->roi_w);
 	f->changed = 1;
 }
 
@@ -406,12 +400,12 @@ static void transform_roi_buffers_old(float *y, float *x, int n)
 		y[i] += x_s[i];
 }
 
-static void transform_roi_buffers(float *y, float *x, int n)
+static void transform_roi_buffers(float *y, float *x, int n, int roi)
 {
-	float x_p[3*n*n];
-	ppsmooth_vec(x_p, x, n, n, 3);
-	//float *x_p = x;
-	//for (int i = 0; i < 3*n*n; i++) y[i] = x_p[i]; return;
+	float x_p0[3*n*n], *x_p = x_p0;
+	ppsmooth_vec(x_p0, x, n, n, 3);
+	if (roi == 2) x_p = x;
+	if (roi == 3) { for (int i = 0; i < 3*n*n; i++) y[i]=x_p0[i]; return; }
 	float *c = xmalloc(n*n*sizeof*c);
 	float *ys = xmalloc(n*n*sizeof*c);
 	fftwf_complex *fc = fftwf_xmalloc(n*n*sizeof*fc);
@@ -469,8 +463,8 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	// if ROI, expose the roi
 	if (e->roi)
 	{
-		float roi_buffer_in [3 * e->roi_w * e->roi_w];
-		float roi_buffer_out[3 * e->roi_w * e->roi_w];
+		float buf_in [3 * e->roi_w * e->roi_w];
+		float buf_out[3 * e->roi_w * e->roi_w];
 		for (int j = 0; j < e->roi_w; j++)
 		for (int i = 0; i < e->roi_w; i++)
 		{
@@ -481,16 +475,16 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 			int jj = j + e->roi_y - e->roi_w/2;
 			double p[2];
 			window_to_image(p, e, ii, jj);
-			float *c = roi_buffer_in + 3 * (j * e->roi_w + i);
+			float *c = buf_in + 3 * (j * e->roi_w + i);
 			pixel(c, e, p[0], p[1]);
 		}
-		transform_roi_buffers(roi_buffer_out, roi_buffer_in, e->roi_w);
+		transform_roi_buffers(buf_out, buf_in, e->roi_w, e->roi);
 		for (int j = 0; j < e->roi_w; j++)
 		for (int i = 0; i < e->roi_w; i++)
 		{
 			int ii = i + e->roi_x - e->roi_w/2;
 			int jj = j + e->roi_y - e->roi_w/2;
-			float *c = roi_buffer_out + 3 * (j * e->roi_w + i);
+			float *c = buf_out + 3 * (j * e->roi_w + i);
 			if (insideP(f->w, f->h, ii, jj))
 			{
 				uint8_t *cc = f->rgb + 3 * (jj * f->w + ii);
@@ -532,8 +526,8 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 	//fprintf(stderr, "button b=%d m=%d\n", b, m);
 	struct pan_state *e = f->userdata;
 
-	if (e->roi && b == FTR_BUTTON_UP) { action_roi_embiggen(f); return; }
-	if (e->roi && b == FTR_BUTTON_DOWN) { action_roi_shrink(f); return; }
+	if (e->roi && b == FTR_BUTTON_UP) { action_roi_embiggen(f,+2); return; }
+	if (e->roi && b == FTR_BUTTON_DOWN){action_roi_embiggen(f,-2); return; }
 	if (b == FTR_BUTTON_UP && m & FTR_MASK_SHIFT) {
 		action_contrast_span(f, 1/1.3); return; }
 	if (b == FTR_BUTTON_DOWN && m & FTR_MASK_SHIFT) {
@@ -571,7 +565,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	//if (k == 'b') action_contrast_change(f, 1, 1);
 	//if (k == 'B') action_contrast_change(f, 1, -1);
 	if (k == 'n') action_qauto(f);
-	if (k == 'r') action_toggle_roi(f, x, y);
+	if (k == 'r') action_toggle_roi(f, x, y, m&FTR_MASK_SHIFT);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
