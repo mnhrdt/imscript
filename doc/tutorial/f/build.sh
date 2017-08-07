@@ -1,3 +1,1 @@
-cat ../i.html |\
-	awk '/<pre class="script">/{b=1;next} /<\/pre>/{b=0} b {print}' |\
-	parallel
+cat ../i.html | awk '/<\/pre>/{x=0}x;/<pre class="script">/{x=1}' | parallel

@@ -252,7 +252,7 @@ void morsi_all(
 int *build_disk(float radius)
 {
 	if (!(radius >1)) return NULL;
-	fprintf(stderr, "building a disk of radius %g\n", radius);
+	//fprintf(stderr, "building a disk of radius %g\n", radius);
 	int side = 2*radius+4, elen = 2*side*side+4;
 	int *e = xmalloc(elen*sizeof*e), cx = 0;
 	for (int i = -radius-1; i <= radius+1; i++)
@@ -271,7 +271,7 @@ int *build_disk(float radius)
 static int *build_dysk(float radius)
 {
 	if (!(radius >1)) return NULL;
-	fprintf(stderr, "building a dysk of radius %g\n", radius);
+	//fprintf(stderr, "building a dysk of radius %g\n", radius);
 	int side = 2*radius+4, elen = 2*side*side+4;
 	int *e = xmalloc(elen*sizeof*e), cx = 0;
 	for (int i = -radius-1; i <= radius+1; i++)
@@ -290,7 +290,7 @@ static int *build_dysk(float radius)
 static int *build_hrec(float radius)
 {
 	if (!(radius >1)) return NULL;
-	fprintf(stderr, "building a hrec of radius %g\n", radius);
+	//fprintf(stderr, "building a hrec of radius %g\n", radius);
 	int side = 2*radius+4;
 	int *e = xmalloc((2*side+4)*sizeof*e), cx = 0;
 	for (int i = -radius-1; i <= radius+1; i++)
@@ -307,7 +307,7 @@ static int *build_hrec(float radius)
 static int *build_vrec(float radius)
 {
 	if (!(radius >1)) return NULL;
-	fprintf(stderr, "building a vrec of radius %g\n", radius);
+	//fprintf(stderr, "building a vrec of radius %g\n", radius);
 	int side = 2*radius+4;
 	int *e = xmalloc((2*side+4)*sizeof*e), cx = 0;
 	for (int i = -radius-1; i <= radius+1; i++)
@@ -324,7 +324,7 @@ static int *build_vrec(float radius)
 static int *build_drec(float radius)
 {
 	if (!(radius >1)) return NULL;
-	fprintf(stderr, "building a drec of radius %g\n", radius);
+	//fprintf(stderr, "building a drec of radius %g\n", radius);
 	int side = 2*radius+4;
 	int *e = xmalloc((2*side+4)*sizeof*e), cx = 0;
 	for (int i = -radius-1; i <= radius+1; i++)
@@ -341,7 +341,7 @@ static int *build_drec(float radius)
 static int *build_Drec(float radius)
 {
 	if (!(radius >1)) return NULL;
-	fprintf(stderr, "building a drec of radius %g\n", radius);
+	//fprintf(stderr, "building a drec of radius %g\n", radius);
 	int side = 2*radius+4;
 	int *e = xmalloc((2*side+4)*sizeof*e), cx = 0;
 	for (int i = -radius-1; i <= radius+1; i++)
