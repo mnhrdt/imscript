@@ -4,14 +4,15 @@
 body {max-width: 66em;}
 .gallery {position:relative;width:auto;height:400px}
 .gallery .index{padding:0;margin:0;width:11em;list-style:none}
-.gallery .index li{margin:0;padding:0} 
+.gallery .index li{margin:0;padding:0}
 .gallery .index a{display:block;background-color:#eee;border:1px solid #fff;text-decoration:none;width:13em;padding:5px}
 .gallery .index a span{display:block;position:absolute;left:-9999px;top:0;padding-left:2em}
 .gallery .index li:first-child a span{left:12em;z-index:99}
 .gallery .index a:hover{ border: 1px solid #888888;}
 .gallery .index a:hover span{left:12em;z-index:100}
-.gallery .index a span img{ /*width: 80%;*/ }
+.gallery .index a span img{ }
 .gallery .index a span { white-space:nowrap; }
+.script {border:1px solid black;background-color:#fff;width:80ex;padding:1ex;}
 		</style>
 
 		<title>imscript tutorial</title>
@@ -152,59 +153,135 @@ body {max-width: 66em;}
 <h3>2.1. Filters</h3>
 
 <p>
-Gaussian blur of different sizes
+Gaussian <b>blur</b> of different sizes
 
-<!--
-SCRIPT: blur gaussian 1 lenak.png lenak_g1.png
-SCRIPT: blur gaussian 3 lenak.png lenak_g3.png
-SCRIPT: blur gaussian 8 lenak.png lenak_g8.png
-SCRIPT: blur gaussian -n 5 lenak.png lenak_gn.png
-SCRIPT: blur gaussian -z 5 lenak.png lenak_gz.png
-SCRIPT: blur gaussian -s 5 lenak.png lenak_gs.png
--->
+<pre class="script">
+blur gaussian 1 A.png A_g1.png
+blur gaussian 3 A.png A_g3.png
+blur gaussian 8 A.png A_g8.png
+</pre>
 
-<div class="gallery" style="height:256px">
+<div class="gallery" style="height:321">
 	<ul class="index">
-		<li><a href="#">input image    <span><img src="f/lenak.png" /></span></a></li>
-		<li><a href="#">blur gaussian 1<span><img src="f/lenak_g1.png" /></span></a></li>
-		<li><a href="#">blur gaussian 3<span><img src="f/lenak_g3.png" /></span></a></li>
-		<li><a href="#">blur gaussian 8<span><img src="f/lenak_g8.png" /></span></a></li>
+		<li><a href="#">input image    <span><img src="f/A.png" /></span></a></li>
+		<li><a href="#">blur gaussian 1<span><img src="f/A_g1.png" /></span></a></li>
+		<li><a href="#">blur gaussian 3<span><img src="f/A_g3.png" /></span></a></li>
+		<li><a href="#">blur gaussian 8<span><img src="f/A_g8.png" /></span></a></li>
 	</ul>
 </div>
 </p>
 
 <p>
 Gaussian blur with different boundary conditions:
-<div class="gallery" style="height:256px">
+<pre class="script">
+blur gaussian 5 -p A.png A_gp.png    # periodic boundary
+blur gaussian 5 -z A.png A_gz.png    # zero boundary
+blur gaussian 5 -s A.png A_gs.png    # symmetric boundary
+</pre>
+<div class="gallery" style="height:321px">
 	<ul class="index">
-		<li><a href="#">input image       <span><img src="f/lenak.png" /></span></a></li>
-		<li><a href="#">blur gaussian 5 -n<span><img src="f/lenak_gn.png" /></span></a></li>
-		<li><a href="#">blur gaussian 5 -z<span><img src="f/lenak_gz.png" /></span></a></li>
-		<li><a href="#">blur gaussian 5 -s<span><img src="f/lenak_gs.png" /></span></a></li>
+		<li><a href="#">input image       <span><img src="f/A.png" /></span></a></li>
+		<li><a href="#">blur gaussian 5 -p<span><img src="f/A_gp.png" /></span></a></li>
+		<li><a href="#">blur gaussian 5 -z<span><img src="f/A_gz.png" /></span></a></li>
+		<li><a href="#">blur gaussian 5 -s<span><img src="f/A_gs.png" /></span></a></li>
 	</ul>
 </div>
 </p>
 
-<!--
-SCRIPT: blur gaussian 5 lenak.png lenak_g.png
-SCRIPT: blur laplace  5 lenak.png lenak_l.png
-SCRIPT: blur disk     5 lenak.png lenak_d.png
-SCRIPT: blur square  11 lenak.png lenak_s.png
-SCRIPT: blur cauchy   2 lenak.png lenak_c.png
-SCRIPT: blur inverse  1 lenak.png | qeasy 100 160 - lenak_i.png
--->
 
 <p>
 Blur with different kernels of the "same" width:
-<div class="gallery" style="height:256px">
+<pre class="script">
+blur gaussian 5 A.png A_g.png
+blur laplace  5 A.png A_l.png
+blur disk     5 A.png A_d.png
+blur square  11 A.png A_s.png
+blur cauchy   2 A.png A_c.png
+blur inverse  1 -p A.png | qauto -i -p 1 - A_i.png
+</pre>
+<div class="gallery" style="height:321px">
 	<ul class="index">
-		<li><a href="#">input image    <span><img src="f/lenak.png" /></span></a></li>
-		<li><a href="#">blur gaussian 5<span><img src="f/lenak_g.png" /></span></a></li>
-		<li><a href="#">blur laplace 5 <span><img src="f/lenak_l.png" /></span></a></li>
-		<li><a href="#">blur disk 5    <span><img src="f/lenak_d.png" /></span></a></li>
-		<li><a href="#">blur square 11 <span><img src="f/lenak_s.png" /></span></a></li>
-		<li><a href="#">blur cauchy 2  <span><img src="f/lenak_c.png" /></span></a></li>
-		<li><a href="#">blur inverse 1 <span><img src="f/lenak_i.png" /></span></a></li>
+		<li><a href="#">input image    <span><img src="f/A.png" /></span></a></li>
+		<li><a href="#">blur gaussian 5<span><img src="f/A_g.png" /></span></a></li>
+		<li><a href="#">blur laplace 5 <span><img src="f/A_l.png" /></span></a></li>
+		<li><a href="#">blur disk 5    <span><img src="f/A_d.png" /></span></a></li>
+		<li><a href="#">blur square 11 <span><img src="f/A_s.png" /></span></a></li>
+		<li><a href="#">blur cauchy 2  <span><img src="f/A_c.png" /></span></a></li>
+		<li><a href="#">blur inverse 1 <span><img src="f/A_i.png" /></span></a></li>
+	</ul>
+</div>
+</p>
+
+<p>
+<b>morsi cross:</b> morphological operations with a cross structuring element:
+<pre class="script">
+morsi cross erosion       A.png A_x_erosion.png
+morsi cross dilation      A.png A_x_dilation.png
+morsi cross median        A.png A_x_median.png
+morsi cross opening       A.png A_x_opening.png
+morsi cross closing       A.png A_x_closing.png
+morsi cross gradient      A.png A_x_gradient.png
+morsi cross igradient     A.png A_x_igradient.png
+morsi cross egradient     A.png A_x_egradient.png
+morsi cross laplacian     A.png | qeasy 40 -40 - A_x_laplacian.png
+morsi cross enhance       A.png A_x_enhance.png
+morsi cross tophat        A.png | qeasy  0 60 - A_x_tophat.png
+morsi cross bothat        A.png | qeasy  0 60 - A_x_bothat.png
+morsi cross oscillation   A.png | qeasy  0 60 - A_x_oscillation.png
+</pre>
+<div class="gallery" style="height:521px">
+	<ul class="index">
+		<li><a href="#">input image    <span><img src="f/A.png" /></span></a></li>
+		<li><a href="#">morsi cross erosion<span><img src="f/A_erosion.png" /></span></a></li>
+		<li><a href="#">morsi cross dilation<span><img src="f/A_dilation.png" /></span></a></li>
+		<li><a href="#">morsi cross median<span><img src="f/A_median.png" /></span></a></li>
+		<li><a href="#">morsi cross opening<span><img src="f/A_opening.png" /></span></a></li>
+		<li><a href="#">morsi cross closing<span><img src="f/A_closing.png" /></span></a></li>
+		<li><a href="#">morsi cross gradient<span><img src="f/A_gradient.png" /></span></a></li>
+		<li><a href="#">morsi cross igradient<span><img src="f/A_igradient.png" /></span></a></li>
+		<li><a href="#">morsi cross egradient<span><img src="f/A_egradient.png" /></span></a></li>
+		<li><a href="#">morsi cross laplacian<span><img src="f/A_laplacian.png" /></span></a></li>
+		<li><a href="#">morsi cross enhance<span><img src="f/A_enhance.png" /></span></a></li>
+		<li><a href="#">morsi cross tophat<span><img src="f/A_tophat.png" /></span></a></li>
+		<li><a href="#">morsi cross bothat<span><img src="f/A_bothat.png" /></span></a></li>
+		<li><a href="#">morsi cross oscillation<span><img src="f/A_oscillation.png" /></span></a></li>
+	</ul>
+</div>
+</p>
+
+<p>
+<b>morsi disk5:</b> morphological operations with disk structuring element of radius 5 pixels:
+<pre class="script">
+morsi disk5 erosion       A.png A_d5_erosion.png
+morsi disk5 dilation      A.png A_d5_dilation.png
+morsi disk5 median        A.png A_d5_median.png
+morsi disk5 opening       A.png A_d5_opening.png
+morsi disk5 closing       A.png A_d5_closing.png
+morsi disk5 gradient      A.png A_d5_gradient.png
+morsi disk5 igradient     A.png A_d5_igradient.png
+morsi disk5 egradient     A.png A_d5_egradient.png
+morsi disk5 laplacian     A.png | qeasy 90 -90 - A_d5_laplacian.png
+morsi disk5 enhance       A.png A_d5_enhance.png
+morsi disk5 tophat        A.png | qeasy 0 100 - A_d5_tophat.png
+morsi disk5 bothat        A.png | qeasy 0 100 - A_d5_bothat.png
+morsi disk5 oscillation   A.png | qeasy 0 100 - A_d5_oscillation.png
+</pre>
+<div class="gallery" style="height:521px">
+	<ul class="index">
+		<li><a href="#">input image    <span><img src="f/A.png" /></span></a></li>
+		<li><a href="#">morsi disk5 erosion<span><img src="f/A_d5_erosion.png" /></span></a></li>
+		<li><a href="#">morsi disk5 dilation<span><img src="f/A_d5_dilation.png" /></span></a></li>
+		<li><a href="#">morsi disk5 median<span><img src="f/A_d5_median.png" /></span></a></li>
+		<li><a href="#">morsi disk5 opening<span><img src="f/A_d5_opening.png" /></span></a></li>
+		<li><a href="#">morsi disk5 closing<span><img src="f/A_d5_closing.png" /></span></a></li>
+		<li><a href="#">morsi disk5 gradient<span><img src="f/A_d5_gradient.png" /></span></a></li>
+		<li><a href="#">morsi disk5 igradient<span><img src="f/A_d5_igradient.png" /></span></a></li>
+		<li><a href="#">morsi disk5 egradient<span><img src="f/A_d5_egradient.png" /></span></a></li>
+		<li><a href="#">morsi disk5 laplacian<span><img src="f/A_d5_laplacian.png" /></span></a></li>
+		<li><a href="#">morsi disk5 enhance<span><img src="f/A_d5_enhance.png" /></span></a></li>
+		<li><a href="#">morsi disk5 tophat<span><img src="f/A_d5_tophat.png" /></span></a></li>
+		<li><a href="#">morsi disk5 bothat<span><img src="f/A_d5_bothat.png" /></span></a></li>
+		<li><a href="#">morsi disk5 oscillation<span><img src="f/A_d5_oscillation.png" /></span></a></li>
 	</ul>
 </div>
 </p>
@@ -235,6 +312,7 @@ morsi cross dilation lenak.png lenak_dilation.png
 Morphological operation with 
 -->
 
+<p>end</p>
 
 	</body>
 </html>

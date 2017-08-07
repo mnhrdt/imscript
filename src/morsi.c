@@ -184,7 +184,7 @@ void morsi_enhance(float *y, float *x, int w, int h, int *e)
 	free(t);
 }
 
-void morsi_strange(float *y, float *x, int w, int h, int *e)
+void morsi_oscillation(float *y, float *x, int w, int h, int *e)
 {
 	float *a = xmalloc(w*h*sizeof*a);
 	float *b = xmalloc(w*h*sizeof*b);
@@ -398,7 +398,7 @@ static char *help_string_long     =
 " enhance     image minus laplacian (sharpen boundaries and details)\n"
 " tophat      image minus opening (select bright blobs)\n"
 " bothat      closing minus image (select dark blobs)\n"
-" strange     closing minus opening (measure local oscillation)\n"
+" oscillation closing minus opening (measure local oscillation)\n"
 "\n"
 "Examples:\n"
 " morsi cross erosion i.png o.png    Erode by a \"cross\" structuring element\n"
@@ -440,19 +440,19 @@ int main_morsi(int c, char **v)
 		return 1;
 	}
 	void (*operation)(float*,float*,int,int,int*) = NULL;
-	if (0 == strcmp(v[2], "erosion"  )) operation = morsi_erosion;
-	if (0 == strcmp(v[2], "dilation" )) operation = morsi_dilation;
-	if (0 == strcmp(v[2], "median"   )) operation = morsi_median;
-	if (0 == strcmp(v[2], "opening"  )) operation = morsi_opening;
-	if (0 == strcmp(v[2], "closing"  )) operation = morsi_closing;
-	if (0 == strcmp(v[2], "gradient" )) operation = morsi_gradient;
-	if (0 == strcmp(v[2], "igradient")) operation = morsi_igradient;
-	if (0 == strcmp(v[2], "egradient")) operation = morsi_egradient;
-	if (0 == strcmp(v[2], "laplacian")) operation = morsi_laplacian;
-	if (0 == strcmp(v[2], "enhance"  )) operation = morsi_enhance;
-	if (0 == strcmp(v[2], "strange"  )) operation = morsi_strange;
-	if (0 == strcmp(v[2], "tophat"   )) operation = morsi_tophat;
-	if (0 == strcmp(v[2], "bothat"   )) operation = morsi_bothat;
+	if (0 == strcmp(v[2], "erosion"    )) operation = morsi_erosion;
+	if (0 == strcmp(v[2], "dilation"   )) operation = morsi_dilation;
+	if (0 == strcmp(v[2], "median"     )) operation = morsi_median;
+	if (0 == strcmp(v[2], "opening"    )) operation = morsi_opening;
+	if (0 == strcmp(v[2], "closing"    )) operation = morsi_closing;
+	if (0 == strcmp(v[2], "gradient"   )) operation = morsi_gradient;
+	if (0 == strcmp(v[2], "igradient"  )) operation = morsi_igradient;
+	if (0 == strcmp(v[2], "egradient"  )) operation = morsi_egradient;
+	if (0 == strcmp(v[2], "laplacian"  )) operation = morsi_laplacian;
+	if (0 == strcmp(v[2], "enhance"    )) operation = morsi_enhance;
+	if (0 == strcmp(v[2], "oscillation")) operation = morsi_oscillation;
+	if (0 == strcmp(v[2], "tophat"     )) operation = morsi_tophat;
+	if (0 == strcmp(v[2], "bothat"     )) operation = morsi_bothat;
 	if (!operation) {
 		fprintf(stderr, "operations = erosion, dilation, opening...\n");
 		return 1;

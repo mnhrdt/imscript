@@ -251,8 +251,8 @@ static void action_toggle_roi(struct FTR *f, int x, int y, int dir)
 	struct pan_state *e = f->userdata;
 	e->roi = (e->roi + (dir?-1:1)) % 4;
 	fprintf(stderr, "ROI SWITCH(%d) = %d\n", dir, e->roi);
-	e->roi_x = x;
-	e->roi_y = y;
+	e->roi_x = x - e->roi_w / 2;
+	e->roi_y = y - e->roi_w / 2;
 	f->changed = 1;
 }
 
