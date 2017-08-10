@@ -73,7 +73,7 @@ static void flip_posetrans(float *X, int *WH, float *x, int w, int h)
 
 	for (int j = 0; j < H; j++)
 	for (int i = 0; i < W; i++)
-		X[j*W+i] = x[(w-1-i)*w+(h-1-j)];
+		X[j*W+i] = x[(h-1-i)*w+(w-1-j)];
 }
 
 static void flip_identity(float *X, int *WH, float *x, int w, int h)
@@ -149,6 +149,7 @@ int main_imflip(int c, char *v[])
 		float *X = x + l*w*h;
 		float *Y = y + l*w*h;
 		if (!strcmp(op, "1"))         flip_identity(Y, wh, X, w, h);
+		if (!strcmp(op, "identity"))  flip_identity(Y, wh, X, w, h);
 		if (!strcmp(op, "x"))         flip_leftright(Y, wh, X, w, h);
 		if (!strcmp(op, "y"))         flip_topdown  (Y, wh, X, w, h);
 		if (!strcmp(op, "r"))         flip_r90      (Y, wh, X, w, h);
