@@ -16,8 +16,6 @@ bin/%  : src/%.o $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 
-
-
 # END OF CORE PART, THE REST OF THIS FILE IS NOT ESSENTIAL
 
 # unit test (end-to-end)
@@ -72,6 +70,9 @@ bin/% : src/ftr/%.o $(OBJ_FTR)
 bin/% : src/misc/%.o $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS_MSC)
 
+# single, fat, busybox-like executable
+bin/im : src/im.o $(BIN:bin/%=src/%.o) $(OBJ)
+	$(CC) $(LDFLAGS) -Wl,--allow-multiple-definition -o $@ $^ $(LDLIBS)
 
 
 
