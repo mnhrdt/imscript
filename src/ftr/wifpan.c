@@ -540,13 +540,13 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 	if (b == FTR_BUTTON_RIGHT)  action_reset_zoom_and_position(f);
 }
 
-void key_handler_print(struct FTR *f, int k, int m, int x, int y)
+static void key_handler_print(struct FTR *f, int k, int m, int x, int y)
 {
 	fprintf(stderr, "key pressed %d '%c' (%d) at %d %d\n",
 			k, isalpha(k)?k:' ', m, x, y);
 }
 
-void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
+static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
 	//fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
 	//		k, isalpha(k)?k:' ', m, x, y);
