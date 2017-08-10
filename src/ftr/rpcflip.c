@@ -1605,7 +1605,7 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 
 // main {{{1
 #include "pickopt.c"
-int main_pan(int c, char *v[])
+int main_rpcflip_pan(int c, char *v[])
 {
 	TIFFSetWarningHandler(NULL);//suppress warnings
 
@@ -1670,7 +1670,7 @@ int main_pan(int c, char *v[])
 	return r;
 }
 
-int main_gray(int c, char *v[])
+int main_rpcflip_gray(int c, char *v[])
 {
 	TIFFSetWarningHandler(NULL);//suppress warnings
 
@@ -1720,12 +1720,17 @@ int main_gray(int c, char *v[])
 	return r;
 }
 
-int main(int c, char *v[])
+int main_rpcflip(int c, char *v[])
 {
 	if (c > 1 && 0 == strcmp(v[1], "-g"))
-		return main_gray(c - 1, v + 1);
+		return main_rpcflip_gray(c - 1, v + 1);
 	else
-		return main_pan(c, v);
+		return main_rpcflip_pan(c, v);
+}
+
+int main(int c, char *v[])
+{
+	return main_rpcflip(c, v);
 }
 
 // vim:set foldmethod=marker:

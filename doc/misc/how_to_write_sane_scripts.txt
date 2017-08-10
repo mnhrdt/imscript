@@ -1,0 +1,6 @@
+- either your script is executable or its name ends in .sh, but not both
+- variable names are uppercase
+- never store filanemes in variables, filenames *are* variable names
+- if you check the existence of files at every line, write a makefile instead
+- use always test and short-circuiting, try to avoid if
+- to break a pipeline into several lines, put each command on a separate line

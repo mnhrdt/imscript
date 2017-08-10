@@ -226,7 +226,7 @@ static void term_exposer(struct FTR *f, int b, int m, int x, int y)
 	f->changed = 1;
 }
 
-int main()
+int main_srt()
 {
 	struct terminal t[1];
 	t->w = 80;
@@ -251,3 +251,5 @@ int main()
 	ftr_set_handler(&f, "key", term_key_handler);
 	return ftr_loop_run(&f);
 }
+
+int main() { return main_srt(); }

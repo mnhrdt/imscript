@@ -551,7 +551,7 @@ void pan_resize(struct FTR *f, int k, int m, int x, int y)
 }
 
 #include "parsenumbers.c"
-int main_pan(int c, char *v[])
+int main_epiview(int c, char *v[])
 {
 
 	// process input arguments
@@ -604,5 +604,5 @@ int main_pan(int c, char *v[])
 
 int main(int c, char *v[])
 {
-	return main_pan(c, v);
+	return main_epiview(c, v);
 }

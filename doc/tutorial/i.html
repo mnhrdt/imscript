@@ -361,7 +361,7 @@ palette 0 2000 nnice     X.tif X_nnice.png      -l leg_nnice.png
 dither lena.png dithered_lena.png
 blur C 1 lena.png | qauto | dither - cauchydithered_lena.png
 </pre>
-<div class="gallery" style="height:512px">
+<div class="gallery" style="height:256px">
 	<ul class="index">
 		<li><a href="#">input image lena<span><img src="f/lena.png" /></span></a></li>
 		<li><a href="#">dither<span><img src="f/dithered_lena.png" /></span></a></li>
@@ -377,6 +377,50 @@ blur -s C 1 A.png | qauto -i | dither - scauchydithered_iA.png
 		<li><a href="#">blur C 1 | qauto -i | dither<span><img src="f/cauchydithered_iA.png" /></span></a></li>
 		<li><a href="#">blur -s C 1 | qauto -i | dither<span><img src="f/scauchydithered_iA.png" /></span></a></li>
 		-->
+	</ul>
+</div>
+</p>
+
+<h3>2.2. Accumulators</h3>
+
+<p>
+<b>plambda:</b> apply an arithmetic expression with input images (the
+expression is written in <a
+href="https://en.wikipedia.org/wiki/Reverse_Polish_notation">reverse polish
+notation</a>).  Common arithmetic operators and all functions from
+<code>math.h</code> are allowed.
+<pre class="script">
+plambda a.png b.png "+ 2 /"  -o ab_avg.png
+plambda a.png b.png "* sqrt" -o ab_geo.png
+plambda a.png b.png "fmin"   -o ab_min.png
+plambda a.png b.png "fmax"   -o ab_max.png
+</pre>
+<div class="gallery" style="height:321px">
+	<ul class="index">
+		<li><a href="#">a.png, b.png<span><img src="f/a.png" /><img src="f/b.png" /></span></a></li>
+		<li><a href="#">ab_avg.png<span><img src="f/ab_avg.png" /></span></a></li>
+		<li><a href="#">ab_geo.png<span><img src="f/ab_geo.png" /></span></a></li>
+		<li><a href="#">ab_min.png<span><img src="f/ab_min.png" /></span></a></li>
+		<li><a href="#">ab_max.png<span><img src="f/ab_max.png" /></span></a></li>
+	</ul>
+</div>
+</p>
+
+<p>
+<b>plambda:</b> apply an arithmetic expression with input images:
+<pre class="script">
+plambda a.png b.png "+ 2 /"  -o ab_avg.png
+plambda a.png b.png "* sqrt" -o ab_geo.png
+plambda a.png b.png "fmin"   -o ab_min.png
+plambda a.png b.png "fmax"   -o ab_max.png
+</pre>
+<div class="gallery" style="height:321px">
+	<ul class="index">
+		<li><a href="#">a.png, b.png<span><img src="f/a.png" /><img src="f/b.png" /></span></a></li>
+		<li><a href="#">ab_avg.png<span><img src="f/ab_avg.png" /></span></a></li>
+		<li><a href="#">ab_geo.png<span><img src="f/ab_geo.png" /></span></a></li>
+		<li><a href="#">ab_min.png<span><img src="f/ab_min.png" /></span></a></li>
+		<li><a href="#">ab_max.png<span><img src="f/ab_max.png" /></span></a></li>
 	</ul>
 </div>
 </p>

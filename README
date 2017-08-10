@@ -2,13 +2,13 @@ IMSCRIPT
 ========
 
 
-OVERVIEW
+1. OVERVIEW
 
 This is a collection of small independent image processing utilities in C.
 These tools allow to do image processing from the comfort of the command line.
 
 
-PHILOSOPHY
+2. PHILOSOPHY
 
 Classic unix philosophy, with some specificities for images:
 
@@ -25,7 +25,7 @@ See doc/misc/nipl.txt for a more complete description of the underlying
 philosophy.
 
 
-IMPLEMENTATION
+3. IMPLEMENTATION
 
 The graph of dependencies between files is as disconnected as possible.
 Most programs use the functions from "iio.c" for opening and saving images.
@@ -33,14 +33,13 @@ The interactive tools use the functions from "ftr.c" for the gui.
 Some files may be directly included into others (e.g., "random.c").
 
 
-
-COMPILATION
+4. COMPILATION
 
 make full -j   # build all the tools (including the interctive ones)
 make -j        # build only the basic tools
 
 
-PREREQUISITES
+5. PREREQUISITES
 
 The only real prerequisites are a C compiler and libfftw3f.
 
@@ -51,17 +50,15 @@ For the interactive tools you will need furthermore libX11.
 Some tools require furthermore libgsl and libgslcblas.
 
 
-
-INSTALLATION
+6. INSTALLATION
 
 There  is no automatic installation.  After compilation, just copy or link the
 desired executables into your PATH (or add imscript/bin into the path).
 
 
+7. SUMMARY OF PROGRAMS
 
-SUMMARY OF PROGRAMS
-
-1. Filters: read one image and write one image of the same size
+* Filters: read one image and write one image of the same size
 
 	- blur: convolve an image by a shift-invariant user-specified kernel
 	- morsi: apply a morphological operation with a user-specified element
@@ -71,7 +68,7 @@ SUMMARY OF PROGRAMS
 	- dither: binarize an image by error diffusion
 	- iion: copy named input to named output (useful to change file format)
 
-2. Accumulators: combine several images into one
+* Accumulators: combine several images into one
 	- plambda: apply an arbitrary pixel-wise expression, given explicitly
 	- veco: generic pixel-wise expressions for gray images, gray output
 	- vecov: generic pixel-wise expressions for color images, color output
@@ -79,33 +76,33 @@ SUMMARY OF PROGRAMS
 	- tbcat: concatenate two image (top-bottom)
 	- lrcat: concatenate two image (left-right)
 
-3. Queries: extract data from one image
+* Queries: extract data from one image
 	- imprintf: print a formatted string of image data
 	- ghisto: common histogram
 	- contihist: continuous histogram
 	- viewflow:  represent a vector field using a color code
 	- flowarrows: represent a vector field using arrows
 
-4. Interpolators: fill-in the holes of one image
+* Interpolators: fill-in the holes of one image
 	- nnint: nearest neighbor interpolation
 	- bdint: interpolation from the boundary of each hole
 	- simpois: poisson, laplace and biharmonic interpolators
 	- amle: absolutely minimizing lipschitz extension
 
-5. Rescalers: produce an image of different size or shape
+* Rescalers: produce an image of different size or shape
 	- downsa: zoom out by combining blocks of pixels
 	- upsa: zoom in by interpolation inside cells
 	- ntiply: zoom in by pixel replication
 	- imflip: rotate or transpose the image domain
 	- homwarp: apply an arbitrary homography to the image domain
 
-6. Frequecy domains:
+* Frequecy domains:
 	- fft: discrete Fourier transform (direct)
 	- ifft: discrete Fourier transform (inverse)
 	- dct: discrete cosine transform
 	- dht: discrete Hartley transform
 
-7. Point processing:
+* Point processing:
 	- pview: display points or matches as an image
 	- ransac: generic ransac implementation
 	- srmatch: multi-scale sift matching for registration
@@ -113,12 +110,12 @@ SUMMARY OF PROGRAMS
 	- colormesh: build 3D mesh from calibrated 2.5D representation
 	- ijmesh: build 3D mesh from non-calibrated 2.5D representation
 
-8. Multi-program suites:
+* Multi-program suites:
 	- siftu: operations for sift keypoints
 	- tiffu: operations for tiff files
 	- fontu: operations for bitmapped fonts
 
-9. Miscellaneous:
+* Miscellaneous:
 	- synflow: generate a synthetic optical flow field
 	- ccproc: connected component filtering
 	- ihough2: generic hough transform (for straight lines)
@@ -130,7 +127,7 @@ SUMMARY OF PROGRAMS
 	- pmba2: poor man bundle adjustment
 	- tcregistration: register two images by translation
 
-10. Interactive programs:
+* Interactive programs:
 	- fpan: display an image with panning, zooming, and contrast changes
 	- fpantiff: like fpan, but understands image pyramids
 	- rpcflip: display several calibrated satellite images

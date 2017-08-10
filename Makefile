@@ -71,13 +71,14 @@ bin/% : src/misc/%.o $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS_MSC)
 
 # single, fat, busybox-like executable
-bin/im : src/im.o $(BIN:bin/%=src/%.o) $(OBJ)
-	$(CC) $(LDFLAGS) -Wl,--allow-multiple-definition -o $@ $^ $(LDLIBS)
+BINOBJ = $(BIN:bin/%=src/%.o) $(BIN_FTR:bin/%=src/ftr/%.o)
+bin/im : src/im.o $(BINOBJ) $(OBJ_ALL)
+	$(CC) $(LDFLAGS) -Wl,--allow-multiple-definition -o $@ $^ $(LDLIBS_FTR)
 
 
 
 # bureaucracy
 clean:
-	$(RM) $(BIN_ALL) src/*.o src/ftr/*.o src/misc/*.o
+	$(RM) $(BIN_ALL) bin/im src/*.o src/ftr/*.o src/misc/*.o
 .PHONY: default full ftr misc clean
 .PRECIOUS: %.o

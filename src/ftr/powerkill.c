@@ -583,7 +583,7 @@ static void create_pyramid(struct pan_state *e)
 
 #include "pickopt.c"
 
-int main_pan(int c, char *v[])
+int main_powerkill(int c, char *v[])
 {
 	// process input arguments
 	char *imask_option = pick_option(&c, &v, "m", "");
@@ -647,5 +647,5 @@ int main_pan(int c, char *v[])
 
 int main(int c, char *v[])
 {
-	return main_pan(c, v);
+	return main_powerkill(c, v);
 }

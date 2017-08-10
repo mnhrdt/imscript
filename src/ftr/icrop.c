@@ -156,4 +156,5 @@ int main_icrop2_panable(int c, char *v[])
 	return 0;
 }
 
-int main(int c, char *v[]) { return main_icrop2_panable(c, v); }
+int main_icrop(int c, char *v[]) { return main_icrop2_panable(c, v); }
+int main(int c, char *v[]) { return main_icrop(c, v); }

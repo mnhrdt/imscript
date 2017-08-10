@@ -1815,7 +1815,7 @@ SMART_PARAMETER(INFERNAL_B,20000)
 // main {{{1
 //#define STRIP_WIDTH 360
 #define HOUGH_SIDE 512
-int main_pan(int c, char *v[])
+int main_vnav(int c, char *v[])
 {
 	TIFFSetWarningHandler(NULL);//suppress warnings
 
@@ -1898,6 +1898,6 @@ int main_pan(int c, char *v[])
 
 int main(int c, char *v[])
 {
-	return main_pan(c, v);
+	return main_vnav(c, v);
 }
 // vim:set foldmethod=marker:

@@ -942,7 +942,7 @@ static void event_expose(struct FTR *f, int b, int m, int x, int y)
 #include "iio.h"
 
 // main function
-int main(int argc, char *argv[])
+int main_viho(int argc, char *argv[])
 {
 	if (argc != 2 && argc != 1) {
 		fprintf(stderr, "usage:\n\t%s [image.png]\n", *argv);
@@ -969,5 +969,7 @@ int main(int argc, char *argv[])
 
 	return ftr_loop_run(&f);
 }
+
+int main(int c, char *v[]) { return main_viho(c, v); }
 
 // vim:set foldmethod=marker:

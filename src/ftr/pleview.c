@@ -912,7 +912,7 @@ static void add_preview(struct pan_state *e, char *filename)
 
 #define BAD_MIN(a,b) a<b?a:b
 
-int main_pan(int c, char *v[])
+int main_pleview(int c, char *v[])
 {
 	TIFFSetWarningHandler(NULL);//suppress warnings
 
@@ -969,5 +969,5 @@ int main_pan(int c, char *v[])
 
 int main(int c, char *v[])
 {
-	return main_pan(c, v);
+	return main_pleview(c, v);
 }

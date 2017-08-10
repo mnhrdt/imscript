@@ -564,7 +564,7 @@ void pan_resize(struct FTR *f, int k, int m, int x, int y)
 	e->x_w = e->f_w = f->w/2;
 }
 
-int main_pan(int c, char *v[])
+int main_dosdo(int c, char *v[])
 {
 
 	// process input arguments
@@ -619,5 +619,5 @@ int main_pan(int c, char *v[])
 
 int main(int c, char *v[])
 {
-	return main_pan(c, v);
+	return main_dosdo(c, v);
 }

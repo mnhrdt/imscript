@@ -485,7 +485,7 @@ static void free_pyramid(struct pan_image *e)
 
 #define BAD_MIN(a,b) a<b?a:b
 
-int main_pan(int c, char *v[])
+int main_fpanflip(int c, char *v[])
 {
 	// all input images are images to read
 	int n = c - 1;
@@ -531,5 +531,5 @@ int main_pan(int c, char *v[])
 
 int main(int c, char *v[])
 {
-	return main_pan(c, v);
+	return main_fpanflip(c, v);
 }

@@ -671,7 +671,7 @@ static void free_pyramid(struct pan_state *e)
 
 
 #define BAD_MIN(a,b) a<=b?a:b
-int main_pan(int c, char *v[])
+int main_wifpan(int c, char *v[])
 {
 	// process input arguments
 	if (c != 2 && c != 1) {
@@ -705,5 +705,5 @@ int main_pan(int c, char *v[])
 
 int main(int c, char *v[])
 {
-	return main_pan(c, v);
+	return main_wifpan(c, v);
 }
