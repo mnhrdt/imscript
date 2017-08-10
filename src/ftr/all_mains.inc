@@ -1,0 +1,13 @@
+	MAIN(viho);
+	MAIN(fpan);
+	MAIN(fpantiff);
+	MAIN(rpcflip);
+	MAIN(icrop);
+	MAIN(powerkill);
+	MAIN(dosdo);
+	MAIN(epiview);
+	MAIN(vnav);
+	MAIN(pleview);
+	MAIN(srt);
+	MAIN(fpanflip);
+	MAIN(wifpan);
