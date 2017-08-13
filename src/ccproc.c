@@ -1,5 +1,7 @@
 // This file contains the implemantation of the "ccproc" function
-// It is a general tool to deal with connect components in images.
+// It is a general tool to deal with connected components in images.
+// Also, it contains the implementation of the "bfollow" function, to track
+// the boundaries of these connected components in anticlockwise order.
 
 #include <math.h>
 #include <stdint.h>
@@ -541,7 +543,7 @@ int ccproc(
 
 	// reorder out_all so that boundarying points come first
 	reorder_boundaries(out_bdsize, out_idx, out_all, out_first, out_size,
-								w, h, r);
+	                   w, h, r);
 
 	// cleanup and exit
 	free(pair);

@@ -1,19 +1,28 @@
+
+<!-- This document is a "semi-literate" program.  To re-compute the figures,
+	run the script "build.sh" from inside the directory "f".  Nothe that you can
+	change the source images (A, B, X, ...), but they should be of a similar size
+	or the layout will be broken.
+-->
+
 <html>
 	<head>
 		<style>
-body {max-width: 60em;}
+body {max-width: 60em; margin-left:1em;}
 .gallery {position:relative;width:auto;height:400px}
 .gallery .index{padding:0;margin:0;width:11em;list-style:none}
 .gallery .index li{margin:0;padding:0}
 .gallery .index a{display:block;background-color:#eee;border:1px solid #fff;text-decoration:none;width:13em;padding:5px}
 .gallery .index a span{display:block;position:absolute;left:-9999px;top:0;padding-left:2em}
-.gallery .index li:nth-child(2) a span{left:12em;z-index:99}
-.gallery .index li:nth-child(2) a {font-weight:bold;}
+.selsecond .index li:nth-child(2) a span{left:12em;z-index:99}
+.selsecond .index li:nth-child(2) a {font-weight:bold;}
+.selfirst .index li:first-child a span{left:12em;z-index:99}
+.selfirst .index li:first-child a {font-weight:bold;}
 .gallery .index a:hover{ border: 1px solid #888888;}
 .gallery .index a:hover span{left:12em;z-index:100}
 .gallery .index a span img{ }
 .gallery .index a span { white-space:nowrap; }
-.script {border:1px solid black;background-color:#fff;width:80ex;padding:1ex;}
+.script {border:1px solid black;background-color:#fff;width:88ex;padding:1ex;}
 		</style>
 
 		<title>imscript tutorial</title>
@@ -157,17 +166,17 @@ body {max-width: 60em;}
 Gaussian <b>blur</b> of different sizes
 
 <pre class="script">
-blur gaussian 1 A.png A_g1.png
-blur gaussian 3 A.png A_g3.png
-blur gaussian 8 A.png A_g8.png
+blur gaussian 1 A.png A_gaussian_1.png
+blur gaussian 3 A.png A_gaussian_3.png
+blur gaussian 8 A.png A_gaussian_8.png
 </pre>
 
-<div class="gallery" style="height:321">
+<div class="gallery selsecond" style="height:321">
 	<ul class="index">
-		<li><a href="#">input image    <span><img src="f/A.png" /></span></a></li>
-		<li><a href="#">blur gaussian 1<span><img src="f/A_g1.png" /></span></a></li>
-		<li><a href="#">blur gaussian 3<span><img src="f/A_g3.png" /></span></a></li>
-		<li><a href="#">blur gaussian 8<span><img src="f/A_g8.png" /></span></a></li>
+		<li><a href="#">A.png<span><img src="f/A.png" /></span></a></li>
+		<li><a href="#">A_gaussian_1.png<span><img src="f/A_gaussian_1.png" /></span></a></li>
+		<li><a href="#">A_gaussian_3.png<span><img src="f/A_gaussian_3.png" /></span></a></li>
+		<li><a href="#">A_gaussian_8.png<span><img src="f/A_gaussian_8.png" /></span></a></li>
 	</ul>
 </div>
 </p>
@@ -175,16 +184,16 @@ blur gaussian 8 A.png A_g8.png
 <p>
 Gaussian <b>blur</b> with different <b>boundary conditions</b>:
 <pre class="script">
-blur gaussian 5 -s A.png A_gs.png    # symmetric boundary
-blur gaussian 5 -p A.png A_gp.png    # periodic boundary
-blur gaussian 5 -z A.png A_gz.png    # zero boundary
+blur gaussian 5 -s A.png A_gaussian_5_s.png    # symmetric boundary
+blur gaussian 5 -p A.png A_gaussian_5_p.png    # periodic boundary
+blur gaussian 5 -z A.png A_gaussian_5_z.png    # zero boundary
 </pre>
-<div class="gallery" style="height:321px">
+<div class="gallery selsecond" style="height:321px">
 	<ul class="index">
-		<li><a href="#">input image       <span><img src="f/A.png" /></span></a></li>
-		<li><a href="#">blur gaussian 5 -s<span><img src="f/A_gs.png" /></span></a></li>
-		<li><a href="#">blur gaussian 5 -p<span><img src="f/A_gp.png" /></span></a></li>
-		<li><a href="#">blur gaussian 5 -z<span><img src="f/A_gz.png" /></span></a></li>
+		<li><a href="#">A.png<span><img src="f/A.png" /></span></a></li>
+		<li><a href="#">A_gaussian_5_s.png<span><img src="f/A_gaussian_5_s.png" /></span></a></li>
+		<li><a href="#">A_gaussian_5_p.png<span><img src="f/A_gaussian_5_p.png" /></span></a></li>
+		<li><a href="#">A_gaussian_5_z.png<span><img src="f/A_gaussian_5_z.png" /></span></a></li>
 	</ul>
 </div>
 </p>
@@ -200,15 +209,15 @@ blur disk     5 A.png A_d.png
 blur cauchy   2 A.png A_c.png
 blur inverse  1 -p A.png | qauto -i -p 1 - A_i.png
 </pre>
-<div class="gallery" style="height:321px">
+<div class="gallery selsecond" style="height:321px">
 	<ul class="index">
-		<li><a href="#">input image    <span><img src="f/A.png" /></span></a></li>
-		<li><a href="#">blur square 11 <span><img src="f/A_s.png" /></span></a></li>
-		<li><a href="#">blur gaussian 5<span><img src="f/A_g.png" /></span></a></li>
-		<li><a href="#">blur laplace 5 <span><img src="f/A_l.png" /></span></a></li>
-		<li><a href="#">blur disk 5    <span><img src="f/A_d.png" /></span></a></li>
-		<li><a href="#">blur cauchy 2  <span><img src="f/A_c.png" /></span></a></li>
-		<li><a href="#">blur inverse 1 <span><img src="f/A_i.png" /></span></a></li>
+		<li><a href="#">A.png<span><img src="f/A.png" /></span></a></li>
+		<li><a href="#">A_s.png<span><img src="f/A_s.png" /></span></a></li>
+		<li><a href="#">A_g.png<span><img src="f/A_g.png" /></span></a></li>
+		<li><a href="#">A_l.png<span><img src="f/A_l.png" /></span></a></li>
+		<li><a href="#">A_d.png<span><img src="f/A_d.png" /></span></a></li>
+		<li><a href="#">A_c.png<span><img src="f/A_c.png" /></span></a></li>
+		<li><a href="#">A_i.png<span><img src="f/A_i.png" /></span></a></li>
 	</ul>
 </div>
 </p>
@@ -230,22 +239,22 @@ morsi cross tophat        A.png | qeasy  0 60 - A_x_tophat.png
 morsi cross bothat        A.png | qeasy  0 60 - A_x_bothat.png
 morsi cross oscillation   A.png | qeasy  0 60 - A_x_oscillation.png
 </pre>
-<div class="gallery" style="height:521px">
+<div class="gallery selfirst" style="height:521px">
 	<ul class="index">
-		<li><a href="#">input image    <span><img src="f/A.png" /></span></a></li>
-		<li><a href="#">morsi cross erosion<span><img src="f/A_x_erosion.png" /></span></a></li>
-		<li><a href="#">morsi cross dilation<span><img src="f/A_x_dilation.png" /></span></a></li>
-		<li><a href="#">morsi cross median<span><img src="f/A_x_median.png" /></span></a></li>
-		<li><a href="#">morsi cross opening<span><img src="f/A_x_opening.png" /></span></a></li>
-		<li><a href="#">morsi cross closing<span><img src="f/A_x_closing.png" /></span></a></li>
-		<li><a href="#">morsi cross gradient<span><img src="f/A_x_gradient.png" /></span></a></li>
-		<li><a href="#">morsi cross igradient<span><img src="f/A_x_igradient.png" /></span></a></li>
-		<li><a href="#">morsi cross egradient<span><img src="f/A_x_egradient.png" /></span></a></li>
-		<li><a href="#">morsi cross laplacian<span><img src="f/A_x_laplacian.png" /></span></a></li>
-		<li><a href="#">morsi cross enhance<span><img src="f/A_x_enhance.png" /></span></a></li>
-		<li><a href="#">morsi cross tophat<span><img src="f/A_x_tophat.png" /></span></a></li>
-		<li><a href="#">morsi cross bothat<span><img src="f/A_x_bothat.png" /></span></a></li>
-		<li><a href="#">morsi cross oscillation<span><img src="f/A_x_oscillation.png" /></span></a></li>
+		<li><a href="#">A<span><img src="f/A.png" /></span></a></li>
+		<li><a href="#">A_x_erosion.png<span><img src="f/A_x_erosion.png" /></span></a></li>
+		<li><a href="#">A_x_dilation.png<span><img src="f/A_x_dilation.png" /></span></a></li>
+		<li><a href="#">A_x_median.png<span><img src="f/A_x_median.png" /></span></a></li>
+		<li><a href="#">A_x_opening.png<span><img src="f/A_x_opening.png" /></span></a></li>
+		<li><a href="#">A_x_closing.png<span><img src="f/A_x_closing.png" /></span></a></li>
+		<li><a href="#">A_x_gradient.png<span><img src="f/A_x_gradient.png" /></span></a></li>
+		<li><a href="#">A_x_igradient.png<span><img src="f/A_x_igradient.png" /></span></a></li>
+		<li><a href="#">A_x_egradient.png<span><img src="f/A_x_egradient.png" /></span></a></li>
+		<li><a href="#">A_x_laplacian.png<span><img src="f/A_x_laplacian.png" /></span></a></li>
+		<li><a href="#">A_x_enhance.png<span><img src="f/A_x_enhance.png" /></span></a></li>
+		<li><a href="#">A_x_tophat.png<span><img src="f/A_x_tophat.png" /></span></a></li>
+		<li><a href="#">A_x_bothat.png<span><img src="f/A_x_bothat.png" /></span></a></li>
+		<li><a href="#">A_x_oscillation.png<span><img src="f/A_x_oscillation.png" /></span></a></li>
 	</ul>
 </div>
 </p>
@@ -267,22 +276,22 @@ morsi disk5 tophat        A.png | qeasy 0 100 - A_d5_tophat.png
 morsi disk5 bothat        A.png | qeasy 0 100 - A_d5_bothat.png
 morsi disk5 oscillation   A.png | qeasy 0 100 - A_d5_oscillation.png
 </pre>
-<div class="gallery" style="height:521px">
+<div class="gallery selfirst" style="height:521px">
 	<ul class="index">
-		<li><a href="#">input image    <span><img src="f/A.png" /></span></a></li>
-		<li><a href="#">morsi disk5 erosion<span><img src="f/A_d5_erosion.png" /></span></a></li>
-		<li><a href="#">morsi disk5 dilation<span><img src="f/A_d5_dilation.png" /></span></a></li>
-		<li><a href="#">morsi disk5 median<span><img src="f/A_d5_median.png" /></span></a></li>
-		<li><a href="#">morsi disk5 opening<span><img src="f/A_d5_opening.png" /></span></a></li>
-		<li><a href="#">morsi disk5 closing<span><img src="f/A_d5_closing.png" /></span></a></li>
-		<li><a href="#">morsi disk5 gradient<span><img src="f/A_d5_gradient.png" /></span></a></li>
-		<li><a href="#">morsi disk5 igradient<span><img src="f/A_d5_igradient.png" /></span></a></li>
-		<li><a href="#">morsi disk5 egradient<span><img src="f/A_d5_egradient.png" /></span></a></li>
-		<li><a href="#">morsi disk5 laplacian<span><img src="f/A_d5_laplacian.png" /></span></a></li>
-		<li><a href="#">morsi disk5 enhance<span><img src="f/A_d5_enhance.png" /></span></a></li>
-		<li><a href="#">morsi disk5 tophat<span><img src="f/A_d5_tophat.png" /></span></a></li>
-		<li><a href="#">morsi disk5 bothat<span><img src="f/A_d5_bothat.png" /></span></a></li>
-		<li><a href="#">morsi disk5 oscillation<span><img src="f/A_d5_oscillation.png" /></span></a></li>
+		<li><a href="#">A.png<span><img src="f/A.png" /></span></a></li>
+		<li><a href="#">A_d5_erosion.png<span><img src="f/A_d5_erosion.png" /></span></a></li>
+		<li><a href="#">A_d5_dilation.png<span><img src="f/A_d5_dilation.png" /></span></a></li>
+		<li><a href="#">A_d5_median.png<span><img src="f/A_d5_median.png" /></span></a></li>
+		<li><a href="#">A_d5_opening.png<span><img src="f/A_d5_opening.png" /></span></a></li>
+		<li><a href="#">A_d5_closing.png<span><img src="f/A_d5_closing.png" /></span></a></li>
+		<li><a href="#">A_d5_gradient.png<span><img src="f/A_d5_gradient.png" /></span></a></li>
+		<li><a href="#">A_d5_igradient.png<span><img src="f/A_d5_igradient.png" /></span></a></li>
+		<li><a href="#">A_d5_egradient.png<span><img src="f/A_d5_egradient.png" /></span></a></li>
+		<li><a href="#">A_d5_laplacian.png<span><img src="f/A_d5_laplacian.png" /></span></a></li>
+		<li><a href="#">A_d5_enhance.png<span><img src="f/A_d5_enhance.png" /></span></a></li>
+		<li><a href="#">A_d5_tophat.png<span><img src="f/A_d5_tophat.png" /></span></a></li>
+		<li><a href="#">A_d5_bothat.png<span><img src="f/A_d5_bothat.png" /></span></a></li>
+		<li><a href="#">A_d5_oscillation.png<span><img src="f/A_d5_oscillation.png" /></span></a></li>
 	</ul>
 </div>
 </p>
@@ -294,7 +303,7 @@ qeasy 20 200   A.png A_saturated.png
 qeasy 0 1000   A.png A_darkened.png
 qeasy -300 300 A.png A_bleached.png
 </pre>
-<div class="gallery" style="height:321px">
+<div class="gallery selfirst" style="height:321px">
 	<ul class="index">
 		<li><a href="#">A.png<span><img src="f/A.png" /></span></a></li>
 		<li><a href="#">A_saturated.png<span><img src="f/A_saturated.png" /></span></a></li>
@@ -311,7 +320,7 @@ qauto       lenac.png lenac_qauto.png
 qauto -p 10 lenac.png lenac_qauto_p10.png
 qauto -i    lenac.png lenac_qauto_i.png
 </pre>
-<div class="gallery" style="height:321px">
+<div class="gallery selfirst" style="height:321px">
 	<ul class="index">
 		<!--
 		<li><a href="#">input image    <span><img src="f/lenac.png" /></span></a></li>
@@ -341,16 +350,16 @@ palette nan 1000 jet.gpl X.tif X_jet.png        -l leg_jet.png
 palette 0 2000 nice      X.tif X_nice.png       -l leg_nice.png
 palette 0 2000 nnice     X.tif X_nnice.png      -l leg_nnice.png
 </pre>
-<div class="gallery" style="height:512px">
+<div class="gallery selsecond" style="height:512px">
 	<ul class="index">
-		<li><a href="#">qauto<span><img src="f/X.png" /></span></a></li>
-		<li><a href="#">palette 0 1000 dem<span><img       src="f/X_dem1000.png" /><img src="f/leg_dem1000.png" /></span></a></li>
-		<li><a href="#">palette 0 2000 dem<span><img       src="f/X_dem2000.png" /><img src="f/leg_dem2000.png" /></span></a></li>
-		<li><a href="#">palette 0 500 dem<span><img        src="f/X_dem500.png"  /><img src="f/leg_dem500.png" /></span></a></li>
-		<li><a href="#">palette nan nan gray<span><img     src="f/X_gray.png"    /><img src="f/leg_gray.png" /></span></a></li>
-		<li><a href="#">palette nan 1000 jet.gpl<span><img src="f/X_jet.png"     /><img src="f/leg_jet.png" /></span></a></li>
-		<li><a href="#">palette 0 2000 nice<span><img      src="f/X_nice.png"    /><img src="f/leg_nice.png" /></span></a></li>
-		<li><a href="#">palette 0 2000 nnice<span><img     src="f/X_nnice.png"   /><img src="f/leg_nnice.png" /></span></a></li>
+		<li><a href="#">X.png        <span><img src="f/X.png"         /></span></a></li>
+		<li><a href="#">X_dem1000.png<span><img src="f/X_dem1000.png" /><img src="f/leg_dem1000.png" /></span></a></li>
+		<li><a href="#">X_dem2000.png<span><img src="f/X_dem2000.png" /><img src="f/leg_dem2000.png" /></span></a></li>
+		<li><a href="#">X_dem500.png <span><img src="f/X_dem500.png"  /><img src="f/leg_dem500.png" /></span></a></li>
+		<li><a href="#">X_gray.png   <span><img src="f/X_gray.png"    /><img src="f/leg_gray.png" /></span></a></li>
+		<li><a href="#">X_jet.png    <span><img src="f/X_jet.png"     /><img src="f/leg_jet.png" /></span></a></li>
+		<li><a href="#">X_nice.png   <span><img src="f/X_nice.png"    /><img src="f/leg_nice.png" /></span></a></li>
+		<li><a href="#">X_nnice.png  <span><img src="f/X_nnice.png"   /><img src="f/leg_nnice.png" /></span></a></li>
 	</ul>
 </div>
 </p>
@@ -358,14 +367,14 @@ palette 0 2000 nnice     X.tif X_nnice.png      -l leg_nnice.png
 <p>
 <b>dither:</b> halftoning by error diffusion:
 <pre class="script">
-dither lena.png dithered_lena.png
-blur C 1 lena.png | qauto | dither - cauchydithered_lena.png
+dither lena.png lena_dithered.png
+blur C 1 lena.png | qauto | dither - lena_dithered_c.png
 </pre>
-<div class="gallery" style="height:256px">
+<div class="gallery selsecond" style="height:256px">
 	<ul class="index">
-		<li><a href="#">input image lena<span><img src="f/lena.png" /></span></a></li>
-		<li><a href="#">dither<span><img src="f/dithered_lena.png" /></span></a></li>
-		<li><a href="#">blur C 1 | qauto | dither<span><img src="f/cauchydithered_lena.png" /></span></a></li>
+		<li><a href="#">lena.png<span><img src="f/lena.png" /></span></a></li>
+		<li><a href="#">lena_dithered.png<span><img src="f/lena_dithered.png" /></span></a></li>
+		<li><a href="#">lena_dithered_c.png<span><img src="f/lena_dithered_c.png" /></span></a></li>
 		<!--
 dither A.png dithered_A.png
 blur C 1 A.png | qauto | dither - cauchydithered_A.png
@@ -390,14 +399,22 @@ href="https://en.wikipedia.org/wiki/Reverse_Polish_notation">reverse polish
 notation</a>).  Common arithmetic operators and all functions from
 <code>math.h</code> are allowed.
 <pre class="script">
+plambda a.png b.png +        -o ab_sum.png
+plambda a.png b.png -        -o ab_dif.png
+plambda a.png b.png "*"      -o ab_mul.png
+plambda a.png b.png /        -o ab_div.png
 plambda a.png b.png "+ 2 /"  -o ab_avg.png
 plambda a.png b.png "* sqrt" -o ab_geo.png
-plambda a.png b.png "fmin"   -o ab_min.png
-plambda a.png b.png "fmax"   -o ab_max.png
+plambda a.png b.png fmin     -o ab_min.png
+plambda a.png b.png fmax     -o ab_max.png
 </pre>
-<div class="gallery" style="height:321px">
+<div class="gallery selsecond" style="height:321px">
 	<ul class="index">
-		<li><a href="#">a.png, b.png<span><img src="f/a.png" /><img src="f/b.png" /></span></a></li>
+		<li><a href="#">a.png &nbsp; &nbsp; b.png<span><img src="f/a.png" /><img src="f/b.png" /></span></a></li>
+		<li><a href="#">ab_sum.png<span><img src="f/ab_sum.png" /></span></a></li>
+		<li><a href="#">ab_dif.png<span><img src="f/ab_dif.png" /></span></a></li>
+		<li><a href="#">ab_mul.png<span><img src="f/ab_mul.png" /></span></a></li>
+		<li><a href="#">ab_div.png<span><img src="f/ab_div.png" /></span></a></li>
 		<li><a href="#">ab_avg.png<span><img src="f/ab_avg.png" /></span></a></li>
 		<li><a href="#">ab_geo.png<span><img src="f/ab_geo.png" /></span></a></li>
 		<li><a href="#">ab_min.png<span><img src="f/ab_min.png" /></span></a></li>
@@ -407,23 +424,57 @@ plambda a.png b.png "fmax"   -o ab_max.png
 </p>
 
 <p>
-<b>plambda:</b> apply an arithmetic expression with input images:
+The <b>plambda</b> language allows many operations, even when applied to a single image.
+See the external plambda tutorial for a comprehensive description.
+Here are some silly examples:
 <pre class="script">
-plambda a.png b.png "+ 2 /"  -o ab_avg.png
-plambda a.png b.png "* sqrt" -o ab_geo.png
-plambda a.png b.png "fmin"   -o ab_min.png
-plambda a.png b.png "fmax"   -o ab_max.png
+plambda b.png "a[2] a[1] a[0] join3" -o b_bgr.png     # swap colors
+plambda b.png "a[0] a[1] a[2] join3" -o b_rgb.png     # do nothing
+plambda b.png "randg 20 * +"         -o b_noisy.png   # add luminance noise
+plambda b.png "a(1,0) a -"           -o b_dx.png      # x-derivative
+plambda b.png "a(1,0) a - 127 +"     -o b_dx_127.png  # x-derivative plus 127
+plambda b.png a,x                    -o b_dx_alt.png  # x-derivative (easier)
+plambda b.png "a,x a,y hypot 2 *"    -o b_edges.png   # gradient norm
+plambda b.png ":y 50 * sin 50 * +"   -o b_bands.png   # sine of y plus image
+plambda b.png ":r 50 * sin 50 * +"   -o b_rings.png   # sine of r plus image
+plambda b.png ":i 8 fmod not  :j 30 fmod not  or 99 * +" -o b_grid.png
 </pre>
-<div class="gallery" style="height:321px">
+<div class="gallery selsecond" style="height:421px">
 	<ul class="index">
-		<li><a href="#">a.png, b.png<span><img src="f/a.png" /><img src="f/b.png" /></span></a></li>
-		<li><a href="#">ab_avg.png<span><img src="f/ab_avg.png" /></span></a></li>
-		<li><a href="#">ab_geo.png<span><img src="f/ab_geo.png" /></span></a></li>
-		<li><a href="#">ab_min.png<span><img src="f/ab_min.png" /></span></a></li>
-		<li><a href="#">ab_max.png<span><img src="f/ab_max.png" /></span></a></li>
+		<li><a href="#">b.png<span><img     src="f/b.png" /></span></a></li>
+		<li><a href="#">b_bgr.png<span><img src="f/b_bgr.png" /></span></a></li>
+		<li><a href="#">b_rgb.png<span><img src="f/b_rgb.png" /></span></a></li>
+		<li><a href="#">b_noisy.png<span><img src="f/b_noisy.png" /></span></a></li>
+		<li><a href="#">b_dx.png<span><img src="f/b_dx.png" /></span></a></li>
+		<li><a href="#">b_dx_127.png<span><img src="f/b_dx_127.png" /></span></a></li>
+		<li><a href="#">b_dx_alt.png<span><img src="f/b_dx_alt.png" /></span></a></li>
+		<li><a href="#">b_edges.png<span><img src="f/b_edges.png" /></span></a></li>
+		<li><a href="#">b_bands.png<span><img src="f/b_bands.png" /></span></a></li>
+		<li><a href="#">b_rings.png<span><img src="f/b_rings.png" /></span></a></li>
+		<li><a href="#">b_grid.png<span><img src="f/b_grid.png" /></span></a></li>
 	</ul>
 </div>
 </p>
+
+<p>
+The <b>lrcat</b> and <b>tbcat</b> programs concatenate two images horizontally or vertically.
+They need not be of the same size.
+<pre class="script">
+lrcat a.png b.png ab_lr.png
+tbcat a.png b.png ab_tb.png
+lrcat a.png b.png | tbcat - lena.png ab_montage.png
+lrcat a.png b.png | BACKGROUND=255 tbcat - lena.png ab_montage2.png
+</pre>
+<div class="gallery" style="height:512px">
+	<ul class="index">
+		<li><a href="#">ab_lr.png<span><img src="f/ab_lr.png" /></span></a></li>
+		<li><a href="#">ab_tb.png<span><img src="f/ab_tb.png" /></span></a></li>
+		<li><a href="#">ab_montage.png<span><img src="f/ab_montage.png" /></span></a></li>
+		<li><a href="#">ab_montage2.png<span><img src="f/ab_montage2.png" /></span></a></li>
+	</ul>
+</div>
+</p>
+
 
 <!--
 
