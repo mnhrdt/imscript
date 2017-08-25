@@ -250,12 +250,33 @@ static float EEE(float *x, int n, float p, float m)
 	return r;
 }
 
+static float float_pargmineg(float *x, float p, int n)
+{
+	long double score[n];
+
+	for (int i = 0; i < n; i++)
+		score[i] = 0;
+
+	for (int i = 0; i < n; i++)
+	for (int j = 0; j < n; j++)
+	if (j != i)
+		score[i] += pow(fabs(x[i] - x[j]), p);
+
+	int ridx = 0;
+	for (int i = 1; i < n; i++)
+	if (score[i] < score[ridx])
+		ridx = i;
+
+	return x[ridx];
+}
+
 static float float_pargmin(float *x, int n)
 {
 	static float p = 2;
 	if (n == -1)
 		return p = *x;
-	if (p < 1) return NAN;
+	if (p > 0 && p < 1) return float_pargmineg(x, p, n);
+	if (p <= 0) return NAN;
 	long double mo = 0;
 	long double m = float_avg(x, n);
 	for (int j = 0; j < 25; j++)
