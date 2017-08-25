@@ -5,7 +5,7 @@
 #include <math.h>
 
 #include "smapa.h"
-SMART_PARAMETER(BINWIDTH, 1)
+SMART_PARAMETER(BINWIDTH, 5)
 SMART_PARAMETER(VERBOSE, 0)
 
 // compute the cumulative sum of an array of ints

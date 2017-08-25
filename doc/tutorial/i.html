@@ -475,6 +475,118 @@ lrcat a.png b.png | BACKGROUND=255 tbcat - lena.png ab_montage2.png
 </div>
 </p>
 
+<p>
+The <b>vecov</b> program aggregates the pixel values of many images.
+<pre class="script">
+vecov avg pRi*.jpg -o outv_avg.png
+vecov min pRi*.jpg -o outv_min.png
+vecov max pRi*.jpg -o outv_max.png
+vecov med pRi*.jpg -o outv_med.png      # geometric medoid
+vecov modc pRi*.jpg -o outv_modc.png    # component-wise mode
+</pre>
+<div class="gallery selfirst" style="height:572px">
+	<ul class="index">
+		<li><a href="#">outv_avg.png<span><img src="f/outv_avg.png" /></span></a></li>
+		<li><a href="#">outv_min.png<span><img src="f/outv_min.png" /></span></a></li>
+		<li><a href="#">outv_max.png<span><img src="f/outv_max.png" /></span></a></li>
+		<li><a href="#">outv_med.png<span><img src="f/outv_med.png" /></span></a></li>
+		<li><a href="#">outv_modc.png<span><img src="f/outv_modc.png" /></span></a></li>
+		<li><a href="#">pRi00.jpg<span><img src="f/pRi00.jpg" /></span></a></li>
+		<li><a href="#">pRi01.jpg<span><img src="f/pRi01.jpg" /></span></a></li>
+		<li><a href="#">pRi02.jpg<span><img src="f/pRi02.jpg" /></span></a></li>
+		<li><a href="#">pRi03.jpg<span><img src="f/pRi03.jpg" /></span></a></li>
+		<li><a href="#">pRi04.jpg<span><img src="f/pRi04.jpg" /></span></a></li>
+		<li><a href="#">pRi05.jpg<span><img src="f/pRi05.jpg" /></span></a></li>
+		<li><a href="#">pRi06.jpg<span><img src="f/pRi06.jpg" /></span></a></li>
+		<li><a href="#">pRi07.jpg<span><img src="f/pRi07.jpg" /></span></a></li>
+		<li><a href="#">pRi08.jpg<span><img src="f/pRi08.jpg" /></span></a></li>
+		<li><a href="#">pRi09.jpg<span><img src="f/pRi09.jpg" /></span></a></li>
+		<li><a href="#">pRi10.jpg<span><img src="f/pRi10.jpg" /></span></a></li>
+		<li><a href="#">pRi11.jpg<span><img src="f/pRi11.jpg" /></span></a></li>
+	</ul>
+</div>
+</p>
+
+<p>
+The <b>veco</b> program is similar, but it only works for gray-scale images and
+supports a much larger variety of accumulators (including very fancy ones).
+<pre class="script">
+veco max gpRi*.jpg -o out_max.png
+veco euc gpRi*.jpg -o out_euc.png                # euclidean mean
+veco avg gpRi*.jpg -o out_avg.png                # arithmetic mean
+veco geo gpRi*.jpg -o out_geo.png                # geometric mean
+veco har gpRi*.jpg -o out_har.png                # harmonic mean
+veco min gpRi*.jpg -o out_min.png
+veco lav gpRi*.jpg -o out_lav.png                # logarithmic average
+veco lse gpRi*.jpg -o out_lse.png                # log-sum-exp (soft max)
+veco mod gpRi*.jpg -o out_mod.png                # mode
+veco med gpRi*.jpg -o out_med.png                # median
+veco q25 gpRi*.jpg -o out_q25.png                # first quartile
+veco q75 gpRi*.jpg -o out_q75.png                # third quartile
+veco rnd gpRi*.jpg -o out_rnd.png                # random sample
+veco std gpRi*.jpg | qeasy 0 20 - out_std.png    # standard deviation
+veco iqd gpRi*.jpg | qeasy 0 20 - out_iqd.png    # interquartile distance
+</pre>
+<div class="gallery selfirst" style="height:532px">
+	<ul class="index">
+		<li><a href="#">out_max.png<span><img src="f/out_max.png" /></span></a></li>
+		<li><a href="#">out_euc.png<span><img src="f/out_euc.png" /></span></a></li>
+		<li><a href="#">out_avg.png<span><img src="f/out_avg.png" /></span></a></li>
+		<li><a href="#">out_geo.png<span><img src="f/out_geo.png" /></span></a></li>
+		<li><a href="#">out_har.png<span><img src="f/out_har.png" /></span></a></li>
+		<li><a href="#">out_min.png<span><img src="f/out_min.png" /></span></a></li>
+		<li><a href="#">out_lav.png<span><img src="f/out_lav.png" /></span></a></li>
+		<li><a href="#">out_lse.png<span><img src="f/out_lse.png" /></span></a></li>
+		<li><a href="#">out_mod.png<span><img src="f/out_mod.png" /></span></a></li>
+		<li><a href="#">out_med.png<span><img src="f/out_med.png" /></span></a></li>
+		<li><a href="#">out_q25.png<span><img src="f/out_q25.png" /></span></a></li>
+		<li><a href="#">out_q75.png<span><img src="f/out_q75.png" /></span></a></li>
+		<li><a href="#">out_rnd.png<span><img src="f/out_rnd.png" /></span></a></li>
+		<li><a href="#">out_std.png<span><img src="f/out_std.png" /></span></a></li>
+		<li><a href="#">out_iqd.png<span><img src="f/out_iqd.png" /></span></a></li>
+	</ul>
+</div>
+</p>
+
+<p>
+The <b>vecoh</b> program also works with gray-scale images and it finds
+clusters of values at each pixel.  The output is a 8-dimesional image, on the
+first component the number of clusters, and on the rest, the cluster centers.
+<pre class="script">
+vecoh kmeans    gpRi*jpg | plambda - "x[0] 0 4 qe" -o kmeans_count.png
+vecoh kmedians  gpRi*jpg | plambda - "x[0] 0 4 qe" -o kmedians_count.png
+vecoh contrario gpRi*jpg | plambda - "x[0] 0 4 qe" -o contrario_count.png
+vecoh kmeans    gpRi*jpg | plambda - "x[1]"        -o kmeans_k1.png
+vecoh kmeans    gpRi*jpg | plambda - "x[2]"        -o kmeans_k2.png
+vecoh kmeans    gpRi*jpg | plambda - "x[3]"        -o kmeans_k3.png
+vecoh kmeans    gpRi*jpg | plambda - "x[4]"        -o kmeans_k4.png
+vecoh kmedians  gpRi*jpg | plambda - "x[1]"        -o kmedians_k1.png
+vecoh kmedians  gpRi*jpg | plambda - "x[2]"        -o kmedians_k2.png
+vecoh kmedians  gpRi*jpg | plambda - "x[3]"        -o kmedians_k3.png
+vecoh kmedians  gpRi*jpg | plambda - "x[4]"        -o kmedians_k4.png
+vecoh contrario gpRi*jpg | plambda - "x[1]"        -o contrario_k1.png
+vecoh contrario gpRi*jpg | plambda - "x[2]"        -o contrario_k2.png
+</pre>
+<div class="gallery selfirst" style="height:532px">
+	<ul class="index">
+		<li><a href="#">kmeans_count.png<span><img src="f/kmeans_count.png" /></span></a></li>
+		<li><a href="#">kmedians_count.png<span><img src="f/kmedians_count.png" /></span></a></li>
+		<li><a href="#">contrario_count.png<span><img src="f/contrario_count.png" /></span></a></li>
+		<li><a href="#">kmeans_k1.png<span><img src="f/kmeans_k1.png" /></span></a></li>
+		<li><a href="#">kmeans_k2.png<span><img src="f/kmeans_k2.png" /></span></a></li>
+		<li><a href="#">kmeans_k3.png<span><img src="f/kmeans_k3.png" /></span></a></li>
+		<li><a href="#">kmeans_k4.png<span><img src="f/kmeans_k4.png" /></span></a></li>
+		<li><a href="#">kmedians_k1.png<span><img src="f/kmedians_k1.png" /></span></a></li>
+		<li><a href="#">kmedians_k2.png<span><img src="f/kmedians_k2.png" /></span></a></li>
+		<li><a href="#">kmedians_k3.png<span><img src="f/kmedians_k3.png" /></span></a></li>
+		<li><a href="#">kmedians_k4.png<span><img src="f/kmedians_k4.png" /></span></a></li>
+		<li><a href="#">contrario_k1.png<span><img src="f/contrario_k1.png" /></span></a></li>
+		<li><a href="#">contrario_k2.png<span><img src="f/contrario_k2.png" /></span></a></li>
+	</ul>
+</div>
+</p>
+
+
 
 <!--
 
