@@ -1,6 +1,6 @@
 
 <!-- This document is a "semi-literate" program.  To re-compute the figures,
-	run the script "build.sh" from inside the directory "f".  Nothe that you can
+	run the script "build.sh" from inside the directory "f".  Note that you can
 	change the source images (A, B, X, ...), but they should be of a similar size
 	or the layout will be broken.
 -->
@@ -77,7 +77,6 @@ body {max-width: 60em; margin-left:1em;}
 <pre>
 
 1. <a href="#sec-filters">Filters</a>: read one image and write one image of the same size
-
 	- <a href="#sec-blur">blur</a>: convolve an image by a shift-invariant user-specified kernel
 	- <a href="#sec-morsi">morsi</a>: apply a morphological operation with a user-specified element
 	- <a href="#sec-qeasy">qeasy</a>: re-scale the dynamic range of an image
@@ -657,10 +656,138 @@ vecoh contrario gpRi*jpg | plambda - "x[2]"        -o contrario_k2.png
 	flowarrors
 -->
 
+<a name="sec-interpolators"></a>
+<h3>2.4. Interpolators</h3>
+
+<!--
+	nnint
+	bdint
+	simpois
+	amle
+-->
+
+<a name="sec-rescalers"></a>
+<h3>2.5. Rescalers</h3>
+
+<!--
+	downsa
+	upsa
+	ntiply
+	imflip
+	homwarp
+-->
 
 
+<a name="sec-transforms"></a>
+<h3>2.6. Transforms</h3>
 
-<h2>3. See also</h2>
+<!--
+	fft
+	ifft
+	dct
+	dht
+	fftshift
+-->
+
+<a name="sec-fft"></a>
+<a name="sec-ifft"></a>
+<a name="sec-dct"></a>
+<a name="sec-dht"></a>
+<a name="sec-fftshift"></a>
+<p>
+The <b>fft</b>, <b>ifft</b>, <b>dct</b> and <b>dht</b> programs are filters tha
+compute, respectively, the discrete Fourier transform, its inverse, the
+discrete cosine transform and the discrete Hartley transform.  The
+<b>fftshift</b> applies a periodic half-size shift to an image so that the
+origin of coordinates appears on the middle of the image; this is useful for
+looking at the Fourier and Hartley transforms.
+<pre class="script">
+cat barb.png | fft | plambda vnorm       | qauto -p 1 - barb_dft_abs.png
+cat barb.png | fft | plambda "x[0]"      | qauto -p 1 - barb_dft_re.png
+cat barb.png | fft | plambda "x[1]"      | qauto -p 1 - barb_dft_im.png
+cat barb.png | fft | plambda "x[0] fabs" | qauto -p 1 - barb_dft_are.png
+cat barb.png | fft | plambda "x[1] fabs" | qauto -p 1 - barb_dft_aim.png
+cat barb.png | dht                       | qauto -p 1 - barb_dht.png
+cat barb.png | dht | plambda fabs        | qauto -p 1 - barb_dht_abs.png 
+cat barb.png | dct                       | qauto -p 1 - barb_dct.png
+cat barb.png | dct | plambda fabs             | qauto -p 1 - barb_dct_abs.png 
+cat barb.png | fft | plambda vnorm | fftshift | qauto -p 1 - barb_dft_abs_s.png
+cat barb.png | dht                 | fftshift | qauto -p 1 - barb_dht_s.png
+</pre>
+<div class="gallery selsecond" style="height:532px">
+	<ul class="index">
+		<li><a>barb.png<span><img src="f/barb.png" /></span></a></li>
+		<li><a>barb_dft_abs.png<span><img src="f/barb_dft_abs.png" /></span></a></li>
+		<li><a>barb_dft_re.png<span><img src="f/barb_dft_re.png" /></span></a></li>
+		<li><a>barb_dft_im.png<span><img src="f/barb_dft_im.png" /></span></a></li>
+		<li><a>barb_dft_are.png<span><img src="f/barb_dft_are.png" /></span></a></li>
+		<li><a>barb_dft_aim.png<span><img src="f/barb_dft_aim.png" /></span></a></li>
+		<li><a>barb_dht.png<span><img src="f/barb_dht.png" /></span></a></li>
+		<li><a>barb_dht_abs.png<span><img src="f/barb_dht_abs.png" /></span></a></li>
+		<li><a>barb_dct.png<span><img src="f/barb_dct.png" /></span></a></li>
+		<li><a>barb_dct_abs.png<span><img src="f/barb_dct_abs.png" /></span></a></li>
+		<li><a>barb_dft_abs_s.png<span><img src="f/barb_dft_abs_s.png" /></span></a></li>
+		<li><a>barb_dht_abs_s.png<span><img src="f/barb_dht_s.png" /></span></a></li>
+	</ul>
+</div>
+</p>
+
+
+<a name="sec-points"></a>
+<h3>2.7. Point processing</h3>
+
+<!--
+	pview
+	ransac
+	srmatch
+	plyflatten
+	colormesh
+	ijmesh
+-->
+
+<a name="sec-suites"></a>
+<h3>2.8. Multi-program suites</h3>
+
+<!--
+	siftu
+	tiffu
+	fontu
+-->
+
+<a name="sec-miscellaneous"></a>
+<h3>2.9. Miscellaneous</h3>
+
+<!--
+	synflow
+	ccproc
+	ihough2
+	tdip
+	rpc_pm
+	distance
+	sdistance
+	ppsmooth
+	pmba2
+	tcregistration
+-->
+
+
+<a name="sec-interactive"></a>
+<h3>2.10. Interactive programs</h3>
+
+<!--
+	fpan
+	fpantiff
+	rpcflip
+	powerkill
+	epiview
+	viho
+	dosdo
+	icrop
+	vnav
+-->
+
+
+<h2>3. Constructions</h2>
 
 <p>end</p>
 
