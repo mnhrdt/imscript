@@ -666,6 +666,38 @@ vecoh contrario gpRi*jpg | plambda - "x[2]"        -o contrario_k2.png
 	amle
 -->
 
+<a name="sec-nnint"></a>
+<a name="sec-bdint"></a>
+<a name="sec-simpois"></a>
+<a name="sec-amle"></a>
+<p>
+These interpolating filters are used to fill-in the missing values of an image
+(by default, indicated by a floating point NAN).
+<!-- plambda mask.png barbara.png "nan if" -o masked.tif-->
+<pre class="script">
+qeasy 0 255 masked.tif masked.png
+cat masked.tif | nnint             - out_nnint.png        # nearest-neighbor
+cat masked.tif | bdint -a min      - out_bdmin.png        # boundary minimum
+cat masked.tif | bdint -a max      - out_bdmax.png        # boundary maximum
+cat masked.tif | bdint -a avg      - out_bdavg.png        # boundary average
+cat masked.tif | simpois          -o out_laplace.png      # harmonic
+cat masked.tif | simpois -t -0.08 -o out_biharm.png       # biharmonic
+</pre>
+<div class="gallery selsecond" style="height:572px">
+	<ul class="index">
+		<li><a>masked.png<span><img src="f/masked.png" /></span></a></li>
+		<li><a>out_nnint.png<span><img src="f/out_nnint.png" /></span></a></li>
+		<li><a>out_bdmin.png<span><img src="f/out_bdmin.png" /></span></a></li>
+		<li><a>out_bdmax.png<span><img src="f/out_bdmax.png" /></span></a></li>
+		<li><a>out_bdavg.png<span><img src="f/out_bdavg.png" /></span></a></li>
+		<li><a>out_laplace.png<span><img src="f/out_laplace.png" /></span></a></li>
+		<li><a>out_biharm.png<span><img src="f/out_biharm.png" /></span></a></li>
+		<li><a>out_amle.png<span><img src="f/out_amle.png" /></span></a></li>
+		<li><a>mask.png<span><img src="f/mask.png" /></span></a></li>
+	</ul>
+</div>
+</p>
+
 <a name="sec-rescalers"></a>
 <h3>2.5. Rescalers</h3>
 
@@ -693,14 +725,11 @@ vecoh contrario gpRi*jpg | plambda - "x[2]"        -o contrario_k2.png
 <a name="sec-ifft"></a>
 <a name="sec-dct"></a>
 <a name="sec-dht"></a>
-<a name="sec-fftshift"></a>
 <p>
 The <b>fft</b>, <b>ifft</b>, <b>dct</b> and <b>dht</b> programs are filters tha
 compute, respectively, the discrete Fourier transform, its inverse, the
-discrete cosine transform and the discrete Hartley transform.  The
-<b>fftshift</b> applies a periodic half-size shift to an image so that the
-origin of coordinates appears on the middle of the image; this is useful for
-looking at the Fourier and Hartley transforms.
+discrete cosine transform and the discrete Hartley transform.
+The DCT and the DHT are self-inverses, and the IFFT is the inverse of the FFT.
 <pre class="script">
 cat barb.png | fft | plambda vnorm       | qauto -p 1 - barb_dft_abs.png
 cat barb.png | fft | plambda "x[0]"      | qauto -p 1 - barb_dft_re.png
@@ -711,10 +740,8 @@ cat barb.png | dht                       | qauto -p 1 - barb_dht.png
 cat barb.png | dht | plambda fabs        | qauto -p 1 - barb_dht_abs.png 
 cat barb.png | dct                       | qauto -p 1 - barb_dct.png
 cat barb.png | dct | plambda fabs             | qauto -p 1 - barb_dct_abs.png 
-cat barb.png | fft | plambda vnorm | fftshift | qauto -p 1 - barb_dft_abs_s.png
-cat barb.png | dht                 | fftshift | qauto -p 1 - barb_dht_s.png
 </pre>
-<div class="gallery selsecond" style="height:532px">
+<div class="gallery selsecond" style="height:572px">
 	<ul class="index">
 		<li><a>barb.png<span><img src="f/barb.png" /></span></a></li>
 		<li><a>barb_dft_abs.png<span><img src="f/barb_dft_abs.png" /></span></a></li>
@@ -728,6 +755,27 @@ cat barb.png | dht                 | fftshift | qauto -p 1 - barb_dht_s.png
 		<li><a>barb_dct_abs.png<span><img src="f/barb_dct_abs.png" /></span></a></li>
 		<li><a>barb_dft_abs_s.png<span><img src="f/barb_dft_abs_s.png" /></span></a></li>
 		<li><a>barb_dht_abs_s.png<span><img src="f/barb_dht_s.png" /></span></a></li>
+	</ul>
+</div>
+</p>
+
+<a name="sec-fftshift"></a>
+The <b>fftshift</b> filter applies a periodic half-size shift to an image so
+that the origin of coordinates appears on the middle of the image; this is
+useful for looking at the Fourier and Hartley transforms.
+<pre class="script">
+fftshift barb.png barb_s.png
+cat barb.png | fft | plambda vnorm | fftshift | qauto -p 1 - barb_dft_s.png
+cat barb.png | dht | plambda vnorm | fftshift | qauto -p 1 - barb_dht_abs_s.png
+cat barb.png | dht                 | fftshift | qauto -p 1 - barb_dht_s.png
+</pre>
+<div class="gallery selsecond" style="height:572px">
+	<ul class="index">
+		<li><a>barb.png<span><img src="f/barb.png" /></span></a></li>
+		<li><a>barb_s.png<span><img src="f/barb_s.png" /></span></a></li>
+		<li><a>barb_dft_s.png<span><img src="f/barb_dft_s.png" /></span></a></li>
+		<li><a>barb_dht_abs_s.png<span><img src="f/barb_dht_abs_s.png" /></span></a></li>
+		<li><a>barb_dht_s.png<span><img src="f/barb_dht_s.png" /></span></a></li>
 	</ul>
 </div>
 </p>
