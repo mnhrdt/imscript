@@ -104,16 +104,22 @@ static void dump_histogram(long double (*h)[2], int n)
 	free(a);
 }
 
+#include "pickopt.c"
 int main_ghisto(int c, char *v[])
 {
+	bool term_png = pick_option(&c, &v, "p", NULL);
 	if (c != 2 && c != 1) {
 		fprintf(stderr, "usage:\n\t%s [in]\n", *v);
 		//                         0   1
 		return EXIT_FAILURE;
 	}
 	char *filename_in = c > 1 ? v[1] : "-";
+
 	int w, h;
 	float *x = iio_read_image_float(filename_in, &w, &h);
+
+	if (term_png) printf("set term pngcairo\n");
+
 	long double (*his)[2] = xmalloc(w * h * sizeof*his);
 	int nh = fill_histogram(his, x, w*h);
 	dump_histogram(his, nh);

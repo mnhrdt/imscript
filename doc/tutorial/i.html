@@ -8,7 +8,7 @@
 <html>
 	<head>
 		<style>
-body {max-width: 60em; margin-left:1em;}
+body {max-width: 91ex; margin-left:1em;}
 .gallery {position:relative;width:auto;height:400px}
 .gallery .index{padding:0;margin:0;width:11em;list-style:none}
 .gallery .index li{margin:0;padding:0}
@@ -22,7 +22,9 @@ body {max-width: 60em; margin-left:1em;}
 .gallery .index a:hover span{left:12em;z-index:100}
 .gallery .index a span img{ }
 .gallery .index a span { white-space:nowrap; }
-.script {border:1px solid black;background-color:#fff;width:88ex;padding:1ex;}
+.script {border:1px solid black;background-color:#fff;width:91ex;padding:1ex;}
+.sscript {border:1px solid black;background-color:#fff;width:91ex;padding:1ex;}
+.oscript {background-color:#ddd;width:91ex;padding:1ex;}
 		</style>
 
 		<title>imscript tutorial</title>
@@ -655,6 +657,110 @@ vecoh contrario gpRi*jpg | plambda - "x[2]"        -o contrario_k2.png
 	viewflow
 	flowarrors
 -->
+<a name="sec-imprintf"></a>
+
+<p>
+The <b>imprintf</b> program creates a string from image data.  The syntax is
+very similar to C's printf, with a image-specific set of conversions.
+<pre class="sscript">
+imprintf "Image  size=%wx%h  avg=%v  med=%e  min=%i  max=%a\n" lena.png
+</pre>
+<pre class="oscript">
+Image  size=256x256  avg=119.08  med=119.08  min=0  max=255
+</pre>
+
+<a name="sec-ghisto"></a>
+<p>
+The <b>ghisto</b> program computes the histogram of an image and prints it in a
+textual form that gnuplot understands.  The <code>-p</code> option produces a
+gnuplot file that renders into a png.
+<pre class="sscript">
+plambda lena.png "40 /  round  40 *" | ghisto
+</pre>
+<pre class="oscript">
+set xrange [0:240]
+set yrange [0:]
+set format y ""
+unset key
+plot "-" w impulses title "histogram", "-" w lines title "accumulated histogram"
+	0	5903
+	40	7993
+	80	10559
+	120	13691
+	160	16375
+	200	6243
+	240	4772
+end
+	0	1474.94
+	40	3472.09
+	80	6110.39
+	120	9531.26
+	160	13622.8
+	200	15182.7
+	240	16375
+end
+</pre>
+<pre class="script">
+cat lena.png                        | ghisto -p | gnuplot > lena_ghisto.png
+plambda lena.png "10 / round  10 *" | ghisto -p | gnuplot > q10lena_ghisto.png
+plambda lena.png "40 / round  40 *" | ghisto -p | gnuplot > q40lena_ghisto.png
+blur g 0.4 lena.png                 | ghisto -p | gnuplot > glena_ghisto.png
+</pre>
+<div class="gallery selfirst" style="height:572px">
+	<ul class="index">
+		<li><a>lena_ghisto.png<span><img src="f/lena_ghisto.png" /></span></a></li>
+		<li><a>q10lena_ghisto.png<span><img src="f/q10lena_ghisto.png" /></span></a></li>
+		<li><a>q40lena_ghisto.png<span><img src="f/q40lena_ghisto.png" /></span></a></li>
+		<li><a>glena_ghisto.png<span><img src="f/glena_ghisto.png" /></span></a></li>
+	</ul>
+</div>
+</p>
+
+
+<a name="sec-contihist"></a>
+<p>The <b>contihist</b> program computes the continuous histogram of an image
+(defined as the derivative of the area of level sets of the interpolated
+image).  This is a real-valued function of a real variable, and you have to
+specify the number of samples to represent this function function and the
+desired range.
+<!--
+cat lena.png | contihist   200  0 255  - -p | gnuplot > lena_contih_200.png
+cat lena.png | contihist   300  0 255  - -p | gnuplot > lena_contih_300.png
+cat lena.png | contihist   400  0 255  - -p | gnuplot > lena_contih_400.png
+cat lena.png | contihist   500  0 255  - -p | gnuplot > lena_contih_500.png
+cat lena.png | contihist   600  0 255  - -p | gnuplot > lena_contih_600.png
+cat lena.png | contihist   700  0 255  - -p | gnuplot > lena_contih_700.png
+cat lena.png | contihist   800  0 255  - -p | gnuplot > lena_contih_800.png
+cat lena.png | contihist   900  0 255  - -p | gnuplot > lena_contih_900.png
+-->
+<pre class="script">
+cat lena.png | contihist   100  0 255  - -p | gnuplot > lena_contih_100.png
+cat lena.png | contihist  1000  0 255  - -p | gnuplot > lena_contih_1000.png
+cat lena.png | contihist  2000  0 255  - -p | gnuplot > lena_contih_2000.png
+cat lena.png | contihist 10000  0 255  - -p | gnuplot > lena_contih_10000.png
+</pre>
+<div class="gallery selsecond" style="height:572px">
+	<ul class="index">
+		<li><a>lena_contih_100.png<span><img   src="f/lena_contih_100.png" /></span></a></li>
+		<!--
+		<li><a>lena_contih_200.png<span><img   src="f/lena_contih_200.png" /></span></a></li>
+		<li><a>lena_contih_300.png<span><img   src="f/lena_contih_300.png" /></span></a></li>
+		<li><a>lena_contih_400.png<span><img   src="f/lena_contih_400.png" /></span></a></li>
+		<li><a>lena_contih_500.png<span><img   src="f/lena_contih_500.png" /></span></a></li>
+		<li><a>lena_contih_600.png<span><img   src="f/lena_contih_600.png" /></span></a></li>
+		<li><a>lena_contih_700.png<span><img   src="f/lena_contih_700.png" /></span></a></li>
+		<li><a>lena_contih_800.png<span><img   src="f/lena_contih_800.png" /></span></a></li>
+		<li><a>lena_contih_900.png<span><img   src="f/lena_contih_900.png" /></span></a></li>
+		-->
+		<li><a>lena_contih_1000.png<span><img  src="f/lena_contih_1000.png" /></span></a></li>
+		<li><a>lena_contih_2000.png<span><img  src="f/lena_contih_2000.png" /></span></a></li>
+		<li><a>lena_contih_10000.png<span><img src="f/lena_contih_10000.png" /></span></a></li>
+	</ul>
+</div>
+</p>
+
+<a name="sec-viewflow"></a>
+<a name="sec-flowarrows"></a>
 
 <a name="sec-interpolators"></a>
 <h3>2.4. Interpolators</h3>

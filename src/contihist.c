@@ -373,8 +373,8 @@ void dump_histogram(FILE *f, long double (*h)[2], int n)
 	memcpy(a, h, n*sizeof*a);
 	accumulate_histogram(a, n);
 	fprintf(f, "set xrange [%Lg:%Lg]\n", h[0][0], h[n-1][0]);
-	//printf("set yrange [0:]\n");
-	//printf("set format y \"\"\n");
+	printf("set yrange [0:]\n");
+	printf("set format y \"\"\n");
 	//if (SHOWSTATS() > 0) {
 	//	printf("set samples 1000\nset key left\n");
 	//	printf("N(m,s,x)=exp(-(x-m)**2/(2*s*s))/(s*sqrt(2*pi))\n");
@@ -471,9 +471,11 @@ static void update_min_max_if_not_finite(float *m, float *M, float *x, int n)
 #include <stdio.h>
 #include <stdlib.h>
 #include "iio.h"
+#include "pickopt.c"
 int main_contihist(int c, char *v[])
 {
 	// process input arguments
+	bool term_png = pick_option(&c, &v, "p", NULL);
 	if (c != 5) {
 		fprintf(stderr, "usage:\n\t%s nbins min max img.png\n", *v);
 		//                          0 1     2   3   4
@@ -498,6 +500,7 @@ int main_contihist(int c, char *v[])
 	fill_continuous_histogram_simple(bins, nbins, hmin, hmax, x, w, h);
 
 	// dump histogram to stdout
+	if (term_png) printf("set term pngcairo\n");
 	dump_histogram(stdout, bins, nbins);
 
 	// cleanup and exit

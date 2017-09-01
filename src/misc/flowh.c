@@ -64,8 +64,10 @@ void flowh(float *y, int ow, int oh, float *x, int w, int h, int nbu, int nu)
 }
 
 #ifndef OMIT_MAIN
+#include "pickopt.c"
 int main(int c, char *v[])
 {
+	bool use_logscale = pick_option(&c, &v, "l", NULL);
 	if (c != 3 && c != 4 && c != 5) {
 		fprintf(stderr, "usage:\n\t%s nbu nu [in [out]]\n", *v);
 		//                          0 1   2   3   4
@@ -84,6 +86,7 @@ int main(int c, char *v[])
 	int oh = ow;
 	float *y = xmalloc(ow*oh*sizeof*y);
 	flowh(y, ow, oh, x, w, h, number_of_bins_per_unit, number_of_units);
+	if (use_logscale) for (int i = 0; i < ow*oh; i++) y[i] = log(1+y[i]);
 	iio_write_image_float_vec(outfile, y, ow, oh, 1);
 	return 0;
 }
