@@ -762,6 +762,104 @@ cat lena.png | contihist 10000  0 255  - -p | gnuplot > lena_contih_10000.png
 <a name="sec-viewflow"></a>
 <a name="sec-flowarrows"></a>
 
+<p>
+Images with two-dimensional pixels are very important in image processing.
+They can be for example displacement fields, velocity fields, gradients of
+gray-valued images, complex-valued images (such as SLC radar images, or Fourier
+transforms of gray-valued images).  Depending on the context, several different
+visualizations are preferred.
+<pre class="script">
+cat wheel.tiff | viewflow  0                                  - wheel_colors.png
+cat wheel.tiff | viewflow -1                                  - wheel_lines.png
+cat wheel.tiff | flowarrows 0.2 17                            - wheel_arrows.png
+cat wheel.tiff | plambda x[0]              | qeasy -1    1    - wheel_x.png
+cat wheel.tiff | plambda x[1]              | qeasy -1    1    - wheel_y.png
+cat wheel.tiff | plambda vnorm             | qeasy  0    2    - wheel_abs.png
+cat wheel.tiff | plambda "x[1] x[0] atan2" | qeasy -3.14 3.14 - wheel_arg.png
+cat wheel.tiff | plambda "split dup join3" | qeasy -2    2    - wheel_xyy.png
+</pre>
+<div class="gallery selfirst" style="height:300">
+	<ul class="index">
+		<li><a>wheel_colors.png<span><img src="f/wheel_colors.png"/></span></a></li>
+		<li><a>wheel_lines.png<span><img  src="f/wheel_lines.png"/></span></a></li>
+		<li><a>wheel_arrows.png<span><img src="f/wheel_arrows.png"/></span></a></li>
+		<li><a>wheel_x.png<span><img      src="f/wheel_x.png" /></span></a></li>
+		<li><a>wheel_y.png<span><img      src="f/wheel_y.png" /></span></a></li>
+		<li><a>wheel_abs.png<span><img    src="f/wheel_abs.png" /></span></a></li>
+		<li><a>wheel_arg.png<span><img    src="f/wheel_arg.png" /></span></a></li>
+		<li><a>wheel_xyy.png<span><img    src="f/wheel_xyy.png" /></span></a></li>
+	</ul>
+</div>
+<pre class="script">
+plambda lena.png x,g | viewflow  0                                - g_colors.png
+plambda lena.png x,g | viewflow -50                               - g_lines.png
+plambda lena.png x,g | flowarrows 3 5                             - g_arrows.png
+plambda lena.png x,g | plambda x[0]                       | qauto - g_x.png
+plambda lena.png x,g | plambda x[1]                       | qauto - g_y.png
+plambda lena.png x,g | plambda vnorm                      | qauto - g_abs.png
+plambda lena.png x,g | plambda "x[1] x[0] atan2"          | qauto - g_arg.png
+plambda lena.png x,g | plambda "split dup join3"          | qauto - g_xyy.png
+</pre>
+<div class="gallery selfirst" style="height:300">
+	<ul class="index">
+		<li><a>g_colors.png<span><img src="f/g_colors.png"/></span></a></li>
+		<li><a>g_lines.png<span><img  src="f/g_lines.png"/></span></a></li>
+		<li><a>g_arrows.png<span><img src="f/g_arrows.png"/></span></a></li>
+		<li><a>g_x.png<span><img      src="f/g_x.png" /></span></a></li>
+		<li><a>g_y.png<span><img      src="f/g_y.png" /></span></a></li>
+		<li><a>g_abs.png<span><img    src="f/g_abs.png" /></span></a></li>
+		<li><a>g_arg.png<span><img    src="f/g_arg.png" /></span></a></li>
+		<li><a>g_xyy.png<span><img    src="f/g_xyy.png" /></span></a></li>
+	</ul>
+</div>
+<pre class="script">
+cat slc.tiff | viewflow  0                                - slc_colors.png
+cat slc.tiff | viewflow -500                              - slc_lines.png
+cat slc.tiff | flowarrows 3 5                             - slc_arrows.png
+cat slc.tiff | plambda x[0]                       | qauto - slc_x.png
+cat slc.tiff | plambda x[1]                       | qauto - slc_y.png
+cat slc.tiff | plambda vnorm                      | qauto - slc_abs.png -p 0.1
+cat slc.tiff | plambda "x[1] x[0] atan2"          | qauto - slc_arg.png
+cat slc.tiff | plambda "split dup join3"          | qauto - slc_xyy.png
+</pre>
+<div class="gallery selfirst" style="height:300">
+	<ul class="index">
+		<li><a>slc_colors.png<span><img src="f/slc_colors.png"/></span></a></li>
+		<li><a>slc_lines.png<span><img  src="f/slc_lines.png"/></span></a></li>
+		<li><a>slc_arrows.png<span><img src="f/slc_arrows.png"/></span></a></li>
+		<li><a>slc_x.png<span><img      src="f/slc_x.png" /></span></a></li>
+		<li><a>slc_y.png<span><img      src="f/slc_y.png" /></span></a></li>
+		<li><a>slc_abs.png<span><img    src="f/slc_abs.png" /></span></a></li>
+		<li><a>slc_arg.png<span><img    src="f/slc_arg.png" /></span></a></li>
+		<li><a>slc_xyy.png<span><img    src="f/slc_xyy.png" /></span></a></li>
+	</ul>
+</div>
+<!--
+# <pre class="noscript">
+# cat barb.png | fft | viewflow  0                              - bf_colors.png
+# cat barb.png | fft | viewflow -50                             - bf_lines.png
+# cat barb.png | fft | flowarrows 3 5                           - bf_arrows.png
+# cat barb.png | fft | plambda x[0]                     | qauto - bf_x.png
+# cat barb.png | fft | plambda x[1]                     | qauto - bf_y.png
+# cat barb.png | fft | plambda vnorm                    | qauto - bf_abs.png
+# cat barb.png | fft | plambda "x[1] x[0] atan2"        | qauto - bf_arg.png
+# cat barb.png | fft | plambda "split dup join3"        | qauto - bf_xyy.png
+# </pre>
+# <div class="gallery selfirst" style="height:300">
+# 	<ul class="index">
+# 		<li><a>bf_colors.png<span><img src="f/bf_colors.png"/></span></a></li>
+# 		<li><a>bf_lines.png<span><img  src="f/bf_lines.png"/></span></a></li>
+# 		<li><a>bf_arrows.png<span><img src="f/bf_arrows.png"/></span></a></li>
+# 		<li><a>bf_x.png<span><img      src="f/bf_x.png" /></span></a></li>
+# 		<li><a>bf_y.png<span><img      src="f/bf_y.png" /></span></a></li>
+# 		<li><a>bf_abs.png<span><img    src="f/bf_abs.png" /></span></a></li>
+# 		<li><a>bf_arg.png<span><img    src="f/bf_arg.png" /></span></a></li>
+# 		<li><a>bf_xyy.png<span><img    src="f/bf_xyy.png" /></span></a></li>
+# 	</ul>
+# </div>
+-->
+</p>
+
 <a name="sec-interpolators"></a>
 <h3>2.4. Interpolators</h3>
 
