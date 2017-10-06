@@ -108,7 +108,7 @@ static void zoom_out_by_factor_two(float *out, int ow, int oh,
 //
 // return value: normalized L2 distance
 //
-float eval_displacement(float *A, int Aw, int Ah, int Apd,
+float eval_displacement_ssd(float *A, int Aw, int Ah, int Apd,
 			float *B, int Bw, int Bh, int Bpd,
 			int d[2])
 {
@@ -129,6 +129,68 @@ float eval_displacement(float *A, int Aw, int Ah, int Apd,
 	}
 	r = sqrt(r);
 	return r;
+}
+
+static long compute_image_stats(long double *mu, long double *var,
+		float *x, int w, int h, int pd, int woff, int hoff)
+{
+	// initialize to zero
+	long cx = 0;
+	for (int i = 0; i < pd; i++)
+		mu[i] = var[i] = 0;
+
+	// compute mu
+	for (int j = hoff; j < h-hoff; j++)
+	for (int i = woff; i < w-woff; i++)
+	for (int l = 0; l < pd; l++) {
+		float v = getsample_nan(x,w,h,pd, i, j, l);
+		if (isfinite(v)) {
+			mu[l] += v;
+			cx += !l;
+		}
+	}
+	for (int i = 0; i < pd; i++)
+		mu[i] /= cx;
+
+	// compute var
+	for (int j = hoff; j < h-hoff; j++)
+	for (int i = woff; i < w-woff; i++)
+	for (int l = 0; l < pd; l++) {
+		float v = getsample_nan(x,w,h,pd, i, j, l);
+		if (isfinite(v))
+			var[l] += (v - mu[l]) * (v - mu[l]);
+	}
+	for (int i = 0; i < pd; i++)
+		var[i] /= cx;
+
+	// return number of valid points
+	return cx;
+}
+
+float eval_displacement_ncc(float *A, int Aw, int Ah, int Apd,
+			float *B, int Bw, int Bh, int Bpd,
+			int d[2])
+{
+	int r = 0;
+	// set up a working offset around the boundary
+	int woff = Aw/16;
+	int hoff = Ah/16;
+
+	// extract image normalization parameters
+	long double Amu[Apd], Avar[Apd], Bmu[Bpd], Bvar[Bpd];
+	long Acount = compute_image_stats(Amu, Avar, A,Aw,Ah,Apd, woff, hoff);
+	long Bcount = compute_image_stats(Bmu, Bvar, B,Bw,Bh,Bpd, woff, hoff);
+
+
+
+	return r;
+}
+
+float eval_displacement(float *A, int Aw, int Ah, int Apd,
+			float *B, int Bw, int Bh, int Bpd,
+			int d[2])
+{
+	return eval_displacement_ssd(A,Aw,Ah,Apd, B,Bw,Bh,Bpd, d);
 }
 
 
@@ -174,10 +236,10 @@ void find_displacement(int d[2],
 		{0,-2},{0,2},{-2,0},{2,0},     // 13
 		{1,-2},{1,2},{-2,1},{2,1},
 		{-1,-2},{-1,2},{-2,-1},{2,-1}, // 21
-		{-1,-1},{-1,1},{1,-1},{1,1},   // 25
+		{-2,-2},{-2,2},{2,-2},{2,2},   // 25
 	};
 	float best = INFINITY;
-	for (int n = 0; n < 9; n++)
+	for (int n = 0; n < 25; n++)
 	{
 		int D[2] = {d[0] + neig[n][0], d[1] + neig[n][1]};
 		float r = eval_displacement(A,Aw,Ah,Apd, B,Bw,Bh,Bpd, D);
