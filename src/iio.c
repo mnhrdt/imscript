@@ -34,6 +34,22 @@
 #define I_CAN_HAS_WHATEVER
 //#define I_CAN_KEEP_TMP_FILES
 
+#ifdef IIO_DISABLE_LIBEXR
+#undef I_CAN_HAS_LIBEXR
+#endif
+
+#ifdef IIO_DISABLE_LIBPNG
+#undef I_CAN_HAS_LIBPNG
+#endif
+
+#ifdef IIO_DISABLE_LIBJPEG
+#undef I_CAN_HAS_LIBJPEG
+#endif
+
+#ifdef IIO_DISABLE_LIBTIFF
+#undef I_CAN_HAS_LIBTIFF
+#endif
+
 #ifdef IIO_DISABLE_IMGLIBS
 #undef I_CAN_HAS_LIBPNG
 #undef I_CAN_HAS_LIBJPEG
@@ -3086,6 +3102,25 @@ static void iio_write_image_as_pfm(const char *filename, struct iio_image *x)
 	xfclose(f);
 }
 
+// PPM writer                                                               {{{2
+static void iio_write_image_as_ppm(const char *filename, struct iio_image *x)
+{
+	assert(x->type == IIO_TYPE_FLOAT);
+	assert(x->dimension == 2);
+	assert(x->pixel_dimension == 1 || x->pixel_dimension == 3);
+	FILE *f = xfopen(filename, "w");
+	int dimchar = 1 < x->pixel_dimension ? '3' : '2';
+	int w = x->sizes[0];
+	int h = x->sizes[1];
+	int pd = x->pixel_dimension;
+	float *t = (float*) x->data;
+	float scale = 255;
+	fprintf(f, "P%c\n%d %d\n%g\n", dimchar, w, h, scale);
+	for (int i = 0; i < w*h*pd; i++)
+		fprintf(f, "%d\n", (int) t[i]);
+	xfclose(f);
+}
+
 // ASC writer                                                               {{{2
 static void iio_write_image_as_asc(const char *filename, struct iio_image *x)
 {
@@ -4023,6 +4058,16 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 	if (string_suffix(filename, ".flo") && typ == IIO_TYPE_FLOAT
 				&& x->pixel_dimension == 2) {
 		iio_write_image_as_flo(filename, x);
+		return;
+	}
+	if (string_suffix(filename, ".ppm") && typ == IIO_TYPE_FLOAT
+		&& (x->pixel_dimension == 1 || x->pixel_dimension == 3)) {
+		iio_write_image_as_ppm(filename, x);
+		return;
+	}
+	if (string_suffix(filename, ".pgm") && typ == IIO_TYPE_FLOAT
+		&& (x->pixel_dimension == 1 || x->pixel_dimension == 3)) {
+		iio_write_image_as_ppm(filename, x);
 		return;
 	}
 	if (string_suffix(filename, ".pfm") && typ == IIO_TYPE_FLOAT

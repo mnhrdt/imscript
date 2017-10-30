@@ -1,16 +1,16 @@
 //Copyright (c) 2011 ashelly.myopenid.com under <http://www.opensource.org/licenses/mit-license>
 //
-// Image filtering adaptation by Gabriele Facciolo, 2017 
+// Image filtering adaptation by Gabriele Facciolo, 2017
 //
- 
+
 #include <stdlib.h>
 #include <math.h>
- 
+
 //Customize for your data Item type
 typedef float Item;
 #define ItemLess(a,b)  ((a)<(b))
 #define ItemMean(a,b)  (((a)+(b))/2)
- 
+
 typedef struct Mediator_t
 {
    Item* data;  //circular queue of values
@@ -20,18 +20,18 @@ typedef struct Mediator_t
    int   idx;   //position in circular queue
    int   ct;    //count of items in queue
 } Mediator;
- 
+
 /*--- Helper Functions ---*/
- 
+
 #define minCt(m) (((m)->ct-1)/2) //count of items in minheap
-#define maxCt(m) (((m)->ct)/2)   //count of items in maxheap 
- 
+#define maxCt(m) (((m)->ct)/2)   //count of items in maxheap
+
 //returns 1 if heap[i] < heap[j]
 int mmless(Mediator* m, int i, int j)
 {
    return ItemLess(m->data[m->heap[i]],m->data[m->heap[j]]);
 }
- 
+
 //swaps items i&j in heap, maintains indexes
 int mmexchange(Mediator* m, int i, int j)
 {
@@ -42,13 +42,13 @@ int mmexchange(Mediator* m, int i, int j)
    m->pos[m->heap[j]]=j;
    return 1;
 }
- 
+
 //swaps items i&j if i<j;  returns true if swapped
 int mmCmpExch(Mediator* m, int i, int j)
 {
    return (mmless(m,i,j) && mmexchange(m,i,j));
 }
- 
+
 //maintains minheap property for all items below i/2.
 void minSortDown(Mediator* m, int i)
 {
@@ -57,7 +57,7 @@ void minSortDown(Mediator* m, int i)
       if (!mmCmpExch(m,i,i/2)) { break; }
    }
 }
- 
+
 //maintains maxheap property for all items below i/2. (negative indexes)
 void maxSortDown(Mediator* m, int i)
 {
@@ -66,7 +66,7 @@ void maxSortDown(Mediator* m, int i)
       if (!mmCmpExch(m,i/2,i)) { break; }
    }
 }
- 
+
 //maintains minheap property for all items above i, including median
 //returns true if median changed
 int minSortUp(Mediator* m, int i)
@@ -74,7 +74,7 @@ int minSortUp(Mediator* m, int i)
    while (i>0 && mmCmpExch(m,i,i/2)) i/=2;
    return (i==0);
 }
- 
+
 //maintains maxheap property for all items above i, including median
 //returns true if median changed
 int maxSortUp(Mediator* m, int i)
@@ -82,11 +82,11 @@ int maxSortUp(Mediator* m, int i)
    while (i<0 && mmCmpExch(m,i/2,i))  i/=2;
    return (i==0);
 }
- 
+
 /*--- Public Interface ---*/
- 
- 
-//creates new Mediator: to calculate `nItems` running median. 
+
+
+//creates new Mediator: to calculate `nItems` running median.
 //mallocs single block of memory, caller must free.
 Mediator* MediatorNew(int nItems)
 {
@@ -103,8 +103,8 @@ Mediator* MediatorNew(int nItems)
    }
    return m;
 }
- 
- 
+
+
 //Inserts item, maintains median in O(lg nItems)
 void MediatorInsert(Mediator* m, Item v)
 {
@@ -127,7 +127,7 @@ void MediatorInsert(Mediator* m, Item v)
       if (minCt(m)) { minSortDown(m, 1); }
    }
 }
- 
+
 //returns median item (or average of 2 when item count is even)
 Item MediatorMedian(Mediator* m)
 {
@@ -135,8 +135,8 @@ Item MediatorMedian(Mediator* m)
    if ((m->ct&1)==0) { v= ItemMean(v,m->data[m->heap[-1]]); }
    return v;
 }
- 
- 
+
+
 /*--- Test Code ---*/
 #include <stdio.h>
 #include "iio.h"
@@ -164,7 +164,7 @@ Item MediatorMedian(Mediator* m)
 //   }
 //   printf("\n");
 //}
-// 
+//
 //void ShowTree(Mediator* m)
 //{
 //   PrintMaxHeap(m);
@@ -172,7 +172,7 @@ Item MediatorMedian(Mediator* m)
 //   PrintMinHeap(m);
 //   printf("\n");
 //}
- 
+
 
 
 
