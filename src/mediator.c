@@ -11,7 +11,7 @@ typedef float Item;
 #define ItemLess(a,b)  ((a)<(b))
 #define ItemMean(a,b)  (((a)+(b))/2)
 
-typedef struct Mediator_t
+struct Mediator
 {
    Item* data;  //circular queue of values
    int*  pos;   //index into `heap` for each value
@@ -19,7 +19,7 @@ typedef struct Mediator_t
    int   N;     //allocated size.
    int   idx;   //position in circular queue
    int   ct;    //count of items in queue
-} Mediator;
+};
 
 /*--- Helper Functions ---*/
 
@@ -27,13 +27,13 @@ typedef struct Mediator_t
 #define maxCt(m) (((m)->ct)/2)   //count of items in maxheap
 
 //returns 1 if heap[i] < heap[j]
-int mmless(Mediator* m, int i, int j)
+int mmless(struct Mediator* m, int i, int j)
 {
    return ItemLess(m->data[m->heap[i]],m->data[m->heap[j]]);
 }
 
 //swaps items i&j in heap, maintains indexes
-int mmexchange(Mediator* m, int i, int j)
+int mmexchange(struct Mediator* m, int i, int j)
 {
    int t = m->heap[i];
    m->heap[i]=m->heap[j];
@@ -44,13 +44,13 @@ int mmexchange(Mediator* m, int i, int j)
 }
 
 //swaps items i&j if i<j;  returns true if swapped
-int mmCmpExch(Mediator* m, int i, int j)
+int mmCmpExch(struct Mediator* m, int i, int j)
 {
    return (mmless(m,i,j) && mmexchange(m,i,j));
 }
 
 //maintains minheap property for all items below i/2.
-void minSortDown(Mediator* m, int i)
+void minSortDown(struct Mediator* m, int i)
 {
    for (; i <= minCt(m); i*=2)
    {  if (i>1 && i < minCt(m) && mmless(m, i+1, i)) { ++i; }
@@ -59,7 +59,7 @@ void minSortDown(Mediator* m, int i)
 }
 
 //maintains maxheap property for all items below i/2. (negative indexes)
-void maxSortDown(Mediator* m, int i)
+void maxSortDown(struct Mediator* m, int i)
 {
    for (; i >= -maxCt(m); i*=2)
    {  if (i<-1 && i > -maxCt(m) && mmless(m, i, i-1)) { --i; }
@@ -69,7 +69,7 @@ void maxSortDown(Mediator* m, int i)
 
 //maintains minheap property for all items above i, including median
 //returns true if median changed
-int minSortUp(Mediator* m, int i)
+int minSortUp(struct Mediator* m, int i)
 {
    while (i>0 && mmCmpExch(m,i,i/2)) i/=2;
    return (i==0);
@@ -77,7 +77,7 @@ int minSortUp(Mediator* m, int i)
 
 //maintains maxheap property for all items above i, including median
 //returns true if median changed
-int maxSortUp(Mediator* m, int i)
+int maxSortUp(struct Mediator* m, int i)
 {
    while (i<0 && mmCmpExch(m,i/2,i))  i/=2;
    return (i==0);
@@ -88,10 +88,10 @@ int maxSortUp(Mediator* m, int i)
 
 //creates new Mediator: to calculate `nItems` running median.
 //mallocs single block of memory, caller must free.
-Mediator* MediatorNew(int nItems)
+struct Mediator* MediatorNew(int nItems)
 {
-   int size = sizeof(Mediator)+nItems*(sizeof(Item)+sizeof(int)*2);
-   Mediator* m=  malloc(size);
+   int size = sizeof(struct Mediator)+nItems*(sizeof(Item)+sizeof(int)*2);
+   struct Mediator* m=  malloc(size);
    m->data= (Item*)(m+1);
    m->pos = (int*) (m->data+nItems);
    m->heap = m->pos+nItems + (nItems/2); //points to middle of storage.
@@ -106,7 +106,7 @@ Mediator* MediatorNew(int nItems)
 
 
 //Inserts item, maintains median in O(lg nItems)
-void MediatorInsert(Mediator* m, Item v)
+void MediatorInsert(struct Mediator* m, Item v)
 {
    int isNew=(m->ct<m->N);
    int p = m->pos[m->idx];
@@ -129,7 +129,7 @@ void MediatorInsert(Mediator* m, Item v)
 }
 
 //returns median item (or average of 2 when item count is even)
-Item MediatorMedian(Mediator* m)
+Item MediatorMedian(struct Mediator* m)
 {
    Item v= m->data[m->heap[0]];
    if ((m->ct&1)==0) { v= ItemMean(v,m->data[m->heap[-1]]); }
@@ -140,7 +140,7 @@ Item MediatorMedian(Mediator* m)
 /*--- Test Code ---*/
 #include <stdio.h>
 #include "iio.h"
-//void PrintMaxHeap(Mediator* m)
+//void PrintMaxHeap(struct Mediator* m)
 //{
 //   int i;
 //   if(maxCt(m))
@@ -152,7 +152,7 @@ Item MediatorMedian(Mediator* m)
 //   }
 //   printf("\n");
 //}
-//void PrintMinHeap(Mediator* m)
+//void PrintMinHeap(struct Mediator* m)
 //{
 //   int i;
 //   if(minCt(m))
@@ -165,7 +165,7 @@ Item MediatorMedian(Mediator* m)
 //   printf("\n");
 //}
 //
-//void ShowTree(Mediator* m)
+//void ShowTree(struct Mediator* m)
 //{
 //   PrintMaxHeap(m);
 //   printf("Mid: %3d\n",m->data[m->heap[0]]);
@@ -191,29 +191,30 @@ static float getpixel_1(float *I, int w, int h, int i, int j)
 
 int main(int argc, char* argv[])
 {
-   // read input image
-   if (argc<4) {
-      printf("fast median filtering using dxd windows:\n");
-      printf("usage: %s d in out\n", argv[0]);
+   if (argc<2) {
+      fprintf(stderr, "fast median filtering using dxd windows:\n");
+      fprintf(stderr, "usage: %s d [in [out]]\n", argv[0]);
+      //                      0  1  2   3
       return 0;
    }
-   int w, h, pd;
+   char *filename_in  = argc > 2 ? argv[2] : "-";
+   char *filename_out = argc > 3 ? argv[3] : "-";
    int size = atoi(argv[1]);
-   size = (size/2)*2 + 1; //make it odd
 
-   int hsize = (size-1)/2;
+   int odd_size = (size/2)*2 + 1;
+   int hsize = (odd_size-1)/2;
    if (hsize<1) {
       printf("filter %d is too small\n", hsize);
       return 0;
    }
 
-   getpixel_operator p = getpixel_1;
-
-   float *in = iio_read_image_float_split(argv[2], &w, &h, &pd);
+   int w, h, pd;
+   float *in = iio_read_image_float_split(filename_in, &w, &h, &pd);
    float *out = malloc(sizeof*out*w*h*pd);
 
-   Mediator* m = MediatorNew(size*size);
+   struct Mediator* m = MediatorNew(size*size);
 
+   getpixel_operator p = getpixel_1;
    for (int c=0;c<pd;c++) {
       for(int j=0;j<h;j++) {
          for(int i=-hsize;i<w+hsize;i++) {
@@ -227,7 +228,7 @@ int main(int argc, char* argv[])
       }
    }
 
-   iio_write_image_float_split(argv[3], out, w, h, pd);
+   iio_write_image_float_split(filename_out, out, w, h, pd);
    free(m);
    free(out);
    free(in);
