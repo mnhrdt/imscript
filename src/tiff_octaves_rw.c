@@ -179,6 +179,14 @@ static void get_tiff_info(struct tiff_info *t, TIFF *tif)
 		t->th = t->h;
 		t->ntiles = 1;
 	}
+
+	// normalize complex shit
+	if (!t->broken && t->fmt == SAMPLEFORMAT_COMPLEXINT)
+	{
+		t->spp *= 2;
+		t->bps /= 2;
+		t->fmt = SAMPLEFORMAT_INT;
+	}
 }
 
 static bool get_tiff_info_filename_e(struct tiff_info *t, char *fname)
