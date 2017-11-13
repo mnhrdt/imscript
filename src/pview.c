@@ -192,7 +192,7 @@ static double lincombin(double a, double b, double t)
 }
 
 // argument for the "traverse_segment_aa" function
-static void put_pixel_aa(int a, int b, float f, void *pp)
+static void put_pixel_color_aa(int a, int b, float f, void *pp)
 {
 	struct {int w, h; struct rgba_value *x, c;} *p = pp;
 	if (inner_point(p->w, p->h, a, b))
@@ -208,6 +208,18 @@ static void put_pixel_aa(int a, int b, float f, void *pp)
 	}
 }
 
+// argument for the "traverse_segment_aa" function
+static void put_pixel_gray_aa(int a, int b, float f, void *pp)
+{
+	struct {int w, h; uint8_t *x, c;} *p = pp;
+	if (inner_point(p->w, p->h, a, b))
+	{
+		uint8_t *g = p->x + b*p->w + a;
+		uint8_t *k = &p->c;
+		*g = lincombin(*g, *k, f);
+	}
+}
+
 // draw a color segment over a color image
 static void overlay_segment_color(struct rgba_value *x, int w, int h,
 		int px, int py, int qx, int qy, struct rgba_value c)
@@ -218,8 +230,22 @@ static void overlay_segment_color(struct rgba_value *x, int w, int h,
 	e.h = h;
 	e.x = x;
 	e.c = c;
-	traverse_segment_aa(px, py, qx, qy, put_pixel_aa, &e);
+	traverse_segment_aa(px, py, qx, qy, put_pixel_color_aa, &e);
 }
+
+// draw a color segment over a color image
+static void overlay_segment_gray(uint8_t *x, int w, int h,
+		int px, int py, int qx, int qy)
+{
+	//struct {int w, h; struct rgba_value *x, c; } e = {w, h, x, c};
+	struct {int w, h; uint8_t *x, c; } e;
+	e.w = w;
+	e.h = h;
+	e.x = x;
+	e.c = 255;
+	traverse_segment_aa(px, py, qx, qy, put_pixel_gray_aa, &e);
+}
+
 
 // draw a color line over a color image
 static void overlay_line(double a, double b, double c,
@@ -346,6 +372,48 @@ int main_viewpairs(int c, char *v[])
 	}
 	iio_write_image_uint8_vec("-", (uint8_t*)o, sizex, sizey, 4);
 	return EXIT_SUCCESS;
+}
+
+// CLI utility to view a set of segments,
+// (produces a binary image)
+int main_viewsegs(int c, char *v[])
+{
+	if (c != 3) {
+		fprintf(stderr, "usage:\n\t"
+			"%s w h < 4col.txt\n", *v);
+		//       0  1 2
+		return 1;
+	}
+	int w = atoi(v[1]);
+	int h = atoi(v[2]);
+
+	int n;
+	double (*p)[4] = (void*)read_ascii_doubles(stdin, &n);
+	n /= 4;
+
+	if (w == -1) for (int i = 0; i < n; i++) {
+			if (w < lrint(p[i][0])) w = lrint(p[i][0]);
+			if (w < lrint(p[i][2])) w = lrint(p[i][2]);
+		}
+	if (h == -1) for (int i = 0; i < n; i++) {
+			if (h < lrint(p[i][1])) h = lrint(p[i][1]);
+			if (h < lrint(p[i][3])) h = lrint(p[i][3]);
+		}
+
+	uint8_t (*o)[w] = xmalloc(w*h);
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+		o[j][i] = 0;
+	for (int i = 0; i < n; i++)
+	{
+		int a[2] = { lrint(p[i][0]), lrint(p[i][1]) };
+		int b[2] = { lrint(p[i][2]), lrint(p[i][3]) };
+		if (inner_point(w,h, a[0],a[1]) && inner_point(w,h, b[0],b[1]))
+			overlay_segment_gray(*o, w, h, a[0], a[1], b[0], b[1]);
+	}
+
+	iio_write_image_uint8_vec("-", (uint8_t*)o, w, h, 1);
+	return 0;
 }
 
 // read stream until character "stop" is found
@@ -788,6 +856,7 @@ int main_pview(int c, char *v[])
 	else if (0 == strcmp(v[1], "points")) return main_viewp(c-1, v+1);
 	else if (0 == strcmp(v[1], "hpoints")) return main_viewhp(c-1, v+1);
 	else if (0 == strcmp(v[1], "pairs")) return main_viewpairs(c-1, v+1);
+	else if (0 == strcmp(v[1], "segments")) return main_viewsegs(c-1, v+1);
 	else if (0 == strcmp(v[1], "polygons")) return main_viewpolygons(c-1, v+1);
 	else if (0 == strcmp(v[1], "triplets")) return main_viewtrips(c-1, v+1);
 	else if (0 == strcmp(v[1], "epipolar")) return main_viewepi(c-1, v+1);

@@ -78,7 +78,12 @@ bin/im : src/im.o $(BINOBJ) $(OBJ_ALL)
 
 
 # bureaucracy
-clean:
-	$(RM) $(BIN_ALL) bin/im src/*.o src/ftr/*.o src/misc/*.o
+clean: ; $(RM) $(BIN_ALL) bin/im src/*.o src/ftr/*.o src/misc/*.o
 .PHONY: default full ftr misc clean
 .PRECIOUS: %.o
+
+# non-standard file dependences
+# (this is needed because some .c files include other .c files directly)
+DIRS = src src/ftr src/misc
+.deps.mk: ; for i in $(DIRS);do cc -MM $$i/*.c|sed "\:^[^ ]:s:^:$$i/:g";done>$@
+-include .deps.mk
