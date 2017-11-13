@@ -1,6 +1,7 @@
 void fill_distance_fast(float *dist, int w, int h, float *points, int npoints);
 void fill_distance_slow(float *dist, int w, int h, float *points, int npoints);
-void build_signed_distance(float *dist, float *mask, int w, int h);
+//void build_signed_distance(float *dist, float *mask, int w, int h);
+void build_signed_distance_t(float *dist, float *mask, int w, int h, float t);
 
 
 #include <assert.h>
@@ -273,11 +274,58 @@ void fill_distance_fast(
 	free_things(e);
 }
 
+void fill_distance_fast_truncated(
+		float *dist, // output image, to be filled with distances
+		int w,       // width of ouput image
+		int h,       // height of input image
+		float *p,    // list of input point coordinates
+		int n,       // number of  input points
+		float t      // maximum distance to consider
+		)
+{
+	struct dist_state e[1];
+	buildup_things(e, dist, w, h, p, n);
+	while (e->nt)
+	{
+		int i = pick_best_trial(e);
+		e->y[i] = KNOWN;
+		int v[8][3], nw = get_8ineighbors(v, w, h, e->invidx[i][0], e->invidx[i][1]);
+		for (int k = 0; k < nw; k++)
+		{
+			int a = v[k][0];
+			int b = v[k][1];
+			int q = b*w + a;
+			assert(q == v[k][2]);
+			if (FAR == e->y[q])
+			{
+				int oi = e->z[i];
+				e->x[q] = dysl(e, oi, a, b);
+				e->y[q] = TRIAL;
+				e->z[q] = oi;
+				if (e->x[q] < t)
+					add_trial_to_heap(e, q);
+			}
+			if (TRIAL == e->y[q])
+			{
+				int oi = e->z[i];
+				double nv = dysll(e, oi, q);
+				if (nv < e->x[q])
+				{
+					e->y[q] = TRIAL;
+					e->z[q] = oi;
+					HEAP_CHANGE_ENERGY(e,e->nt,e->hpos[q],nv);
+				}
+			}
+		}
+	}
+	free_things(e);
+}
+
 
 #include "iio.h"
-void build_signed_distance(float *d, float *m, int w, int h)
+void build_signed_distance_t(float *d, float *m, int w, int h, float T)
 {
-	iio_write_image_float("/tmp/mmmm.tiff", m, w, h);
+	//iio_write_image_float("/tmp/mmmm.tiff", m, w, h);
 	float *t = xmalloc(    w * h * sizeof*t);  // temporary image
 	float *p = xmalloc(2 * w * h * sizeof*p);  // list of points
 	for (int l = 0; l < 2; l++)
@@ -292,9 +340,12 @@ void build_signed_distance(float *d, float *m, int w, int h)
 			p[2*n+1] = j;
 			n += 1;
 		}
-		fill_distance_fast(t, w, h, p, n);
-		if ( l) iio_write_image_float("/tmp/sdistemp_1.tiff", t, w, h);
-		if (!l) iio_write_image_float("/tmp/sdistemp_0.tiff", t, w, h);
+		if (isnan(T))
+			fill_distance_fast(t, w, h, p, n);
+		else
+			fill_distance_fast_truncated(t, w, h, p, n, T);
+		//if( l)iio_write_image_float("/tmp/sdistemp_1.tiff",t,w,h);
+		//if(!l)iio_write_image_float("/tmp/sdistemp_0.tiff",t,w,h);
 		for (int i = 0; i < w*h; i++)
 		{
 			if ( l && !m[i]) d[i] = t[i];
@@ -316,8 +367,10 @@ void build_signed_distance(float *d, float *m, int w, int h)
 #include <stdio.h>
 #include <stdlib.h>
 #include "iio.h"
+#include "pickopt.c"
 int main_sdistance(int c, char *v[])
 {
+	float t = atof(pick_option(&c, &v, "t", "NAN"));
 	if (c > 1)
 		return fprintf(stderr,
 				"usage:\n\t%s <masrk >signed_distance\n", *v);
@@ -326,7 +379,7 @@ int main_sdistance(int c, char *v[])
 	int w, h;
 	float *m = iio_read_image_float("-", &w, &h);
 	float *d = malloc(w*h*sizeof*d);
-	build_signed_distance(d, m, w, h);
+	build_signed_distance_t(d, m, w, h, t);
 	iio_write_image_float("-", d, w, h);
 	return 0;
 }
