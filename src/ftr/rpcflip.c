@@ -643,9 +643,37 @@ static void preview_at_bic(float *out, struct pan_view *v, double x, double y)
 
 static void rgbi_to_rgb_inplace(float c[4])
 {
-	c[0] = 1.00 * c[0]  +  0.05 * c[3];
-	c[1] = 0.60 * c[1]  +  0.20 * c[3];
-	c[2] = 1.30 * c[2]  -  0.20 * c[3];
+	float t = c[0];
+	c[0] = c[2];
+	c[2] = t;
+	c[1] = 0.8*c[1] + 0.2*c[3];
+	//c[0] = 1.00 * c[0]  +  0.05 * c[3];
+	//c[1] = 0.60 * c[1]  +  0.20 * c[3];
+	//c[2] = 1.30 * c[2]  -  0.20 * c[3];
+}
+
+static void rgbi_to_rgb_inplace_n(float *c, int n)
+{
+	float t;
+	switch (n)
+	{
+	case 4:
+		t = c[0];
+		c[0] = c[2];
+		c[2] = t;
+		c[1] = 0.8*c[1] + 0.2*c[3];
+		break;
+	case 8:
+		c[0] = c[4];
+		t = c[1];
+		c[1] = c[2];
+		c[2] = t;
+		break;
+	default: fail("caca");
+	}
+	//c[0] = 1.00 * c[0]  +  0.05 * c[3];
+	//c[1] = 0.60 * c[1]  +  0.20 * c[3];
+	//c[2] = 1.30 * c[2]  -  0.20 * c[3];
 }
 
 static
@@ -733,13 +761,13 @@ static int tiffo_getpixel_float_bicubic(float *r, struct tiff_octaves *t,
 static void pixel_from_ms(float *out, struct pan_view *v, double p, double q,
 		int i)
 {
-	float c[4];
+	float c[20];
 	float ipc = (p + v->rgbiox) / 4;
 	float iqc = (q + v->rgbioy) / 4;
 	if (i == 2)      tiffo_getpixel_float_bilinear(c, v->tc, 0, ipc, iqc);
 	else if (i == 3) tiffo_getpixel_float_bicubic(c, v->tc, 0, ipc, iqc);
 	else             tiffo_getpixel_float_1(c, v->tc, 0, ipc, iqc);
-	rgbi_to_rgb_inplace(c);
+	rgbi_to_rgb_inplace_n(c, v->tc->i->spp);
 	float g = (c[0] + c[1] + c[2] + c[3]) / 4;
 	float nc = 4*hypot(c[0], hypot(c[1], c[2]));
 	out[0] = c[0] * g / nc;
@@ -755,13 +783,14 @@ static void pixel_from_mso(float *out, struct pan_view *v, double p, double q,
 	//out[1] = 50;
 	//out[2] = 200;
 	int ofac = 1 << (o);
-	float c[4];
+	float c[20];
 	float ipc = (p + v->rgbiox) / ofac;
 	float iqc = (q + v->rgbioy) / ofac;
 	if (i == 2)      tiffo_getpixel_float_bilinear(c, v->tc, o-2, ipc, iqc);
 	else if (i == 3) tiffo_getpixel_float_bicubic(c, v->tc, o-2, ipc, iqc);
 	else             tiffo_getpixel_float_1(c, v->tc, o-2, ipc, iqc);
-	rgbi_to_rgb_inplace(c);
+	//rgbi_to_rgb_inplace(c);
+	rgbi_to_rgb_inplace_n(c, v->tc->i->spp);
 	float g = (c[0] + c[1] + c[2] + c[3]) / 4;
 	float nc = 4*hypot(c[0], hypot(c[1], c[2]));
 	out[0] = c[0] * g / nc;
@@ -773,7 +802,7 @@ static void pixel_from_go(float *out, struct pan_view *v, double p, double q,
 		int i, int o)
 {
 	int ofac = 1 << (o);
-	float c[4];
+	float c[20];
 	float ipc = p / ofac;
 	float iqc = q / ofac;
 	if (i == 2)      tiffo_getpixel_float_bilinear(c, v->tg, o, ipc, iqc);
@@ -787,14 +816,15 @@ static void pixel_from_pms(float *out, struct pan_view *v, double p, double q,
 {
 	float pc = (p + v->rgbiox) / 4;
 	float qc = (q + v->rgbioy) / 4;
-	float g, c[4];
+	float g, c[20];
 	if (i == 2)      tiffo_getpixel_float_bilinear(&g, v->tg, 0, p , q );
 	else if (i == 3) tiffo_getpixel_float_bicubic (&g, v->tg, 0, p , q );
 	else             tiffo_getpixel_float_1       (&g, v->tg, 0, p , q );
 	if (i == 2)      tiffo_getpixel_float_bilinear(c , v->tc, 0, pc, qc);
 	else if (i == 3) tiffo_getpixel_float_bicubic (c , v->tc, 0, pc, qc);
 	else             tiffo_getpixel_float_1       (c , v->tc, 0, pc, qc);
-	rgbi_to_rgb_inplace(c);
+	//rgbi_to_rgb_inplace(c);
+	rgbi_to_rgb_inplace_n(c, v->tc->i->spp);
 	float nc = 4*hypot(c[0], hypot(c[1], c[2]));
 	out[0] = c[0] * g / nc;
 	out[1] = c[1] * g / nc;
@@ -1449,7 +1479,7 @@ static void pan_motion_handler(struct FTR *f, int unused_b, int m, int x, int y)
 	(void)unused_b;
 	struct pan_state *e = f->userdata;
 	static double ox = 0, oy = 0;
-	if (m == FTR_BUTTON_LEFT) action_offset_viewport(f, x - ox, y - oy);
+	if (m & FTR_BUTTON_LEFT) action_offset_viewport(f, x - ox, y - oy);
 	ox = x;
 	oy = y;
 
