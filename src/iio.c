@@ -2165,7 +2165,7 @@ static int read_beheaded_bmp(struct iio_image *x,
 // EXR reader                                                               {{{2
 
 #ifdef I_CAN_HAS_LIBEXR
-#include <ImfCRgbaFile.h>
+#include <OpenEXR/ImfCRgbaFile.h>
 // EXTERNALIZED TO :  read_exr_float.cpp
 
 static int read_whole_exr(struct iio_image *x, const char *filename)

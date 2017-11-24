@@ -7,6 +7,7 @@ BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
       contihist fontu imprintf pview viewflow flowarrows palette ransac blur \
       srmatch tiffu siftu crop lrcat tbcat fftshift bmms registration imflip \
       fft dct dht flambda fancy_crop fancy_downsa autotrim iion mediator     \
+      redim colormatch
 
 BIN := $(addprefix bin/,$(BIN))
 
