@@ -1,4 +1,6 @@
+#include <assert.h>
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -7,12 +9,14 @@
 
 // structure to describe the "contrast model" of an image
 struct model_params {
+	int pd;
 	float mu[MAX_DIM];
 	float sigma[MAX_DIM];
 };
 
 // structure to describe a contrast change between two images
 struct model_map {
+	int pd;
 	float a[MAX_DIM];
 	float b[MAX_DIM];
 };
@@ -21,6 +25,7 @@ struct model_map {
 static
 void apply_map(float *y, struct model_map m, float *x, int w, int h, int pd)
 {
+	assert(m.pd == pd);
 	for (int l = 0; l < pd; l++)
 	for (int i = 0; i < w*h; i++)
 		y[i*pd+l] = m.a[l] * x[i*pd+l] + m.b[l];
@@ -30,8 +35,10 @@ void apply_map(float *y, struct model_map m, float *x, int w, int h, int pd)
 static
 struct model_map match_models(struct model_params x, struct model_params y)
 {
+	assert(x.pd == y.pd);
 	struct model_map m;
-	for (int l = 0; l < MAX_DIM; l++)
+	m.pd = x.pd;
+	for (int l = 0; l < m.pd; l++)
 	{
 		m.a[l] = x.sigma[l] / y.sigma[l];
 		m.b[l] = x.mu[l] - m.a[l] * y.mu[l];
@@ -62,6 +69,7 @@ static struct model_params compute_model(
 		char *mask)
 {
 	struct model_params r;
+	r.pd = pd;
 	float *t = malloc(w*h*sizeof*t); // storage for valid samples
 	for (int l = 0; l < pd; l++)
 	{
@@ -85,6 +93,19 @@ static float getsample_nan(float *x, int w, int h, int pd, int i, int j, int l)
 	if (i < 0 || j < 0 || i >= w || j >= h || l < 0 || l >= pd)
 		return NAN;
 	return x[(j*w+i)*pd+l];
+}
+
+#include "smapa.h"
+SMART_PARAMETER_SILENT(VERBOSE,0)
+static void dump_model_stderr(struct model_params p)
+{
+	for (int i = 0; i < p.pd; i++)
+		fprintf(stderr, "p[%d] = %g %g\n", i, p.mu[i], p.sigma[i]);
+}
+static void dump_map_stderr(struct model_map m)
+{
+	for (int i = 0; i < m.pd; i++)
+		fprintf(stderr, "m[%d] = %g %g\n", i, m.a[i], m.b[i]);
 }
 
 static void colormatch(float *C, float *A, int w, int h, int pd, float *B)
@@ -114,6 +135,13 @@ static void colormatch(float *C, float *A, int w, int h, int pd, float *B)
 
 	// apply transformation so that B looks like A
 	apply_map(C, m, B, w, h, pd);
+
+	if (VERBOSE() > 0)
+	{
+		dump_model_stderr(p);
+		dump_model_stderr(q);
+		dump_map_stderr(m);
+	}
 }
 
 #include "iio.h"
