@@ -371,20 +371,23 @@ void build_signed_distance_t(float *d, float *m, int w, int h, float T)
 int main_sdistance(int c, char *v[])
 {
 	float t = atof(pick_option(&c, &v, "t", "NAN"));
-	if (c > 1)
+	if (c > 3)
 		return fprintf(stderr,
-				"usage:\n\t%s <masrk >signed_distance\n", *v);
-		//                          0
+				"usage:\n\t%s [mask [signed_distance]]\n", *v);
+		//                          0  1     2
+
+	char *filename_in  = c > 1 ? v[1] : "-";
+	char *filename_out = c > 2 ? v[2] : "-";
 
 	int w, h;
-	float *m = iio_read_image_float("-", &w, &h);
+	float *m = iio_read_image_float(filename_in, &w, &h);
 	float *d = malloc(w*h*sizeof*d);
 	build_signed_distance_t(d, m, w, h, t);
-	iio_write_image_float("-", d, w, h);
+	iio_write_image_float(filename_out, d, w, h);
 	return 0;
 }
 #endif//USE_DISTANCE_MAIN
 
 #ifndef OMIT_ALL_MAINS
-int main(int c, char *v[]) { return main_sdistance(c-1, v+1); }
+int main(int c, char *v[]) { return main_sdistance(c, v); }
 #endif//OMIT_ALL_MAINS
