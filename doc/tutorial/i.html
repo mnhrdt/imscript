@@ -409,18 +409,18 @@ href="https://en.wikipedia.org/wiki/Reverse_Polish_notation">reverse polish
 notation</a>).  Common arithmetic operators and all functions from
 <code>math.h</code> are allowed.
 <pre class="script">
-plambda a.png b.png +        -o ab_sum.png
-plambda a.png b.png -        -o ab_dif.png
-plambda a.png b.png "*"      -o ab_mul.png
-plambda a.png b.png /        -o ab_div.png
-plambda a.png b.png "+ 2 /"  -o ab_avg.png
-plambda a.png b.png "* sqrt" -o ab_geo.png
-plambda a.png b.png fmin     -o ab_min.png
-plambda a.png b.png fmax     -o ab_max.png
+plambda a.jpg b.jpg +        -o ab_sum.png
+plambda a.jpg b.jpg -        -o ab_dif.png
+plambda a.jpg b.jpg "*"      -o ab_mul.png
+plambda a.jpg b.jpg /        -o ab_div.png
+plambda a.jpg b.jpg "+ 2 /"  -o ab_avg.png
+plambda a.jpg b.jpg "* sqrt" -o ab_geo.png
+plambda a.jpg b.jpg fmin     -o ab_min.png
+plambda a.jpg b.jpg fmax     -o ab_max.png
 </pre>
 <div class="gallery selsecond" style="height:321px">
 	<ul class="index">
-		<li><a>a.png &nbsp; &nbsp; b.png<span><img src="f/a.png" /><img src="f/b.png" /></span></a></li>
+		<li><a>a.jpg &nbsp; &nbsp; b.jpg<span><img src="f/a.jpg" /><img src="f/b.jpg" /></span></a></li>
 		<li><a>ab_sum.png<span><img src="f/ab_sum.png" /></span></a></li>
 		<li><a>ab_dif.png<span><img src="f/ab_dif.png" /></span></a></li>
 		<li><a>ab_mul.png<span><img src="f/ab_mul.png" /></span></a></li>
@@ -438,20 +438,20 @@ The <b>plambda</b> language allows many operations, even when applied to a singl
 See the external plambda tutorial for a comprehensive description.
 Here are some silly examples:
 <pre class="script">
-plambda b.png "a[2] a[1] a[0] join3" -o b_bgr.png     # swap colors
-plambda b.png "a[0] a[1] a[2] join3" -o b_rgb.png     # do nothing
-plambda b.png "randg 20 * +"         -o b_noisy.png   # add luminance noise
-plambda b.png "a(1,0) a -"           -o b_dx.png      # x-derivative
-plambda b.png "a(1,0) a - 127 +"     -o b_dx_127.png  # x-derivative plus 127
-plambda b.png a,x                    -o b_dx_alt.png  # x-derivative (easier)
-plambda b.png "a,x a,y hypot 2 *"    -o b_edges.png   # gradient norm
-plambda b.png ":y 50 * sin 50 * +"   -o b_bands.png   # sine of y plus image
-plambda b.png ":r 50 * sin 50 * +"   -o b_rings.png   # sine of r plus image
-plambda b.png ":i 8 fmod not  :j 30 fmod not  or 99 * +" -o b_grid.png
+plambda b.jpg "a[2] a[1] a[0] join3" -o b_bgr.png     # swap colors
+plambda b.jpg "a[0] a[1] a[2] join3" -o b_rgb.png     # do nothing
+plambda b.jpg "randg 20 * +"         -o b_noisy.png   # add luminance noise
+plambda b.jpg "a(1,0) a -"           -o b_dx.png      # x-derivative
+plambda b.jpg "a(1,0) a - 127 +"     -o b_dx_127.png  # x-derivative plus 127
+plambda b.jpg a,x                    -o b_dx_alt.png  # x-derivative (easier)
+plambda b.jpg "a,x a,y hypot 2 *"    -o b_edges.png   # gradient norm
+plambda b.jpg ":y 50 * sin 50 * +"   -o b_bands.png   # sine of y plus image
+plambda b.jpg ":r 50 * sin 50 * +"   -o b_rings.png   # sine of r plus image
+plambda b.jpg ":i 8 fmod not  :j 30 fmod not  or 99 * +" -o b_grid.png
 </pre>
 <div class="gallery selsecond" style="height:421px">
 	<ul class="index">
-		<li><a>b.png<span><img     src="f/b.png" /></span></a></li>
+		<li><a>b.jpg<span><img     src="f/b.jpg" /></span></a></li>
 		<li><a>b_bgr.png<span><img src="f/b_bgr.png" /></span></a></li>
 		<li><a>b_rgb.png<span><img src="f/b_rgb.png" /></span></a></li>
 		<li><a>b_noisy.png<span><img src="f/b_noisy.png" /></span></a></li>
@@ -472,10 +472,10 @@ plambda b.png ":i 8 fmod not  :j 30 fmod not  or 99 * +" -o b_grid.png
 The <b>lrcat</b> and <b>tbcat</b> programs concatenate two images horizontally or vertically.
 They need not be of the same size.
 <pre class="script">
-lrcat a.png b.png ab_lr.png
-tbcat a.png b.png ab_tb.png
-lrcat a.png b.png | tbcat - lena.png ab_montage.png
-lrcat a.png b.png | BACKGROUND=255 tbcat - lena.png ab_montage2.png
+lrcat a.jpg b.jpg ab_lr.png
+tbcat a.jpg b.jpg ab_tb.png
+lrcat a.jpg b.jpg | tbcat - lena.png ab_montage.png
+lrcat a.jpg b.jpg | BACKGROUND=255 tbcat - lena.png ab_montage2.png
 </pre>
 <div class="gallery" style="height:512px">
 	<ul class="index">

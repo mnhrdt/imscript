@@ -15,7 +15,7 @@ src/ccproc.o: src/ccproc.c src/abstract_dsf.c src/xmalloc.c src/fail.c
 src/censust.o: src/censust.c src/iio.h src/pickopt.c
 src/cleant_cgpois.o: src/cleant_cgpois.c src/minicg.c src/smapa.h
 src/colorcoordsf.o: src/colorcoordsf.c
-src/colormatch.o: src/colormatch.c src/iio.h
+src/colormatch.o: src/colormatch.c src/smapa.h src/iio.h
 src/contihist.o: src/contihist.c src/xfopen.c src/fail.c src/xmalloc.c \
  src/iio.h src/pickopt.c
 src/crop.o: src/crop.c src/fail.c src/xmalloc.c src/iio.h
