@@ -220,6 +220,18 @@ static void put_pixel_gray_aa(int a, int b, float f, void *pp)
 	}
 }
 
+static void put_pixel_vec_aa(int a, int b, float f, void *ee)
+{
+	struct {int w, h, pd; float *x, *v; } *e = ee;
+	if (inner_point(e->w, e->h, a, b))
+	{
+		float *g = e->x + (b * e->w + a) * e->pd;
+		float *v = e->v;
+		for (int k = 0; k < e->pd; k++)
+			g[k] = lincombin(g[k], v[k], f);
+	}
+}
+
 // draw a color segment over a color image
 static void overlay_segment_color(struct rgba_value *x, int w, int h,
 		int px, int py, int qx, int qy, struct rgba_value c)
@@ -244,6 +256,19 @@ static void overlay_segment_gray(uint8_t *x, int w, int h,
 	e.x = x;
 	e.c = 255;
 	traverse_segment_aa(px, py, qx, qy, put_pixel_gray_aa, &e);
+}
+
+// draw a segment over a vector-valued float image
+static void overlay_segment_vec(float *x, int w, int h, int pd,
+		int px, int py, int qx, int qy, float *v)
+{
+	struct {int w, h, pd; float *x, *v; } e;
+	e.w  = w;
+	e.h  = h;
+	e.pd = pd;
+	e.x  = x;
+	e.v  = v;
+	traverse_segment_aa(px, py, qx, qy, put_pixel_vec_aa, &e);
 }
 
 
@@ -413,6 +438,51 @@ int main_viewsegs(int c, char *v[])
 	}
 
 	iio_write_image_uint8_vec("-", (uint8_t*)o, w, h, 1);
+	return 0;
+}
+
+// CLI utility to render a set of segments,
+// (produces a gradient image)
+int main_gviewsegs(int c, char *v[])
+{
+	if (c != 3) {
+		fprintf(stderr, "usage:\n\t"
+			"%s w h < 4col.txt\n", *v);
+		//       0  1 2
+		return 1;
+	}
+	int w = atoi(v[1]);
+	int h = atoi(v[2]);
+
+	int n;
+	double (*p)[4] = (void*)read_ascii_doubles(stdin, &n);
+	n /= 4;
+
+	if (w == -1) for (int i = 0; i < n; i++) {
+			if (w < lrint(p[i][0])) w = lrint(p[i][0]);
+			if (w < lrint(p[i][2])) w = lrint(p[i][2]);
+		}
+	if (h == -1) for (int i = 0; i < n; i++) {
+			if (h < lrint(p[i][1])) h = lrint(p[i][1]);
+			if (h < lrint(p[i][3])) h = lrint(p[i][3]);
+		}
+
+	float *o = xmalloc(2*w*h*sizeof*o);
+	for (int i = 0; i < w*h*2; i++)
+		o[i] = 0;
+	for (int i = 0; i < n; i++)
+	{
+		int a[2] = { lrint(p[i][0]), lrint(p[i][1]) };
+		int b[2] = { lrint(p[i][2]), lrint(p[i][3]) };
+		float X[2] = {a[1] - b[1], b[0] - a[0]};
+		float N = hypot(X[0], X[1]);
+		X[0] /= N;
+		X[1] /= N;
+		if (inner_point(w,h, a[0],a[1]) && inner_point(w,h, b[0],b[1]))
+			overlay_segment_vec(o, w,h,2, a[0],a[1], b[0],b[1], X);
+	}
+
+	iio_write_image_float_vec("-", o, w, h, 2);
 	return 0;
 }
 
@@ -857,11 +927,12 @@ int main_pview(int c, char *v[])
 	else if (0 == strcmp(v[1], "hpoints")) return main_viewhp(c-1, v+1);
 	else if (0 == strcmp(v[1], "pairs")) return main_viewpairs(c-1, v+1);
 	else if (0 == strcmp(v[1], "segments")) return main_viewsegs(c-1, v+1);
-	else if (0 == strcmp(v[1], "polygons")) return main_viewpolygons(c-1, v+1);
+	else if (0 == strcmp(v[1], "gsegments")) return main_gviewsegs(c-1,v+1);
+	else if (0 == strcmp(v[1],"polygons"))return main_viewpolygons(c-1,v+1);
 	else if (0 == strcmp(v[1], "triplets")) return main_viewtrips(c-1, v+1);
 	else if (0 == strcmp(v[1], "epipolar")) return main_viewepi(c-1, v+1);
 	else if (0 == strcmp(v[1], "fmpair")) return main_viewfmpair(c-1, v+1);
-	//else if (0 == strcmp(v[1], "fmpairi")) return main_viewfmpairi(c-1,v+1);
+	//else if (0 == strcmp(v[1],"fmpairi"))return main_viewfmpairi(c-1,v+1);
 	else {
 	usage: fprintf(stderr, "usage:\n\t%s [points|pairs|triplets|epipolar] "
 			       "params... < data.txt | display\n", *v);
