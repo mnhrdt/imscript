@@ -90,9 +90,17 @@ static float getsample_0(float *x, int w, int h, int i, int j, int l)
 // evaluate a frgb image at a point
 static void interpolate_at(float *out, float *x, int w, int h, float p, float q)
 {
-	out[0] = getsample_0(x, w, h, (int)p, (int)q, 0);
-	out[1] = getsample_0(x, w, h, (int)p, (int)q, 1);
-	out[2] = getsample_0(x, w, h, (int)p, (int)q, 2);
+	int i = p;
+	int j = q;
+	if (i < 0 || i >= w) { out[0] = out[1] = out[2] = 0; return; }
+	if (j < 0 || j >= h) { out[0] = out[1] = out[2] = 0; return; }
+	out[0] = x[3*(j*w+i)+0];
+	out[1] = x[3*(j*w+i)+1];
+	out[2] = x[3*(j*w+i)+2];
+	//return x[3*(j*w+i)+l];
+	//out[0] = getsample_0(x, w, h, (int)p, (int)q, 0);
+	//out[1] = getsample_0(x, w, h, (int)p, (int)q, 1);
+	//out[2] = getsample_0(x, w, h, (int)p, (int)q, 2);
 }
 
 // evaluate the shadow of a frgb image (the g and b channels are ignored)
@@ -138,7 +146,7 @@ static void pixel(float *out, struct pan_state *e, double p, double q)
 		//	first_run = 0;
 		//}
 		if(p<0||q<0){out[0]=out[1]=out[2]=0;return;}
-		int s = -0 - log(e->zoom_factor) / log(2);
+		int s = round(log2(1/e->zoom_factor)) - 1;
 		if (s < 0) s = 0;
 		if (s >= MAX_PYRAMID_LEVELS) s = MAX_PYRAMID_LEVELS-1;
 		int sfac = 1<<(s+1);
@@ -150,29 +158,29 @@ static void pixel(float *out, struct pan_state *e, double p, double q)
 }
 
 // pixel shadow
-static void pixel_s(float *out, struct pan_state *e, double p, double q)
-{
-	if (e->zoom_factor > 0.9999)
-		interpolate_at_s(out, e->frgb, e->w, e->h, p, q);
-	else {
-		//static int first_run = 1;
-		//if (first_run) {
-		//	fprintf(stderr, "create pyramid\n");
-		//	void create_pyramid(struct pan_state *e);
-		//	create_pyramid(e);
-		//	first_run = 0;
-		//}
-		if(p<0||q<0){out[0]=out[1]=out[2]=0;return;}
-		int s = -0 - log(e->zoom_factor) / log(2);
-		if (s < 0) s = 0;
-		if (s >= MAX_PYRAMID_LEVELS) s = MAX_PYRAMID_LEVELS-1;
-		int sfac = 1<<(s+1);
-		int w = e->pyr_w[s];
-		int h = e->pyr_h[s];
-		float *rgb = e->pyr_rgb[s];
-		interpolate_at_s(out, rgb, w, h, p/sfac, q/sfac);
-	}
-}
+//static void pixel_s(float *out, struct pan_state *e, double p, double q)
+//{
+//	if (e->zoom_factor > 0.9999)
+//		interpolate_at_s(out, e->frgb, e->w, e->h, p, q);
+//	else {
+//		//static int first_run = 1;
+//		//if (first_run) {
+//		//	fprintf(stderr, "create pyramid\n");
+//		//	void create_pyramid(struct pan_state *e);
+//		//	create_pyramid(e);
+//		//	first_run = 0;
+//		//}
+//		if(p<0||q<0){out[0]=out[1]=out[2]=0;return;}
+//		int s = -0 - log(e->zoom_factor) / log(2);
+//		if (s < 0) s = 0;
+//		if (s >= MAX_PYRAMID_LEVELS) s = MAX_PYRAMID_LEVELS-1;
+//		int sfac = 1<<(s+1);
+//		int w = e->pyr_w[s];
+//		int h = e->pyr_h[s];
+//		float *rgb = e->pyr_rgb[s];
+//		interpolate_at_s(out, rgb, w, h, p/sfac, q/sfac);
+//	}
+//}
 
 static void action_print_value_under_cursor(struct FTR *f, int x, int y)
 {
@@ -445,6 +453,9 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		window_to_image(p, e, i, j);
 		float c[3];
 		pixel(c, e, p[0], p[1]);
+		//if (!i && !j)
+		//	fprintf(stderr, "first pixel (%g %g){%g %g %g}\n",
+		//			p[0], p[1], c[0], c[1], c[2]);
 		unsigned char *cc = f->rgb + 3 * (j * f->w + i);
 		for (int l = 0; l < 3; l++)
 		{
@@ -642,6 +653,7 @@ typedef void (*zoom_out_function_t)(float*,int,int,float*,int,int);
 
 #include "smapa.h"
 SMART_PARAMETER_SILENT(ZOMAX,0)
+SMART_PARAMETER_SILENT(PYRSAVE,0)
 
 static void create_pyramid(struct pan_state *e)
 {
@@ -660,6 +672,16 @@ static void create_pyramid(struct pan_state *e)
 		e->pyr_w[s]   = sw;
 		e->pyr_h[s]   = sh;
 		e->pyr_rgb[s] = srgb;
+	}
+	if (PYRSAVE() > 0) {
+		for (int s = 0; s < MAX_PYRAMID_LEVELS; s++)
+		{
+			char buf[FILENAME_MAX];
+			snprintf(buf, FILENAME_MAX, "/tmp/pyrsave_%d.tiff", s);
+			iio_write_image_float_vec(buf, e->pyr_rgb[s],
+					e->pyr_w[s], e->pyr_h[s], 3);
+			fprintf(stderr, "saved image \"%s\"\n", buf);
+		}
 	}
 }
 
