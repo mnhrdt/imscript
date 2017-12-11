@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <tgmath.h>
 #include <math.h>
 #include "iio.h"
 
@@ -46,7 +47,7 @@ static float float_min(float *x, int n)
 static float float_max(float *x, int n)
 {
 	float r = -INFINITY;
-	for (int i = 1; i < n; i++)
+	for (int i = 0; i < n; i++)
 		if (x[i] > r)
 			r = x[i];
 	return r;
@@ -132,6 +133,30 @@ static float float_mod(float *x, int n)
 	return mi;
 }
 
+static float float_modH(float *x, int n)
+{
+	static float p = 1;
+	if (n == -1)
+		return p = *x;
+	float h[0x100];
+	for (int i = 0; i < 0x100; i++)
+		h[i] = 0;
+	for (int i = 0; i < n; i++)
+	{
+		int xi = p*floor(x[i]/p);
+		if (xi < 0) fail("negative xi=%g", x[i]);//xi = 0;
+		if (xi > 0xff) fail("large xi=%g", x[i]);//xi = 0xff;
+		h[xi] += 2;
+		if (xi > 0) h[xi-1] += 1;
+		if (xi < 0xff) h[xi+1] += 1;
+	}
+	int mi = 0x80;
+	for (int i = 0; i < 0x100; i++)
+		if (h[i] > h[mi])
+			mi = i;
+	return mi;
+}
+
 static float float_harmonic(float *x, int n)
 {
 	long double r = 0;
@@ -153,7 +178,7 @@ static float float_geometric(float *x, int n)
 	long double r = 1;
 	for (int i = 0; i < n; i++)
 		r *= x[i];
-	return pow(r, 1.0/n);
+	return powl(r, 1.0/n);
 }
 
 static float float_holder(float *x, int n)
@@ -163,8 +188,8 @@ static float float_holder(float *x, int n)
 		return p = *x;
 	long double r = 0;
 	for (int i = 0; i < n; i++)
-		r += pow(x[i], p);
-	return pow(r/n, 1/p);
+		r += powl(x[i], p);
+	return powl(r/n, 1/p);
 }
 
 static float float_lehmer(float *x, int n)
@@ -176,8 +201,8 @@ static float float_lehmer(float *x, int n)
 	long double b = 0;
 	for (int i = 0; i < n; i++)
 	{
-		a += pow(x[i], p);
-		b += pow(x[i], p-1);
+		a += powl(x[i], p);
+		b += powl(x[i], p-1);
 	}
 	return a / b;
 }
@@ -196,19 +221,19 @@ static float float_gini(float *x, int n)
 		long double b = 0;
 		for (int i = 0; i < n; i++)
 		{
-			a *= pow(x[i], pow(x[i], p));
-			b += pow(x[i], p);
+			a *= powl(x[i], powl(x[i], p));
+			b += powl(x[i], p);
 		}
-		return pow(a, 1/b);
+		return powl(a, 1/b);
 	} else {
 		long double a = 0;
 		long double b = 0;
 		for (int i = 0; i < n; i++)
 		{
-			a += pow(x[i], p);
-			b += pow(x[i], q);
+			a += powl(x[i], p);
+			b += powl(x[i], q);
 		}
-		return pow(a / b, 1 / (p - q));
+		return powl(a / b, 1 / (p - q));
 	}
 }
 
@@ -246,7 +271,7 @@ static float EEE(float *x, int n, float p, float m)
 {
 	long double r = 0;
 	for (int i = 0; i < n; i++)
-		r += pow(fabs(x[i] - m),  p);
+		r += powl(fabs(x[i] - m),  p);
 	return r;
 }
 
@@ -260,12 +285,19 @@ static float float_pargmineg(float *x, float p, int n)
 	for (int i = 0; i < n; i++)
 	for (int j = 0; j < n; j++)
 	if (j != i)
-		score[i] += pow(fabs(x[i] - x[j]), p);
+		score[i] += powl(fabs(x[i] - x[j]), p);
 
 	int ridx = 0;
-	for (int i = 1; i < n; i++)
-	if (score[i] < score[ridx])
-		ridx = i;
+	if (p > 0) {
+		for (int i = 1; i < n; i++)
+		if (score[i] < score[ridx])
+			ridx = i;
+	}
+	if (p < 0) {
+		for (int i = 1; i < n; i++)
+		if (score[i] > score[ridx])
+			ridx = i;
+	}
 
 	return x[ridx];
 }
@@ -275,8 +307,8 @@ static float float_pargmin(float *x, int n)
 	static float p = 2;
 	if (n == -1)
 		return p = *x;
-	if (p > 0 && p < 1) return float_pargmineg(x, p, n);
-	if (p <= 0) return NAN;
+	if (p < 1) return float_pargmineg(x, p, n);
+	if (p == 0) return NAN;
 	long double mo = 0;
 	long double m = float_avg(x, n);
 	for (int j = 0; j < 25; j++)
@@ -286,7 +318,7 @@ static float float_pargmin(float *x, int n)
 		long double b = 0;
 		for (int i = 0; i < n; i++)
 		{
-			long double w = pow(fabs(x[i] - m), p - 2);
+			long double w = powl(fabs(x[i] - m), p - 2);
 			fprintf(stderr, "\tw = |%g - %g|^%g = %g\n", x[i], (double)m, p-2, (double)w);
 			a += w * x[i];
 			b += w;
@@ -452,10 +484,22 @@ int main_veco(int c, char *v[])
 		f = float_pargmin;
 		f(&p, -1);
 	}
+	if (*operation_name == 'H') {
+		float p = atof(1 + operation_name);
+		f = float_modH;
+		f(&p, -1);
+	}
 	if (*operation_name == 'L') {
 		float p = atof(1 + operation_name);
 		f = float_lehmer;
 		f(&p, -1);
+	}
+	if (*operation_name == 'G') {
+		float pq[2];
+		int r = sscanf(operation_name, "G%g,%g", pq, pq+1);
+		if (r != 2) fail("unrecognized op \"%s\"", operation_name);
+		f = float_gini;
+		f(pq, -1);
 	}
 	if (!f) fail("unrecognized operation \"%s\"", operation_name);
 	bool (*isgood)(float) = NULL;
