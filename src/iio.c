@@ -3124,19 +3124,36 @@ static void iio_write_image_as_ppm(const char *filename, struct iio_image *x)
 // ASC writer                                                               {{{2
 static void iio_write_image_as_asc(const char *filename, struct iio_image *x)
 {
-	assert(x->type == IIO_TYPE_FLOAT);
-	assert(x->dimension == 2);
-	FILE *f = xfopen(filename, "w");
-	int w = x->sizes[0];
-	int h = x->sizes[1];
-	int pd = x->pixel_dimension;
-	fprintf(f, "%d %d 1 %d\n", w, h, pd);
-	float *t = xmalloc(w*h*pd*sizeof*t);
-	break_pixels_float(t, x->data, w*h, pd);
-	for (int i = 0; i < w*h*pd; i++)
-		fprintf(f, "%.9g\n", t[i]);
-	xfree(t);
-	xfclose(f);
+	if (x->type == IIO_TYPE_FLOAT)
+	{
+		assert(x->type == IIO_TYPE_FLOAT);
+		assert(x->dimension == 2);
+		FILE *f = xfopen(filename, "w");
+		int w = x->sizes[0];
+		int h = x->sizes[1];
+		int pd = x->pixel_dimension;
+		fprintf(f, "%d %d 1 %d\n", w, h, pd);
+		float *t = xmalloc(w*h*pd*sizeof*t);
+		break_pixels_float(t, x->data, w*h, pd);
+		for (int i = 0; i < w*h*pd; i++)
+			fprintf(f, "%.9g\n", t[i]);
+		xfree(t);
+		xfclose(f);
+	} else if (x->type == IIO_TYPE_DOUBLE) {
+		assert(x->type == IIO_TYPE_DOUBLE);
+		assert(x->dimension == 2);
+		FILE *f = xfopen(filename, "w");
+		int w = x->sizes[0];
+		int h = x->sizes[1];
+		int pd = x->pixel_dimension;
+		fprintf(f, "%d %d 1 %d\n", w, h, pd);
+		double *t = xmalloc(w*h*pd*sizeof*t);
+		break_pixels_double(t, x->data, w*h, pd);
+		for (int i = 0; i < w*h*pd; i++)
+			fprintf(f, "%.9g\n", t[i]);
+		xfree(t);
+		xfclose(f);
+	}
 }
 
 // CSV writer                                                               {{{2
@@ -3146,10 +3163,21 @@ static void iio_write_image_as_csv(const char *filename, struct iio_image *x)
 	int w = x->sizes[0];
 	int h = x->sizes[1];
 	assert(x->pixel_dimension == 1);
-	assert(x->type == IIO_TYPE_FLOAT);
-	float *t = x->data;
-	for (int i = 0; i < w*h; i++)
-		fprintf(f, "%.9g%c", t[i], (i+1)%w?',':'\n');
+	if (x->type == IIO_TYPE_FLOAT) {
+		float *t = x->data;
+		for (int i = 0; i < w*h; i++)
+			fprintf(f, "%.9g%c", t[i], (i+1)%w?',':'\n');
+	}
+	if (x->type == IIO_TYPE_DOUBLE) {
+		double *t = x->data;
+		for (int i = 0; i < w*h; i++)
+			fprintf(f, "%.9g%c", t[i], (i+1)%w?',':'\n');
+	}
+	if (x->type == IIO_TYPE_UINT8) {
+		uint8_t *t = x->data;
+		for (int i = 0; i < w*h; i++)
+			fprintf(f, "%d%c", t[i], (i+1)%w?',':'\n');
+	}
 	xfclose(f);
 }
 
@@ -4062,7 +4090,7 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 	}
 	if (string_suffix(filename, ".ppm") && typ == IIO_TYPE_FLOAT
 		&& (x->pixel_dimension == 1 || x->pixel_dimension == 3)) {
-		iio_write_image_as_ppm(filename, x);
+	iio_write_image_as_ppm(filename, x);
 		return;
 	}
 	if (string_suffix(filename, ".pgm") && typ == IIO_TYPE_FLOAT
@@ -4075,7 +4103,8 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 		iio_write_image_as_pfm(filename, x);
 		return;
 	}
-	if (string_suffix(filename, ".csv") && typ == IIO_TYPE_FLOAT
+	if (string_suffix(filename, ".csv") &&
+			(typ==IIO_TYPE_FLOAT || typ==IIO_TYPE_DOUBLE)
 				&& x->pixel_dimension == 1) {
 		iio_write_image_as_csv(filename, x);
 		return;
@@ -4090,7 +4119,9 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 		iio_write_image_as_rim_cimage(filename, x);
 		return;
 	}
-	if (string_suffix(filename, ".asc") && typ == IIO_TYPE_FLOAT) {
+	if (string_suffix(filename, ".asc") &&
+			(typ == IIO_TYPE_FLOAT || typ == IIO_TYPE_DOUBLE)
+				) {
 		iio_write_image_as_asc(filename, x);
 		return;
 	}
@@ -4431,6 +4462,11 @@ void iio_write_image_uint16_vec(char *filename, uint16_t *data,
 	x->data = data;
 	x->contiguous_data = false;
 	iio_write_image_default(filename, x);
+}
+
+void iio_free(char *p)
+{
+	xfree(p);
 }
 
 // API (deprecated)                                                         {{{1
