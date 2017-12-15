@@ -1379,6 +1379,7 @@ static int token_is_vardef(const char *t)
 #define PLAMBDA_STACKOP_DEINTERLEAVE 12
 #define PLAMBDA_STACKOP_HALVE 13
 #define PLAMBDA_STACKOP_NSPLIT 14
+#define PLAMBDA_STACKOP_NSTACK 15
 
 // if token is a stack operation, return its id
 // otherwise, return zero
@@ -1394,12 +1395,14 @@ static int token_is_stackop(const char *t)
 	if (0 == strcmp(t, "join3")) return PLAMBDA_STACKOP_VMERGE3;
 	if (0 == strcmp(t, "mergeall")) return PLAMBDA_STACKOP_VMERGEALL;
 	if (0 == strcmp(t, "joinall")) return PLAMBDA_STACKOP_VMERGEALL;
+	if (0 == strcmp(t, "ajoin")) return PLAMBDA_STACKOP_VMERGEALL;
 	if (0 == strcmp(t, "njoin")) return PLAMBDA_STACKOP_NMERGE;
 	if (0 == strcmp(t, "nmerge")) return PLAMBDA_STACKOP_NMERGE;
 	if (0 == strcmp(t, "interleave")) return PLAMBDA_STACKOP_INTERLEAVE;
 	if (0 == strcmp(t, "deinterleave")) return PLAMBDA_STACKOP_DEINTERLEAVE;
 	if (0 == strcmp(t, "halve")) return PLAMBDA_STACKOP_HALVE;
 	if (0 == strcmp(t, "nsplit")) return PLAMBDA_STACKOP_NSPLIT;
+	if (0 == strcmp(t, "nstack")) return PLAMBDA_STACKOP_NSTACK;
 	return 0;
 }
 
@@ -1986,6 +1989,9 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 		FORI(n)
 			vstack_push_scalar(s, x[i]);
 				     }
+		break;
+	case PLAMBDA_STACKOP_NSTACK:
+		vstack_push_scalar(s, s->n);
 		break;
 	case PLAMBDA_STACKOP_VMERGE: {
 		float x[PLAMBDA_MAX_PIXELDIM];
