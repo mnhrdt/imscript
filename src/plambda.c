@@ -2692,6 +2692,7 @@ verbosity>0?
 " join3\tjoin the components of three vectors ATTOTS\n"
 " njoin\tjoin the components of n vectors\n"
 " halve\tsplit an even-sized vector ATTOTS into two equal-sized parts\n"
+" nstack\tcurrent number of elements in the stack (useful with njoin)\n"
 //" interleave\tinterleave\n"
 //" deinterleave\tdeinterleave\n"
 //" nsplit\tnsplit\n"

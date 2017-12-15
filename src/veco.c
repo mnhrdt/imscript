@@ -544,6 +544,9 @@ int main_veco(int c, char *v[])
 				fail("%dth image size mismatch\n", i);
 		}
 		float (*y) = xmalloc(*w * *h * sizeof*y);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
 		for (int i = 0; i < *w * *h; i++)
 		{
 			float tmp[n];
