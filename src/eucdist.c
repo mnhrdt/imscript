@@ -1,15 +1,11 @@
-// euclidean distance transform by Mejister-Felzenszwalb-Huttenlocher algorithm
+// euclidean distance transform (Mejister-Felzenszwalb-Huttenlocher algorithm)
 
 #include <math.h>
 
-static float square(float x)
+static float obtain_slope(float *f, int q, int p)
 {
-	return x*x;
-}
-
-static float get_hypot(float *f, int *v, int q, int k)
-{
-	float s = (f[q] + square(q) - f[v[k]] - square(v[k])) / (2*q - 2*v[k]);
+	if (!isfinite(f[q]) && !isfinite(f[p])) return 0;
+	return ((f[q] + q*q) - (f[p] + p*p)) / (2*q - 2*p);
 }
 
 static void squared_distances_1d(
@@ -18,18 +14,18 @@ static void squared_distances_1d(
 		int n      // length
 		)
 {
-	int v[n];      // index table
 	float z[n+1];  // temporary array
+	int v[n];      // index table
 	int k = 0;     // last index
 
 	v[0] = 0;
 	z[0] = -INFINITY;
 	z[1] =  INFINITY;
-	for (int q = 1; q < n; q++)
-	{
-		float s = get_hypot(f, v, q, k);
-		while (s <= z[k])
-			s = get_hypot(f, v, q, --k);
+	for (int q = 1; q < n; q++) {
+		// TODO: simplify the following loop
+		float s = obtain_slope(f, q, v[k]);
+		while (s < z[k])
+			s = obtain_slope(f, q, v[--k]);
 		k++;
 		v[k] = q;
 		z[k] = s;
@@ -37,11 +33,10 @@ static void squared_distances_1d(
 	}
 
 	k = 0;
-	for (int q = 0; q < n; q++)
-	{
+	for (int q = 0; q < n; q++) {
 		while (z[k+1] < q)
 			k++;
-		d[q] = square(q - v[k]) + f[v[k]];
+		d[q] = (q - v[k]) * (q - v[k]) + f[v[k]];
 	}
 }
 
@@ -61,19 +56,29 @@ static void squared_distances_2d(float *f, int w, int h)
 	{
 		float t[w], d[w];
 		for (int i = 0; i < w; i++) t[i] = f[j*w+i];
-		squared_distances_1d(d, t, h);
-		for (int i = 0; i < w; i++) f[j*w+i] = d[j];
+		squared_distances_1d(d, t, w);
+		for (int i = 0; i < w; i++) f[j*w+i] = d[i];
 	}
 }
 
-void euclidean_distance_transform(
-		float *d,   // output distance
-		float *m,   // input mask (binary image)
+void squared_euclidean_distance_to_nonzeros(
+		float *x,   // input/output: (binary image/distance to nonzeros)
 		int w,      // width
 		int h       // height
 		)
 {
 	for (int i = 0; i < w*h; i++)
-		d[i] = m[i] ? 0 : INFINITY;
-	squared_distances_2d(d, w, h);
+		x[i] = x[i] > 0 ? 0: INFINITY;
+	squared_distances_2d(x, w, h);
+}
+
+#include "iio.h"
+int main(int c, char *v[])
+{
+	if (c != 3) return 3;
+	int w, h;
+	float *x = iio_read_image_float(v[1], &w, &h);
+	squared_euclidean_distance_to_nonzeros(x, w, h);
+	iio_write_image_float(v[2], x, w, h);
+	return 0;
 }
