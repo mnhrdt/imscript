@@ -1991,7 +1991,7 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 				     }
 		break;
 	case PLAMBDA_STACKOP_NSTACK:
-		vstack_push_scalar(s, s->n);
+		vstack_push_scalar(s, s->n - 1);
 		break;
 	case PLAMBDA_STACKOP_VMERGE: {
 		float x[PLAMBDA_MAX_PIXELDIM];
