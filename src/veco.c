@@ -221,8 +221,9 @@ static float float_gini(float *x, int n)
 		long double b = 0;
 		for (int i = 0; i < n; i++)
 		{
-			a *= powl(x[i], powl(x[i], p));
-			b += powl(x[i], p);
+			long double aip = powl(x[i], p);
+			b += aip;
+			a *= powl(x[i], aip);
 		}
 		return powl(a, 1/b);
 	} else {
@@ -435,9 +436,10 @@ int main_veco(int c, char *v[])
 	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
 	bool use_numbers =   pick_option(&c, &v, "x", 0);
 	bool by_columns =    pick_option(&c, &v, "c", 0);
+	bool by_channels =   pick_option(&c, &v, "k", 0);
 	char *goodness =     pick_option(&c, &v, "g", "numeric");
 	char *filename_out = pick_option(&c, &v, "o", "-");
-	if (c < 3) {
+	if (c < 3 && !by_channels) {
 		fprintf(stderr,
 		"usage:\n\t%s {sum|min|max|avg|mul|med} [v1 ...] > out\n", *v);
 		//          0  1                          2  3
@@ -534,6 +536,20 @@ int main_veco(int c, char *v[])
 			y[i] = f(tmp, ngood);
 		}
 		iio_write_image_float(filename_out, y, w, 1);
+	} else if (n < 2 && by_channels) {
+		int w, h, pd;
+		float *x = iio_read_image_float_vec(c>2?v[2]:"-", &w, &h, &pd);
+		float *y = xmalloc(w * h * sizeof*y);
+		for (int i = 0; i < w*h; i++)
+		{
+			float tmp[pd];
+			int ngood = 0;
+			for (int j = 0; j < pd; j++)
+				if (isgood(x[i*pd+j]))
+					tmp[ngood++] = x[i*pd+j];
+			y[i] = f(tmp, ngood);
+		}
+		iio_write_image_float(filename_out, y, w, h);
 	} else {
 		float *x[n];
 		int w[n], h[n];

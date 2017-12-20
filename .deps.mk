@@ -27,6 +27,7 @@ src/downsa.o: src/downsa.c src/iio.h src/fail.c src/xmalloc.c src/random.c \
  src/help_stuff.c
 src/drawsegment.o: src/drawsegment.c
 src/drawtriangle.o: src/drawtriangle.c
+src/eucdist.o: src/eucdist.c src/iio.h
 src/exterior_algebra.o: src/exterior_algebra.c
 src/extrapolators.o: src/extrapolators.c
 src/fail.o: src/fail.c
@@ -66,6 +67,7 @@ src/lrcat.o: src/lrcat.c src/iio.h src/xmalloc.c src/fail.c src/getpixel.c \
  src/pickopt.c
 src/marching_interpolation.o: src/marching_interpolation.c
 src/marching_squares.o: src/marching_squares.c
+src/means.o: src/means.c
 src/mediator.o: src/mediator.c src/iio.h
 src/minicg.o: src/minicg.c
 src/modes_detector.o: src/modes_detector.c src/smapa.h
@@ -74,6 +76,7 @@ src/morsi.o: src/morsi.c src/iio.h src/help_stuff.c
 src/nnint.o: src/nnint.c src/abstract_heap.h src/xmalloc.c src/fail.c \
  src/iio.h src/pickopt.c
 src/ntiply.o: src/ntiply.c src/iio.h
+src/numbersio.o: src/numbersio.c
 src/ok_list.o: src/ok_list.c src/fail.c src/xmalloc.c
 src/palette.o: src/palette.c src/fail.c src/xmalloc.c src/xfopen.c \
  src/smapa.h src/iio.h src/pickopt.c src/fontu.c src/dataconv.c \

@@ -22,10 +22,10 @@ static void squared_distances_1d(
 	z[0] = -INFINITY;
 	z[1] =  INFINITY;
 	for (int q = 1; q < n; q++) {
-		// TODO: simplify the following loop
-		float s = obtain_slope(f, q, v[k]);
-		while (s < z[k])
-			s = obtain_slope(f, q, v[--k]);
+		// TODO: simplify the following ugly loop
+		float s;
+		while ((s = obtain_slope(f, q, v[k])) < z[k])
+			k--;
 		k++;
 		v[k] = q;
 		z[k] = s;
