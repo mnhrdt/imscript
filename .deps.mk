@@ -75,6 +75,7 @@ src/moistiv_epipolar.o: src/moistiv_epipolar.c src/fail.c
 src/morsi.o: src/morsi.c src/iio.h src/help_stuff.c
 src/nnint.o: src/nnint.c src/abstract_heap.h src/xmalloc.c src/fail.c \
  src/iio.h src/pickopt.c
+src/nonmaxsup.o: src/nonmaxsup.c src/smapa.h src/iio.h
 src/ntiply.o: src/ntiply.c src/iio.h
 src/numbersio.o: src/numbersio.c
 src/ok_list.o: src/ok_list.c src/fail.c src/xmalloc.c

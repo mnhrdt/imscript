@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
 
 // a smart parameter is just like a regular parameter, but it can be
 // re-defined at the shell-environment.  Instead of
