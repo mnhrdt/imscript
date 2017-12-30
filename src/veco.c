@@ -217,15 +217,27 @@ static float float_gini(float *x, int n)
 		return p*q;
 	}
 	if (p == q) {
-		long double a = 1;
+		//long double a = 1;
+		//long double b = 0;
+		//for (int i = 0; i < n; i++)
+		//{
+		//	long double xip = powl(x[i], p);
+		//	b += xip;
+		//	a *= powl(x[i], xip);
+		//}
+		//return powl(a, 1/b);
+		//
+		// the following code is algebraically equivalent,
+		// but much better conditionated than the formula above
+		long double a = 0;
 		long double b = 0;
 		for (int i = 0; i < n; i++)
 		{
-			long double aip = powl(x[i], p);
-			b += aip;
-			a *= powl(x[i], aip);
+			long double xip = powl(x[i], p);
+			a += xip * logl(x[i]);
+			b += xip;
 		}
-		return powl(a, 1/b);
+		return exp(a/b);
 	} else {
 		long double a = 0;
 		long double b = 0;
