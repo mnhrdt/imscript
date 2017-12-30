@@ -1,5 +1,10 @@
 // euclidean distance transform (Mejister-Felzenszwalb-Huttenlocher algorithm)
 
+// this implementation is based on the article
+// "Distance Transforms of Sampled Functions",
+// by P.F.Felzenszwalb and D.P.Huttenlocher,
+// published on "Theory of Computing" in 2012
+
 #include <math.h>
 
 static float obtain_slope(float *f, int q, int p)
@@ -8,6 +13,7 @@ static float obtain_slope(float *f, int q, int p)
 	return ((f[q] + q*q) - (f[p] + p*p)) / (2*q - 2*p);
 }
 
+// algorithm 1 from the paper, using the same variable names
 static void squared_distances_1d(
 		float *d,  // output distance
 		float *f,  // input data
