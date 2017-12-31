@@ -42,6 +42,12 @@ static void pix_cp(float *y, float *x, int p)
 		y[i] = x[i];
 }
 
+static void pix_weighted_acc(float *y, float *x, float w, int p)
+{
+	for (int i = 0; i < p; i++)
+		y[i] += w * x[i];
+}
+
 static void pix_weighted_sum(float *y, float **x, float *w, int p, int n)
 {
 	for (int k = 0; k < p; k++)
@@ -182,6 +188,10 @@ void ntiply_hq2x(float *y, float *x, int w, int h, int p)
 	float t[4*256];
 	hq2x_fill_lut(t);
 
+	// initialize large image to zero (to be accumulated into)
+	for (int i = 0; i < 4*w*h*p; i++)
+		y[i] = 0;
+
 	// traverse the small image
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
@@ -216,10 +226,10 @@ void ntiply_hq2x(float *y, float *x, int w, int h, int p)
 		float *q10 = pix_get(y, 2*w, 2*h, p, 2*i+1, 2*j  );
 		float *q01 = pix_get(y, 2*w, 2*h, p, 2*i  , 2*j+1);
 		float *q11 = pix_get(y, 2*w, 2*h, p, 2*i+1, 2*j+1);
-		pix_weighted_sum(q00, p00, t + 4*lbp, p, 4);
-		pix_weighted_sum(q10, p10, t + 4*lbp, p, 4);
-		pix_weighted_sum(q01, p01, t + 4*lbp, p, 4);
-		pix_weighted_sum(q11, p11, t + 4*lbp, p, 4);
+		pix_weighted_acc(q00, *p00, 4*t[4*lbp + 0], p);
+		pix_weighted_acc(q10, *p10, 3*t[4*lbp + 1], p);
+		pix_weighted_acc(q01, *p01, 2*t[4*lbp + 2], p);
+		pix_weighted_acc(q11, *p11, 1*t[4*lbp + 3], p);
 	}
 }
 
