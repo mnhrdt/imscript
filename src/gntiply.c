@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -41,8 +42,19 @@ static void pix_cp(float *y, float *x, int p)
 		y[i] = x[i];
 }
 
+static void pix_weighted_sum(float *y, float **x, float *w, int p, int n)
+{
+	for (int k = 0; k < p; k++)
+		y[k] = 0;
+	for (int k = 0; k < p; k++)
+	for (int i = 0; i < n; i++)
+		y[k] += w[i] * x[i][k];
+}
+
 void ntiply_epx2(float *y, float *x, int w, int h, int p)
 {
+	// Eric's Pixel eXpansion algorithm, by Eric Johnston of LucasArts
+	//
 	//    A    --\ 1 2
 	//  C P B  --/ 3 4
 	//    D
@@ -61,28 +73,154 @@ void ntiply_epx2(float *y, float *x, int w, int h, int p)
 		float *B = pix_get(x, w, h, p, i+1, j  );
 		float *C = pix_get(x, w, h, p, i-1, j  );
 		float *D = pix_get(x, w, h, p, i  , j+1);
-		float *t[4] = { pix_get(y, 2*w, 2*h, p, 2*i  , 2*j  ),
-		                pix_get(y, 2*w, 2*h, p, 2*i+1, 2*j  ),
-		                pix_get(y, 2*w, 2*h, p, 2*i  , 2*j+1),
-		                pix_get(y, 2*w, 2*h, p, 2*i+1, 2*j+1)
+		float *t[4] = {
+			pix_get(y, 2*w, 2*h, p, 2*i  , 2*j  ),
+			pix_get(y, 2*w, 2*h, p, 2*i+1, 2*j  ),
+			pix_get(y, 2*w, 2*h, p, 2*i  , 2*j+1),
+			pix_get(y, 2*w, 2*h, p, 2*i+1, 2*j+1),
 		};
 		for (int k = 0; k < 4; k++)
 			pix_cp(t[k], P, p);
-		if (pix_eq(C,A,p) && !pix_eq(C,D,p) && !pix_eq(A,B,p))
-			pix_cp(t[0], A, p);
-		if (pix_eq(A,B,p) && !pix_eq(A,C,p) && !pix_eq(B,D,p))
-			pix_cp(t[1], B, p);
-		if (pix_eq(D,C,p) && !pix_eq(D,B,p) && !pix_eq(C,A,p))
-			pix_cp(t[2], C, p);
-		if (pix_eq(B,D,p) && !pix_eq(B,A,p) && !pix_eq(D,C,p))
-			pix_cp(t[3], D, p);
+#define eq(a,b) pix_eq(a,b,p)
+		if (eq(C,A) && !eq(C,D) && !eq(A,B)) pix_cp(t[0], A, p);
+		if (eq(A,B) && !eq(A,C) && !eq(B,D)) pix_cp(t[1], B, p);
+		if (eq(D,C) && !eq(D,B) && !eq(C,A)) pix_cp(t[2], C, p);
+		if (eq(B,D) && !eq(B,A) && !eq(D,C)) pix_cp(t[3], D, p);
+#undef eq
 	}
+}
+
+void ntiply_epx3(float *y, float *x, int w, int h, int p)
+{
+// pseudocode from https://en.wikipedia.org/wiki/Pixel-art_scaling_algorithms
+//
+// A B C --\  1 2 3
+// D E F    > 4 5 6
+// G H I --/  7 8 9
+//
+// 1=E; 2=E; 3=E; 4=E; 5=E; 6=E; 7=E; 8=E; 9=E;
+// IF D==B AND D!=H AND B!=F :
+//         1=D
+// IF (D==B AND D!=H AND B!=F AND E!=C) OR (B==F AND B!=D AND F!=H AND E!=A) :
+//         2=B
+// IF B==F AND B!=D AND F!=H :
+//         3=F
+// IF (H==D AND H!=F AND D!=B AND E!=A) OR (D==B AND D!=H AND B!=F AND E!=G) :
+//         4=D
+// 5=E
+// IF (B==F AND B!=D AND F!=H AND E!=I) OR (F==H AND F!=B AND H!=D AND E!=C) :
+//         6=F
+// IF H==D AND H!=F AND D!=B
+//         7=D
+// IF (F==H AND F!=B AND H!=D AND E!=G) OR (H==D AND H!=F AND D!=B AND E!=I) :
+//         8=H
+// IF F==H AND F!=B AND H!=D :
+//         9=F
+//
+// Note: the C code below is obtained from this pseudocode by search&replace
+
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		float *A = pix_get(x, w, h, p, i-1, j-1);
+		float *B = pix_get(x, w, h, p, i  , j-1);
+		float *C = pix_get(x, w, h, p, i+1, j-1);
+		float *D = pix_get(x, w, h, p, i-1, j  );
+		float *E = pix_get(x, w, h, p, i  , j  );
+		float *F = pix_get(x, w, h, p, i+1, j  );
+		float *G = pix_get(x, w, h, p, i-1, j+1);
+		float *H = pix_get(x, w, h, p, i  , j+1);
+		float *I = pix_get(x, w, h, p, i+1, j+1);
+		float *t[9] = {
+			pix_get(y, 3*w, 3*h, p, 3*i-1, 3*j-1),
+			pix_get(y, 3*w, 3*h, p, 3*i  , 3*j-1),
+			pix_get(y, 3*w, 3*h, p, 3*i+1, 3*j-1),
+			pix_get(y, 3*w, 3*h, p, 3*i-1, 3*j  ),
+			pix_get(y, 3*w, 3*h, p, 3*i  , 3*j  ),
+			pix_get(y, 3*w, 3*h, p, 3*i+1, 3*j  ),
+			pix_get(y, 3*w, 3*h, p, 3*i-1, 3*j+1),
+			pix_get(y, 3*w, 3*h, p, 3*i  , 3*j+1),
+			pix_get(y, 3*w, 3*h, p, 3*i+1, 3*j+1),
+		};
+		for (int k = 0; k < 9; k++)
+			pix_cp(t[k], E, p);
+#define eq(a,b) pix_eq(a,b,p)
+		if ( eq(D,B) && !eq(D,H) && !eq(B,F) )
+			pix_cp(t[0], D, p);
+		if ( (eq(D,B) && !eq(D,H) && !eq(B,F) && !eq(E,C))
+			|| (eq(B,F) && !eq(B,D) && !eq(F,H) && !eq(E,A)) )
+			pix_cp(t[1], B, p);
+		if ( eq(B,F) && !eq(B,D) && !eq(F,H) )
+			pix_cp(t[2], F, p);
+		if ( (eq(H,D) && !eq(H,F) && !eq(D,B) && !eq(E,A))
+			|| (eq(D,B) && !eq(D,H) && !eq(B,F) && !eq(E,G)) )
+			pix_cp(t[3], D, p);
+		//pix_cp(t[4], E, p);
+		if ( (eq(B,F) && !eq(B,D) && !eq(F,H) && !eq(E,I))
+			|| (eq(F,H) && !eq(F,B) && !eq(H,D) && !eq(E,C)) )
+			pix_cp(t[5], F, p);
+		if ( eq(H,D) && !eq(H,F) && !eq(D,B) )
+			pix_cp(t[6], D, p);
+		if ( (eq(F,H) && !eq(F,B) && !eq(H,D) && !eq(E,G))
+			|| (eq(H,D) && !eq(H,F) && !eq(D,B) && !eq(E,I)) )
+			pix_cp(t[7], H, p);
+		if (eq(F,H) && !eq(F,B) && !eq(H,D))
+			pix_cp(t[8], F, p);
+#undef eq
+	}
+}
+
+static void hq2x_fill_lut(float t[4*256])
+{
+	for (int i = 0; i < 4*256; i++)
+		t[i] = 0.25;
 }
 
 void ntiply_hq2x(float *y, float *x, int w, int h, int p)
 {
-	fprintf(stderr, "WARNING: hq2x not implemented\n");
-	ntiply_naive(y, x, w, h, p, 2);
+	// build lookup table (could be cached if necessary)
+	float t[4*256];
+	hq2x_fill_lut(t);
+
+	// traverse the small image
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		// extract pixel values at 3x3 neighborhood
+		float *A[9] = {
+			pix_get(x, w, h, p, i-1, j-1), // 0
+			pix_get(x, w, h, p, i  , j-1), // 1
+			pix_get(x, w, h, p, i+1, j-1), // 2
+			pix_get(x, w, h, p, i-1, j  ), // 3
+			pix_get(x, w, h, p, i  , j  ), // 4 <- center
+			pix_get(x, w, h, p, i+1, j  ), // 5
+			pix_get(x, w, h, p, i-1, j+1), // 6
+			pix_get(x, w, h, p, i  , j+1), // 7
+			pix_get(x, w, h, p, i+1, j+1), // 8
+		};
+
+		// local binary pattern (8 bits)
+		int lbp = 0;
+		for (int b = 0; b < 8; b++)
+			lbp = 2 * lbp + pix_eq(A[b], A[4], p);
+		assert(lbp >= 0 && lbp < 256);
+
+		// 0 1 2
+		// 3 4 5
+		// 6 7 8
+		float *p00[4] = {A[0], A[1], A[3], A[4]};
+		float *p10[4] = {A[1], A[2], A[4], A[5]};
+		float *p01[4] = {A[3], A[4], A[6], A[7]};
+		float *p11[4] = {A[4], A[5], A[7], A[8]};
+		float *q00 = pix_get(y, 2*w, 2*h, p, 2*i  , 2*j  );
+		float *q10 = pix_get(y, 2*w, 2*h, p, 2*i+1, 2*j  );
+		float *q01 = pix_get(y, 2*w, 2*h, p, 2*i  , 2*j+1);
+		float *q11 = pix_get(y, 2*w, 2*h, p, 2*i+1, 2*j+1);
+		pix_weighted_sum(q00, p00, t + 4*lbp, p, 4);
+		pix_weighted_sum(q10, p10, t + 4*lbp, p, 4);
+		pix_weighted_sum(q01, p01, t + 4*lbp, p, 4);
+		pix_weighted_sum(q11, p11, t + 4*lbp, p, 4);
+	}
 }
 
 void ntiply_generic(
@@ -97,6 +235,8 @@ void ntiply_generic(
 {
 	if      (0 == strcmp(m, "epx") && f == 2)
 		ntiply_epx2(y, x, w, h, p);
+	else if (0 == strcmp(m, "epx") && f == 3)
+		ntiply_epx3(y, x, w, h, p);
 	else if (0 == strcmp(m, "hqx") && f == 2)
 		ntiply_hq2x(y, x, w, h, p);
 	else
