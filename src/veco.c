@@ -401,6 +401,7 @@ static char *help_string_long     =
 " -o file      use a named output file instead of stdout\n"
 " -g GOODNESS  use a specific GOODNESS criterion for discarding samples\n"
 " -x NUMBERS   instead of images, combine the given numbers\n"
+" -k IMAGE     operate over the channels of a single image\n"
 " -c IMAGE     operate over the columns of a single image\n"
 "\n"
 "Operations:\n"
