@@ -1344,12 +1344,21 @@ static int read_beheaded_png(struct iio_image *x,
 #ifdef I_CAN_HAS_LIBJPEG
 #  include <jpeglib.h>
 
+void on_jpeg_error(j_common_ptr cinfo)
+{
+	// this error happens, for example, when reading a truncated jpeg file
+	char buf[JMSG_LENGTH_MAX];
+	(*cinfo->err->format_message)(cinfo, buf);
+	fail("%s", buf);
+}
+
 static int read_whole_jpeg(struct iio_image *x, FILE *f)
 {
 	// allocate and initialize a JPEG decompression object
 	struct jpeg_decompress_struct cinfo[1];
 	struct jpeg_error_mgr jerr[1];
 	cinfo->err = jpeg_std_error(jerr);
+	jerr[0].error_exit = on_jpeg_error;
 	jpeg_create_decompress(cinfo);
 
 	// specify the source of the compressed data
