@@ -44,6 +44,7 @@ static float *read_image_float_rgb(char *fname, int *w, int *h)
 struct view_port {
 	double zoom_factor, offset_x, offset_y;
 	double a, b;
+	double aaa[3], bbb[3];
 };
 
 // data structure for the image viewer
@@ -200,6 +201,9 @@ static void action_qauto(struct FTR *f)
 
 	p->a = 255 / ( M - m );
 	p->b = 255 * m / ( m - M );
+	p->bbb[0] = p->b;
+	p->bbb[1] = p->b;
+	p->bbb[2] = p->b;
 
 	f->changed = 1;
 }
@@ -215,6 +219,9 @@ static void action_center_contrast_at_point(struct FTR *f, int x, int y)
 	pixel(c, e, p[0], p[1]);
 	float C = (c[0] + c[1] + c[2])/3;
 
+	vp->bbb[0] = 127.5 - vp->a * c[0];
+	vp->bbb[1] = 127.5 - vp->a * c[1];
+	vp->bbb[2] = 127.5 - vp->a * c[2];
 	vp->b = 127.5 - vp->a * C;
 
 	f->changed = 1;
@@ -226,8 +233,11 @@ static void action_contrast_span(struct FTR *f, float factor)
 	struct view_port *p = obtain_viewport(e);
 
 	float c = (127.5 - p->b)/ p->a;
+	float ccc[3];
+	for(int l=0;l<3;l++) ccc[l] = (127.5 - p->bbb[l]) / p->a;
 	p->a *= factor;
 	p->b = 127.5 - p->a * c;
+	for(int l=0;l<3;l++) p->bbb[l] = 127.5 - p->a * ccc[l];
 
 	f->changed = 1;
 }
@@ -320,7 +330,8 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		unsigned char *cc = f->rgb + 3 * (j * f->w + i);
 		for (int l = 0; l < 3; l++)
 		{
-			float g = P->a * c[l] + P->b;
+			//float g = P->a * c[l] + P->b;
+			float g = P->a * c[l] + P->bbb[l];
 			if      (g < 0)   cc[l] = 0  ;
 			else if (g > 255) cc[l] = 255;
 			else              cc[l] = g  ;

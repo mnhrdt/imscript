@@ -212,7 +212,7 @@ static void action_reset_zoom_and_position(struct FTR *f)
 	e->offset_y = 0;
 	e->a = 1;
 	e->b = 0;
-	e->bbb[0] = e->bbb[1] = e->bbb[2];
+	e->bbb[0] = e->bbb[1] = e->bbb[2] = 0;
 
 	e->roi = 0;
 	e->roi_x = f->w / 2;
