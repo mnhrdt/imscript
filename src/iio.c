@@ -319,7 +319,6 @@ char *global_variable_containing_the_name_of_the_last_opened_file = NULL;
 static FILE *xfopen(const char *s, const char *p)
 {
 	global_variable_containing_the_name_of_the_last_opened_file = NULL;
-	FILE *f;
 
 	if (!s) fail("trying to open a file with NULL name");
 
@@ -337,11 +336,12 @@ static FILE *xfopen(const char *s, const char *p)
 	// NOTE: the 'b' flag is required for I/O on Windows systems
 	// on unix, it is ignored
 	char pp[3] = { p[0], 'b', '\0' };
-	f = fopen(s, pp);
+	FILE *f = fopen(s, pp);
 	if (f == NULL)
 		fail("can not open file \"%s\" in mode \"%s\"",// (%s)",
 				s, pp);//, strerror(errno));
 	global_variable_containing_the_name_of_the_last_opened_file = s;
+	IIO_DEBUG("fopen (%s) = %p\n", s, (void*)f);
 	return f;
 }
 
@@ -350,6 +350,7 @@ static void xfclose(FILE *f)
 	global_variable_containing_the_name_of_the_last_opened_file = NULL;
 	if (f != stdout && f != stdin && f != stderr) {
 		int r = fclose(f);
+		IIO_DEBUG("fclose (%p) = %d\n", (void*)f, r);
 		if (r) fail("fclose error");// \"%s\"", strerror(errno));
 	}
 }
@@ -2863,7 +2864,6 @@ static int read_beheaded_whatever(struct iio_image *x,
 	// dump data to file
 	long filesize;
 	void *filedata = load_rest_of_file(&filesize, fin, header, nheader);
-	xfclose(fin);
 	char *filename = put_data_into_temporary_file(filedata, filesize);
 	xfree(filedata);
 
@@ -2876,7 +2876,10 @@ static int read_beheaded_whatever(struct iio_image *x,
 	IIO_DEBUG("COMMAND: %s\n", command);
 	int r = system(command);
 	IIO_DEBUG("command returned %d\n", r);
-	if (r) fail("could not run command \"%s\" successfully", command);
+	if (r) {
+		xfclose(fin);
+		fail("could not run command \"%s\" successfully", command);
+	}
 	FILE *f = xfopen(ppmname, "r");
 	r = read_image_f(x, f);
 	xfclose(f);
@@ -3603,7 +3606,6 @@ static int read_image(struct iio_image *x, const char *fname)
 		r = read_image_f(x, f);
 		xfclose(f);
 		delete_temporary_file(tfn);
-
 	} else
 #endif//I_CAN_HAS_WGET
 
