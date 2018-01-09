@@ -8,6 +8,9 @@
 
 #define BAD_MAX(a,b) (a)<(b)?(b):(a);
 
+#include "smapa.h"
+SMART_PARAMETER(BACKGROUND,0)
+
 int main_lrcat(int c, char *v[])
 {
 	if (c != 3 && c != 4) {
@@ -28,7 +31,7 @@ int main_lrcat(int c, char *v[])
 
 	float *z = xmalloc(w[2] * h[2] * pd[2] * sizeof*y);
 	for (int i = 0; i < w[2] * h[2] * pd[2]; i++)
-		z[i] = 0;
+		z[i] = BACKGROUND();
 
 	for (int j = 0; j < h[0]; j++)
 	for (int i = 0; i < w[0]; i++)
