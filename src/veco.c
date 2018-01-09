@@ -403,6 +403,7 @@ static char *help_string_long     =
 " -x NUMBERS   instead of images, combine the given numbers\n"
 " -k IMAGE     operate over the channels of a single image\n"
 " -c IMAGE     operate over the columns of a single image\n"
+" -i           operate independently along the dimensions of multispectral images\n"
 "\n"
 "Operations:\n"
 " min          minimum value of the good samples\n"
@@ -450,6 +451,7 @@ int main_veco(int c, char *v[])
 	bool use_numbers =   pick_option(&c, &v, "x", 0);
 	bool by_columns =    pick_option(&c, &v, "c", 0);
 	bool by_channels =   pick_option(&c, &v, "k", 0);
+	bool indep_chans =   pick_option(&c, &v, "i", 0);
 	char *goodness =     pick_option(&c, &v, "g", "numeric");
 	char *filename_out = pick_option(&c, &v, "o", "-");
 	if (c < 3 && !by_channels) {
@@ -563,6 +565,30 @@ int main_veco(int c, char *v[])
 			y[i] = f(tmp, ngood);
 		}
 		iio_write_image_float(filename_out, y, w, h);
+	} else if (indep_chans) {
+		float *x[n];
+		int w[n], h[n], d[n];
+		for (int i = 0; i < n; i++)
+			x[i] = iio_read_image_float_split(v[i+2], w+i,h+i,d+i);
+		for (int i = 0; i < n; i++) {
+			if (w[i] != *w || h[i] != *h || d[i] != *d)
+				fail("%dth image size mismatch\n", i);
+		}
+		float (*y) = xmalloc(*w * *h * *d * sizeof*y);
+		for (int l = 0; l < *d; l++)
+		{
+			int O = l * *w * *h;
+			for (int i = 0; i < *w * *h; i++)
+			{
+				float tmp[n];
+				int ngood = 0;
+				for (int j = 0; j < n; j++)
+					if (isgood(x[j][i+O]))
+						tmp[ngood++] = x[j][i+O];
+				y[i+O] = f(tmp, ngood);
+			}
+		}
+		iio_write_image_float_split(filename_out, y, *w, *h, *d);
 	} else {
 		float *x[n];
 		int w[n], h[n];
