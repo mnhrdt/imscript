@@ -62,7 +62,8 @@ struct pan_view {
 	char *pfg, *pfc; // filenames
 
 	// calibration
-	struct rpc r[1];
+	struct rpc r[1];  // PAN rpc
+	struct rpc rc[1]; // MSI rpc
 	double P[8]; // local affine approximation of "raster to image"
 	double rgbiox, rgbioy; // offset between P and MS (in P pixel units)
 
@@ -102,6 +103,7 @@ struct pan_state {
 	int srtm4_base;
 };
 
+// TODO: integrate this variable into the state
 static int msoctaves_instead_of_preview;
 
 // generic utility functions {{{1
@@ -191,6 +193,51 @@ static void init_view(struct pan_view *v,
 	v->repaint = 1;
 }
 
+static void init_view_no_preview(struct pan_view *v,
+		char *fgtif, char *fgrpc, char *fctif, char *fcrpc)
+{
+	// build preview (use only color, by now)
+	//v->preview = load_nice_preview(fgpre, fcpre, &v->pw, &v->ph);
+	v->preview = NULL;
+	v->pfg = NULL;
+	v->pfc = NULL;
+	v->gray_only = 0;
+
+	// load P and MS
+	int megabytes = 0;
+	tiff_octaves_init_implicit(v->tg, fgtif, megabytes);
+	if (fctif)
+		tiff_octaves_init_implicit(v->tc, fctif, megabytes);
+	else v->gray_only = 1;//fail("not fctif\n"); //v->tc = NULL;
+	v->w = -1;//v->tg->i->w;
+	v->h = -1;//v->tg->i->h;
+	v->rgbiox = v->rgbioy = 4; // normally untouched
+
+	// load RPC
+	read_rpc_file_xml(v->r, fgrpc);
+	if (fcrpc)
+		read_rpc_file_xml(v->rc, fcrpc);
+
+	{ // adjust PAN-MSI offsets
+		double msi_cx = 2000; //v->tc->i->w / 2.0;
+		double msi_cy = 2000; //v->tc->i->h / 2.0;
+		double ll[2], ij[2], base_h = 200;
+		eval_rpc (ll, v->rc, msi_cx, msi_cy, base_h);
+		eval_rpci(ij, v->r , ll[0] , ll[1] , base_h);
+		fprintf(stderr, "msi_center = %g %g\n", msi_cx, msi_cy);
+		fprintf(stderr, "llh = %g %g %g\n", ll[0], ll[1], base_h);
+		fprintf(stderr, "ij  = %g %g\n", ij[0], ij[1]);
+		v->rgbiox = 4 * msi_cx - ij[0];
+		v->rgbioy = 4 * msi_cy - ij[1];
+		fprintf(stderr, "rgbio  = %g %g\n", v->rgbiox, v->rgbioy);
+	}
+
+	// setup display cache
+	v->display = NULL;
+	v->fdisplay = NULL;
+	v->repaint = 1;
+}
+
 static void init_view_sizes(struct pan_view *v)
 {
 	void *p = tiff_octaves_getpixel(v->tg, 0, 1, 1);
@@ -267,6 +314,47 @@ static void init_state(struct pan_state *e,
 	e->so = 0;
 	e->srtm4_base = 0;
 	msoctaves_instead_of_preview = e->view->tg->noctaves > 4 ||
+		(ci && e->view->tc->noctaves > 3);
+}
+
+static void init_state_no_preview(struct pan_state *e,
+	char *gi[], char *gr[], char *ci[], char *cr[], int n)
+{
+	// set views
+	assert(n < MAX_VIEWS);
+	e->nviews = n;
+	e->current_view = 0;
+	for (int i = 0; i < n; i++)
+		init_view_no_preview(e->view + i,
+				gi[i],
+				gr[i],
+				ci?ci[i]:NULL,
+				cr?cr[i]:NULL);
+
+	// set geography
+	e->base_h = 0;
+	e->lon_0 = e->lat_0 = e->lon_d = e->lat_d = NAN;
+	setup_nominal_pixels_according_to_first_view(e);
+
+	// set viewport
+	e->a = 1;
+	e->b = 0;
+	e->zoom_factor = 1;
+	e->offset_x = e->offset_y = 0;
+
+	// set options
+	e->force_exact = 0;
+	e->image_space = 0;
+	e->diff_mode = 0;
+	e->show_vertdir = 0;
+	e->interpolation_order = 0;
+	e->image_rotation_status = 0;
+	e->qauto = 0;
+	e->log_scale = 0;
+	e->show_srtm4 = 0;
+	e->so = 0;
+	e->srtm4_base = 0;
+	msoctaves_instead_of_preview = true;e->view->tg->noctaves > 4 ||
 		(ci && e->view->tc->noctaves > 3);
 }
 
@@ -1817,6 +1905,67 @@ int main_rpcflip_pan(int c, char *v[])
 	return r;
 }
 
+int main_rpcflip_pank(int c, char *v[])
+{
+	TIFFSetWarningHandler(NULL);//suppress warnings
+
+	// process input arguments
+	char *command_string = pick_option(&c, &v, "c", "");
+	if (c < 4 || (c - 1) % 4 != 0) {
+		fprintf(stderr, "usage:\n\t"
+				"%s [P.TIF P.RPC MS.TIF MS.RPC]+\n", *v);
+		//                0  1     2     3      4
+		return c;
+	}
+	int n = BAD_MIN((c - 1)/4,MAX_VIEWS);
+	fprintf(stderr, "we have %d views\n", n);
+	char *filename_gtif[n];
+	char *filename_grpc[n];
+	char *filename_ctif[n];
+	char *filename_crpc[n];
+	for (int i = 0; i < n; i++)
+	{
+		filename_gtif[i] = v[4*i+1];
+		filename_grpc[i] = v[4*i+2];
+		filename_ctif[i] = v[4*i+3];
+		filename_crpc[i] = v[4*i+4];
+		fprintf(stderr, "view %d\n", i);
+		fprintf(stderr, "\tgtif %s\n", filename_gtif[i]);
+		fprintf(stderr, "\tgrpc %s\n", filename_grpc[i]);
+		fprintf(stderr, "\tctif %s\n", filename_ctif[i]);
+		fprintf(stderr, "\tcrpc %s\n", filename_crpc[i]);
+	}
+
+	// start state
+	struct pan_state e[1];
+	init_state_no_preview(e,
+			filename_gtif,
+			filename_grpc,
+			filename_ctif,
+			filename_crpc,
+			n);
+
+	// if non-interactive, run the requested command string and exit
+	if (*command_string)
+		return pan_non_interactive(e, command_string);
+
+	// open window
+	//struct FTR f = ftr_new_window(320, 320);
+	struct FTR f = ftr_new_window(800, 600);
+	f.userdata = e;
+	f.changed = 1;
+	ftr_set_handler(&f, "key"   , pan_key_handler);
+	ftr_set_handler(&f, "button", pan_button_handler);
+	ftr_set_handler(&f, "motion", pan_motion_handler);
+	ftr_set_handler(&f, "expose", pan_exposer);
+	ftr_set_handler(&f, "resize", pan_resize);
+	int r = ftr_loop_run(&f);
+
+	// cleanup and exit (optional)
+	ftr_close(&f);
+	return r;
+}
+
 int main_rpcflip_gray(int c, char *v[])
 {
 	TIFFSetWarningHandler(NULL);//suppress warnings
@@ -1869,8 +2018,10 @@ int main_rpcflip_gray(int c, char *v[])
 
 int main_rpcflip(int c, char *v[])
 {
-	if (c > 1 && 0 == strcmp(v[1], "-g"))
+	if      (c > 1 && 0 == strcmp(v[1], "-g"))
 		return main_rpcflip_gray(c - 1, v + 1);
+	else if (c > 1 && 0 == strcmp(v[1], "-k"))
+		return main_rpcflip_pank(c - 1, v + 1);
 	else
 		return main_rpcflip_pan(c, v);
 }
