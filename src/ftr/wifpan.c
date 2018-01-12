@@ -13,6 +13,10 @@
 #endif
 #include "ftr.h"
 
+#define OMIT_MAIN_FONTU
+#include "fontu.c" // todo: cherry-pick the required fontu functions
+#include "fonts/xfonts_all.c"
+
 #include "xmalloc.c"
 
 #define WHEEL_FACTOR 2
@@ -64,6 +68,9 @@ struct pan_state {
 	// 4. roi
 	int roi; // 0=nothing 1=dftwindow 2=rawfourier 3=ppsmooth
 	int roi_x, roi_y, roi_w;
+
+	// 5. user interface
+	struct bitmap_font font[1];
 };
 
 // change of coordinates: from window "int" pixels to image "double" point
@@ -76,8 +83,8 @@ static void window_to_image(double p[2], struct pan_state *e, int i, int j)
 // change of coordinates: from image "double" point to window "int" pixel
 static void image_to_window(int i[2], struct pan_state *e, double x, double y)
 {
-	i[0] = floor(x * e->zoom_factor - e->offset_x);
-	i[1] = floor(y * e->zoom_factor - e->offset_y);
+	i[0] = floor((x - e->offset_x) * e->zoom_factor );
+	i[1] = floor((y - e->offset_y) * e->zoom_factor );
 }
 
 static float getsample_0(float *x, int w, int h, int i, int j, int l)
@@ -471,6 +478,31 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		}
 	}
 
+	// if pixels are "huge", show their values
+	if (e->zoom_factor > 100) // "zoom_factor equals the pixel size"
+	{
+		// find first inner pixel in the image domain
+		double p[2];
+		window_to_image(p, e, 0, 0);
+		double ip[2] = {ceil(p[0])+0.5, ceil(p[1])+0.5}; // port coords
+		int ij[2]; // window coords
+		image_to_window(ij, e, ip[0], ip[1]);
+		for (int jj=ij[1];jj<f->h-e->zoom_factor;jj+=e->zoom_factor)
+		for (int ii=ij[0];ii<f->w-e->zoom_factor;ii+=e->zoom_factor)
+		{
+			window_to_image(p, e, ii, jj);
+			float c[3]; pixel(c, e, p[0], p[1]);
+			uint8_t fg[3] = {0, 255, 0};
+			uint8_t bg[3] = {0, 0, 0};
+			char buf[0x100];
+			int l=snprintf(buf, 0x100, "%g %g %g", c[0],c[1],c[2]);
+			put_string_in_rgb_image(f->rgb, f->w, f->h,
+					ii-l*e->font->width/2, jj,
+					fg, bg, 0, e->font, buf);
+		}
+
+	}
+
 	// if ROI, expose the roi
 	if (e->roi)
 	{
@@ -691,7 +723,6 @@ static void free_pyramid(struct pan_state *e)
 		free(e->pyr_rgb[s]);
 }
 
-
 #define BAD_MIN(a,b) a<=b?a:b
 int main_wifpan(int c, char *v[])
 {
@@ -707,6 +738,9 @@ int main_wifpan(int c, char *v[])
 	struct pan_state e[1];
 	e->frgb = read_image_float_rgb(filename_in, &e->w, &e->h);
 	create_pyramid(e);
+
+	// setup font
+	e->font[0] = reformat_font(*xfont_6x12, UNPACKED);
 
 	// open window
 	struct FTR f = ftr_new_window(BAD_MIN(e->w,1000), BAD_MIN(e->h,800));
