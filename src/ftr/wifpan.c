@@ -479,7 +479,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	}
 
 	// if pixels are "huge", show their values
-	if (e->zoom_factor > 100) // "zoom_factor equals the pixel size"
+	if (e->zoom_factor > 50) // "zoom_factor equals the pixel size"
 	{
 		// find first inner pixel in the image domain
 		double p[2];
@@ -494,8 +494,12 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 			float c[3]; pixel(c, e, p[0], p[1]);
 			uint8_t fg[3] = {0, 255, 0};
 			uint8_t bg[3] = {0, 0, 0};
-			char buf[0x100];
-			int l=snprintf(buf, 0x100, "%g %g %g", c[0],c[1],c[2]);
+			char buf[300];
+			int l;
+			if (e->zoom_factor>100 && (c[0]!=c[1] || c[0]!=c[2]))
+				l=snprintf(buf,300,"%g %g %g",c[0],c[1],c[2]);
+			if (c[0] == c[1] && c[0] == c[2])
+				l=snprintf(buf, 300, "%g", c[0]);
 			put_string_in_rgb_image(f->rgb, f->w, f->h,
 					ii-l*e->font->width/2, jj,
 					fg, bg, 0, e->font, buf);
