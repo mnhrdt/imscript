@@ -60,6 +60,9 @@ struct pan_image {
 	// 3. image pyramid
 	float *pyr_rgb[MAX_PYRAMID_LEVELS];
 	int pyr_w[MAX_PYRAMID_LEVELS], pyr_h[MAX_PYRAMID_LEVELS];
+
+	// 4. optional metadata
+	char *fname;
 };
 
 #define MAX_IMAGES 100
@@ -311,6 +314,10 @@ static void action_cycle(struct FTR *f, int d)
 {
 	struct pan_state *e = f->userdata;
 	e->current_image = good_modulus(e->current_image + d, e->n_images);
+	fprintf(stderr, "current image %d \"%s\"\n",
+			e->current_image,
+			e->t[e->current_image].fname
+			);
 	f->changed = 1;
 }
 
@@ -381,8 +388,8 @@ void key_handler_print(struct FTR *f, int k, int m, int x, int y)
 
 void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
-	fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
-			k, isalnum(k)?k:' ', m, x, y);
+	//fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
+	//		k, isalnum(k)?k:' ', m, x, y);
 
 	//if (k == '+') action_increase_zoom(f, f->w/2, f->h/2);
 	//if (k == '-') action_decrease_zoom(f, f->w/2, f->h/2);
@@ -516,6 +523,7 @@ int main_fpanflip(int c, char *v[])
 		fprintf(stderr, "reading image %d \"%s\"\n", i, fname[i]);
 		struct pan_image *x = e->t + i;
 		x->frgb = read_image_float_rgb(fname[i], &x->w, &x->h);
+		x->fname = fname[i];
 		create_pyramid(x);
 	}
 
