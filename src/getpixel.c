@@ -67,20 +67,6 @@ static float getsample_exit(float *x, int w, int h, int pd, int i, int j, int l)
 }
 
 // like n%p, but works for all numbers
-static int good_modulus(int n, int p)
-{
-	if (!p) return 0;
-	if (p < 1) return good_modulus(n, -p);
-
-	int r = n % p;
-	r = r < 0 ? r + p : r;
-
-//	assert(r >= 0);
-//	assert(r < p);
-	return r;
-}
-
-
 static int gmod(int x, int m)
 {
 	int r = x % m;
@@ -89,13 +75,10 @@ static int gmod(int x, int m)
 
 static int positive_reflex(int n, int p)
 {
-	int r = good_modulus(n, 2*p);
+	int r = gmod(n, 2*p);
 	if (r == p) r -= 1;
 	if (r > p)
 		r = 2*p - r;
-	if (n < 0 && p > 1) r += 1;
-	//assert(r >= 0);
-	//assert(r < p);
 	return r;
 }
 
