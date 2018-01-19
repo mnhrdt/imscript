@@ -164,6 +164,29 @@ static float *get_gpl_nodes(char *filename, int *n)
 	return nodes;
 }
 
+static float *get_gpf_nodes(char *filename, int *n)
+{
+	int bufsize = 0xff, nnodes = 0;
+	char buf[bufsize];
+	FILE *f = xfopen(filename, "r");
+	static float nodes[4*PALSAMPLES];
+	while(fgets(buf, bufsize, f) && nnodes < PALSAMPLES) {
+		//fprintf(stderr, "s = \"%s\"\n", buf);
+		float *t = nodes + 4*nnodes;
+		*t = nnodes;
+		if (4 == sscanf(buf, "%g %g %g %g", t, t+1, t+2, t+3)) {
+			t[1] = round(t[1] * 255);
+			t[2] = round(t[2] * 255);
+			t[3] = round(t[3] * 255);
+			fprintf(stderr, "\tnod[%d]{%g} = %g %g %g\n", nnodes, t[0], t[1], t[2], t[3]);
+			nnodes += 1;
+		}
+	}
+	xfclose(f);
+	*n = nnodes;
+	return nodes;
+}
+
 static bool hassuffix(const char *s, const char *suf)
 {
 	int len_s = strlen(s);
@@ -196,6 +219,11 @@ static void fill_palette(struct palette *p, char *s, float m, float M)
 	} else if (hassuffix(s, ".gpl")) {
 		int nnodes;
 		float *nodes = get_gpl_nodes(s, &nnodes);
+		set_node_positions_linearly(nodes, nnodes, m, M);
+		fill_palette_with_nodes(p, nodes, nnodes);
+	} else if (hassuffix(s, ".gpf")) {
+		int nnodes;
+		float *nodes = get_gpf_nodes(s, &nnodes);
 		set_node_positions_linearly(nodes, nnodes, m, M);
 		fill_palette_with_nodes(p, nodes, nnodes);
 	}
