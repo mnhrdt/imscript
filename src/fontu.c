@@ -254,8 +254,8 @@ static enum font_data_format packing_unstring(char *s)
 static struct bitmap_font reformat_font(struct bitmap_font f,
 		enum font_data_format fmt)
 {
-	fprintf(stderr, "reformat_font(%s -> %s)\n",
-			packing_string(f.packing), packing_string(fmt));
+	//fprintf(stderr, "reformat_font(%s -> %s)\n",
+	//		packing_string(f.packing), packing_string(fmt));
 	uint8_t *(*transform)(uint8_t *t, int, int*) = NULL;
 
 	if (fmt == f.packing) {
@@ -272,6 +272,7 @@ static struct bitmap_font reformat_font(struct bitmap_font f,
 	} else if (f.packing == PCXX85 && fmt == UNPACKED) {
 		// PCXX85 -x85toraw-> PCX -pcxtoraw-> PACKED -rawtobit-> UNPACKED
 	// TODO arrays of transforms (turn this function from code to data)
+	// TODO : fix leaks
 	f.data = alloc_and_transform_from_X85_to_RAW(f.data, f.ndata, &f.ndata);
 	f.data = alloc_and_transform_from_RLE8_to_RAW(f.data, f.ndata, &f.ndata);
 	f.data = alloc_and_transform_from_RAW_to_BIT(f.data, f.ndata, &f.ndata);

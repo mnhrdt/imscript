@@ -833,6 +833,7 @@ void convert_floats_to_samples(struct tiff_info *ti, void *s, float *f, int n)
 #undef FIN
 }
 
+static
 void tiff_octaves_setpixel_float(struct tiff_octaves *t, int i, int j, float *p)
 {
 	int pixel_size = (t->i->spp * t->i->bps) / 8;

@@ -46,7 +46,7 @@ endif
 # FTR: interactive tools, require X11 or freeglut
 # MSC: "misc" tools, or those requiring GSL
 
-OBJ_FTR = src/iio.o src/ftr/ftr.o src/ftr/egm96.o
+OBJ_FTR = src/iio.o src/ftr/ftr.o src/ftr/egm96.o src/ftr/fancy_image.o
 
 BIN_FTR = $(shell cat src/ftr/TARGETS)
 BIN_MSC = $(shell cat src/misc/TARGETS)

@@ -4,7 +4,7 @@ CFLAGS ?= -march=native -O3
 LDLIBS  = -ljpeg -ltiff -lpng -lfftw3f -lz -lm -lX11
 
 BIN = $(shell cat TARGETS)
-OBJ = iio.o ftr.o egm96.o
+OBJ = iio.o fancy_image.o ftr.o egm96.o
 
 default : $(BIN)
 $(BIN)  : $(OBJ)
