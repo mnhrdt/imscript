@@ -273,9 +273,14 @@ static struct bitmap_font reformat_font(struct bitmap_font f,
 		// PCXX85 -x85toraw-> PCX -pcxtoraw-> PACKED -rawtobit-> UNPACKED
 	// TODO arrays of transforms (turn this function from code to data)
 	// TODO : fix leaks
-	f.data = alloc_and_transform_from_X85_to_RAW(f.data, f.ndata, &f.ndata);
-	f.data = alloc_and_transform_from_RLE8_to_RAW(f.data, f.ndata, &f.ndata);
-	f.data = alloc_and_transform_from_RAW_to_BIT(f.data, f.ndata, &f.ndata);
+	void *tmp = f.data;
+	f.data = alloc_and_transform_from_X85_to_RAW(tmp, f.ndata, &f.ndata);
+	//free(tmp);
+	tmp = f.data;
+	f.data = alloc_and_transform_from_RLE8_to_RAW(tmp, f.ndata, &f.ndata);
+	free(tmp); tmp = f.data;
+	f.data = alloc_and_transform_from_RAW_to_BIT(tmp, f.ndata, &f.ndata);
+	free(tmp); tmp = f.data;
 	f.packing = UNPACKED;
 	return f;
 	} else if (fmt == DIFF) {
@@ -656,6 +661,7 @@ static void put_string_in_rgb_image(uint8_t *x, int w, int h,
 		int posx, int posy, uint8_t *fg, uint8_t *bg, int kerning,
 		struct bitmap_font *font, char *string)
 {
+	fprintf(stderr, "PUTS_RGB \"%s\"\n", string);
 	int posx0 = posx;
 	while (1)
 	{
@@ -675,7 +681,7 @@ static void put_string_in_rgb_image(uint8_t *x, int w, int h,
 				int jj = posy + j;
 				if (get_font_bit(font, c, i, j))
 					put_pixel_rgb(x, w, h, ii, jj, fg);
-				else
+				else if (bg)
 					put_pixel_rgb(x, w, h, ii, jj, bg);
 			}
 		}

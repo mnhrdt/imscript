@@ -42,7 +42,7 @@ struct pan_state {
 	int roi_x, roi_y, roi_w;
 
 	// 5. user interface
-	struct bitmap_font font[1];
+	struct bitmap_font font[5];
 };
 
 // change of coordinates: from window "int" pixels to image "double" point
@@ -59,6 +59,7 @@ static void image_to_window(int i[2], struct pan_state *e, double x, double y)
 	i[1] = floor((y - e->offset_y) * e->zoom_factor );
 }
 
+// TODO: refactor this function with "pixel" and "colormap3"
 static void get_rgb_from_vec(float *rgb, struct pan_state *e, float *vec)
 {
 	rgb[0] = rgb[1] = rgb[2] = vec[0];
@@ -353,6 +354,27 @@ static void transform_roi_buffers(float *y, float *x, int n, int roi)
 	//blur_2d(y, y, n, n, 3, "cauchy", param, 1);
 }
 
+// TODO: combine "colormap3" and "pixel"
+static void colormap3(unsigned char *rgb, struct pan_state *e, float *frgb)
+{
+	for (int l = 0; l < 3; l++)
+	{
+		if (!isfinite(frgb[l]))
+			rgb[l] = 0;
+		else {
+			//float g = e->a * c[l] + e->b;
+			float g = e->a * frgb[l] + e->bbb[l];
+			if      (g < 0)   rgb[l] = 0  ;
+			else if (g > 255) rgb[l] = 255;
+			else              rgb[l] = g  ;
+		}
+	}
+}
+
+static struct bitmap_font *get_font_for_zoom(struct pan_state *e, double z)
+{
+	return e->font + 1 * (z > 50) + 3 * (z > 100);
+}
 
 // dump the image acording to the state of the viewport
 static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
@@ -371,22 +393,12 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		//	fprintf(stderr, "first pixel (%g %g){%g %g %g}\n",
 		//			p[0], p[1], c[0], c[1], c[2]);
 		unsigned char *cc = f->rgb + 3 * (j * f->w + i);
-		for (int l = 0; l < 3; l++)
-		{
-			if (!isfinite(c[l]))
-				cc[l] = 0;
-			else {
-				//float g = e->a * c[l] + e->b;
-				float g = e->a * c[l] + e->bbb[l];
-				if      (g < 0)   cc[l] = 0  ;
-				else if (g > 255) cc[l] = 255;
-				else              cc[l] = g  ;
-			}
-		}
+		colormap3(cc, e, c);
 	}
 
 	// if pixels are "huge", show their values
-	if (e->zoom_factor > 50) // "zoom_factor equals the pixel size"
+	double zf = e->zoom_factor;
+	if (zf > 30) // "zoom_factor equals the pixel size"
 	{
 		// find first inner pixel in the image domain
 		double p[2];
@@ -394,22 +406,32 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		double ip[2] = {ceil(p[0])+0.5, ceil(p[1])+0.5}; // port coords
 		int ij[2]; // window coords
 		image_to_window(ij, e, ip[0], ip[1]);
-		for (int jj=ij[1];jj<f->h-e->zoom_factor;jj+=e->zoom_factor)
-		for (int ii=ij[0];ii<f->w-e->zoom_factor;ii+=e->zoom_factor)
+		for (int jj = ij[1] - zf; jj < f->h + zf; jj += zf)
+		for (int ii = ij[0] - zf; ii < f->w + zf; ii += zf)
 		{
 			window_to_image(p, e, ii, jj);
 			float c[3]; pixel(c, e, p[0], p[1]);
-			uint8_t fg[3] = {0, 255, 0};
+			uint8_t rgb[3]; colormap3(rgb, e, c);
+			uint8_t color_green[3] = {0, 255, 0};
+			uint8_t color_red[3] = {255, 0, 0};
 			uint8_t bg[3] = {0, 0, 0};
+			uint8_t *fg = rgb[1] < rgb[0] ? color_green : color_red;
+			if (hypot(rgb[0], rgb[1]) > 250 && rgb[0] < 2*rgb[1])
+				fg = color_red;
 			char buf[300];
-			int l;
-			if (e->zoom_factor>100 && (c[0]!=c[1] || c[0]!=c[2]))
-				l=snprintf(buf,300,"%g %g %g",c[0],c[1],c[2]);
-			if (c[0] == c[1] && c[0] == c[2])
+			int l = 0;
+			if (e->i->pd > 2 && zf > 50)
+			//if (e->zoom_factor>100 && (c[0]!=c[1] || c[0]!=c[2]))
+				l=snprintf(buf,300,"%g\n%g\n%g",c[0],c[1],c[2]);
+			else if (e->i->pd == 2 && zf > 50)
+				l=snprintf(buf,300,"%g\n%g",c[0],c[1]);
+			else if (e->i->pd == 1)
+			//if (c[0] == c[1] && c[0] == c[2])
 				l=snprintf(buf, 300, "%g", c[0]);
-			put_string_in_rgb_image(f->rgb, f->w, f->h,
-					ii-l*e->font->width/2, jj,
-					fg, bg, 0, e->font, buf);
+			struct bitmap_font *font = get_font_for_zoom(e, zf);
+			if (l) put_string_in_rgb_image(f->rgb, f->w, f->h,
+					ii-2.5*font->width, jj-1.5*font->height,
+					fg, NULL, 0, font, buf);
 		}
 
 	}
@@ -567,8 +589,13 @@ int main_cpu(int c, char *v[])
 	e->w = e->i->w;
 	e->h = e->i->h;
 
-	// setup font
-	e->font[0] = reformat_font(*xfont_6x12, UNPACKED);
+	// setup fonts
+	//e->font[0] = reformat_font(*xfont_5x7, UNPACKED);
+	e->font[0] = reformat_font(*xfont_4x6, UNPACKED);
+	e->font[1] = reformat_font(*xfont_6x12, UNPACKED);
+	e->font[2] = reformat_font(*xfont_7x13, UNPACKED);
+	e->font[3] = reformat_font(*xfont_9x15, UNPACKED);
+	e->font[4] = reformat_font(*xfont_10x20, UNPACKED);
 
 	// open window
 	struct FTR f = ftr_new_window(BAD_MIN(e->w,1000), BAD_MIN(e->h,800));
@@ -581,6 +608,7 @@ int main_cpu(int c, char *v[])
 	int r = ftr_loop_run(&f);
 
 	// cleanup and exit (optional)
+	for (int i = 0; i < 5; i++) free(e->font[i].data);
 	ftr_close(&f);
 	fancy_image_close(e->i);
 	return r - 1;
