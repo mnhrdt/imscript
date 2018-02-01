@@ -745,6 +745,7 @@ static void rgbi_to_rgb_inplace_n(float *c, int n)
 	float t;
 	switch (n)
 	{
+	case 0: break;//c[0] = c[1] = c[2] = 127; break;
 	case 4:
 		t = c[0];
 		c[0] = c[2];
@@ -757,7 +758,7 @@ static void rgbi_to_rgb_inplace_n(float *c, int n)
 		c[1] = c[2];
 		c[2] = t;
 		break;
-	default: fail("caca");
+	default: fail("caca %d", n);
 	}
 	//c[0] = 1.00 * c[0]  +  0.05 * c[3];
 	//c[1] = 0.60 * c[1]  +  0.20 * c[3];
@@ -1036,7 +1037,7 @@ static void inplace_rgb_span3(float *x, int w, int h, double a)
 		if (isfinite(x[3*i+l]))
 			tmp[l][nnn[l]++] = x[3*i+l];
 	for (int l = 0; l < 3; l++)
-		qsort(tmp[l], n, sizeof(float), compare_floats);
+		qsort(tmp[l], nnn[l], sizeof(float), compare_floats);
 	float med[3], iqd[3];
 	for (int l = 0; l < 3; l++) med[l] = tmp[l][n/2];
 	for (int l = 0; l < 3; l++) iqd[l] = tmp[l][3*n/4] - tmp[l][1*n/4];

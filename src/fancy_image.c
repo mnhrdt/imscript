@@ -11,7 +11,7 @@
 #include "iio.h"
 #include "xmalloc.c"
 
-// default setup: with TIFF and without GDAL
+// default setup (e.g. with TIFF and without GDAL)
 #define FANCY_TIFF
 #undef FANCY_GDAL
 
@@ -20,6 +20,16 @@
 #undef FANCY_TIFF
 #endif
 
+// act upon external definitions
+#ifdef FANCY_IMAGE_DISABLE_GDAL
+#undef FANCY_GDAL
+#endif
+
+// Note: there are 3 backends for "fancy_image"
+// 0) the "iio" fallback, internally using (optionally) tiff, png, and jpeg
+// 1) the "TIFF" backend, uses pyramidal tiff using libtiff
+// 2) the "GDAL" backend, using whatever gdal provides (read-only, no pyramids)
+
 
 #ifdef FANCY_TIFF
 #include "tiff_octaves_rw.c"
@@ -27,6 +37,7 @@
 
 #ifdef FANCY_GDAL
 #include <gdal.h>
+#include <cpl_conv.h>
 #endif//FANCY_GDAL
 
 #ifndef MAX_OCTAVES
@@ -212,7 +223,9 @@ static void interpret_options(struct FI *f, char *options_arg)
 		if (0 == strcmp(tok, "wr"  ))  f->option_write = true;
 		if (0 == strcmp(tok, "write")) f->option_write = true;
 		if (0 == strcmp(tok, "c"   ))  f->option_creat = true;
-		if (0 == strcmp(tok, "creat"   ))  f->option_creat = true;
+		if (0 == strcmp(tok, "creat")) f->option_creat = true;
+		if (0 == strcmp(tok, "k"   ))  f->option_compressed = true;
+		if (0 == strcmp(tok, "compressed"))f->option_compressed = true;
 		double x;
 		if (1 == sscanf(tok, "megabytes=%lf",&x)) f->megabytes      = x;
 		if (1 == sscanf(tok, "octaves=%lf", &x))  f->max_octaves    = x;
@@ -229,6 +242,7 @@ static void interpret_options(struct FI *f, char *options_arg)
 		if (1 == sscanf(tok, "fmt=%lf", &x))      f->option_fmt     = x;
 		if (1 == sscanf(tok, "tilewidth=%lf", &x))f->option_tw      = x;
 		if (1 == sscanf(tok, "tileheight=%lf",&x))f->option_tw      = x;
+		if (1 == sscanf(tok, "compression=%lf",&x))f->option_compressed=x;
 		tok = strtok(NULL, ",");
 	}
 
@@ -252,35 +266,24 @@ void create_iio_file(char *filename, int w, int h, int spp)
 	free(buf);
 }
 
-
-// API: open a fancy image
-struct fancy_image *fancy_image_open(char *filename, char *options)
+void generic_create(struct FI *f, char *filename)
 {
-	// create return struct and its alias
-	//struct fancy_image r[1];
-	struct fancy_image *r = xmalloc(sizeof*r); // I hate this malloc!
-	struct FI *f = (void*)r;
-
-	// process options parameter
-	interpret_options(f, options);
-
-	// if "c", do create the file
-	if (f->option_creat) {
 #ifdef FANCY_TIFF
-		if (filename_corresponds_to_tiffo(filename) || f->option_tw > 0)
-			create_zero_tiff_file(filename,
-					f->option_w, f->option_h,
-					f->option_tw, f->option_th,
-					f->option_spp, f->option_bps,
-					f->option_fmt,
-					true, f->option_compressed);
-		else
+	if (filename_corresponds_to_tiffo(filename) || f->option_tw > 0)
+		create_zero_tiff_file(filename,
+				f->option_w, f->option_h,
+				f->option_tw, f->option_th,
+				f->option_spp, f->option_bps,
+				f->option_fmt,
+				true, f->option_compressed);
+	else
 #endif//FANCY_TIFF
-			create_iio_file(filename, f->option_w, f->option_h,
-					f->option_spp);
-	}
+		create_iio_file(filename, f->option_w, f->option_h,
+				f->option_spp);
+}
 
-	// read the image
+void generic_read(struct FI *f, char *filename)
+{
 	if (filename_corresponds_to_tiffo(filename)) {
 #ifdef FANCY_TIFF
 		f->tiffo = true;
@@ -300,6 +303,31 @@ struct fancy_image *fancy_image_open(char *filename, char *options)
 		strncpy(f->x_filename, filename, FILENAME_MAX);
 		f->x_changed = false;
 	}
+	f->gdal = false;
+}
+
+
+// API: open a fancy image
+struct fancy_image *fancy_image_open(char *filename, char *options)
+{
+	// create return struct and its alias
+	//struct fancy_image r[1];
+	struct fancy_image *r = xmalloc(sizeof*r); // I hate this malloc!
+	struct FI *f = (void*)r;
+
+	// process options parameter
+	interpret_options(f, options);
+
+	if (f->option_verbose)
+			fprintf(stderr, "fancy_image_open\n\tf="
+				"\"%s\"\n\to=\"%s\"\n", filename, options);
+
+	// if "c", do create the file
+	if (f->option_creat)
+		generic_create(f, filename);
+
+	// read the image
+	generic_read(f, filename);
 
 	if (f->option_verbose) {
 		fprintf(stderr, "FANCY IMAGE \"%s\"\n", filename);
@@ -423,6 +451,14 @@ float fancy_image_getsample_oct(struct fancy_image *fi,
 		if (!p_pixel) return NAN;
 		uint8_t *p_sample = p_pixel + (l * f->t->i->bps) / 8;
 		return convert_sample_to_float(f->t->i, p_sample);
+#else
+		assert(false);
+#endif
+	} else if (f->gdal) {
+#ifdef FANCY_GDAL
+		if (octave != 0) return NAN;
+
+
 #else
 		assert(false);
 #endif

@@ -2,12 +2,12 @@ Your moral quality depends upon the terms used to describe your activities.
 
 
 A: program, algorithm, code
-B: module, project, application
+B: module, project, application, notebook
 C: solution, framework, product
 
 A: function
 B: method
-C: domain logic
+C: domain logic, business logic
 
 A: writer, author
 B: copyright holder
@@ -28,6 +28,14 @@ C: xml, binary files
 A: struct
 B: typedef struct
 C: class
+
+A: fig, postscript, text file with numbers
+B: svg
+C: wmf, pdf, ai
+
+A: irc, talk, write
+B: whatsapp, hangouts
+C: slack
 
 
 

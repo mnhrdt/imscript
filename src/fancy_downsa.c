@@ -107,8 +107,12 @@ static void fancy_downsa(char *fname_out, char *fname_in, int nw, int nh, int m)
 	int bw = a->w / nw;
 	int bh = a->h / nh;
 	struct fancy_image *b = fancy_image_create(fname_out,
-			"w=%d,h=%d,pd=%d,bps=%d,fmt=%d,tw=%d,th=%d",
-			bw, bh, a->pd, bps, fmt, tw, th);
+			"w=%d,h=%d,pd=%d,bps=%d,fmt=%d,tw=%d,th=%d,"
+			"compression=%d",
+			bw, bh, a->pd, bps, fmt, tw, th,
+			(int)(fmt==1 && bw>1000 && bh>1000
+			&& tw<800 && th<800)
+			);
 
 	// fill-in the zoomed-out image
 	for (int j = 0; j < b->h; j++)

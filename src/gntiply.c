@@ -26,14 +26,14 @@ static float *pix_get(float *x, int w, int h, int p, int i, int j)
 // function to compare whether two pixels are close enough
 static bool pix_eq(float *a, float *b, int p)
 {
-	//double r = 0;
-	//for (int i = 0; i < p; i++)
-	//	r = hypot(r, a[i] - b[i]);
-	//return r < 40;
+	double r = 0;
 	for (int i = 0; i < p; i++)
-		if (a[i] != b[i])
-			return false;
-	return true;
+		r = hypot(r, a[i] - b[i]);
+	return r < 200;
+	//for (int i = 0; i < p; i++)
+	//	if (a[i] != b[i])
+	//		return false;
+	//return true;
 }
 
 static void pix_cp(float *y, float *x, int p)

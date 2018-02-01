@@ -29,7 +29,6 @@
 struct pan_state {
 	// 1. image data
 	int w, h;
-	//float *frgb;
 	struct fancy_image *i;
 
 	// 2. view port parameters
@@ -60,6 +59,7 @@ static void image_to_window(int i[2], struct pan_state *e, double x, double y)
 }
 
 // TODO: refactor this function with "pixel" and "colormap3"
+// add various shader options
 static void get_rgb_from_vec(float *rgb, struct pan_state *e, float *vec)
 {
 	rgb[0] = rgb[1] = rgb[2] = vec[0];
@@ -69,13 +69,17 @@ static void get_rgb_from_vec(float *rgb, struct pan_state *e, float *vec)
 		rgb[2] = vec[2];
 }
 
+//static float fancy_interpolate(struct fancy_image *f, int oct,
+//		float p, float q, int l
+//{
+//}
+
 // evaluate the value a position (p,q) in image coordinates
 static void pixel(float *out, struct pan_state *e, double p, double q)
 {
-	if(p<0||q<0){out[0]=out[1]=out[2]=127;return;}// TODO: kill this
-	if(p>=e->i->w||q>=e->i->h){out[0]=out[1]=out[2]=0;return;}
+	if(p<0||q<0){out[0]=out[1]=out[2]=170;return;}// TODO: kill this
+	if(p>=e->i->w||q>=e->i->h){out[0]=out[1]=out[2]=85;return;}
 
-	float vec[e->i->pd];
 	int oct = 0;
 	if (e->zoom_factor < 0.9999)
 	{
@@ -88,8 +92,17 @@ static void pixel(float *out, struct pan_state *e, double p, double q)
 		q /= sfac;
 	}
 	for (int i = 0; i < e->i->pd; i++)
-		vec[i] = fancy_image_getsample_oct(e->i, oct, p, q, i);
-	get_rgb_from_vec(out, e, vec);
+	{
+		// TODO, interpolation
+		out[i] = fancy_image_getsample_oct(e->i, oct, p, q, i);
+	}
+}
+
+static void pixel_rgbf(float out[3], struct pan_state *e, double p, double q)
+{
+	float v[e->i->pd];
+	pixel(v, e, p, q);
+	get_rgb_from_vec(out, e, v);
 }
 
 static void action_print_value_under_cursor(struct FTR *f, int x, int y)
@@ -99,7 +112,7 @@ static void action_print_value_under_cursor(struct FTR *f, int x, int y)
 		double p[2];
 		window_to_image(p, e, x, y);
 		float c[3];
-		pixel(c, e, p[0], p[1]);
+		pixel_rgbf(c, e, p[0], p[1]);
 		//interpolate_at(c, e->frgb, e->w, e->h, p[0], p[1]);
 		//printf("%g\t%g\t: %g\t%g\t%g\n", p[0], p[1], c[0], c[1], c[2]);
 		printf("not implemented %g %g : %g %g %g\n",
@@ -145,6 +158,79 @@ static void action_contrast_change(struct FTR *f, float afac, float bshift)
 	f->changed = 1;
 }
 
+static int compare_floats(const void *a, const void *b)
+{
+	const float *da = (const float *) a;
+	const float *db = (const float *) b;
+	return (*da > *db) - (*da < *db);
+}
+
+void compute_scalar_position_and_size(
+		float *out_pos, float *out_siz,
+		float *x, int n,
+		float p)
+{
+	if (false) ;
+	else if (p == INFINITY)
+	{
+		float min = INFINITY;
+		float max = -INFINITY;
+		for (int i = 0; i < n; i++)
+		{
+			min = fmin(min, x[i]);
+			max = fmin(max, x[i]);
+		}
+		*out_pos = (min + max) / 2;
+		*out_siz = max - min;
+	}
+	else if (p == 2) // mean, average
+	{
+		long double mu = 0;
+		long double sigma = 0;
+		for (int i = 0; i < n; i++)
+			mu += x[i];
+		mu /= n;
+		for (int i = 0; i < n; i++)
+			sigma = hypot(sigma, x[i] - mu);
+		sigma /= sqrt(n);
+		*out_pos = mu;
+		*out_siz = sigma;
+	}
+	else if (p == 1)
+	{
+		float *t = xmalloc(n * sizeof*t);
+		for (int i = 0; i < n; i++)
+			t[i] = x[i];
+		qsort(t, n, sizeof*t, compare_floats);
+		float med = t[n/2];
+		free(t);
+		long double aad = 0;
+		for (int i = 0; i < n; i++)
+			aad += fabs(x[i] - med);
+	}
+	// todo: implement other measures
+}
+
+void compute_vectorial_position_and_size(
+		float *m, // array of output mus
+		float *s, // array of output sigmas
+		float *x, // input array of n d-dimsensional vectors
+		int n,    // number of input vectors
+		int d,    // dimension of each vector
+		float p   // p robustness parameter (p=1,2,inf)
+		)
+{
+	// we do the coward thing, component by component
+	float *t = xmalloc(n * sizeof *t);
+	for (int l = 0; l < d; l++)
+	{
+		for (int i = 0; i < n; i++)
+			t[i] = x[i*d+l];
+		compute_scalar_position_and_size(m + l, s + l, t, n, p);
+	}
+	free(t);
+}
+
 static void action_qauto(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
@@ -167,6 +253,36 @@ static void action_qauto(struct FTR *f)
 	e->bbb[2] = e->b;
 
 	f->changed = 1;
+}
+
+static void action_qauto2(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+
+	static int qauto_p_idx = 0;
+	float p[4] = {NAN, INFINITY, 2, 1};
+	qauto_p_idx = (qauto_p_idx + 1) % 4;
+	fprintf(stderr, "qauto p = %g\n", p[qauto_p_idx]);
+
+	// build an array of pixel values from the current screen
+	// TODO: cache this shit, we are computing this twice!
+	int w = f->w * 0.8;
+	int h = f->h * 0.8;
+	int pd = e->i->pd;
+	float *t = xmalloc(w * h * pd * sizeof*t);
+	for (int j = 0.1*f->h; j < 0.9*f->h; j++)
+	for (int i = 0.1*f->w; i < 0.9*f->w; i++)
+	{
+		double p[2]; window_to_image(p, e, i, j);
+		float c[pd]; pixel(c, e, p[0], p[1]);
+	}
+
+	// extract mu/sigma for each channel
+	//int pd = e->i->pd;
+	//float mu[pd], sigma[pd];
+	//compute_vectorial_position_and_size(mu, sigma, 
+	//
+	free(t);
 }
 
 static void action_toggle_roi(struct FTR *f, int x, int y, int dir)
@@ -206,7 +322,7 @@ static void action_center_contrast_at_point(struct FTR *f, int x, int y)
 	double p[2];
 	window_to_image(p, e, x, y);
 	float c[3];
-	pixel(c, e, p[0], p[1]);
+	pixel_rgbf(c, e, p[0], p[1]);
 	float C = (c[0] + c[1] + c[2])/3;
 
 	e->bbb[0] = 127.5 - e->a * c[0];
@@ -279,8 +395,8 @@ static bool insideP(int w, int h, int i, int j)
 
 static void ppsmooth_vec(float *y, float *x, int w, int h, int pd)
 {
-	float *x_split = malloc(w*h*pd*sizeof*x);
-	float *y_split = malloc(w*h*pd*sizeof*x);
+	float *x_split = xmalloc(w*h*pd*sizeof*x);
+	float *y_split = xmalloc(w*h*pd*sizeof*x);
 
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
@@ -376,27 +492,9 @@ static struct bitmap_font *get_font_for_zoom(struct pan_state *e, double z)
 	return e->font + 1 * (z > 50) + 3 * (z > 100);
 }
 
-// dump the image acording to the state of the viewport
-static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
+static void expose_pixel_values(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
-
-	// expose the whole image
-	for (int j = 0; j < f->h; j++)
-	for (int i = 0; i < f->w; i++)
-	{
-		double p[2];
-		window_to_image(p, e, i, j);
-		float c[3];
-		pixel(c, e, p[0], p[1]);
-		//if (!i && !j)
-		//	fprintf(stderr, "first pixel (%g %g){%g %g %g}\n",
-		//			p[0], p[1], c[0], c[1], c[2]);
-		unsigned char *cc = f->rgb + 3 * (j * f->w + i);
-		colormap3(cc, e, c);
-	}
-
-	// if pixels are "huge", show their values
 	double zf = e->zoom_factor;
 	if (zf > 30) // "zoom_factor equals the pixel size"
 	{
@@ -410,7 +508,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		for (int ii = ij[0] - zf; ii < f->w + zf; ii += zf)
 		{
 			window_to_image(p, e, ii, jj);
-			float c[3]; pixel(c, e, p[0], p[1]);
+			float c[3]; pixel_rgbf(c, e, p[0], p[1]);
 			uint8_t rgb[3]; colormap3(rgb, e, c);
 			uint8_t color_green[3] = {0, 255, 0};
 			uint8_t color_red[3] = {255, 0, 0};
@@ -435,46 +533,73 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		}
 
 	}
+}
 
-	// if ROI, expose the roi
-	if (e->roi)
+static void expose_roi(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+
+	float buf_in [3 * e->roi_w * e->roi_w];
+	float buf_out[3 * e->roi_w * e->roi_w];
+	for (int j = 0; j < e->roi_w; j++)
+	for (int i = 0; i < e->roi_w; i++)
 	{
-		float buf_in [3 * e->roi_w * e->roi_w];
-		float buf_out[3 * e->roi_w * e->roi_w];
-		for (int j = 0; j < e->roi_w; j++)
-		for (int i = 0; i < e->roi_w; i++)
+		// i,h       = position inside ROI
+		// ii,jj     = position inside viewport
+		// p[0],p[1] = position inside image domain
+		int ii = i + e->roi_x - e->roi_w/2;
+		int jj = j + e->roi_y - e->roi_w/2;
+		double p[2];
+		window_to_image(p, e, ii, jj);
+		float *c = buf_in + 3 * (j * e->roi_w + i);
+		pixel_rgbf(c, e, p[0], p[1]);
+	}
+	transform_roi_buffers(buf_out, buf_in, e->roi_w, e->roi);
+	for (int j = 0; j < e->roi_w; j++)
+	for (int i = 0; i < e->roi_w; i++)
+	{
+		int ii = i + e->roi_x - e->roi_w/2;
+		int jj = j + e->roi_y - e->roi_w/2;
+		float *c = buf_out + 3 * (j * e->roi_w + i);
+		if (insideP(f->w, f->h, ii, jj))
 		{
-			// i,h       = position inside ROI
-			// ii,jj     = position inside viewport
-			// p[0],p[1] = position inside image domain
-			int ii = i + e->roi_x - e->roi_w/2;
-			int jj = j + e->roi_y - e->roi_w/2;
-			double p[2];
-			window_to_image(p, e, ii, jj);
-			float *c = buf_in + 3 * (j * e->roi_w + i);
-			pixel(c, e, p[0], p[1]);
-		}
-		transform_roi_buffers(buf_out, buf_in, e->roi_w, e->roi);
-		for (int j = 0; j < e->roi_w; j++)
-		for (int i = 0; i < e->roi_w; i++)
-		{
-			int ii = i + e->roi_x - e->roi_w/2;
-			int jj = j + e->roi_y - e->roi_w/2;
-			float *c = buf_out + 3 * (j * e->roi_w + i);
-			if (insideP(f->w, f->h, ii, jj))
+			uint8_t *cc = f->rgb + 3 * (jj * f->w + ii);
+			for (int l = 0; l < 3; l++)
 			{
-				uint8_t *cc = f->rgb + 3 * (jj * f->w + ii);
-				for (int l = 0; l < 3; l++)
-				{
-					float g = e->a * c[l] + e->bbb[l];
-					if      (g < 0)   cc[l] = 0  ;
-					else if (g > 255) cc[l] = 255;
-					else              cc[l] = g  ;
-					//cc[l] = c[l];
-				}
+				float g = e->a * c[l] + e->bbb[l];
+				if      (g < 0)   cc[l] = 0  ;
+				else if (g > 255) cc[l] = 255;
+				else              cc[l] = g  ;
+				//cc[l] = c[l];
 			}
 		}
 	}
+}
+
+// dump the image acording to the state of the viewport
+static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+
+	// expose the whole image
+	for (int j = 0; j < f->h; j++)
+	for (int i = 0; i < f->w; i++)
+	{
+		double p[2];
+		window_to_image(p, e, i, j);
+		float c[3];
+		pixel_rgbf(c, e, p[0], p[1]);
+		unsigned char *cc = f->rgb + 3 * (j * f->w + i);
+		colormap3(cc, e, c);
+	}
+
+	// if pixels are "huge", show their values
+	if (e->zoom_factor > 30)
+		expose_pixel_values(f);
+
+	// if ROI, expose the roi
+	if (e->roi)
+		expose_roi(f);
 
 	// mark shit as changed
 	f->changed = 1;
@@ -524,8 +649,9 @@ static void key_handler_print(struct FTR *f, int k, int m, int x, int y)
 
 static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
-	//fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
-	//		k, isalpha(k)?k:' ', m, x, y);
+	if (m & FTR_MASK_SHIFT && islower(k)) k = toupper(k);
+	fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
+			k, isalpha(k)?k:' ', m, x, y);
 
 	//if (k == '+') action_increase_zoom(f, f->w/2, f->h/2);
 	//if (k == '-') action_decrease_zoom(f, f->w/2, f->h/2);
@@ -541,6 +667,7 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	//if (k == 'b') action_contrast_change(f, 1, 1);
 	//if (k == 'B') action_contrast_change(f, 1, -1);
 	if (k == 'n') action_qauto(f);
+	if (k == 'N') action_qauto2(f);
 	if (k == 'r') action_toggle_roi(f, x, y, m&FTR_MASK_SHIFT);
 
 	// if ESC or q, exit
@@ -589,13 +716,13 @@ int main_cpu(int c, char *v[])
 	e->w = e->i->w;
 	e->h = e->i->h;
 
-	// setup fonts
-	//e->font[0] = reformat_font(*xfont_5x7, UNPACKED);
+	// setup fonts (TODO, integrate these calls into fontu's caching stuff)
 	e->font[0] = reformat_font(*xfont_4x6, UNPACKED);
 	e->font[1] = reformat_font(*xfont_6x12, UNPACKED);
 	e->font[2] = reformat_font(*xfont_7x13, UNPACKED);
 	e->font[3] = reformat_font(*xfont_9x15, UNPACKED);
 	e->font[4] = reformat_font(*xfont_10x20, UNPACKED);
+	//e->font[0] = reformat_font(*xfont_5x7, UNPACKED);
 
 	// open window
 	struct FTR f = ftr_new_window(BAD_MIN(e->w,1000), BAD_MIN(e->h,800));

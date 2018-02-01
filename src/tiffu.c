@@ -2561,6 +2561,15 @@ static int mandelbailout(double x, double y, int niter)
 	}
 }
 
+static int mandelbailout_ij(int w, int h,
+		double x0, double xf, double y0, double yf, int ii, int jj,
+		int niter)
+{
+	double x = (xf - x0) * ii / (w - 1.0) + x0;
+	double y = (yf - y0) * jj / (h - 1.0) + y0;
+	return  mandelbailout(x, y, niter);
+}
+
 static int main_manwhole(int argc, char *argv[])
 {
 	if (argc != 7) {
@@ -2600,16 +2609,31 @@ static int main_manwhole(int argc, char *argv[])
 	for (int tj = 0; tj < td; tj++)
 	for (int ti = 0; ti < ta; ti++)
 	{
+		int n = 0; // side bailout sum
+		{
+			for (int i = 0; i < tw; i++) n += mandelbailout_ij(w,h,
+					x0,xf,y0,yf,ti*tw+i,tj*th+0, niter);
+			for (int i = 0; i < tw; i++) n += mandelbailout_ij(w,h,
+					x0,xf,y0,yf,ti*tw+i,tj*th+th-1, niter);
+			for (int j = 0; j < th; j++) n += mandelbailout_ij(w,h,
+					x0,xf,y0,yf,ti*tw+0,tj*th+j, niter);
+			for (int j = 0; j < th; j++) n += mandelbailout_ij(w,h,
+					x0,xf,y0,yf,ti*tw+tw-1,tj*th+j, niter);
+		}
+		if (!n) {for(int i=0;i<tw*th;i++)buf[i]=0;fprintf(stderr, "tile (%d %d) BAILOUT\n", ti, tj);} else {
 		for (int j = 0; j < th; j++)
 		for (int i = 0; i < tw; i++)
 		{
 			int ii = ti*tw + i;
 			int jj = tj*th + j;
-			double x = (xf - x0) * ii / (w - 1.0) + x0;
-			double y = (yf - y0) * jj / (h - 1.0) + y0;
-			buf[j*tw+i] = mandelbailout(x, y, niter);
+			//double x = (xf - x0) * ii / (w - 1.0) + x0;
+			//double y = (yf - y0) * jj / (h - 1.0) + y0;
+			buf[j*tw+i] = mandelbailout_ij(w,h, x0,xf,y0,yf, ii,jj,
+					niter);
+		}
 		}
 		TIFFWriteTile(tif, buf, ti*tw, tj*th, 0, 0);
+		fprintf(stderr, "tile (%d %d) / (%d %d)\n", ti, tj, ta, td);
 	}
 
 	TIFFClose(tif);

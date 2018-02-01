@@ -120,8 +120,8 @@ static float float_mod(float *x, int n)
 	for (int i = 0; i < n; i++)
 	{
 		int xi = x[i];
-		if (xi < 0) fail("negative xi=%g", x[i]);//xi = 0;
-		if (xi > 0xff) fail("large xi=%g", x[i]);//xi = 0xff;
+		if (xi < 0) continue;//fail("negative xi=%g", x[i]);//xi = 0;
+		if (xi > 0xff) continue;//fail("large xi=%g", x[i]);//xi = 0xff;
 		h[xi] += 2;
 		if (xi > 0) h[xi-1] += 1;
 		if (xi < 0xff) h[xi+1] += 1;
@@ -144,8 +144,8 @@ static float float_modH(float *x, int n)
 	for (int i = 0; i < n; i++)
 	{
 		int xi = p*floor(x[i]/p);
-		if (xi < 0) fail("negative xi=%g", x[i]);//xi = 0;
-		if (xi > 0xff) fail("large xi=%g", x[i]);//xi = 0xff;
+		if (xi < 0) continue;//fail("negative xi=%g", x[i]);//xi = 0;
+		if (xi > 0xff) continue;//fail("large xi=%g", x[i]);//xi = 0xff;
 		h[xi] += 2;
 		if (xi > 0) h[xi-1] += 1;
 		if (xi < 0xff) h[xi+1] += 1;

@@ -625,35 +625,30 @@ static void put_string_in_float_image(float *x, int w, int h, int pd,
 		int posx, int posy, float *color, int kerning,
 		struct bitmap_font *font, char *string)
 {
+	float *bg = NULL;
+	float *fg = color;
 	int posx0 = posx;
 	while (1)
 	{
 		int c = *string++;
-		if (!c) break;
-		if (c == '\n') {
-			posx = posx0;
-			posy += font->height;
-			continue;
-		}
-		if (c > 0 && c < font->number_of_glyphs)
+		if (!c) { break;
+		} else if (c == '\n') { posy += font->height; posx = posx0;
+		} else if (c == '\t') { posx += 8 * (font->width + kerning);
+		} else if (c == '\b') { posx -= 1 * (font->width + kerning);
+		} else if (c > 0 && c < font->number_of_glyphs)
 		{
-			//fprintf(stderr, "putting glyph \"%d\" '%c'\n", c, c);
 			for (int i = 0; i < font->width; i++)
 			for (int j = 0; j < font->height; j++)
+			{
+				int ii = posx + i;
+				int jj = posy + j;
 				if (get_font_bit(font, c, i, j))
-				{
-					int ii = posx + i;
-					int jj = posy + j;
-					put_pixel(x, w, h, pd, ii, jj, color);
-				}
-			       	//else {
-				//	float white[10] = {255};
-				//	int ii = posx + i;
-				//	int jj = posy + j;
-				//	put_pixel(x, w, h, pd, ii, jj, white);
-				//}
+					put_pixel(x, w, h, pd, ii, jj, fg);
+				else if (bg)
+					put_pixel(x, w, h, pd, ii, jj, bg);
+			}
+			posx += font->width + kerning;
 		}
-		posx += font->width + kerning;
 	}
 }
 
@@ -661,18 +656,15 @@ static void put_string_in_rgb_image(uint8_t *x, int w, int h,
 		int posx, int posy, uint8_t *fg, uint8_t *bg, int kerning,
 		struct bitmap_font *font, char *string)
 {
-	fprintf(stderr, "PUTS_RGB \"%s\"\n", string);
 	int posx0 = posx;
 	while (1)
 	{
 		int c = *string++;
-		if (!c) break;
-		if (c == '\n') {
-			posx = posx0;
-			posy += font->height;
-			continue;
-		}
-		if (c > 0 && c < font->number_of_glyphs)
+		if (!c) { break;
+		} else if (c == '\n') { posy += font->height; posx = posx0;
+		} else if (c == '\t') { posx += 8 * (font->width + kerning);
+		} else if (c == '\b') { posx -= 1 * (font->width + kerning);
+		} else if (c > 0 && c < font->number_of_glyphs)
 		{
 			for (int i = 0; i < font->width; i++)
 			for (int j = 0; j < font->height; j++)
@@ -684,8 +676,8 @@ static void put_string_in_rgb_image(uint8_t *x, int w, int h,
 				else if (bg)
 					put_pixel_rgb(x, w, h, ii, jj, bg);
 			}
+			posx += font->width + kerning;
 		}
-		posx += font->width + kerning;
 	}
 }
 
