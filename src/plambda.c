@@ -138,23 +138,35 @@
 //	--version	print program version
 //
 // EXAMPLES                                                                {{{2
-// 	Sum two images:
+// 	Sum two images (to standard output):
+// 		plambda a.png b.png +
 //
-// 		plambda a.png b.png "a b +" > aplusb.png
+// 	Sum two images (to the named file):
+// 		plambda a.png b.png + -o aplusb.png
 //
 //	Add a gaussian to half of lena:
+//		plambda /tmp/lena.png "2 / :r :r * -1 * 40 * exp 200 * +"
 //
-//		plambda /tmp/lena.png "x 2 / :r :r * -1 * 40 * exp 200 * +"
+//	Forward differences to compute the derivative in vertical direction:
+//		plambda lena.png "x(0,1) x -"
 //
-//	Forward differences to compute the derivative in horizontal direction:
+//	Forward differences (shorthand of the above):
+//		plambda lena.png "x,y"
 //
-//		plambda lena.png "x(1,0) x -"
-//
-//	Sobel edge detector:
+//	Sobel edge detector (explicit version in coordinates):
 //		plambda lena.png "x(1,0) 2 * x(1,1) x(1,-1) + + x(-1,0) 2 * x(-1,1) x(-1,-1) + + - x(0,1) 2 * x(1,1) x(-1,1) + + x(0,-1) 2 * x(1,-1) x(-1,-1) + + - hypot"
 //
-//	Color to gray:
+//	Sobel edge detector (equivalent, using vectorial operators):
+//		plambda lena.png "x,gs vnorm"
+//
+//	Sobel edge detector (still equivalent, using even more vectorial ops):
+//		plambda lena.png x,ns
+//
+//	Color to gray (in explicit coordinates):
 //		plambda lena.png "x[0] x[1] x[2] + + 3 /"
+//
+//	Color to gray (equivalent, using vector operations):
+//		plambda lena.png vavg
 //
 //	Pick the blue channel of a RGB image:
 //		plambda lena.png "x[2]"
@@ -168,16 +180,16 @@
 //		plambda lena.png "x split rot join3"
 //
 //	Merge the two components of a vector field into a single file
-//		plambda x.tiff y.tiff "x y join" > xy.tiff
+//		plambda x.tiff y.tiff join -o xy.tiff
 //
 //	Set to 0 the green component of a RGB image
 //		plambda lena.png "x[0] 0 x[2] join3"
 //
-//	Naive Canny filter:
+//	Naive Canny filter (in all its glory, using explicit coordinates):
 //		cat lena.png | gblur 2 | plambda - "x(1,0) 2 * x(1,1) x(1,-1) + + x(-1,0) 2 * x(-1,1) x(-1,-1) + + - >1 x(0,1) 2 * x(1,1) x(-1,1) + + x(0,-1) 2 * x(1,-1) x(-1,-1) + + - >2 <1 <2 hypot <2 <1 atan2 join" | plambda - "x[0] 4 > >1 x[1] fabs pi 4 / > x[1] fabs pi 4 / 3 * < * >2 x[1] fabs pi 4 / < x[1] fabs pi 4 / 3 * > + >3 x[0] x[0](0,1) > x[0] x[0](0,-1) > * >4 x[0] x[0](1,0) > x[0] x[0](-1,0) > * >5 <1 <3 <5 * * <1 <2 <4 * * + x[0] *" | qauto | display
 //
 //	Anti-Lalpacian (solve Poisson equation):
-//		cat lena.png | fft 1 | plambda - "x  :I :I * :J :J * + / -1 *" | fft -1 | qauto | display
+//		cat lena.png | fft 1 | plambda ":I :I * :J :J * + / -1 *" | fft -1 | qauto | display
 //
 //	Wiener Filter (for real kernels):
 //		PREC=0.01
@@ -187,7 +199,7 @@
 //		FCUT=80
 //		plambda kernel.fft image.fft ":I :J hypot $FCUT < y h[0] / 0 if"
 //
-//	Generate a U(-1,1) scalar field with gaussian grain
+//	Generate a U(-1,1) scalar field with gaussian grain of size WxH
 //		GRAINSIZE=7
 //		plambda zero:WxH "randn"|blur g $GRAINSIZE|plambda - "x $GRAINSIZE * pi sqrt * 2 * 2 sqrt / erf"
 //
@@ -198,7 +210,7 @@
 //		plambda zero:WxH "randn randn randn randn  4 njoin $GRAINSIZE * pi sqrt * 2 *"|blur g $GRAINSIZE|plambda - "x[0] x[1] * x[2] x[3] * - 2 sqrt /"
 //
 //	Periodic component of an image
-//		  cat image|fftsym|fft|plambda - "x :I :I * :J :J * + *"|ifft|crop 0 0 `imprintf "%w %h" image`|fft|plambda - "x :I :I * :J :J * + / 4 /"|ifft >pcomponent
+//		  cat image|fftsym|fft|plambda ":I :I * :J :J * + *"|ifft|crop 0 0 `imprintf "%w %h" image`|fft|plambda ":I :I * :J :J * + / 4 /"|ifft >pcomponent
 //
 //
 //
@@ -2743,6 +2755,13 @@ verbosity>0?
 " mtrans\t\ttranspose of a matrix\n"
 " mtrace\t\ttrace of a matrix\n"
 " minv\t\tinverse of a matrix\n"
+" vavg\t\taverage value of a vector\n"
+" vsum\t\tsum of the components of a vector\n"
+" vmul\t\tproduct of the components of a vector\n"
+" vmax\t\tmax component of a vector\n"
+" vmin\t\tmin component of a vector\n"
+" vnorm\t\teuclidean norm of a vector\n"
+" vdim\t\tlength of a vector\n"
 "\n"
 "Registers (numbered from 1 to 9):\n"
 " >7\tcopy to register 7\n"
