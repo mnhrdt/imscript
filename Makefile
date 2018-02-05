@@ -1,4 +1,4 @@
-CFLAGS ?= -march=native -O2 -DNDEBUG
+CFLAGS ?= -march=native -O3 -DNDEBUG
 LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm
 
 OBJ = src/iio.o src/fancy_image.o
@@ -7,7 +7,7 @@ BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
       contihist fontu imprintf pview viewflow flowarrows palette ransac blur \
       srmatch tiffu siftu crop lrcat tbcat fftshift bmms registration imflip \
       fft dct dht flambda fancy_crop fancy_downsa autotrim iion mediator     \
-      redim colormatch eucdist nonmaxsup gntiply
+      redim colormatch eucdist nonmaxsup gntiply idump
 
 BIN := $(addprefix bin/,$(BIN))
 
