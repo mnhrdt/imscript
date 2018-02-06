@@ -376,6 +376,18 @@ static double range(double x, double a, double b)
 	return (x-a)/(b-a);
 }
 
+static double affine_half(double x, double a, double b)
+{
+	if (x < b)
+		return a*x;
+	else
+	{
+		double p = (a*b - 255) / (b - 255);
+		double q = 255 - 255 * p;
+		return p*x + q;
+	}
+}
+
 static double bound_double(double x, double a, double b)
 {
 	if (x < a) return a;
@@ -781,6 +793,7 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(quantize_easy,"qe",3),
 	REGISTER_FUNCTIONN(unquantize_easy,"iqe",3),
 	REGISTER_FUNCTIONN(range,"range",3),
+	REGISTER_FUNCTIONN(affine_half,"affhalf",3),
 	REGISTER_FUNCTIONN(bound_double,"bound",3),
 	REGISTER_FUNCTIONN(pow,"^",2),
 	REGISTER_FUNCTIONN(sum_two_doubles,"+",2),
