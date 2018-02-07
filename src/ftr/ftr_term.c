@@ -80,20 +80,24 @@ static void enable_canonical_and_echo_modes(void)
 	tcsetattr(0, TCSANOW, t);
 }
 
+#include "smapa.h"
+SMART_PARAMETER(COLUMNS,80)
+SMART_PARAMETER(LINES,25)
+
 // ftr_new_window_with_image_uint8_rgb {{{2
 struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 {
 	//if (w != 80 || h != 25)
 	//	exit(fprintf(stderr, "this is not a proper terminal!\n"));
-	w = 80;
-	h = 50;
+	w = COLUMNS();
+	h = 2*(LINES() - 7) - 4;
 
 	struct _FTR f[1];
 
 	f->w = w;
 	f->h = h;
-	f->max_w = 80;
-	f->max_h = 50;
+	f->max_w = 2000;
+	f->max_h = 2000;
 	f->rgb = malloc(f->max_w * f->max_h * 3);
 	for (int i = 0; i < 3*w*h; i++)
 		f->rgb[i] = x ? x[i] : 0;
@@ -157,7 +161,7 @@ int ftr_loop_run(struct FTR *ff)
 				buf[buf_i++] = c;
 			}
 		} else {
-			if (c == 27) // ESC 
+			if (c == 27) // ESC
 			{
 				inside_code = true;
 				continue;
@@ -177,7 +181,7 @@ int ftr_loop_run(struct FTR *ff)
 
 		fprintf(stderr, "trans key %d '%c'\n", c, isprint(c)?c:' ');
 		if (f->handle_key)
-			f->handle_key(ff, c, 0, 40, 25);
+			f->handle_key(ff, c, 0, f->w/2, f->h/2);
 		if (f->handle_expose)
 			f->handle_expose(ff, 0, 0, 0, 0);
 		ftr_term_dump(f);
