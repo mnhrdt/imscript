@@ -651,7 +651,7 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
 	if (m & FTR_MASK_SHIFT && islower(k)) k = toupper(k);
 	fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
-			k, isalpha(k)?k:' ', m, x, y);
+			k, isprint(k)?k:' ', m, x, y);
 
 	//if (k == '+') action_increase_zoom(f, f->w/2, f->h/2);
 	//if (k == '-') action_decrease_zoom(f, f->w/2, f->h/2);
@@ -681,21 +681,21 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 		if (m & FTR_MASK_SHIFT  ) inc /= 10;
 		if (m & FTR_MASK_CONTROL) inc *= 10;
 		switch (k) {
-		case FTR_KEY_LEFT : d[0] -= inc; break;
-		case FTR_KEY_RIGHT: d[0] += inc; break;
-		case FTR_KEY_UP   : d[1] -= inc; break;
-		case FTR_KEY_DOWN : d[1] += inc; break;
+		case 'h': case FTR_KEY_LEFT : d[0] -= inc; break;
+		case 'l': case FTR_KEY_RIGHT: d[0] += inc; break;
+		case 'k': case FTR_KEY_UP   : d[1] -= inc; break;
+		case 'j': case FTR_KEY_DOWN : d[1] += inc; break;
 		}
 		if (k == FTR_KEY_PAGE_UP)   d[1] = +f->h/3;
 		if (k == FTR_KEY_PAGE_DOWN) d[1] = -f->h/3;
 		action_offset_viewport(f, d[0], d[1]);
 	}
 
-	// if 'k', do weird things
-	if (k == 'k') {
-		fprintf(stderr, "setting key_handler_print\n");
-		ftr_set_handler(f, "key", key_handler_print);
-	}
+//	// if 'k', do weird things
+//	if (k == 'k') {
+//		fprintf(stderr, "setting key_handler_print\n");
+//		ftr_set_handler(f, "key", key_handler_print);
+//	}
 }
 
 
