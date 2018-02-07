@@ -12,20 +12,13 @@
 #include <stdio.h>
 #include "iio.h"
 
-static void idump_pair(uint8_t *a, uint8_t *b)
-{
-	printf("\x1b[38;2;%d;%d;%dm\x1b[48;2;%d;%d;%dm▀",
-			a[0], a[1], a[2], b[0], b[1], b[2]);
-
 // https://en.wikipedia.org/wiki/ANSI_escape_code#24-bit
 //
 //   ESC[ … 38;2;<r>;<g>;<b> … m Select RGB foreground color
 //   ESC[ … 48;2;<r>;<g>;<b> … m Select RGB background color
 //
 // NOTE: \x1b == ESC
-}
-
-
+//
 static void idump(uint8_t *x, int w, int h)
 {
 	for (int j = 0; j < h; j += 2)
@@ -34,7 +27,8 @@ static void idump(uint8_t *x, int w, int h)
 		{
 			uint8_t *a = x + 3 * (w*(j+0) + i);
 			uint8_t *b = x + 3 * (w*(j+1) + i);
-			idump_pair(a, b);
+			printf("\x1b[38;2;%d;%d;%dm\x1b[48;2;%d;%d;%dm▀",
+					a[0], a[1], a[2], b[0], b[1], b[2]);
 		}
 		printf("\x1b[0m\n");
 	}
