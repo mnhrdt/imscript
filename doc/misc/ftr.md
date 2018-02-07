@@ -13,10 +13,11 @@ around native libraries, intended to be as thin as possible, but not thinner.
 </p>
 
 <p>
-Current ports include X11 (tested on linux, freebsd and openbsd) and any
-platform supporting <a href="http://freeglut.sourceforge.net/">freeglut</a> (tested on linux, should work on Windows and
-OSX after installing freeglut).  Planned ports include native Windows in the
-short term and native OSX on the long term.
+Current ports include X11 (tested on linux, freebsd and openbsd),
+ANSI-terminal (without mouse),  and any platform supporting <a
+href="http://freeglut.sourceforge.net/">freeglut</a> (tested on linux, should
+work on Windows and OSX after installing freeglut).  Planned ports include
+native Windows in the short term and native OSX on the long term.
 </p>
 
 <h2>Examples</h2>
