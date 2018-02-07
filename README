@@ -128,12 +128,19 @@ desired executables into your PATH (or add imscript/bin into the path).
 	- tcregistration: register two images by translation
 
 * Interactive programs:
-	- fpan: display an image with panning, zooming, and contrast changes
-	- fpantiff: like fpan, but understands image pyramids
-	- rpcflip: display several calibrated satellite images
+	- cpu: display an image with panning, zooming, contrast changes, and dft
+	- rpcflip: flip between several geo-referenced satellite images
 	- powerkill: fourier-domain band-pas filter editor
 	- epiview: visualize the epipolar geometry between two images
 	- viho: interactive homographic visualization
-	- dosdo: look at an image and its fourier transform
+	- dosdo: look at an image and its fourier transform side by side
 	- icrop: interactive crop
 	- vnav: visualize cylindrical images
+
+	NOTE: all interactive programs admit two backends.  By default, they
+	open an x-window.  But they can also be compiled as "name_term" and
+	then a simpler backend without graphical dependencies is produced.
+	This backend us based on ANSI control sequences and utf-8 characters
+	and should work on many modern terminals.  This backend is useful for
+	interactive image visualization behind ssh.  Note that mouse support
+	is still lacking for the ANSI backend, only the keyboard works.
