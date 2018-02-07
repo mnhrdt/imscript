@@ -76,7 +76,9 @@ BINOBJ = $(BIN:bin/%=src/%.o) $(BIN_FTR:bin/%=src/ftr/%.o)
 bin/im : src/im.o $(BINOBJ) $(OBJ_ALL)
 	$(CC) $(LDFLAGS) -Wl,--allow-multiple-definition -o $@ $^ $(LDLIBS_FTR)
 
-
+# the cpu executable, but compiled for the terminal backend
+bin/cpu_term : $(addprefix src/ftr/,ftr_term.o cpu.o fancy_image.o iio.o)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 # bureaucracy
 clean: ; $(RM) $(BIN_ALL) bin/im src/*.o src/ftr/*.o src/misc/*.o
