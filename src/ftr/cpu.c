@@ -33,8 +33,13 @@ struct pan_state {
 
 	// 2. view port parameters
 	double zoom_factor, offset_x, offset_y;
-	double a, b;
-	double aaa[3], bbb[3];
+	double a, b, bbb[3];
+
+	// 3. ancillary data, viewing configuration
+	float chan_mu[3];
+	float chan_size[3];
+	float p;
+	bool auto_qauto;
 
 	// 4. roi
 	int roi; // 0=nothing 1=dftwindow 2=rawfourier 3=ppsmooth
@@ -120,15 +125,6 @@ static void action_print_value_under_cursor(struct FTR *f, int x, int y)
 	}
 }
 
-static void action_offset_viewport(struct FTR *f, int dx, int dy)
-{
-	struct pan_state *e = f->userdata;
-	e->offset_x -= dx/e->zoom_factor;
-	e->offset_y -= dy/e->zoom_factor;
-
-	f->changed = 1;
-}
-
 static void action_reset_zoom_and_position(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
@@ -139,6 +135,9 @@ static void action_reset_zoom_and_position(struct FTR *f)
 	e->a = 1;
 	e->b = 0;
 	e->bbb[0] = e->bbb[1] = e->bbb[2] = 0;
+
+	e->p = INFINITY;
+	e->auto_qauto = false;
 
 	e->roi = 0;
 	e->roi_x = f->w / 2;
@@ -165,12 +164,24 @@ static int compare_floats(const void *a, const void *b)
 	return (*da > *db) - (*da < *db);
 }
 
+#include "smapa.h"
+SMART_PARAMETER(SIGMAFACTOR_P1,2)
+SMART_PARAMETER(SIGMAFACTOR_P2,3)
+
 void compute_scalar_position_and_size(
 		float *out_pos, float *out_siz,
 		float *x, int n,
 		float p)
 {
+	fprintf(stderr, "ska_pos_s    p=%g     len=%d    first=%g\n",
+			p, n, x[0]);
+
 	if (false) ;
+	else if (isnan(p))
+	{
+		*out_pos = 127.5;
+		*out_siz = 255;
+	}
 	else if (p == INFINITY)
 	{
 		float min = INFINITY;
@@ -178,7 +189,7 @@ void compute_scalar_position_and_size(
 		for (int i = 0; i < n; i++)
 		{
 			min = fmin(min, x[i]);
-			max = fmin(max, x[i]);
+			max = fmax(max, x[i]);
 		}
 		*out_pos = (min + max) / 2;
 		*out_siz = max - min;
@@ -194,7 +205,7 @@ void compute_scalar_position_and_size(
 			sigma = hypot(sigma, x[i] - mu);
 		sigma /= sqrt(n);
 		*out_pos = mu;
-		*out_siz = sigma;
+		*out_siz = sigma * SIGMAFACTOR_P2();
 	}
 	else if (p == 1)
 	{
@@ -207,11 +218,17 @@ void compute_scalar_position_and_size(
 		long double aad = 0;
 		for (int i = 0; i < n; i++)
 			aad += fabs(x[i] - med);
+		aad /= n;
+		*out_pos = med;
+		*out_siz = aad * SIGMAFACTOR_P1();
 	}
+	else fail("unrecognized p=%g\n", p);
 	// todo: implement other measures
+
+	fprintf(stderr, "\tpos size = %g %g\n", *out_pos, *out_siz);
 }
 
-void compute_vectorial_position_and_size(
+void compute_split_position_and_size(
 		float *m, // array of output mus
 		float *s, // array of output sigmas
 		float *x, // input array of n d-dimsensional vectors
@@ -258,31 +275,44 @@ static void action_qauto(struct FTR *f)
 static void action_qauto2(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
-
-	static int qauto_p_idx = 0;
-	float p[4] = {NAN, INFINITY, 2, 1};
-	qauto_p_idx = (qauto_p_idx + 1) % 4;
-	fprintf(stderr, "qauto p = %g\n", p[qauto_p_idx]);
+	//static int qauto_p_idx = 0;
+	//float p[4] = {NAN, INFINITY, 2, 1};
+	//qauto_p_idx = (qauto_p_idx + 1) % 4;
+	//fprintf(stderr, "qauto p = %g\n", p[qauto_p_idx]);
 
 	// build an array of pixel values from the current screen
 	// TODO: cache this shit, we are computing this twice!
-	int w = f->w * 0.8;
-	int h = f->h * 0.8;
 	int pd = e->i->pd;
-	float *t = xmalloc(w * h * pd * sizeof*t);
+	float *t = xmalloc(f->w * f->h * pd * sizeof*t);
+	int winsize = 0;
 	for (int j = 0.1*f->h; j < 0.9*f->h; j++)
 	for (int i = 0.1*f->w; i < 0.9*f->w; i++)
 	{
 		double p[2]; window_to_image(p, e, i, j);
-		float c[pd]; pixel(c, e, p[0], p[1]);
+		pixel(t + pd * winsize++, e, p[0], p[1]);
 	}
 
 	// extract mu/sigma for each channel
-	//int pd = e->i->pd;
-	//float mu[pd], sigma[pd];
-	//compute_vectorial_position_and_size(mu, sigma, 
-	//
+	float mu[pd], sigma[pd];
+	compute_split_position_and_size(mu, sigma, t, winsize, pd, e->p);
 	free(t);
+
+	for (int i = 0; i < pd; i++)
+		fprintf(stderr, "musigma[%d] = %g %g\n", i, mu[i], sigma[i]);
+
+
+	// adapt mu/sigma to color
+	float mu_rgb[3], sigma_rgb[3];
+	get_rgb_from_vec(mu_rgb   , e, mu   );
+	get_rgb_from_vec(sigma_rgb, e, sigma);
+
+	// change contrast viewport accordingly
+	e->a = 255 * 3 / (sigma_rgb[0] + sigma_rgb[1] + sigma_rgb[2]);
+	e->bbb[0] = 127.5 - e->a * mu_rgb[0];
+	e->bbb[1] = 127.5 - e->a * mu_rgb[1];
+	e->bbb[2] = 127.5 - e->a * mu_rgb[2];
+
+	f->changed = 1;
 }
 
 static void action_toggle_roi(struct FTR *f, int x, int y, int dir)
@@ -292,6 +322,28 @@ static void action_toggle_roi(struct FTR *f, int x, int y, int dir)
 	fprintf(stderr, "ROI SWITCH(%d) = %d\n", dir, e->roi);
 	e->roi_x = x - e->roi_w / 2;
 	e->roi_y = y - e->roi_w / 2;
+	f->changed = 1;
+}
+
+static void action_toggle_aqauto(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->auto_qauto = !e->auto_qauto;
+	if (e->auto_qauto)
+		action_qauto2(f);
+}
+
+static void action_toggle_p(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	if (false) ;
+	else if (isnan(e->p)) e->p = 1;
+	else if (e->p == 1) e->p = 2;
+	else if (e->p == 2) e->p = INFINITY;
+	else if (e->p == INFINITY) e->p = NAN;
+
+	fprintf(stderr, "P = %g\n", e->p);
+	action_qauto2(f);
 	f->changed = 1;
 }
 
@@ -360,6 +412,7 @@ static void action_change_zoom_by_factor(struct FTR *f, int x, int y, double F)
 	e->offset_y = c[1] - y/e->zoom_factor;
 	fprintf(stderr, "\t zoom changed %g\n", e->zoom_factor);
 
+	if (e->auto_qauto) action_qauto2(f);
 	f->changed = 1;
 }
 
@@ -370,8 +423,6 @@ static void action_reset_zoom_only(struct FTR *f, int x, int y)
 	action_change_zoom_by_factor(f, x, y, 1/e->zoom_factor);
 }
 
-
-
 static void action_increase_zoom(struct FTR *f, int x, int y)
 {
 	action_change_zoom_by_factor(f, x, y, WHEEL_FACTOR);
@@ -381,6 +432,18 @@ static void action_decrease_zoom(struct FTR *f, int x, int y)
 {
 	action_change_zoom_by_factor(f, x, y, 1.0/WHEEL_FACTOR);
 }
+
+static void action_offset_viewport(struct FTR *f, int dx, int dy)
+{
+	struct pan_state *e = f->userdata;
+	e->offset_x -= dx/e->zoom_factor;
+	e->offset_y -= dy/e->zoom_factor;
+
+	if (e->auto_qauto) action_qauto2(f);
+
+	f->changed = 1;
+}
+
 
 static bool insideP(int w, int h, int i, int j)
 {
@@ -666,9 +729,10 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'A') action_contrast_span(f, 1.3);
 	//if (k == 'b') action_contrast_change(f, 1, 1);
 	//if (k == 'B') action_contrast_change(f, 1, -1);
-	if (k == 'n') action_qauto(f);
-	if (k == 'N') action_qauto2(f);
+	if (k == 'n') action_qauto2(f);
+	if (k == 'N') action_toggle_aqauto(f);
 	if (k == 'r') action_toggle_roi(f, x, y, m&FTR_MASK_SHIFT);
+	if (k == 'c') action_toggle_p(f);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
