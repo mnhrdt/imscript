@@ -179,6 +179,8 @@ int ftr_loop_run(struct FTR *ff)
 			inside_code = false;
 		}
 
+		if (c == 127) c = '\b';
+
 		fprintf(stderr, "trans key %d '%c'\n", c, isprint(c)?c:' ');
 		if (f->handle_key)
 			f->handle_key(ff, c, 0, f->w/2, f->h/2);

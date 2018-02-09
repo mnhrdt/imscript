@@ -662,8 +662,8 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'P') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1.006);
 	if (k == 'M') action_change_zoom_by_factor(f, f->w/2, f->h/2, 1/1.006);
 
-	//if (k == 'a') action_contrast_change(f, 1.3, 0);
-	//if (k == 'A') action_contrast_change(f, 1/1.3, 0);
+	if (k == 'a') action_contrast_span(f, 1/1.3);
+	if (k == 'A') action_contrast_span(f, 1.3);
 	//if (k == 'b') action_contrast_change(f, 1, 1);
 	//if (k == 'B') action_contrast_change(f, 1, -1);
 	if (k == 'n') action_qauto(f);
@@ -675,7 +675,7 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 		ftr_notify_the_desire_to_stop_this_loop(f, 1);
 
 	// arrows move the viewport
-	if (k > 1000) {
+	if (k > 1000 || k=='j'||k=='k'||k=='l'||k=='h') {
 		int d[2] = {0, 0};
 		int inc = -10;
 		if (m & FTR_MASK_SHIFT  ) inc /= 10;
