@@ -1,0 +1,20 @@
+#!/usr/bin/env octave
+
+#x = iio_read("/tmp/lena.png")
+
+fprintf(stderr, "%s; %d arguments\n", program_name(), nargin);
+arg_list = argv();
+for i = 1:nargin
+    fprintf(stderr, "%d argument = %s\n", i, arg_list{i});
+endfor
+
+if (nargin != 3)
+	fprintf(stderr, "usage:\n\t %s ", program_name())
+	exit(3)
+endif
+
+filename_ina = argv(){1};
+filename_inb = argv(){2};
+filename_out = argv(){3};
+
+fprintf(stderr, "a,b,out = %s %s %s\n",filename_ina,filename_inb,filename_out);

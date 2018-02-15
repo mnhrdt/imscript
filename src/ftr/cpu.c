@@ -79,11 +79,27 @@ static void get_rgb_from_vec(float *rgb, struct pan_state *e, float *vec)
 //{
 //}
 
+// like n%p, but works for all numbers
+static int gmod(int x, int m)
+{
+	int r = x % m;
+	return r < 0 ? r + m : r;
+}
+
 // evaluate the value a position (p,q) in image coordinates
 static void pixel(float *out, struct pan_state *e, double p, double q)
 {
-	if(p<0||q<0){out[0]=out[1]=out[2]=170;return;}// TODO: kill this
-	if(p>=e->i->w||q>=e->i->h){out[0]=out[1]=out[2]=85;return;}
+	//if(p<0||q<0){out[0]=out[1]=out[2]=170;return;}// TODO: kill this
+	//if(p>=e->i->w||q>=e->i->h){out[0]=out[1]=out[2]=85;return;}
+	if (p < 0 || q < 0 || p >= e->i->w || q >= e->i->h) {
+		int ip = p+256;
+		int iq = q+256;
+		int pip = gmod(ip/256, 2);
+		int piq = gmod(iq/256, 2);
+		int val = gmod(pip+piq,2);
+		out[0] = out[1] = out[2] = 127+val*64;
+		return;
+	}
 
 	int oct = 0;
 	if (e->zoom_factor < 0.9999)
