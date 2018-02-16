@@ -542,8 +542,8 @@ struct ann_pair *siftlike_get_annpairs_lowe(
 	struct ann_pair *p = xmalloc(na * sizeof * p);
 	int cx = 0;
 	FORI(na) {
-		double d = INFINITY, dp = 1;
-		//int to = fancynearest(ka+i, kb, nb, &d, &dp);
+		double d, dp;
+		fancynearest(ka+i, kb, nb, &d, &dp);
 		assert(dp >= d);
 		if (d / dp < loweratio) {
 			p[cx].from = i;
@@ -579,8 +579,8 @@ struct ann_pair *siftlike_get_annpairs_lowe2(
 	int count_tup = 0;
 	int count_ratiotup = 0;
 	FORI(na) {
-		double d = 1, dp = INFINITY;
-		//int to = fancynearest(ka+i, kb, nb, &d, &dp);
+		double d, dp;
+		fancynearest(ka+i, kb, nb, &d, &dp);
 		assert(dp >= d);
 		if ((d / dp < loweratio && d < tup) || d < tdown ) {
 			p[cx].from = i;
