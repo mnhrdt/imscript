@@ -202,7 +202,7 @@ double srtm4o(double lon, double lat, int octave)
 	if (t == NULL)
 		return NO_DATA;
 	else {
-		double r = getpixelo_double(t, xlon, xlat, fabs(octave));
+		double r = getpixelo_double(t, xlon, xlat, abs(octave));
 		return r > 0 ? r : 0;
 	}
 }

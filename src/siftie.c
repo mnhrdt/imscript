@@ -542,8 +542,8 @@ struct ann_pair *siftlike_get_annpairs_lowe(
 	struct ann_pair *p = xmalloc(na * sizeof * p);
 	int cx = 0;
 	FORI(na) {
-		double d, dp;
-		int to = fancynearest(ka+i, kb, nb, &d, &dp);
+		double d = INFINITY, dp = 1;
+		//int to = fancynearest(ka+i, kb, nb, &d, &dp);
 		assert(dp >= d);
 		if (d / dp < loweratio) {
 			p[cx].from = i;
@@ -579,8 +579,8 @@ struct ann_pair *siftlike_get_annpairs_lowe2(
 	int count_tup = 0;
 	int count_ratiotup = 0;
 	FORI(na) {
-		double d, dp;
-		int to = fancynearest(ka+i, kb, nb, &d, &dp);
+		double d = 1, dp = INFINITY;
+		//int to = fancynearest(ka+i, kb, nb, &d, &dp);
 		assert(dp >= d);
 		if ((d / dp < loweratio && d < tup) || d < tdown ) {
 			p[cx].from = i;
@@ -758,7 +758,7 @@ struct ann_pair *compute_sift_matches_locally(int *onp,
 	float x0[2] = {0, 0};
 	float dxy[2] = {dx, dy};
 	int n[2] = {1+(w-1)/dx, 1+(h-1)/dy};
-	int nr = n[0] * n[1];
+	//int nr = n[0] * n[1];
 	//struct ok_grid ga[1]; ok_grid_init(ga, na, x0, dxy, n);
 	struct ok_grid gb[1]; ok_grid_init(gb, nb, x0, dxy, n);
 	//for (int i = 0; i < na; i++) ok_grid_add_point(ga, i, ka[i].pos);
@@ -885,7 +885,7 @@ static bool cut_line_with_segment(double out[2], double line[3],
 static bool cut_line_with_rectangle(double out_a[2], double out_b[2],
 		double line[3], double rec_from[2], double rec_to[2])
 {
-	double nnn = hypot(line[0], line[1]);
+	//double nnn = hypot(line[0], line[1]);
 	//fprintf(stderr, "clwr (%g %g %g) (%g %g)-(%g %g)...",
 	//		line[0]/nnn, line[1]/nnn, line[2]/nnn,
 	//		rec_from[0], rec_from[1], rec_to[0], rec_to[1]);
@@ -1011,7 +1011,7 @@ void traverse_segment_thick(int px, int py, int qx, int qy,
 				float exact = py + i*slope;
 				int whole = lrint(exact);
 				float part = fabs(whole - exact);
-				int owhole = (whole<exact)?whole+1:whole-1;
+				//int owhole = (whole<exact)?whole+1:whole-1;
 				assert(part <= 0.5);
 				f(i+px, whole, e);
 				f(i+px, whole+1, e);
@@ -1028,7 +1028,7 @@ void traverse_segment_thick(int px, int py, int qx, int qy,
 				float exact = px + j*slope;
 				int whole = lrint(exact);
 				float part = fabs(whole - exact);
-				int owhole = (whole<exact)?whole+1:whole-1;
+				//int owhole = (whole<exact)?whole+1:whole-1;
 				assert(part <= 0.5);
 				f(whole, j+py, e);
 				f(whole+1, j+py, e);

@@ -1143,7 +1143,7 @@ static float mandelpoint(complex long double c, int niter)
 		oz = z;
 		z = z * z + c;
 	}
-	return cabs(oz);//k%2;
+	return cabsl(oz);//k%2;
 }
 
 struct mandel_site {
@@ -1496,7 +1496,7 @@ static const struct { char *n; int(*f)(int,char*[]); } mains[] = {
 	MAIN(mandelbrot),
 	MAIN(events),
 	MAIN(paint),
-	{ 0 }
+	{ 0, 0 }
 };
 
 static char *base_name(char *p)

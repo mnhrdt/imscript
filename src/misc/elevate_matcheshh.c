@@ -93,7 +93,7 @@ int main(int c, char *v[])
 
 	int n, lmax = 10000;
 	char line[lmax];
-	while (n = getlinen(line, lmax, fi))
+	while ((n = getlinen(line, lmax, fi)))
 	{
 		double m[4], p[2], q[2];
 		int r = sscanf(line, "%lf %lf %lf %lf", m, m + 1, m + 2, m + 3);

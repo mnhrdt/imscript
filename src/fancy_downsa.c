@@ -101,7 +101,7 @@ static void fancy_downsa(char *fname_out, char *fname_in, int nw, int nh, int m)
 
 	// read information from input image
 	int tw = 0, th = 0, fmt = 0, bps = 0;
-	int tiffo = fancy_image_leak_tiff_info(&tw, &th, &fmt, &bps, a);
+	fancy_image_leak_tiff_info(&tw, &th, &fmt, &bps, a);
 
 	// create output image of the appropriate size and options
 	int bw = a->w / nw;

@@ -125,7 +125,6 @@ static void env_interpolate_at(float *out,
 static void invflow(float *ou, float *flo, float *pin, int w, int h, int pd)
 {
 	float (*out)[w][pd] = (void*)ou;
-	float (*in)[w][pd] = (void*)pin;
 	float (*flow)[w][2] = (void*)flo;
 	float *flowdiv = NULL;
 	float *flowdet = NULL;

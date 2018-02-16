@@ -213,15 +213,8 @@ static float getsample_ass(float *x, int w, int h, int pd, int i, int j, int l)
 // like n%p, but works for all numbers
 static int good_modulus(int n, int p)
 {
-	if (!p) return 0;
-	if (p < 1) return good_modulus(n, -p);
-
 	int r = n % p;
-	r = r < 0 ? r + p : r;
-
-	assert(r >= 0);
-	assert(r < p);
-	return r;
+	return r < 0 ? r + p : r;
 }
 
 // symmetrized and periodized index

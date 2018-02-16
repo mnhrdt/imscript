@@ -796,8 +796,9 @@ int main_viewfmpair(int c, char *v[])
 		return EXIT_FAILURE;
 	}
 	double A[9]; FORI(9) A[i] = atof(v[1+i]);
-	int s[2], n; FORI(2) s[i] = atoi(v[10+i]);
+	int s[2]; FORI(2) s[i] = atoi(v[10+i]);
 	int overlay = atoi(v[12]);
+	(void)overlay;
 
 	double Atr[9];
 	FORI(3)FORJ(3) Atr[3*i+j]=A[3*j+i];

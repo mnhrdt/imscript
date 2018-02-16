@@ -354,8 +354,8 @@ static void init_state_no_preview(struct pan_state *e,
 	e->show_srtm4 = 0;
 	e->so = 0;
 	e->srtm4_base = 0;
-	msoctaves_instead_of_preview = true;e->view->tg->noctaves > 4 ||
-		(ci && e->view->tc->noctaves > 3);
+	msoctaves_instead_of_preview = true;//e->view->tg->noctaves > 4 ||
+	//	(ci && e->view->tc->noctaves > 3);
 }
 
 // state query functions {{{1
@@ -1045,10 +1045,7 @@ static void inplace_rgb_span3(float *x, int w, int h, double a)
 			med[0], med[1], med[2], iqd[0], iqd[1], iqd[2]);
 	for (int i = 0; i < n; i++)
 	for (int l = 0; l < 3; l++)
-	{
-		float xx = ( x[3*i+l] - med[l] ) / iqd[l];
 		x[3*i+l] = 127 + a * (x[3*i+l] - med[l] ) / iqd[l];
-	}
 	for (int l = 0; l < 3; l++) free(tmp[l]);
 }
 
@@ -1515,8 +1512,6 @@ static void action_dump_raw(struct FTR *f)
 		win_to_img = window_to_image_apm;
 		if (e->image_space)      win_to_img = window_to_image_apm;
 		else if (e->force_exact) win_to_img = window_to_image_ex;
-		int o = obtain_octave(e);
-		int interp = e->interpolation_order;
 		if (!e->image_space) continue;
 		double p[2];
 		win_to_img(p, e, i, j);
@@ -1569,7 +1564,6 @@ static void action_dump_raw_fancy(struct FTR *f)
 		win_to_img = window_to_image_apm;
 		if (e->image_space)      win_to_img = window_to_image_apm;
 		else if (e->force_exact) win_to_img = window_to_image_ex;
-		int o = obtain_octave(e);
 		int io = e->interpolation_order;
 		//if (!e->image_space) continue;
 		double p[2];
@@ -1629,7 +1623,6 @@ static void action_dump_raw_collection_fancy(struct FTR *f)
 			win_to_img = window_to_image_apm;
 			if (e->image_space)    win_to_img = window_to_image_apm;
 			else if(e->force_exact) win_to_img = window_to_image_ex;
-			int o = obtain_octave(e);
 			int io = e->interpolation_order;
 			//if (!e->image_space) continue;
 			double p[2];

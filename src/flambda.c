@@ -2399,7 +2399,7 @@ static int run_program_vectorially_at_fancy(float *out,
 			break;
 		case PLAMBDA_IMAGEOP: {
 			struct fancy_image *img = val[t->index];
-			int pdv = img->pd;
+			//int pdv = img->pd;
 			float lout[PLAMBDA_MAX_PIXELDIM];
 			int rdim = imageop_fancy(lout, img, ai, aj, t);
 			vstack_push_vector(s, lout, rdim);

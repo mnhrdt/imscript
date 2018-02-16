@@ -290,7 +290,7 @@ static void obtain_current_homography(double H[3][3], struct viewer_state *e)
 // change from window coordinates to image coordinates
 static void map_window_to_image(struct viewer_state *e, double *y, double *x)
 {
-	double H[3][3], C[4][2];
+	double H[3][3];
 	obtain_current_homography(H, e);
 	apply_homography(y, H, x);
 }

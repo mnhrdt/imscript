@@ -286,7 +286,7 @@ static void traverse_segment_aa2(float px, float py, float qx, float qy,
 			}
 		} else { // vertical
 			float slope = (qx - px); slope /= (qy - py);
-			assert(abs(qy - py) >= abs(qx - px));
+			assert(fabs(qy - py) >= fabs(qx - px));
 			assert(py < qy);
 			assert(fabs(slope) <= 1);
 			for (int j = 0; j <= qy-py; j++) {

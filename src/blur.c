@@ -198,7 +198,7 @@ void gblur(float *y, float *x, int w, int h, int pd, float s)
 
 static float kernel_2d_square(float x, float y, float *p)
 {
-	int nx, ny;
+	int nx=0, ny=0;
 	if (p[0] == 1)
 		nx = ny = p[1];
 	else if (p[0] == 2) {
@@ -274,7 +274,6 @@ static float kernel_2d_logcauchy(float x, float y, float *p)
 static float kernel_2d_powerlaw2(float x, float y, float *p)
 {
 	float sigma = p[1];
-	float power = 2;
 
 	float a = (x*x + y*y)/(sigma*sigma);
 	float r = 1.0/(1.0 + a*a);
@@ -428,7 +427,7 @@ void blur_2d(float *y, float *x, int w, int h, int pd,
 		return;
 	}
 
-	float (*f)(float,float,float*);
+	float (*f)(float,float,float*) = NULL;
 	switch(tolower(kernel_id[0])) {
 	case 'g': f = kernel_2d_gaussian; break;
 	case 'l': f = kernel_2d_laplace;  break;

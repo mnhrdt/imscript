@@ -643,12 +643,12 @@ static void action_increase_octave(struct FTR *f, int x, int y)
 	struct pan_state *e = f->userdata;
 
 	//if (e->octave < e->tg->noctaves - 1) {
-	if (e->octave < 5)
+	if (e->octave < 5) {
 		e->octave += 1;
 		double fac = 1 << e->octave;
 		if (e->octave < 0) fac = 1.0/(1<<-e->octave);
 		action_change_zoom_to_factor(f, x, y, fac);
-	//}
+	}
 
 	fprintf(stderr, "increased octave to %d\n", e->octave);
 }

@@ -345,7 +345,7 @@ double rpc_height(struct rpc *rpca, struct rpc *rpcb,
 		double xa, double ya, double xb, double yb, double *outerr)
 {
 	double e[2];
-	double r = rpc_height(rpca, rpcb, xa, ya, xb, yb, e);
+	double r = rpc_height2(rpca, rpcb, xa, ya, xb, yb, e);
 	*outerr = hypot(e[0], e[1]);
 	return r;
 }

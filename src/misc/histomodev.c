@@ -76,7 +76,7 @@ static float histogram_mode(struct histogram *h, bool solve_ties_upwards,
 	return fmaxi;
 }
 
-static float histogram_debug(struct histogram *h)
+static void histogram_debug(struct histogram *h)
 {
 	fprintf(stderr, "HISTOGRAM(bsize=%g bphase=%g nbins=%d)\n",
 			h->binsize, h->binphase, h->nbins);

@@ -293,21 +293,10 @@ static void action_select_image(struct FTR *f, int i)
 }
 
 // auxiliary function: compute n%p correctly, even for huge and negative numbers
-static int good_modulus(int nn, int p)
+static int good_modulus(int x, int m)
 {
-	if (!p) return 0;
-	if (p < 1) return good_modulus(nn, -p);
-
-	unsigned int r;
-	if (nn >= 0)
-		r = nn % p;
-	else {
-		unsigned int n = nn;
-		r = p - (-n) % p;
-		if (r == p)
-			r = 0;
-	}
-	return r;
+	int r = x % m;
+	return r < 0 ? r + m : r;
 }
 
 static void action_cycle(struct FTR *f, int d)

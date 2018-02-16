@@ -60,7 +60,7 @@ int homwarp(float *X, int W, int H, double M[9], float *x,
 	for (int j = 0; j < H; j++)
 	for (int i = 0; i < W; i++)
 	{
-		double p[2] = {i, j}, Mp[2];
+		double p[2] = {i, j};
 		apply_homography(p, M, p);
 		X[j*W+i] = u(x, w, h, p[0], p[1]);
 	}

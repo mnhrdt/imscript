@@ -36,7 +36,6 @@ static float average_of_cluster_variances(
 
 	for (int i = 0; i < n; i++)
 	{
-		float vi = x[i];
 		int gi = group[i];
 		assert(gi >= 0);
 		assert(gi <  k);

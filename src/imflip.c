@@ -139,7 +139,7 @@ int main_imflip(int c, char *v[])
 	char *filename_out = c > 3 ? v[3] : "-";
 
 	// read input image and alloc space for output image
-	int w, h, pd, wh[2];
+	int w, h, pd, wh[2] = {0, 0};
 	float *x = iio_read_image_float_split(filename_in, &w, &h, &pd);
 	float *y = malloc(w*h*pd*sizeof*y);
 

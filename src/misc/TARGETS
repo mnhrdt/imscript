@@ -6,7 +6,7 @@ cutrecombine deframe disp_to_corr distance ditheru drawroads dveco dvecov_lm
 elap elap2 elap3 elap_rec elap_recsep elevate_matches elevate_matcheshh
 fancy_evals fancy_zoomout faxpb faxpby fft fftper fill_bill fill_rect
 fillcorners flowback flowdiv flowgrad flowh flowjac flownop fmsrA fnorm fontu
-fpgraph frakes_monaco_smith frustumize gblur gblur_core genk gharrows ghough
+fpgraph frustumize gblur gblur_core genk gharrows ghough
 ghough2 graysing harris histeq8 histomodev homdots homfilt houghs hrezoom hs
 huffman hview ihough2 ijmesh imdim imgerr imgstats iminfo imspread inppairs
 intimg ipol_watermark isingroot isoricci lapbediag lapbediag_sep lapcolo lgblur

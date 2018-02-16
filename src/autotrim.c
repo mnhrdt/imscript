@@ -79,7 +79,7 @@ int main(int c, char *v[])
 	char *filename_out = c > 2 ? v[2] : "-";
 	pixel_mask_f *criterion_bad = pixel_has_nonpositive_sample;
 
-	int w, h, pd, ow, oh;
+	int w, h, pd;//, ow, oh;
 	float *x = iio_read_image_float_vec(filename_in, &w, &h, &pd);
 	float *y = malloc(w*h*pd*sizeof*y);
 	autotrim(y, &w, &h, x, w, h, pd, criterion_bad);

@@ -8,7 +8,7 @@ static void fancy_crop(char *fname_out, char *fname_in,
 
 	// read information from input image
 	int tw = 0, th = 0, fmt = 0, bps = 0;
-	int tiffo = fancy_image_leak_tiff_info(&tw, &th, &fmt, &bps, a);
+	fancy_image_leak_tiff_info(&tw, &th, &fmt, &bps, a);
 
 	// adapt tile size
 	if (tw == a->w) tw = w;

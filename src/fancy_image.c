@@ -471,6 +471,7 @@ float fancy_image_getsample_oct(struct fancy_image *fi,
 		int  idx = (j * w + i) * f->pd + l;
 		return x[idx];
 	}
+	return NAN;
 }
 
 // API: set a sample of an image

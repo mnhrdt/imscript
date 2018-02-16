@@ -1,4 +1,5 @@
 // code to read .gml cloud masks and plot them into images
+// (also used to fill arbitrary regions defined by polygons)
 
 
 
@@ -196,6 +197,7 @@ static void plot_segment_gray(int *img, int w, int h,
 {
 	int p[2] = {round(a[0]), round(a[1])};
 	int q[2] = {round(b[0]), round(b[1])};
+	fprintf(stderr, "%d %d %d %d\n", p[0], p[1], q[0], p[1]);
 	struct plot_data d = { img, w, h, c };
 	traverse_segment(p[0], p[1], q[0], q[1], plot_pixel, &d);
 }
@@ -411,6 +413,7 @@ int main(int c, char *v[])
 	// read input arguments
 	char *Hstring = pick_option(&c, &v, "h", "");
 	bool option_t = pick_option(&c, &v, "t", NULL);
+	bool option_c = pick_option(&c, &v, "c", NULL);
 	if (c != 5 && c!= 4 && c != 3) {
 		return fprintf(stderr, "usage:\n\t%s"
 		"width height [-h \"h1 ... h9\"] [clouds.gml [out.png]]\n", *v);
@@ -427,7 +430,6 @@ int main(int c, char *v[])
 		read_cloud_mask_from_txt_file(m, filename_clg);
 	else
 		read_cloud_mask_from_gml_file(m, filename_clg);
-
 	// acquire space for output image
 	int w = out_width;
 	int h = out_height;
@@ -446,6 +448,18 @@ int main(int c, char *v[])
 
 	} else
 		cloud_mask_rescale(m, w, h);
+
+
+	fprintf(stderr, "cloud mask from \"%s\"\n", filename_clg);
+	fprintf(stderr, "\tn = %d\n", m->n);
+	for (int i = 0; i < m->n; i++)
+	{
+		fprintf(stderr, "\tpoly %d, n=%d\n" , i, m->t[i].n);
+		for (int j = 0; j < m->t[i].n; j++)
+			fprintf(stderr, "\t\tv_%d=(%g,%g),...\n",
+					j, m->t[i].v[2*j+0], m->t[i].v[2*j+1]);
+	}
+
 
 	// draw mask over output image
 	clouds_mask_fill(x, w, h, m);

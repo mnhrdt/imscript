@@ -180,6 +180,7 @@ static uint8_t encode_b64_quark(uint8_t x)
 	if (x == 62) return '+';
 	if (x == 63) return '/';
 	fail("impossible base64 quark");
+	return 0;
 }
 
 static uint8_t decode_b64_quark(uint8_t x)
@@ -190,6 +191,7 @@ static uint8_t decode_b64_quark(uint8_t x)
 	if (x == '+' || x == '-') return 62;
 	if (x == '/' || x == '_') return 63;
 	fail("bad quark %c", x);
+	return 0;
 }
 
 // base 64 encoding

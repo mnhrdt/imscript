@@ -206,7 +206,9 @@ int solvps(double *a,double *b,int n)
 static double solve_sdp_6x6(double x[6], double A[6][6], double b[6])
 {
 	fprintf(stderr,"A = \n"); for (int j = 0; j < 6; j++) {
-		for (int i = 0; i < 6; i++)fprintf(stderr," %g", A[j][i]);fprintf(stderr,"\n");}
+		for (int i = 0; i < 6; i++)
+			fprintf(stderr," %g", A[j][i]);
+		fprintf(stderr,"\n");}
 	fprintf(stderr,"rhs = \n");for(int i=0;i<6;i++)fprintf(stderr," %g",b[i]);fprintf(stderr,"\n");
 
 	int r = solvps(A[0], b, 6);

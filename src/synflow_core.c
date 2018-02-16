@@ -703,18 +703,18 @@ static void produce_flow_model(struct flow_model *f,
 		invert_affinity(invH, H);
 		FORI(6) f->H[i] = H[i];
 		FORI(6) f->iH[i] = invH[i];
-	} else if (f->hidden_id == FLOWMODEL_HIDDEN_PRADIAL) {
-		assert(f->nh == 3);
-		double H[3], invH[3];
-		produce_radial_model(H, invH, w, h, f->model_name, f->p);
-		FORI(3) f->H[i] = H[i];
-		FORI(3) f->iH[i] = invH[i];
-	} else if (f->hidden_id == FLOWMODEL_HIDDEN_IPRADIAL) {
-		assert(f->nh == 3);
-		double H[3], invH[3];
-		produce_iradial_model(H, invH, w, h, f->model_name, f->p);
-		FORI(3) f->H[i] = H[i];
-		FORI(3) f->iH[i] = invH[i];
+	//} else if (f->hidden_id == FLOWMODEL_HIDDEN_PRADIAL) {
+	//	assert(f->nh == 3);
+	//	double H[3], invH[3];
+	//	produce_radial_model(H, invH, w, h, f->model_name, f->p);
+	//	FORI(3) f->H[i] = H[i];
+	//	FORI(3) f->iH[i] = invH[i];
+	//} else if (f->hidden_id == FLOWMODEL_HIDDEN_IPRADIAL) {
+	//	assert(f->nh == 3);
+	//	double H[3], invH[3];
+	//	produce_iradial_model(H, invH, w, h, f->model_name, f->p);
+	//	FORI(3) f->H[i] = H[i];
+	//	FORI(3) f->iH[i] = invH[i];
 	} else if (f->hidden_id == FLOWMODEL_HIDDEN_COMBI2) {
 		assert(f->nh == 15);
 		double H[15], invH[9];

@@ -202,9 +202,9 @@ static float eval_displacement_by_sc(float *a, float *b, int w, int h, int pd,
 {
 	getsample_operator p = getsample_nan;
 
-	int wside = 2 * wrad + 1;
+	//int wside = 2 * wrad + 1;
 	float r = 0;
-	int cx = 0;
+	//int cx = 0;
 	for (int l = 0; l < pd; l++)
 	{
 		float va = getsample_nan(a, w, h, pd, i, j, l);

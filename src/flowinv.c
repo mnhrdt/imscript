@@ -67,7 +67,7 @@ static void flowinv_iter(float *v, float *u, int w, int h)
 static float flowinv_eval(float *v, float *u, int w, int h)
 {
 	static int idcount = 0;
-	float (*U)[w][2] = (void*)u;
+	//float (*U)[w][2] = (void*)u;
 	float (*V)[w][2] = (void*)v;
 
 	float (*sav)[w][2] = xmalloc(2 * w * h * sizeof(float));

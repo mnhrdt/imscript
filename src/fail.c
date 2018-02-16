@@ -64,7 +64,6 @@ static void print_trace(FILE *f)
 //static void fail(const char *fmt, ...) __attribute__((noreturn,format(printf,1,2)));
 static void fail(const char *fmt, ...) __attribute__((noreturn));
 static void fail(const char *fmt, ...)
-
 {
 	va_list argp;
 	fprintf(stderr, "\nFAIL(\"%s\"): ", myname());

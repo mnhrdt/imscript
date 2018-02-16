@@ -306,7 +306,7 @@ int seven_point_algorithm(float *fm, float *p, void *usr)
 	int r = moistiv_epipolar(m1, m2, K, z, F1, F2);
 	//MAT_PRINT_4X4(F1);
 	//MAT_PRINT_4X4(F2);
-	int ridx = 0;
+	//int ridx = 0;
 	//if (r == 3) ridx = random_index(0, 3);
 	//fprintf(stderr, "z = %g\n", z[ridx]);
 	int cx = 0;

@@ -196,6 +196,7 @@ static char *packing_string(enum font_data_format p)
 #undef casepack
 	default: fail("impossible packing style");
 	}
+	return 0;
 }
 
 static enum font_data_format packing_unstring(char *s)
@@ -220,6 +221,7 @@ static enum font_data_format packing_unstring(char *s)
 	casepack(RLEXORPCXX85);
 #undef casepack
 	fail("unrecognized packing \"%s\"", s);
+	return -1;
 }
 
 //static struct bitmap_font reformat_font(struct bitmap_font *f,

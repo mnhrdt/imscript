@@ -396,7 +396,7 @@ static void put_tile_into_file(char *filename, struct tiff_tile *t, int tidx)
 	int th = tiff_tilewidth(tif);
 	int spp = tiff_samplesperpixel(tif);
 	int bps = tiff_bitspersample(tif);
-	int fmt = tiff_sampleformat(tif);
+	//int fmt = tiff_sampleformat(tif);
 	if (tw != t->w) fail("tw=%d different to t->w=%d", tw, t->w);
 	if (th != t->h) fail("th=%d different to t->h=%d", th, t->h);
 	if (spp != t->spp) fail("spp=%d different to t->spp=%d", spp, t->spp);
@@ -1472,7 +1472,7 @@ static int main_meta_old(int argc, char *argv[])
 		//                          0 1   2        c-1
 		return 1;
 	}
-	char *command = argv[1];
+	//char *command = argv[1];
 	int n_in = 0, n_out = 0;
 	int filenames_in[argc];
 	int filenames_out[argc];

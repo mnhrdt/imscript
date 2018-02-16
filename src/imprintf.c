@@ -252,7 +252,7 @@ static void compute_stuff_basic(struct printable_data *p,
 
 
 	// pixel basic stuff
-	int np = w * h, minpixel_idx, maxpixel_idx, rnp = 0;
+	int np = w * h, rnp = 0;
 	float minpixel = INFINITY, maxpixel = -INFINITY;
 	long double avgpixel[MAX_PIXELDIM] = {0}, avgnorm = 0;
 	int minidx=-1, maxidx=-1;
@@ -423,10 +423,8 @@ static void compute_printable_data(struct printable_data *p,
 		float *x, int w, int h, int pd)
 {
 	p->x = x; p->w = w; p->h = h; p->pd = pd;
-	int action_table[0x100], idx = 0;
+	int idx = 0;
 	p->compuflag = 0;
-	for (int i = 0; i < 0x100; i++)
-		action_table[i] = -1;
 	while (p->t[idx].name) {
 		if (p->t[idx].selected)
 			p->compuflag |= p->t[idx].required_precomputation;
