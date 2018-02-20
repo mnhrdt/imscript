@@ -46,4 +46,5 @@ gdal_translate $FNAME_TMP $FNAME_OUT $ALL_OPTIONS
 
 # cleanup and exit
 rm $FNAME_TMP
+rm -f $TPD/a.IMD # remove gdal bullshit
 rmdir $TPD
