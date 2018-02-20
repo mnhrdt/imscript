@@ -747,10 +747,16 @@ static void rgbi_to_rgb_inplace_n(float *c, int n)
 	{
 	case 0: break;//c[0] = c[1] = c[2] = 127; break;
 	case 4:
+#ifdef WV3_HACK
 		t = c[0];
 		c[0] = c[2];
 		c[2] = t;
 		c[1] = 0.8*c[1] + 0.2*c[3];
+#else
+	c[0] = 1.00 * c[0]  +  0.05 * c[3];
+	c[1] = 0.60 * c[1]  +  0.20 * c[3];
+	c[2] = 1.30 * c[2]  -  0.20 * c[3];
+#endif
 		break;
 	case 8:
 		c[0] = c[4];
