@@ -460,6 +460,13 @@ static void action_offset_viewport(struct FTR *f, int dx, int dy)
 	f->changed = 1;
 }
 
+static void action_reload_image(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	fancy_image_reload(e->i);
+	f->changed = 1;
+}
+
 
 static bool insideP(int w, int h, int i, int j)
 {
@@ -771,6 +778,8 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 		action_offset_viewport(f, d[0], d[1]);
 	}
 
+	if (k == '2') action_reload_image(f);
+
 //	// if 'k', do weird things
 //	if (k == 'k') {
 //		fprintf(stderr, "setting key_handler_print\n");
@@ -780,8 +789,12 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 
 
 #define BAD_MIN(a,b) a<=b?a:b
+#include "pickopt.c"
 int main_cpu(int c, char *v[])
 {
+	// extract named options
+	char *window_title = pick_option(&c, &v, "t", "cpu");
+
 	// process input arguments
 	if (c != 2 && c != 1) {
 		fprintf(stderr, "usage:\n\t%s [image]\n", *v);
@@ -806,6 +819,7 @@ int main_cpu(int c, char *v[])
 
 	// open window
 	struct FTR f = ftr_new_window(BAD_MIN(e->w,1000), BAD_MIN(e->h,800));
+	ftr_change_title(&f, window_title);
 	f.userdata = e;
 	action_reset_zoom_and_position(&f);
 	ftr_set_handler(&f, "expose", pan_exposer);

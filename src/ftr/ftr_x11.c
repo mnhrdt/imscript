@@ -117,6 +117,7 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 			RootWindow(f->display, s), 10, 10, f->w, f->h, 1,
 			black, white);
 			//white, black);
+	XStoreName(f->display, f->window, "ftr");
 	f->ximage = NULL;
 	f->imgupdate = 1;
 	f->wheel_ax = 0;
@@ -151,6 +152,12 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	f->handle_expose2 = 0;
 
 	return *(struct FTR *)f;
+}
+
+void ftr_change_title(struct FTR *ff, char *s)
+{
+	struct _FTR *f = (void*)ff;
+	XStoreName(f->display, f->window, s);
 }
 
 void ftr_close(struct FTR *ff)

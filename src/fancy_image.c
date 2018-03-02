@@ -306,6 +306,50 @@ void generic_read(struct FI *f, char *filename)
 	f->gdal = false;
 }
 
+// API: reload an image (works only for "small", images that can be read whole)
+void fancy_image_reload(struct fancy_image *fi)
+{
+	struct FI *f = (void*)fi;
+
+	if (!f->tiffo && !f->gdal)
+	{
+		int tmp_w, tmp_h, tmp_pd;
+		float *tmp_x = iio_read_image_float_vec(f->x_filename,
+				&tmp_w, &tmp_h, &tmp_pd);
+		if (!tmp_x)
+		{
+			fprintf(stderr, "WARNING: could not reload image %s\n",
+					f->x_filename);
+			return;
+		}
+		if (tmp_w != f->w || tmp_h != f->h || tmp_pd != f->pd)
+		{
+			fprintf(stderr, "WARNING: image \"%s\" was resized"
+					" from (%d %d %d) to (%d %d %d)\n",
+					f->x_filename,
+					f->w, f->h, f->pd,
+					tmp_w, tmp_h, tmp_pd);
+		}
+		if (f->no > 1)
+			free_pyramid(f);
+		else
+			free(f->x);
+		f->x = tmp_x;
+		f->w = tmp_w;
+		f->h = tmp_h;
+		f->pd = tmp_pd;
+		f->no = build_pyramid(f, f->max_octaves);
+		f->x_changed = true;
+
+	}
+
+	if (f->tiffo && !f->gdal)
+	{
+		// TODO: perform some sort of cache invalidation
+		fprintf(stderr, "WARNING: tiffo reload not implemented!\n");
+	}
+}
+
 
 // API: open a fancy image
 struct fancy_image *fancy_image_open(char *filename, char *options)

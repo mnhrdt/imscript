@@ -80,6 +80,10 @@ static void enable_canonical_and_echo_modes(void)
 	tcsetattr(0, TCSANOW, t);
 }
 
+void ftr_change_title(struct FTR *ff, char *s)
+{
+}
+
 #include "smapa.h"
 SMART_PARAMETER(COLUMNS,80)
 SMART_PARAMETER(LINES,25)

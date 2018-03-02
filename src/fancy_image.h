@@ -45,6 +45,9 @@ struct fancy_image *fancy_image_open(char *filename, char *options);
 // (if the option "write" was given, it may write tiles upon this call)
 void fancy_image_close(struct fancy_image *f);
 
+// reload the data of an image (in case it has changed)
+void fancy_image_reload(struct fancy_image *f);
+
 
 // obtain a sample of the image at the given point and octave
 // (if the coordinates or the octave are out of range, return NAN)

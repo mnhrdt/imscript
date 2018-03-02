@@ -43,6 +43,9 @@ struct _FTR {
 // (if this line fails, increase the padding at the end of struct FTR on ftr.h)
 typedef char check_FTR_size[sizeof(struct _FTR)<=sizeof(struct FTR)?1:-1];
 
+void ftr_change_title(struct FTR *ff, char *s)
+{
+}
 
 // glut-specific part {{{1
 
