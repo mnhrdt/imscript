@@ -129,7 +129,7 @@ static void construct_symmetric_boundary_Fancy(float *xx, int w, int h)
 		x[j][i] = NAN;
 }
 
-static float global_parameter_p = NAN;
+static float global_parameter_p = 2;
 
 // construct the symmetric boundary of an image
 static void construct_symmetric_boundary_fancier(float *xx, int w, int h)

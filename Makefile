@@ -11,7 +11,7 @@ BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
 
 BIN := $(addprefix bin/,$(BIN))
 
-default: $(BIN)
+default: $(BIN) bin/cpu_term bin/rpcflip_term
 
 bin/%  : src/%.o $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
@@ -82,7 +82,7 @@ bin/%_term : src/ftr/%.o $(OBJ_FTR_TERM)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 # bureaucracy
-clean: ; $(RM) $(BIN_ALL) bin/im src/*.o src/ftr/*.o src/misc/*.o
+clean: ; @$(RM) $(BIN_ALL) bin/im src/*.o src/ftr/*.o src/misc/*.o
 .PHONY: default full ftr misc clean
 .PRECIOUS: %.o
 

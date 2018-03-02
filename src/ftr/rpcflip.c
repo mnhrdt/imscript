@@ -74,7 +74,7 @@ struct pan_view {
 	int repaint;
 };
 
-#define MAX_VIEWS 60
+#define MAX_VIEWS 200
 struct pan_state {
 	// 1. data for each view
 	int nviews;
@@ -747,6 +747,7 @@ static void rgbi_to_rgb_inplace_n(float *c, int n)
 	{
 	case 0: break;//c[0] = c[1] = c[2] = 127; break;
 	case 4:
+#define WV3_HACK
 #ifdef WV3_HACK
 		t = c[0];
 		c[0] = c[2];
@@ -1220,6 +1221,21 @@ static void request_repaints(struct FTR *f)
 // the "FTR".  This is necessary so that actions can be directly called even
 // when there is no interface (e.g., for scripted usage).
 
+static void action_print_data_under_cursor(struct FTR *f, int i, int j)
+{
+	struct pan_state *e = f->userdata;
+	double xy[2], ll[2], pq_a[2], pq_e[2];
+	window_to_raster(xy, e, i, j);
+	raster_to_geo(ll, e, xy[0], xy[1]);
+	window_to_image_apm(pq_a, e, i, j);
+	window_to_image_ex (pq_e, e, i, j);
+	fprintf(stderr, "PRINT win=(%d %d) ras=(%g %g) geo=(%g %g) "
+			"img_a=(%g %g) img_e=(%g %g)\n",
+			i, j, xy[0], xy[1], ll[0], ll[1],
+			pq_a[0], pq_a[1], pq_e[0], pq_e[1]
+			);
+}
+
 static void action_offset_viewport(struct FTR *f, double dx, double dy)
 {
 	struct pan_state *e = f->userdata;
@@ -1665,12 +1681,14 @@ static void action_dump_raw_collection_fancy(struct FTR *f)
 // CALLBACK: pan_button_handler {{{1
 static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 {
+	//fprintf(stderr, "BUT b=%d m=%d x=%d y=%d\n", b, m, x, y);
 	if (b == FTR_BUTTON_UP && m & FTR_MASK_CONTROL) {
 		action_cycle_view(f, +1, x, y); return; }
 	if (b == FTR_BUTTON_DOWN && m & FTR_MASK_CONTROL) {
 		action_cycle_view(f, -1, x, y); return; }
 	if (b == FTR_BUTTON_DOWN)   action_increase_zoom(f, x, y);
 	if (b == FTR_BUTTON_UP  )   action_decrease_zoom(f, x, y);
+	if (b == FTR_BUTTON_MIDDLE) action_print_data_under_cursor(f, x, y);
 }
 
 

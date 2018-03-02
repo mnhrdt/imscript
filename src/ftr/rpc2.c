@@ -423,7 +423,7 @@ static void eval_nrpc_iterative(double *result,
 static void eval_nrpc(double *result,
 		struct rpc *p, double x, double y, double z)
 {
-	if(isfinite(p->numx[0])) {
+	if (isfinite(p->numx[0])) {
 		double numx = eval_pol20(p->numx, x, y, z);
 		double denx = eval_pol20(p->denx, x, y, z);
 		double numy = eval_pol20(p->numy, x, y, z);
@@ -468,6 +468,16 @@ void eval_rpc_pair(double xprime[2],
 	double tmp[2];
 	eval_rpc(tmp, pa, x, y, z);
 	eval_rpci(xprime, pb, tmp[0], tmp[1], z);
+}
+
+void rpc_projection(double ij[2], struct rpc *r, double lonlatheight[3])
+{
+	eval_rpci(ij, r, lonlatheight[0], lonlatheight[1], lonlatheight[2]);
+}
+
+void rpc_localization(double lonlat[2], struct rpc *r, double ijh[3])
+{
+	eval_rpc(lonlat, r, ijh[0], ijh[1], ijh[2]);
 }
 
 
