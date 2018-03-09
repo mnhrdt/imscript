@@ -449,10 +449,11 @@ int main_veco(int c, char *v[])
 {
 	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
 	bool use_numbers =   pick_option(&c, &v, "x", 0);
-	bool by_columns =    pick_option(&c, &v, "c", 0);
+	bool by_columns  =   pick_option(&c, &v, "c", 0);
 	bool by_channels =   pick_option(&c, &v, "k", 0);
+	bool by_full_img =   pick_option(&c, &v, "f", 0);
 	bool indep_chans =   pick_option(&c, &v, "i", 0);
-	char *goodness =     pick_option(&c, &v, "g", "numeric");
+	char *goodness   =   pick_option(&c, &v, "g", "numeric");
 	char *filename_out = pick_option(&c, &v, "o", "-");
 	if (c < 3 && !by_channels) {
 		fprintf(stderr,
@@ -565,6 +566,19 @@ int main_veco(int c, char *v[])
 			y[i] = f(tmp, ngood);
 		}
 		iio_write_image_float(filename_out, y, w, h);
+	} else if (n < 2 && by_full_img) {
+		int w, h, pd;
+		float *x = iio_read_image_float_vec(c>2?v[2]:"-", &w, &h, &pd);
+		float *y = xmalloc(w * h * sizeof*y);
+		int ngood = 0;
+		for (int i = 0; i < w*h; i++)
+		{
+			for (int j = 0; j < pd; j++)
+				if (isgood(x[i*pd+j]))
+					y[ngood++] = x[i*pd+j];
+		}
+		float out = f(y, ngood);
+		printf("%lf\n", out);
 	} else if (indep_chans) {
 		float *x[n];
 		int w[n], h[n], d[n];
