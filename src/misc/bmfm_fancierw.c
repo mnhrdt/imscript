@@ -57,12 +57,80 @@ static int window_image_ndiag_25[] = {9,9, 4,4,
 	0,0,0,0,0,0,1,1,1,
 	0,0,0,0,0,0,0,1,1,
 };
+static int window_image_square_7x7[] = {7,7, 3,3,
+	1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,
+	1,1,1,2,1,1,1,
+	1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,
+};
+static int window_image_square_9x9[] = {9,9, 5,5,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,2,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+};
+static int window_image_squared0_9x9[] = {9,9, 0,0,
+	2,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+};
+static int window_image_squared1_9x9[] = {9,9, 8,0,
+	1,1,1,1,1,1,1,1,2,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+};
+static int window_image_squared2_9x9[] = {9,9, 0,8,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	2,1,1,1,1,1,1,1,1,
+};
+static int window_image_squared3_9x9[] = {9,9, 8,8,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,1,
+	1,1,1,1,1,1,1,1,2,
+};
 static int *window_images[] = {
-		window_image_square_5x5,
-		window_image_horiz_25,
-		window_image_vert_25,
-		window_image_diag_25,
-		window_image_ndiag_25,
+	window_image_squared0_9x9,
+	window_image_squared1_9x9,
+	window_image_squared2_9x9,
+	window_image_squared3_9x9,
+//		window_image_square_5x5,
+//		window_image_horiz_25,
+//		window_image_vert_25,
+//		window_image_diag_25,
+//		window_image_ndiag_25,
 };
 static int number_of_window_images = sizeof(window_images)/sizeof*window_images;
 
@@ -262,12 +330,13 @@ void bmfm_fancy(float *disp,         // output disparities image (dx, dy)
 		)
 {
 	int maxpoints = 2 * (w+h), (*P)[2] = xmalloc(maxpoints*sizeof*P);
-	for (int j = 0; j < h; j++)
+	for (int j = 0; j < h; j++) {
 	for (int i = 0; i < w; i++) {
 		float rad = NAN, ini[2] = {0, 0};
 		if (search_radius) rad = search_radius[j*w+i];
 		if (disp_init) ini[0] = disp_init[2*(j*w+i)+0];
 		if (disp_init) ini[1] = disp_init[2*(j*w+i)+1];
+		if (!isfinite(ini[0])) continue;
 		int np = plot_epipolar_fancy(P, fm, w, h, i, j, ini, rad);
 		float mincorr = INFINITY;
 		int minidx = 0;
@@ -285,6 +354,9 @@ void bmfm_fancy(float *disp,         // output disparities image (dx, dy)
 		if (disp) disp[2*(j*w+i) + 0] = P[minidx][0] - i;
 		if (disp) disp[2*(j*w+i) + 1] = P[minidx][1] - j;
 		if (errc) errc[j*w+i] = mincorr;
+	}
+	if (0 == j%100)
+		fprintf(stderr, "j=%d/%d\n", j, h);
 	}
 	free(P);
 }
