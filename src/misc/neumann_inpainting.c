@@ -6,7 +6,26 @@
 #include "smapa.h"
 SMART_PARAMETER(NSCALES,20)
 SMART_PARAMETER(TSTEP,0.25)
-SMART_PARAMETER(NITER,10)
+SMART_PARAMETER(NITER,30)
+SMART_PARAMETER_SILENT(DEBUI,-1)
+SMART_PARAMETER_SILENT(DEBUJ,-1)
+
+#include<stdarg.h>
+//#include "iio.h"
+static void img_debug(float *x, int w, int h, int pd, const char *fmt, ...)
+{
+	return;
+//	va_list ap;
+//	char fname[FILENAME_MAX];
+//	va_start(ap, fmt);
+//	vsnprintf(fname, FILENAME_MAX, fmt, ap);
+//	va_end(ap);
+//	fprintf(stderr, "IMG_DEBUG(%dx%d,%d) \"%s\"\n", w, h, pd, fname);
+//	iio_write_image_float_vec(fname, x, w, h, pd);
+}
+
+
+
 
 // extrapolate by nearest value (useful for Neumann boundary conditions)
 static float getpixel(float *x, int w, int h, int i, int j)
@@ -34,11 +53,8 @@ static void zoom_out_by_factor_two(float *out, int ow, int oh,
 		int cx = 0;
 		for (int k = 0; k < 4; k++)
 			if (isfinite(a[k])) {
-				//m += a[k];
-				//cx += 1;
-				m = a[k];
-				cx = 1;
-				break;
+				m += a[k];
+				cx += 1;
 			}
 		out[ow*j + i] = cx ? m/cx : NAN;
 	}
@@ -46,6 +62,7 @@ static void zoom_out_by_factor_two(float *out, int ow, int oh,
 
 // zoom-out by 2x2 block averages
 // NANs are discarded when possible
+// neumask has the size of the large imge (in)
 static void zoom_out_by_factor_two_neum(float *out, int ow, int oh,
 		float *in, int iw, int ih, float *neumask)
 	// neum has size iwxih
@@ -53,19 +70,20 @@ static void zoom_out_by_factor_two_neum(float *out, int ow, int oh,
 	for (int j = 0; j < oh; j++)
 	for (int i = 0; i < ow; i++)
 	{
-		float a[4], m = 0;
-		a[0] = getpixel(in, iw, ih, 2*i, 2*j);
-		a[1] = getpixel(in, iw, ih, 2*i+1, 2*j);
-		a[2] = getpixel(in, iw, ih, 2*i, 2*j+1);
-		a[3] = getpixel(in, iw, ih, 2*i+1, 2*j+1);
+		float a[4], b[4], m = 0;
+		a[0] = getpixel(in,      iw, ih, 2*i  , 2*j  );
+		a[1] = getpixel(in,      iw, ih, 2*i+1, 2*j  );
+		a[2] = getpixel(in,      iw, ih, 2*i  , 2*j+1);
+		a[3] = getpixel(in,      iw, ih, 2*i+1, 2*j+1);
+		b[0] = getpixel(neumask, iw, ih, 2*i  , 2*j  );
+		b[1] = getpixel(neumask, iw, ih, 2*i+1, 2*j  );
+		b[2] = getpixel(neumask, iw, ih, 2*i  , 2*j+1);
+		b[3] = getpixel(neumask, iw, ih, 2*i+1, 2*j+1);
 		int cx = 0;
 		for (int k = 0; k < 4; k++)
-			if (isfinite(a[k])) {
-				//m += a[k];
-				//cx += 1;
-				m = a[k];
-				cx = 1;
-				break;
+			if (isfinite(a[k]) && b[0] <= 0) {
+				m += a[k];
+				cx += 1;
 			}
 		out[ow*j + i] = cx ? m/cx : NAN;
 	}
@@ -107,14 +125,19 @@ static void zoom_in_by_factor_two(float *out, int ow, int oh,
 						(i-0.5)/2, (j-0.5)/2);
 }
 
+
 static void zoom_in_by_factor_two_neum(float *out, int ow, int oh,
 		float *in, int iw, int ih, float *neum)
-	// neum has size iwxih
+	// neum has the size of the large image (in) iwxih
 {
 	for (int j = 0; j < oh; j++)
 	for (int i = 0; i < ow; i++)
 		out[ow*j+i] = bilinear_interpolation(in, iw, ih,
 						(i-0.5)/2, (j-0.5)/2);
+	// Actually, this is the same zoom algorithm as without neumann.  This
+	// is incorrect, but it does not matter because we are running a few
+	// corrective iterations at each step, and the boundary condition is
+	// correctly re-imposed at each scale after those iterations.
 }
 
 static float laplacian_neum(float *I, float *n, int w, int h, int i, int j)
@@ -135,12 +158,26 @@ static float laplacian_neum(float *I, float *n, int w, int h, int i, int j)
 
 	// computation
 	float r = 0;
-	if (nx)
+	//if (!nx) // TODO: correct handling when all boundaries are neumann
 	{
 		if (!na && isfinite(a)) r += a-x;
 		if (!nb && isfinite(b)) r += b-x;
 		if (!nc && isfinite(c)) r += c-x;
 		if (!nd && isfinite(d)) r += d-x;
+	}
+	if (i==DEBUI() && j==DEBUJ())
+	{
+		fprintf(stderr, "\tx = %g\n", x);
+		fprintf(stderr, "\ta = %g\n", a);
+		fprintf(stderr, "\tb = %g\n", b);
+		fprintf(stderr, "\tc = %g\n", c);
+		fprintf(stderr, "\td = %g\n", d);
+		fprintf(stderr, "\tnx = %d\n", nx);
+		fprintf(stderr, "\tna = %d\n", na);
+		fprintf(stderr, "\tnb = %d\n", nb);
+		fprintf(stderr, "\tnc = %d\n", nc);
+		fprintf(stderr, "\tnd = %d\n", nd);
+		fprintf(stderr, "\tij=(%d %d) l=%g\n", i, j, r);
 	}
 	return r;
 }
@@ -164,7 +201,6 @@ static void gauss_seidel_neumann(
 		int ij = j*w + i;
 
 		float l = laplacian_neum(I, n, w, h, i, j);
-		if (fabs(l) > 0.2) fprintf(stderr, "\tij=(%d %d){%g} l=%g\n",i,j,I[ij],l);
 		float d = 0;//f ? f[ij] : 0;
 		I[ij] = I[ij] + tstep * (l - d);
 	}
@@ -203,7 +239,6 @@ static void run_a_few_poisson_iterations(
 		float *initialization
 		)
 {
-	fprintf(stderr, "r_p_i %d %d {%d}\n", w, h, niter);
 	// build the list of pixels inside the region of interest
 	int n_omega, (*omega)[2] = build_mask(&n_omega, g, w, h);
 
@@ -213,10 +248,7 @@ static void run_a_few_poisson_iterations(
 
 	// perform the requested iterations
 	for (int i = 0; i < niter; i++)
-	{
-		fprintf(stderr, "\titer %d {nomega=%d}\n", i, n_omega);
 		gauss_seidel_neumann(u, n, w, h, omega, n_omega, timestep);
-	}
 
 	// cleanup
 	free(omega);
@@ -225,7 +257,8 @@ static void run_a_few_poisson_iterations(
 void simplest_inpainting_neum(float *out, float *in, float *neum,
 		int w, int h, int scale)
 {
-	fprintf(stderr, "s_i_n %d %d\n", w, h);
+	img_debug(in, w, h, 1, "/tmp/sin_in_%d_%d.tif", w, h);
+	img_debug(neum, w, h, 1, "/tmp/sin_neum_%d_%d.tif", w, h);
 	float *init = malloc(w * h * sizeof*init);
 	if (scale > 1)
 	{
@@ -235,6 +268,7 @@ void simplest_inpainting_neum(float *out, float *in, float *neum,
 		float *outs = malloc(ws * hs * sizeof*outs);
 		float *neus  = malloc(ws * hs * sizeof*neus);
 		zoom_out_by_factor_two(neus, ws, hs, neum, w, h);
+		img_debug(neus, ws, hs, 1, "/tmp/sin_neus_%d_%d.tif", ws, hs);
 		zoom_out_by_factor_two_neum(ins, ws, hs, in, w, h, neum);
 		simplest_inpainting_neum(outs, ins, neus, ws, hs, scale - 1);
 		zoom_in_by_factor_two_neum(init, w, h, outs, ws, hs, neum);
@@ -260,6 +294,7 @@ void simplest_inpainting_neum(float *out, float *in, float *neum,
 void simplest_inpainting_separable_neum(float *out, float *in, float *neum,
 		int w, int h, int pd, int nscales)
 {
+	if (pd != 1) exit(42);
 	for (int l = 0; l < pd; l++)
 	{
 		float *outl = out + w*h*l;
@@ -288,7 +323,7 @@ int main(int argc, char *argv[])
 	int w[3], h[3], pd;
 	float *in = iio_read_image_float_split(filename_in, w, h, &pd);
 	float *mask = iio_read_image_float(filename_mask, w+1, h+1);
-	float *neum = iio_read_image_float(filename_mask, w+2, h+2);
+	float *neum = iio_read_image_float(filename_neum, w+2, h+2);
 	if (w[0] != w[1] || h[0] != h[1])
 		return fprintf(stderr, "image and mask file size mismatch");
 	if (w[0] != w[2] || h[0] != h[2])
