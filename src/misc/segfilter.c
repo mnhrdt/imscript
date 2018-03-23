@@ -52,6 +52,27 @@ int main_transform_by_homography(int c, char *v[])
 	return 0;
 }
 
+// use points instead of segments
+int main_transform_by_phomography(int c, char *v[])
+{
+	if (c != 2) return fprintf(stderr, "usage:\n\t"
+			"%s phomography < in.txt > out.txt\n", *v);
+	//                0 1
+	double H[9];
+	read_n_doubles_from_string(H, v[1], 9);
+
+	float x[2];
+	while (2 == scanf("%g %g\n", x+0, x+1))
+	{
+		float y[4];
+		apply_homography(y+0, H, x+0);
+		printf("%g %g\n", y[0], y[1]);
+	}
+
+	return 0;
+}
+
+
 
 #include "iio.h"
 int main_completely_inside_binary_mask(int c, char *v[])
@@ -87,6 +108,8 @@ int main(int c, char *v[])
 		return main_completely_inside_binary_mask(c-1, v+1);
 	if (c >= 2 && 0 == strcmp(v[1], "homography"))
 		return main_transform_by_homography(c-1, v+1);
+	if (c >= 2 && 0 == strcmp(v[1], "phomography"))
+		return main_transform_by_phomography(c-1, v+1);
 	return fprintf(stderr, "usage:\n\t"
 			"segfilter {minlength|inmask|homography} ...\n");
 }

@@ -176,6 +176,7 @@ void iio_write_image_float           (char*, float*        , int, int     );
 void iio_write_image_double          (char*, double*       , int, int     );
 void iio_write_image_int             (char*, int*          , int, int     );
 void iio_write_image_int_vec         (char*, int*          , int, int, int);
+void iio_write_image_int_split       (char*, int*          , int, int, int);
 void iio_write_image_uint8_vec       (char*, uint8_t*      , int, int, int);
 void iio_write_image_uint8_split     (char*, uint8_t*      , int, int, int);
 void iio_write_image_uint16_vec      (char*, uint16_t*     , int, int, int);
@@ -208,5 +209,7 @@ void iio_save_image_uint8_matrix(char *f, unsigned char **x, int w, int h);
 // (w, h; 1 float) => tiff, pfm
 // (w, h; 3 float) => tiff, pfm
 
+// convenience wrapper for free (to avoid need to inlcude stdlib.h)
+void iio_free(void*);
 
 #endif//IIO_H
