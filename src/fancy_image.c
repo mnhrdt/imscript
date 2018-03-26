@@ -291,6 +291,11 @@ void generic_create(struct FI *f, char *filename)
 #include "smapa.h"
 SMART_PARAMETER(FORCE_GDAL,0)
 
+static bool has_prefix(const char *s, const char *p)
+{
+	return s == strstr(s, p);
+}
+
 void generic_read(struct FI *f, char *filename)
 {
 	if (filename_corresponds_to_tiffo(filename)) {
@@ -309,7 +314,11 @@ void generic_read(struct FI *f, char *filename)
 #ifdef FANCY_GDAL
 		f->gdal = true;
 		GDALAllRegister();
-		f->gdal_img = GDALOpen(filename, GA_ReadOnly);
+		char buf[2*FILENAME_MAX];
+		snprintf(buf, 2*FILENAME_MAX, has_prefix(filename, "http://") ||
+				has_prefix(filename, "https://") ?
+				"/vsicurl/%s" : "%s", filename);
+		f->gdal_img = GDALOpen(buf, GA_ReadOnly);
 		fprintf(stderr, "gdal_dataset = %p\n", f->gdal_img);
 		f->pd = GDALGetRasterCount(f->gdal_img);
 		f->w = GDALGetRasterXSize(f->gdal_img);
