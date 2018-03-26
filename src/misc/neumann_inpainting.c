@@ -11,17 +11,17 @@ SMART_PARAMETER_SILENT(DEBUI,-1)
 SMART_PARAMETER_SILENT(DEBUJ,-1)
 
 #include<stdarg.h>
-//#include "iio.h"
+#include "iio.h"
 static void img_debug(float *x, int w, int h, int pd, const char *fmt, ...)
 {
-	return;
-//	va_list ap;
-//	char fname[FILENAME_MAX];
-//	va_start(ap, fmt);
-//	vsnprintf(fname, FILENAME_MAX, fmt, ap);
-//	va_end(ap);
-//	fprintf(stderr, "IMG_DEBUG(%dx%d,%d) \"%s\"\n", w, h, pd, fname);
-//	iio_write_image_float_vec(fname, x, w, h, pd);
+//	return;
+	va_list ap;
+	char fname[FILENAME_MAX];
+	va_start(ap, fmt);
+	vsnprintf(fname, FILENAME_MAX, fmt, ap);
+	va_end(ap);
+	fprintf(stderr, "IMG_DEBUG(%dx%d,%d) \"%s\"\n", w, h, pd, fname);
+	iio_write_image_float_vec(fname, x, w, h, pd);
 }
 
 
