@@ -1,5 +1,5 @@
 CFLAGS ?= -march=native -O3 -DNDEBUG
-LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm
+LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm #-lgdal
 
 OBJ = src/iio.o src/fancy_image.o
 BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \

@@ -44,6 +44,10 @@
 #define MAX_OCTAVES 30
 #endif
 
+#ifndef MAX_GDAL_BANDS
+#define MAX_GDAL_BANDS 40
+#endif
+
 #ifndef SAMPLEFORMAT_UINT
 // definitions form tiff.h, reused here
 #define SAMPLEFORMAT_UINT  1
@@ -89,6 +93,8 @@ struct FI {
 	bool gdal;
 #ifdef FANCY_GDAL
 	// gdal shit
+	GDALDatasetH gdal_img;
+	GDALRasterBandH gdal_band[MAX_GDAL_BANDS];
 #endif//FANCY_GDAL
 };
 
@@ -282,6 +288,9 @@ void generic_create(struct FI *f, char *filename)
 				f->option_spp);
 }
 
+#include "smapa.h"
+SMART_PARAMETER(FORCE_GDAL,0)
+
 void generic_read(struct FI *f, char *filename)
 {
 	if (filename_corresponds_to_tiffo(filename)) {
@@ -296,14 +305,27 @@ void generic_read(struct FI *f, char *filename)
 #else
 		assert(false);
 #endif
+	} else if (!f->option_write && FORCE_GDAL()) {
+#ifdef FANCY_GDAL
+		f->gdal = true;
+		GDALAllRegister();
+		f->gdal_img = GDALOpen(filename, GA_ReadOnly);
+		fprintf(stderr, "gdal_dataset = %p\n", f->gdal_img);
+		f->pd = GDALGetRasterCount(f->gdal_img);
+		f->w = GDALGetRasterXSize(f->gdal_img);
+		f->h = GDALGetRasterYSize(f->gdal_img);
+		f->no = 1;
+		for (int i = 0; i < f->pd; i++)
+			f->gdal_band[i] = GDALGetRasterBand(f->gdal_img, i+1);
+#else
+		assert(false);
+#endif
 	} else {
-		f->tiffo = false;
 		f->x = iio_read_image_float_vec(filename, &f->w, &f->h, &f->pd);
 		f->no = build_pyramid(f, f->max_octaves);
 		strncpy(f->x_filename, filename, FILENAME_MAX);
 		f->x_changed = false;
 	}
-	f->gdal = false;
 }
 
 // API: reload an image (works only for "small", images that can be read whole)
@@ -371,6 +393,7 @@ struct fancy_image *fancy_image_open(char *filename, char *options)
 		generic_create(f, filename);
 
 	// read the image
+	f->gdal = f->tiffo = false;
 	generic_read(f, filename);
 
 	if (f->option_verbose) {
@@ -489,6 +512,7 @@ float fancy_image_getsample_oct(struct fancy_image *fi,
 	if (l < 0) l = 0;
 	if (l >= f->pd) l = f->pd - 1;
 
+
 	if (f->tiffo) {
 #ifdef FANCY_TIFF
 		uint8_t *p_pixel = tiff_octaves_getpixel(f->t, octave, i, j);
@@ -501,8 +525,12 @@ float fancy_image_getsample_oct(struct fancy_image *fi,
 	} else if (f->gdal) {
 #ifdef FANCY_GDAL
 		if (octave != 0) return NAN;
-
-
+		static float *roi = NULL;
+		if (!roi) roi = CPLMalloc(1*1*sizeof*roi);
+		GDALRasterBandH img = f->gdal_band[l];
+		int r = GDALRasterIO(img, GF_Read, i,j,1, 1, roi,1,1,
+				GDT_Float32, 0,0);
+		return roi[0*0+0];
 #else
 		assert(false);
 #endif
