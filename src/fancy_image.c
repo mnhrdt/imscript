@@ -36,8 +36,8 @@
 #endif//FANCY_TIFF
 
 #ifdef FANCY_GDAL
-#include <gdal.h>
-#include <cpl_conv.h>
+#include <gdal/gdal.h>
+#include <gdal/cpl_conv.h>
 #endif//FANCY_GDAL
 
 #ifndef MAX_OCTAVES
@@ -289,7 +289,7 @@ void generic_create(struct FI *f, char *filename)
 }
 
 #include "smapa.h"
-SMART_PARAMETER(FORCE_GDAL,0)
+SMART_PARAMETER_SILENT(FORCE_GDAL,0)
 
 static bool has_prefix(const char *s, const char *p)
 {
