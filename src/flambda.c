@@ -1313,6 +1313,7 @@ static int token_is_vardef(const char *t)
 #define PLAMBDA_STACKOP_DEINTERLEAVE 12
 #define PLAMBDA_STACKOP_HALVE 13
 #define PLAMBDA_STACKOP_NSPLIT 14
+#define PLAMBDA_STACKOP_NSTACK 15
 
 // if token is a stack operation, return its id
 // otherwise, return zero
@@ -1328,12 +1329,14 @@ static int token_is_stackop(const char *t)
 	if (0 == strcmp(t, "join3")) return PLAMBDA_STACKOP_VMERGE3;
 	if (0 == strcmp(t, "mergeall")) return PLAMBDA_STACKOP_VMERGEALL;
 	if (0 == strcmp(t, "joinall")) return PLAMBDA_STACKOP_VMERGEALL;
+	if (0 == strcmp(t, "ajoin")) return PLAMBDA_STACKOP_VMERGEALL;
 	if (0 == strcmp(t, "njoin")) return PLAMBDA_STACKOP_NMERGE;
 	if (0 == strcmp(t, "nmerge")) return PLAMBDA_STACKOP_NMERGE;
 	if (0 == strcmp(t, "interleave")) return PLAMBDA_STACKOP_INTERLEAVE;
 	if (0 == strcmp(t, "deinterleave")) return PLAMBDA_STACKOP_DEINTERLEAVE;
 	if (0 == strcmp(t, "halve")) return PLAMBDA_STACKOP_HALVE;
 	if (0 == strcmp(t, "nsplit")) return PLAMBDA_STACKOP_NSPLIT;
+	if (0 == strcmp(t, "nstack")) return PLAMBDA_STACKOP_NSTACK;
 	return 0;
 }
 
@@ -1453,6 +1456,7 @@ static void parse_imageop(const char *s, int *op, int *scheme)
 	//else if (hasprefix(s, "k")) *op = IMAGEOP_CURV;
 	//else fail("unrecognized comma modifier \",%s\"", s);
 	*scheme = SCHEME_SOBEL;
+	if (*op == IMAGEOP_XY) *scheme = SCHEME_CENTERED;
 	if (false) ;
 	else if (hassuffix(s, "f")) *scheme = SCHEME_FORWARD;
 	else if (hassuffix(s, "b")) *scheme = SCHEME_BACKWARD;
@@ -1649,6 +1653,7 @@ static const char *arity(struct predefined_function *f)
 	}
 }
 
+inline
 static void print_compiled_program(struct plambda_program *p)
 {
 	fprintf(stderr, "COMPILED PROGRAM OF %d TOKENS:\n", p->n);
@@ -1918,6 +1923,9 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 		FORI(n)
 			vstack_push_scalar(s, x[i]);
 				     }
+		break;
+	case PLAMBDA_STACKOP_NSTACK:
+		vstack_push_scalar(s, s->n - 1);
 		break;
 	case PLAMBDA_STACKOP_VMERGE: {
 		float x[PLAMBDA_MAX_PIXELDIM];
@@ -2603,7 +2611,7 @@ static int print_help(char *v, int verbosity)
 //" --man\tdisplay manpage\n"
 "\n"
 "Examples:\n"
-" plambda a.tiff b.tiff \"x y +\" -o sum.tiff\tCompute the sum of two images.\n"
+" flambda a.tiff b.tiff \"x y +\" -o sum.tiff\tCompute the sum of two images.\n"
 "%s"
 "\n"
 "Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>.\n",
@@ -2659,6 +2667,7 @@ verbosity>0?
 " x[0]\t\tvalue of first component of pixel (i,j)\n"
 " x[1]\t\tvalue of second component of pixel (i,j)\n"
 " x(1,2)[3]\tvalue of fourth component of pixel (i+1,j+2)\n"
+"\n"
 "Comma modifiers (pre-defined local operators):\n"
 " a,x\tx-derivative of the image a\n"
 " a,y\ty-derivative\n"
@@ -2686,6 +2695,7 @@ verbosity>0?
 " join3\tjoin the components of three vectors ATTOTS\n"
 " njoin\tjoin the components of n vectors\n"
 " halve\tsplit an even-sized vector ATTOTS into two equal-sized parts\n"
+" nstack\tcurrent number of elements in the stack (useful with njoin)\n"
 //" interleave\tinterleave\n"
 //" deinterleave\tdeinterleave\n"
 //" nsplit\tnsplit\n"
@@ -2736,6 +2746,13 @@ verbosity>0?
 " mtrans\t\ttranspose of a matrix\n"
 " mtrace\t\ttrace of a matrix\n"
 " minv\t\tinverse of a matrix\n"
+" vavg\t\taverage value of a vector\n"
+" vsum\t\tsum of the components of a vector\n"
+" vmul\t\tproduct of the components of a vector\n"
+" vmax\t\tmax component of a vector\n"
+" vmin\t\tmin component of a vector\n"
+" vnorm\t\teuclidean norm of a vector\n"
+" vdim\t\tlength of a vector\n"
 "\n"
 "Registers (numbered from 1 to 9):\n"
 " >7\tcopy to register 7\n"
@@ -2747,7 +2764,10 @@ verbosity>0?
 	:
 	"See the manual page for details on the syntax for expressions.\n"
 	,
-	v, v);
+	v,
+	verbosity < 1 ? "" :
+	" plambda -c \"355 113 /\"\t\t\t\tPrint an approximation of pi\n"
+		);
 	return 0;
 }
 

@@ -13,7 +13,7 @@
 
 // default setup (e.g. with TIFF and without GDAL)
 #define FANCY_TIFF
-#undef FANCY_GDAL
+#define FANCY_GDAL
 
 // act upon external definitions
 #ifdef FANCY_IMAGE_DISABLE_TIFF

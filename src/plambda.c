@@ -2178,6 +2178,8 @@ static float stencil_3x3_dxx[9] =  {0,0,0,  1,-2,1, 0,0,0};
 static float stencil_3x3_dyy[9] =  {0,1,0,  0,-2,0, 0,1,0};
 static float stencil_3x3_dxy_4point[9] =  {-Q,0,Q,  0,0,0, Q,0,-Q};
 static float stencil_3x3_dxy_7point[9] =  {0,-H,H,  -H,1,-H, H,-H,0};
+static float stencil_3x3_dxy_forward[9] =  {0,0,0,  0,-1,1, 0,1,-1};
+static float stencil_3x3_dxy_backward[9] =  {-1,1,0,  1,-1,0, 0,0,0};
 #undef H
 #undef Q
 #undef O
@@ -2191,6 +2193,8 @@ static float *get_stencil_3x3(int operator, int scheme)
 	case IMAGEOP_XY: { switch(scheme) {
 			 case SCHEME_CENTERED: return stencil_3x3_dxy_4point;
 			 case SCHEME_SOBEL: return stencil_3x3_dxy_7point;
+			 case SCHEME_FORWARD: return stencil_3x3_dxy_forward;
+			 case SCHEME_BACKWARD: return stencil_3x3_dxy_backward;
 			 default: fail("unrecognized stencil,xy scheme %d");
 			 }
 		}
