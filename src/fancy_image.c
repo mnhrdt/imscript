@@ -626,6 +626,19 @@ void fancy_image_fill_rectangle_float_split(
 	}
 }
 
+void fancy_image_getpixel(float *out, struct fancy_image *f, int i, int j)
+{
+	for (int l = 0; l < f->pd; l++)
+		out[l] = fancy_image_getsample(f, i, j, l);
+}
+
+void fancy_image_getpixel_oct(float *out, struct fancy_image *f,
+		int o, int i, int j)
+{
+	for (int l = 0; l < f->pd; l++)
+		out[l] = fancy_image_getsample_oct(f, o, i, j, l);
+}
+
 #ifdef MAIN_FI
 #include <stdio.h>
 int main_example(int c, char *v[])
