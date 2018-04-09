@@ -420,6 +420,7 @@ static void complex_division(float *xy, float *x, float *y)
 	xy[1] = ( -x[0]*y[1] + x[1]*y[0] ) / yn;
 }
 
+
 static void complex_exp(float *y, float *x)
 {
 #ifdef __STDC_IEC_559_COMPLEX__
@@ -430,6 +431,13 @@ static void complex_exp(float *y, float *x)
 	y[1] = exp(x[0]) * sin(x[1]);
 #endif
 }
+
+#ifdef __STDC_IEC_559_COMPLEX__
+static void complex_cpow(float *z, float *x, float *y)
+{
+	*(complex float *)z = cpow(*(complex float *)y, *(complex float *)x);
+}
+#endif
 
 #ifdef __STDC_IEC_559_COMPLEX__
 #define REGISTERC(f) static void complex_ ## f(float *y, float *x) {\
@@ -728,6 +736,23 @@ static int vector_colorsign(float *r, float *a, int n)
 	return 3;
 }
 
+// instance of "univector_function"
+static int complex_creal(float *y, float *x, int n)
+{
+	if (n != 2) fail("cannot extract real part of a %d-vector", n);
+	y[0] = x[0];
+	return 1;
+}
+
+// instance of "univector_function"
+static int complex_cimag(float *y, float *x, int n)
+{
+	if (n != 2) fail("cannot extract imaginary part of a %d-vector", n);
+	y[0] = x[1];
+	return 1;
+}
+
+
 // table of all functions (local and from math.h) {{{1
 static struct predefined_function {
 	void (*f)(void);
@@ -845,8 +870,11 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(complex_csqrt , "csqrt", -2),
 	REGISTER_FUNCTIONN(complex_ctan  , "ctan", -2),
 	REGISTER_FUNCTIONN(complex_ctanh , "ctanh", -2),
+	REGISTER_FUNCTIONN(complex_cpow  , "cpow", -3),
 #endif
-	REGISTER_FUNCTIONN(complex_exp,"cexp", -2),
+	REGISTER_FUNCTIONN(complex_exp   , "cexp", -2),
+	REGISTER_FUNCTIONN(complex_creal , "creal", -6),
+	REGISTER_FUNCTIONN(complex_cimag , "cimag", -6),
 	REGISTER_FUNCTIONN(complex_product,"cprod", -3),
 	REGISTER_FUNCTIONN(complex_division,"cdiv", -3),
 	REGISTER_FUNCTIONN(matrix_product,"mprod",-5),
@@ -2765,6 +2793,8 @@ verbosity>0?
 " xyz2rgb\tconvert a 3-vector from XYZ to RGB\n"
 " rgb2xyz\tconvert a 3-vector from RGB to XYZ\n"
 " cprod\t\tmultiply two 2-vectrs as complex numbers\n"
+" cexp\t\tcomplex exponential\n"
+" cpow\t\tcomplex power\n"
 " mprod\t\tmultiply two 2-vectrs as matrices (4-vector = 2x2 matrix, etc)\n"
 " vprod\t\tvector product of two 3-vectors\n"
 " sprod\t\tscalar product of two n-vectors\n"
