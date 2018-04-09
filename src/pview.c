@@ -141,6 +141,7 @@ static int main_viewhp(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
+
 bool identityP(double A[9])
 {
 	return A[0]==1 && A[1]==0 && A[2]==0 &&
@@ -159,12 +160,12 @@ void projective_map(double y[2], double A[9], double x[2])
 }
 
 // argument for the "traverse_segment" function
-//static void put_pixel(int a, int b, void *pp)
-//{
-//	struct {int w, h; struct rgba_value *x, c;} *p = pp;
-//	if (inner_point(p->w, p->h, a, b))
-//		p->x[b*p->w+a] = p->c;
-//}
+static void put_pixel_gray(int a, int b, void *pp)
+{
+	struct {int w, h; uint8_t *x, c; } *p = pp;
+	if (inner_point(p->w, p->h, a, b))
+		p->x[b*p->w+a] = p->c;
+}
 
 #include "smapa.h"
 SMART_PARAMETER_SILENT(LINN,70)
@@ -232,6 +233,17 @@ static void put_pixel_vec_aa(int a, int b, float f, void *ee)
 	}
 }
 
+// put a pixel with a radial direction towards (cx,cy)
+static void put_pixel_rvec(int a, int b, void *ee)
+{
+	struct {int w, h; int cx, cy; float *x; } *e = ee;
+	if (inner_point(e->w, e->h, a, b))
+	{
+		e->x[2*(b*e->w + a) + 0] = a - e->cx;
+		e->x[2*(b*e->w + a) + 1] = b - e->cy;
+	}
+}
+
 // draw a color segment over a color image
 static void overlay_segment_color(struct rgba_value *x, int w, int h,
 		int px, int py, int qx, int qy, struct rgba_value c)
@@ -256,6 +268,29 @@ static void overlay_segment_gray(uint8_t *x, int w, int h,
 	e.x = x;
 	e.c = 255;
 	traverse_segment_aa(px, py, qx, qy, put_pixel_gray_aa, &e);
+}
+
+static void overlay_circle_gray(uint8_t *x, int w, int h,
+		int cx, int cy, int r)
+{
+	struct {int w, h; uint8_t *x, c; } e;
+	e.w = w;
+	e.h = h;
+	e.x = x;
+	e.c = 255;
+	traverse_circle(cx, cy, r, put_pixel_gray, &e);
+}
+
+static void overlay_circle_rvec(float *x, int w, int h,
+		int cx, int cy, int r)
+{
+	struct {int w, h; int cx, cy; float *x; } e;
+	e.w = w;
+	e.h = h;
+	e.x = x;
+	e.cx = cx;
+	e.cy = cy;
+	traverse_circle(cx, cy, r, put_pixel_rvec, &e);
 }
 
 // draw a segment over a vector-valued float image
@@ -480,6 +515,85 @@ int main_gviewsegs(int c, char *v[])
 		X[1] /= N;
 		if (inner_point(w,h, a[0],a[1]) && inner_point(w,h, b[0],b[1]))
 			overlay_segment_vec(o, w,h,2, a[0],a[1], b[0],b[1], X);
+	}
+
+	iio_write_image_float_vec("-", o, w, h, 2);
+	return 0;
+}
+
+// CLI utility to view a set of circles,
+// (produces a binary image)
+int main_viewcircs(int c, char *v[])
+{
+	if (c != 3) {
+		fprintf(stderr, "usage:\n\t"
+			"%s w h < 3col.txt\n", *v);
+		//       0  1 2
+		return 1;
+	}
+	int w = atoi(v[1]);
+	int h = atoi(v[2]);
+
+	int n;
+	double (*p)[3] = (void*)read_ascii_doubles(stdin, &n);
+	n /= 3;
+
+	if (w == -1) for (int i = 0; i < n; i++) {
+			if (w < lrint(p[i][0])) w = lrint(p[i][0]);
+			if (w < lrint(p[i][2])) w = lrint(p[i][2]);
+		}
+	if (h == -1) for (int i = 0; i < n; i++) {
+			if (h < lrint(p[i][1])) h = lrint(p[i][1]);
+			if (h < lrint(p[i][3])) h = lrint(p[i][3]);
+		}
+
+	uint8_t (*o)[w] = xmalloc(w*h);
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+		o[j][i] = 0;
+	for (int i = 0; i < n; i++)
+	{
+		int c[3] = { lrint(p[i][0]), lrint(p[i][1]), lrint(p[i][2]) };
+		overlay_circle_gray(*o, w, h, c[0], c[1], c[2]);
+	}
+
+	iio_write_image_uint8_vec("-", (uint8_t*)o, w, h, 1);
+	return 0;
+}
+
+// CLI utility to render a set of circles,
+// (produces a gradient image)
+int main_gviewcircs(int c, char *v[])
+{
+	if (c != 3) {
+		fprintf(stderr, "usage:\n\t"
+			"%s w h < 3col.txt\n", *v);
+		//       0  1 2
+		return 1;
+	}
+	int w = atoi(v[1]);
+	int h = atoi(v[2]);
+
+	int n;
+	double (*p)[3] = (void*)read_ascii_doubles(stdin, &n);
+	n /= 3;
+
+	if (w == -1) for (int i = 0; i < n; i++) {
+			if (w < lrint(p[i][0])) w = lrint(p[i][0]);
+			if (w < lrint(p[i][2])) w = lrint(p[i][2]);
+		}
+	if (h == -1) for (int i = 0; i < n; i++) {
+			if (h < lrint(p[i][1])) h = lrint(p[i][1]);
+			if (h < lrint(p[i][3])) h = lrint(p[i][3]);
+		}
+
+	float *o = xmalloc(2*w*h*sizeof*o);
+	for (int i = 0; i < w*h*2; i++)
+		o[i] = 0;
+	for (int i = 0; i < n; i++)
+	{
+		int c[3] = { lrint(p[i][0]), lrint(p[i][1]), lrint(p[i][2]) };
+		overlay_circle_rvec(o, w, h, c[0], c[1], c[2]);
 	}
 
 	iio_write_image_float_vec("-", o, w, h, 2);
@@ -929,6 +1043,8 @@ int main_pview(int c, char *v[])
 	else if (0 == strcmp(v[1], "pairs")) return main_viewpairs(c-1, v+1);
 	else if (0 == strcmp(v[1], "segments")) return main_viewsegs(c-1, v+1);
 	else if (0 == strcmp(v[1], "gsegments")) return main_gviewsegs(c-1,v+1);
+	else if (0 == strcmp(v[1], "circles")) return main_viewcircs(c-1, v+1);
+	else if (0 == strcmp(v[1], "gcircles"))return main_gviewcircs(c-1, v+1);
 	else if (0 == strcmp(v[1],"polygons"))return main_viewpolygons(c-1,v+1);
 	else if (0 == strcmp(v[1], "triplets")) return main_viewtrips(c-1, v+1);
 	else if (0 == strcmp(v[1], "epipolar")) return main_viewepi(c-1, v+1);

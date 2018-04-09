@@ -110,4 +110,20 @@ void traverse_segment_aa2(float px, float py, float qx, float qy,
 	}
 }
 
+// draw a segment between two points
+static
+void traverse_circle(int cx, int cy, int r,
+		void (*f)(int,int,void*), void *e)
+{
+	int h = r / sqrt(2);
+	for (int i = -h; i <= h; i++)
+	{
+		int s = sqrt(r*r - i*i);
+		f(cx + i, cy + s, e); // upper quadrant
+		f(cx + i, cy - s, e); // lower quadrant
+		f(cx + s, cy + i, e); // right quadrant
+		f(cx - s, cy + i, e); // left quadrant
+	}
+}
+
 #endif//_DRAWSEGMENT_C
