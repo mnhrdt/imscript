@@ -26,10 +26,10 @@ static void cline(float *musigma,
 		from[i] = zer[i] - dir[i];
 		toto[i] = zer[i] + dir[i];
 	}
-	fprintf(stderr, "c,s = %g %g\n", c, s);
-	fprintf(stderr, "dir = %g %g\n", dir[0], dir[1]);
-	fprintf(stderr, "zer = %g %g\n", zer[0], zer[1]);
-	fprintf(stderr, "(%g %g)=>(%g %g)\n",from[0],from[1],toto[0],toto[1]);
+	//fprintf(stderr, "c,s = %g %g\n", c, s);
+	//fprintf(stderr, "dir = %g %g\n", dir[0], dir[1]);
+	//fprintf(stderr, "zer = %g %g\n", zer[0], zer[1]);
+	//fprintf(stderr, "(%g %g)=>(%g %g)\n",from[0],from[1],toto[0],toto[1]);
 	double mu = 0, sigma = 0, nn = 0;
 	for (int i = 0; i < n; i++) {
 		float a = i/(n - 1.0), p[2];
@@ -59,7 +59,7 @@ static void cline(float *musigma,
 		musigma[0] = mu;
 		musigma[1] = sigma;
 	}
-	fprintf(stderr, "mu sigma = %g %g\n", mu, sigma);
+	//fprintf(stderr, "mu sigma = %g %g\n", mu, sigma);
 }
 
 static void clineh(float *musigma, float *l, int n, float *x, int w, int h)
@@ -113,7 +113,7 @@ static void getmusigmamass(float musigmamass[3], float *l, int n)
 			sigma += l[i]*(posi-mu)*(posi-mu);
 	}
 	sigma = sqrt(sigma/nn);
-	fprintf(stderr, "mu sigma mass nn = %g %g %g %g\n", mu, sigma, mass,nn);
+	//fprintf(stderr,"mu sigma mass nn = %g %g %g %g\n", mu,sigma, mass,nn);
 	musigmamass[0] = mu;
 	musigmamass[1] = sigma;
 	musigmamass[2] = mass;
@@ -124,7 +124,7 @@ static void plot_cline2(float *l, int n)
 	printf("set samples 1000\n");
 	//printf("set logscale x\n");
 	//printf("set logscale y\n");
-	printf("plot \"-\" w lines title \"data\"");
+	printf("plot [-pi:pi] \"-\" w lines title \"data\"");
 	float musigmamass[3];
 	getmusigmamass(musigmamass, l, n);
 	float mu = musigmamass[0];
@@ -132,7 +132,7 @@ static void plot_cline2(float *l, int n)
 	float mass = musigmamass[2];
 	float alpha_g = mass/(sigma*sqrt(2*3.1416));
 	float alpha_l = mass/(sigma*sqrt(2));
-	fprintf(stderr, "mass = %g\n", mass);
+	//fprintf(stderr, "mass = %g\n", mass);
 	//printf(",(%g)*exp(-(x-(%g))**2/(2*(%g)**2)) title \"normal\"",
 	//		alpha_g, mu, sigma);
 	//printf(",(%g)*exp(-abs(x-(%g))*sqrt(2)/(%g)) title \"laplacian\"",
@@ -160,7 +160,7 @@ static void plot_cline(float *l, int n, char *title, float mu, float sigma)
 		mass *= 2*3.1416/n;
 		float alpha_g = mass/(sigma*sqrt(2*3.1416));
 		float alpha_l = mass/(sigma*sqrt(2));
-		fprintf(stderr, "mass = %g\n", mass);
+		//fprintf(stderr, "mass = %g\n", mass);
 		printf(",%g*exp(-(x-%g)**2/(2*(%g)**2)) title \"normal\"",
 				alpha_g, mu, sigma);
 		printf(",%g*exp(-abs(x-%g)*sqrt(2)/%g) title \"laplacian\"",
@@ -177,7 +177,7 @@ static void plot_cline(float *l, int n, char *title, float mu, float sigma)
 
 #include "iio.h"
 #include "smapa.h"
-SMART_PARAMETER(NFAC,1)
+SMART_PARAMETER_SILENT(NFAC,1)
 int main(int c, char *v[])
 {
 	if (c != 2 && c != 3) {
@@ -190,8 +190,8 @@ int main(int c, char *v[])
 	int w, h;
 	float *x = iio_read_image_float(in_img, &w, &h);
 	int n = NFAC()*(2+hypot(w+2,h+2));
-	fprintf(stderr, "geometry = %dx%d\n", w, h);
-	fprintf(stderr, "n = %d\n", n);
+	//fprintf(stderr, "geometry = %dx%d\n", w, h);
+	//fprintf(stderr, "n = %d\n", n);
 	float l[n], musigma[2] = {0};
 	if (isfinite(angle))
 		cline(musigma, l, n, x, w, h, angle);

@@ -6,6 +6,7 @@
 #include "iio.h"
 
 #define xmalloc malloc
+static int global_verbose_flag = 0;
 
 static int compare_floats(const void *a, const void *b)
 {
@@ -52,7 +53,8 @@ static void simplest_color_balance(float *y, float *x, int w, int h, float p)
 {
 	float rmin, rmax;
 	get_rminmax(&rmin, &rmax, x, w*h, w*h*(p/100));
-	fprintf(stderr, "qauto: rminmax = %g %g\n", rmin, rmax);
+	if (global_verbose_flag)
+		fprintf(stderr, "qauto: rminmax = %g %g\n", rmin, rmax);
 
 	for (int i = 0; i < w*h; i++)
 		y[i] = 255 * (x[i] - rmin) / (rmax - rmin);
@@ -126,6 +128,7 @@ static char *help_string_long     =
 " -p -X\t\tset the mean to 127 and the standard deviation to X\n"
 " -f\t\tdo not quantize the output, only rescale the values\n"
 " -i\t\ttreat each pixel dimension independently\n"
+" -v\t\tverbose mode (print details of the transformation)\n"
 " -h\t\tdisplay short help message\n"
 " --help\t\tdisplay longer help message\n"
 "\n"
@@ -147,6 +150,7 @@ int main_qauto(int c, char *v[])
 	float parameter = atof(pick_option(&c, &v, "p", "5"));
 	bool independent = pick_option(&c, &v, "i", 0);
 	bool dontquantize = pick_option(&c, &v, "f", 0);
+	global_verbose_flag = !!pick_option(&c, &v, "v", 0);
 
 	// get positional arguments
 	if (c != 3 && c != 2 && c != 1) {
