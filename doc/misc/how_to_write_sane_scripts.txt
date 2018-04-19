@@ -1,6 +1,42 @@
 - either your script is executable or its name ends in .sh, but not both
-- variable names are uppercase
+- preferably, use #!/bin/sh, but then assume sh is not bash
+- otherwise if you need bash, use #!/bin/bash
+- only put a shebang if the file is executable
+- if your script is not executable, it can be run with ". file.sh" without ever
+  quitting the parent shell
+- variable names are uppercase, except maybe if they are single letters
 - never store filanemes in variables, filenames *are* variable names
 - if you check the existence of files at every line, write a makefile instead
 - use always test and short-circuiting, try to avoid if
 - to break a pipeline into several lines, put each command on a separate line
+- assume that your filenames do not contain spaces.  Otherwise, start your
+  script by temporarily renaming the files using saner names.  Do not ever
+  use weird quotes to "accept" filenames with spaces.
+- this is the basic skeleton of a script
+
+#!/bin/sh
+
+set -x   # set flag to print debugging information
+set -e   # set flag to quit on first error
+
+# extract input arguments
+if [ $# != "3" ] ; then
+	printf "usage:\n\t$0 in1.txt in2.txt out.txt\n" >&2
+	exit 1
+fi
+FNAME_IN1=$1
+FNAME_IN2=$2
+FNAME_OUT=$3
+
+# copy files into temporary directory
+T=`mktemp -d /tmp/myscript.XXXXXX`
+cp $FNAME_IN1 $T/a.txt
+cp $FNAME_IN2 $T/b.txt
+cd $T
+
+# run your computation
+transform a.txt b.txt c.txt >oo 2>oe
+
+# recover the result
+cd -
+cp $T/c.txt $FNAME_OUT
