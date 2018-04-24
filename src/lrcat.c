@@ -11,7 +11,7 @@
 #include "smapa.h"
 SMART_PARAMETER(BACKGROUND,0)
 
-int main_lrcat(int c, char *v[])
+int main_lrcat_two(int c, char *v[])
 {
 	if (c != 3 && c != 4) {
 		fprintf(stderr, "usage:\n\t%s a b [ab]\n", *v);
@@ -49,6 +49,50 @@ int main_lrcat(int c, char *v[])
 
 	iio_write_image_float_vec(filename_out, z, w[2], h[2], pd[2]);
 	return EXIT_SUCCESS;
+}
+
+int main_lrcat(int c, char *v[])
+{
+	char *filename_out = pick_option(&c, &v, "o", "");
+	if (!*filename_out && c != 3 && c != 4) {
+		fprintf(stderr, "usage:\n\t%s a b [ab]\n", *v);
+		//                          0 1 2  3
+		return 1;
+	}
+	int n = *filename_out ? c - 1 : 2;
+	char *filename[n+1];
+	filename[n] = *filename_out ? filename_out : "-";
+	for (int i = 0; i < n; i++)
+		filename[i] = v[i+1];
+
+	int w[n+1], h[n+1], pd[n+1];
+	float *x[n+1];
+	w[n] = h[n] = pd[n] = 0;
+	for (int k = 0; k < n; k++)
+	{
+		x[k] = iio_read_image_float_vec(filename[k], w+k, h+k, pd+k);
+		w[n] += w[k];
+		h[n] = BAD_MAX(h[n], h[k]);
+		pd[n] = BAD_MAX(pd[n], pd[k]);
+	}
+	x[n] = xmalloc(w[n] * h[n] * pd[n] * sizeof(x[0][0]));
+	for (int i = 0; i < w[n] * h[n] * pd[n]; i++)
+		x[n][i] = BACKGROUND();
+
+	int ok = 0;
+	for (int k = 0; k < n; k++)
+	{
+		for (int j = 0; j < h[0]; j++)
+		for (int i = 0; i < w[0]; i++)
+		for (int l = 0; l < pd[2]; l++) {
+			float s = getsample_1(x[k], w[k], h[k], pd[k], i, j, l);
+			setsample_0(x[n], w[n], h[n], pd[n], i+ok, j, l, s);
+		}
+		ok += w[k];
+	}
+
+	iio_write_image_float_vec(filename[n], x[n], w[n], h[n], pd[n]);
+	return 0;
 }
 
 #ifndef HIDE_ALL_MAINS
