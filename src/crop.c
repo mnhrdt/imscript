@@ -14,8 +14,8 @@ static int bound(int x, int min, int max)
 static void crop(float *out, int *cw, int *ch, float *in, int w, int h, int pd,
 		int x0, int y0, int xf, int yf)
 {
-	if (xf < 0) xf = w + xf;
-	if (yf < 0) yf = h + yf;
+	if (xf <= 0) xf = w + xf;
+	if (yf <= 0) yf = h + yf;
 	x0 = bound(x0, 0, w);
 	xf = bound(xf, 0, w);
 	y0 = bound(y0, 0, h);
