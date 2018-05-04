@@ -2882,10 +2882,10 @@ static int read_beheaded_whatever(struct iio_image *x,
 
 	//char command_format[] = "convert - %s < %s\0";
 	char command_format[] = "/usr/bin/convert - %s < %s\0";
-	char ppmname[strlen(filename)+5];
-	snprintf(ppmname, FILENAME_MAX, "%s.ppm", filename);
+	char ppmname[strlen(filename)+10];
+	snprintf(ppmname, FILENAME_MAX+10, "%s.ppm", filename);
 	char command[strlen(command_format)+1+2*strlen(filename)];
-	snprintf(command, FILENAME_MAX, command_format, ppmname, filename);
+	snprintf(command, FILENAME_MAX+10, command_format, ppmname, filename);
 	IIO_DEBUG("COMMAND: %s\n", command);
 	int r = system(command);
 	IIO_DEBUG("command returned %d\n", r);
@@ -3612,9 +3612,10 @@ static int read_image(struct iio_image *x, const char *fname)
 	if (fname == strstr(fname, "http://")
 			|| fname==strstr(fname, "https://") ) {
 		// TODO: for security, sanitize the fname
-		char tfn[FILENAME_MAX], cmd[FILENAME_MAX];
+		int cmd_len = 2*FILENAME_MAX + 20;
+		char tfn[cmd_len], cmd[cmd_len];
 		fill_temporary_filename(tfn);
-		snprintf(cmd, FILENAME_MAX, "wget %s -q -O %s", fname, tfn);
+		snprintf(cmd, cmd_len, "wget %s -q -O %s", fname, tfn);
 		int rsys = system(cmd);
 		if (rsys != 0) fail("system wget returned %d", rsys);
 		FILE *f = xfopen(tfn, "r");

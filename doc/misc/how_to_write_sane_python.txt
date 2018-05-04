@@ -1,0 +1,67 @@
+
+How to write sane Python
+------------------------
+
+
+BASIC HYGIENE
+
+H1. print a copy of PEP8 and burn it unceremoniously
+H2. require at least python 3.6.  Previous versions are unusable.
+H3. process strings with % or with f-interpolation;  do not use .format
+H4. try to ignore the existence of exceptions as much as possible
+H5. avoid any kind of boilerplate that helps for 2.7 compatibility
+
+
+NAMING
+
+N1. local variables are single letters.  No exceptions.
+N2. use unicode letters without fear: α, β, γ = alpha, beta, gamma
+N3. function names are long and descriptive
+N4. global variables have long and uppercase names
+N5. do not bring new mixed-case symbols into the world
+N6. either your file is executable or its name ends in .py, but not both
+
+
+FORMATTING
+
+F1. indent with 1 tab per indentation level
+F2. max 80 characters per line (1 indent counts as 8)
+F3. max 25 lines per function
+F4. max 8 local variables per scope
+F5. strings are always quoted "like this", ...
+F6. ... except when they are dictionary keys, which are quoted 'thusly'
+
+
+COMMENTS
+
+C1. write a single-line comment for each variable explaining its meaning
+C2. write a few lines of comment to document each function
+C3. docstrings are used only for functions intended to be used in another file
+C4. the docstring does not replace the comment associated to the function.  It
+    serves a very different purpose: The docstring is to be read by people who
+    only want to use your function but do not care about the implementaiton.
+    The comment is to be read by the person who implements the function, and
+    it often explains how the function relates to the other pieces of the code.
+C5. do not put any licensing/copyright boilerplate at the top of the file
+    (if it is really necessary, put it at the bottom of the file)
+
+
+
+IMPORTING
+
+I1. strive to minimize the number of imports
+I2. imports should be as local as possible (e.g., inside a function)
+I3. Comparison of importing styles:
+    BAD: import package as pk         # your code becomes un-copypasteable
+    GOOD: import package              # code is clear (but may be too verbose)
+    BEST: from package import fu bar  # useful for short and function-heavy code
+
+
+USAGE
+
+U1. prefer string interpolation than concatenation
+U2. avoid os.path.join, use string processing instead
+U3. in numpy, never use .dot, use always @
+U4. use matplotlib for plots, but do not EVER use it for displaying an image
+U5. tkinter is there, and is useful, and is simple; do not be afraid of it
+U6. represent graphs as sparse matrices, not as dictionaries^2

@@ -1,0 +1,63 @@
+RULES FOR OPTIMIZATION AND PARALELIZATION
+=========================================
+
+
+A. OPTIMIZATION
+---------------
+
+- The first rule of optimzation is that you should not optimize your code.
+
+- The second rule of optimzation is that YOU SHOULD NOT OPTIMIZE YOUR CODE.
+
+- Third rule: the shortest possible code is often the fastest.
+
+- Fourth rule: do not ever optimize ugly code.  Before even thinking about
+  optimization, refactor your code to be beautiful, correctly formatted,
+  commented, without unused parts or unnecessary dependencies, and with a solid
+  compilation and test system, that works correctly over several different
+  architectures and compilers.
+
+- Fourth rule: do not call it "code optimization", call it "code
+  complexification with collateral performance effects during runtime".  Forget
+  about the word "optimization" and use instead "complexification"; this sets
+  the appropriate mental frame.
+
+- Fifth rule: it is forbidden to complexify before profiling.
+
+- Sixth rule: if you decide to complexify a part of your program, measure its
+  performance before and after the changes.  If the gain is negligible (say,
+  less than 5% of running time for that part of the code), then DISCARD THE
+  CHANGES AND RECOVER THE SLOW VERSION.
+
+- Seventh rule: save two versions of the code (original and complexified), and
+  verify that they always produce IDENTICAL results.
+
+
+B. CPU PARLELIZATION
+--------------------
+
+- The first rule of paralelization is that you should not paralelize.
+
+- The second rule of paralelization is that you should not paralelize.
+
+- The third rule: let the operating system paralelize for you.  Insteat of
+  running one program that spans several threads, run several single-threaded
+  programs concurrently.
+
+- Fourth rule: the only way to achieve the ideal linear speedup is with
+  separate processes acting over different files.  A linear speedup with
+  threads is impossible.
+
+- Fifth rule: nesting parallel blocks is forbidden.
+
+- Sixth rule: parallelize only the outermost possible loop.
+
+- Seventh rule: Your program should compile correctly without paralelization
+  and give identical results.
+
+- Eight rule: measure the cpu and wall running time.  Build a graph of speedup
+  ratio for all possible numbers of processors.  Very often this graph will
+  have an optimum at around 4 processors, even with machines of 32 cores.
+
+- Ninth rule: all the assumptions that you make about the speedup that you will
+  achieve are wrong.  The only thing that counts is real measurements.

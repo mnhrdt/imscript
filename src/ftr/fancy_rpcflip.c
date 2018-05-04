@@ -810,7 +810,7 @@ void pixel_from_preview(float *r, struct pan_view *v, double p, double q, int i)
 	}
 }
 
-static int tiffo_getpixel_float_raw(float *r, struct fancy_image *t,
+static void tiffo_getpixel_float_raw(float *r, struct fancy_image *t,
 		int o, int i, int j)
 {
 	//void *p = tiff_octaves_getpixel(t, o, i, j);
@@ -819,14 +819,14 @@ static int tiffo_getpixel_float_raw(float *r, struct fancy_image *t,
 	fancy_image_getpixel_oct(r, t, o, i, j);
 }
 
-static int tiffo_getpixel_float_1(float *r, struct fancy_image *t,
+static void tiffo_getpixel_float_1(float *r, struct fancy_image *t,
 		int o, int i, int j)
 {
 	//if (i < 0) i = 0;
 	//if (j < 0) j = 0;
 	//if (i >= t->i[o].w) i = t->i[o].w;
 	//if (j >= t->i[o].h) i = t->i[o].h;
-	return tiffo_getpixel_float_raw(r, t, o, i, j);
+	tiffo_getpixel_float_raw(r, t, o, i, j);
 }
 
 static int tiffo_getpixel_float_bilinear(float *r, struct fancy_image *t,
@@ -1863,8 +1863,9 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 	{
 		pan_repaint(e, w, h);
 		struct pan_view *v = obtain_view(e);
-		char buf[FILENAME_MAX];
-		snprintf(buf, FILENAME_MAX, "%s/%s_%d.png", outdir, outnam, i);
+		int buf_len = 2*FILENAME_MAX + 10;
+		char buf[buf_len];
+		snprintf(buf, buf_len, "%s/%s_%d.png", outdir, outnam, i);
 		iio_write_image_uint8_vec(buf, v->display, w, h, 3);
 		action_select_view(f, i+1, w/2, h/2); // not parallelizable
 	}

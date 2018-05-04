@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <unistd.h> // for getpid only
 
-#include "tiff_octaves_rw.c"
+#include "tiff_octaves_rw.c" // TODO: change tiff_octaves to fancy_image
 #include "srtm4o.c"
 
 #define DONT_USE_TEST_MAIN
@@ -74,7 +74,7 @@ struct pan_view {
 	int repaint;
 };
 
-#define MAX_VIEWS 200
+#define MAX_VIEWS 60
 struct pan_state {
 	// 1. data for each view
 	int nviews;
@@ -1100,7 +1100,7 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 		double xy[2], ll[2];
 		window_to_raster(xy, e, w/2, h/2);
 		raster_to_geo(ll, e, xy[0], xy[1]);
-		dh = srtm4o(ll[0], ll[1], 0) + egm96(ll[0], ll[1]);
+		dh = 0;//srtm4o(ll[0], ll[1], 0) + egm96(ll[0], ll[1]);
 		e->base_h = dh;
 	}
 	update_local_projection(e, w/2, h/2, e->base_h);
@@ -1129,7 +1129,7 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 						e->zoom_factor, so, 1 << so);
 				so = -so;
 			}
-			double hhh = srtm4o(ll[0], ll[1], so) + egm96(ll[0], ll[1]);
+			double hhh = 0;//srtm4o(ll[0], ll[1], so) + egm96(ll[0], ll[1]);
 			float *cc = v->fdisplay + 3 * (j * v->dw + i);
 			for (int l = 0; l < 3; l++)
 				cc[l] = e->a * hhh + e->b;
@@ -1849,8 +1849,9 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 	{
 		pan_repaint(e, w, h);
 		struct pan_view *v = obtain_view(e);
-		char buf[FILENAME_MAX];
-		snprintf(buf, FILENAME_MAX, "%s/%s_%d.png", outdir, outnam, i);
+		int buf_len = 2*FILENAME_MAX + 30;
+		char buf[buf_len];
+		snprintf(buf, buf_len, "%s/%s_%d.png", outdir, outnam, i);
 		iio_write_image_uint8_vec(buf, v->display, w, h, 3);
 		action_select_view(f, i+1, w/2, h/2); // not parallelizable
 	}

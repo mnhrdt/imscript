@@ -1,3 +1,6 @@
+How to write sane scripts
+-------------------------
+
 - either your script is executable or its name ends in .sh, but not both
 - preferably, use #!/bin/sh, but then assume sh is not bash
 - otherwise if you need bash, use #!/bin/bash
@@ -6,12 +9,31 @@
   quitting the parent shell
 - variable names are uppercase, except maybe if they are single letters
 - never store filanemes in variables, filenames *are* variable names
+- exception: input arguments $1, $2, ... can be put into variables
 - if you check the existence of files at every line, write a makefile instead
 - use always test and short-circuiting, try to avoid if
 - to break a pipeline into several lines, put each command on a separate line
 - assume that your filenames do not contain spaces.  Otherwise, start your
   script by temporarily renaming the files using saner names.  Do not ever
-  use weird quotes to "accept" filenames with spaces.
+  use weird quotes to "deal with" filenames with spaces.  The names of files
+  are  the single most important choice in shell scripting, and they are
+  always *your* choice.
+- how to do parallelism:
+
+  GOOD:
+        for i in *.txt; do
+                process $i &
+        done
+        wait
+
+  BETTER:
+        for i in *.txt; do
+                echo process $i
+        done | parallel -j 32
+
+  BEST: write a makefile
+
+
 - this is the basic skeleton of a script
 
 #!/bin/sh

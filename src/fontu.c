@@ -624,11 +624,9 @@ static void put_pixel_rgb(uint8_t *x, int w, int h, int i, int j, uint8_t *c)
 }
 
 static void put_string_in_float_image(float *x, int w, int h, int pd,
-		int posx, int posy, float *color, int kerning,
+		int posx, int posy, float *fg, float *bg, int kerning,
 		struct bitmap_font *font, char *string)
 {
-	float *bg = NULL;
-	float *fg = color;
 	int posx0 = posx;
 	while (1)
 	{
@@ -778,7 +776,8 @@ static int main_dumptry(int c, char **v)
 static int main_puts(int c, char **v)
 {
 	int kerning = atoi(pick_option(&c, &v, "k", "0"));
-	char *colorname = pick_option(&c, &v, "c", "000");
+	char *fgcolorname = pick_option(&c, &v, "c", "000");
+	char *bgcolorname = pick_option(&c, &v, "b", "000");
 	if (c != 5 && c != 6 && c != 7) {
 		fprintf(stderr, "usage:\n\t"
 			"%s font.bdf px py \"string\" [in [out]]\n", *v);
@@ -798,11 +797,15 @@ static int main_puts(int c, char **v)
 	int w, h, pd;
 	float *x = iio_read_image_float_vec(filename_in, &w, &h, &pd);
 
-	float color[10] = {0};
-	if (pd == (int)strlen(colorname))
+	float fg[10] = {0};
+	if (pd == (int)strlen(fgcolorname))
 		for (int i = 0; i < pd; i++)
-			color[i] = (unsigned char)((255*(colorname[i]-'0'))/8);
-	put_string_in_float_image(x, w,h,pd, px,py, color, kerning, &f, text);
+			fg[i] = (unsigned char)((255*(fgcolorname[i]-'0'))/8);
+	float bg[10] = {0};
+	if (pd == (int)strlen(bgcolorname))
+		for (int i = 0; i < pd; i++)
+			bg[i] = (unsigned char)((255*(bgcolorname[i]-'0'))/8);
+	put_string_in_float_image(x, w,h,pd, px,py, fg, bg,  kerning, &f, text);
 
 	iio_write_image_float_vec(filename_out, x, w, h, pd);
 
