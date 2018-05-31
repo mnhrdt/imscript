@@ -13,8 +13,8 @@ int main_redim(int c, char *v[])
 	//                                         0 1 2 3      4
 	int target_w       = atoi(v[1]);
 	int target_h       = atoi(v[2]);
-	char *filename_in  = c < 3 ? "-" : v[3];
-	char *filename_out = c < 4 ? "-" : v[4];
+	char *filename_in  = c > 3 ? "-" : v[3];
+	char *filename_out = c > 4 ? "-" : v[4];
 
 	int w, h, pd;
 	float *x = iio_read_image_float_vec(filename_in, &w, &h, &pd);
@@ -31,6 +31,9 @@ int main_redim(int c, char *v[])
 		target_h = ceil((w*h)/(1.0*target_w));
 
 	assert(target_w * target_h >= w*h);
+
+	fprintf(stderr, "from %d %d %d to %d %d %d\n",
+			w, h, pd, target_w, target_h, pd);
 
 	float *y = malloc(target_w*target_h*pd*sizeof*y);
 	memset(y, 0, target_w*target_h*pd*sizeof*y);
