@@ -9,6 +9,7 @@
 #include "fail.c"
 #include "xmalloc.c"
 #include "bilinear_interpolation.c"
+#include "bicubic.c"
 
 
 static void bilinear_interpolant_vec(float *y, int yw, int yh,
@@ -23,6 +24,49 @@ static void bilinear_interpolant_vec(float *y, int yw, int yh,
 		float p = i*wfactor;
 		float q = j*hfactor;
 		bilinear_interpolation_vec_at(yy[j][i], x, xw, xh, pd, p, q);
+	}
+}
+
+static void bicubic_interpolant_vec(float *y, int yw, int yh,
+		float *x, int xw, int xh, int pd)
+{
+	float (*yy)[yw][pd] = (void*)y;
+	float wfactor = xw/(float)yw;
+	float hfactor = xh/(float)yh;
+	for (int j = 0; j < yh; j++)
+	for (int i = 0; i < yw; i++)
+	{
+		float p = i*wfactor;
+		float q = j*hfactor;
+		bicubic_interpolation(yy[j][i], x, xw, xh, pd, p, q);
+	}
+}
+
+static void nn_interpolation(float *out, float *x, int w, int h, int pd,
+		float p, float q)
+{
+	int ip = lrint(p);
+	int iq = lrint(q);
+	if (ip < 0) ip = 0;
+	if (iq < 0) iq = 0;
+	if (ip >= w) ip = w - 1;
+	if (iq >= h) iq = h - 1;
+	for (int l = 0; l < pd; l++)
+		out[l] = x[(iq*w+ip)*pd + l];
+}
+
+static void nn_interpolant_vec(float *y, int yw, int yh,
+		float *x, int xw, int xh, int pd)
+{
+	float (*yy)[yw][pd] = (void*)y;
+	float wfactor = xw/(float)yw;
+	float hfactor = xh/(float)yh;
+	for (int j = 0; j < yh; j++)
+	for (int i = 0; i < yw; i++)
+	{
+		float p = i*wfactor;
+		float q = j*hfactor;
+		nn_interpolation(yy[j][i], x, xw, xh, pd, p, q);
 	}
 }
 
@@ -85,6 +129,8 @@ void compute_resize_sizes(int *out_w, int *out_h, int w, int h)
 #include "smapa.h"
 SMART_PARAMETER_SILENT(ZOOMBIL_DIRECT,0)
 
+static int global_order = 0;
+
 void resize_api_vec(float *y, int yw, int yh, float *x, int xw, int xh, int pd)
 {
 	//fprintf(stderr, "resize %dx%d -> %dx%d\n", xw, xh, yw, yh);
@@ -101,16 +147,22 @@ void resize_api_vec(float *y, int yw, int yh, float *x, int xw, int xh, int pd)
 		downsav2(t, x, xw, xh, pd, m, n);
 		//fprintf(stderr, "w: %d -> %d -> %d\n", xw, tw, yw);
 		//fprintf(stderr, "h: %d -> %d -> %d\n", xh, th, yh);
-		bilinear_interpolant_vec(y, yw, yh, t, tw, th, pd);
+		if (global_order == 3)
+			bicubic_interpolant_vec(y, yw, yh, t, tw, th, pd);
+		else if (global_order == 0)
+			nn_interpolant_vec(y, yw, yh, t, tw, th, pd);
+		else
+			bilinear_interpolant_vec(y, yw, yh, t, tw, th, pd);
 		free(t);
 	} else fail("anisotropic resize %dx%d => %dx%d not implemented",
 			xw, xh, yw, yh);
 }
 
 #include "iio.h"
-
+#include "pickopt.c"
 int main(int c, char *v[])
 {
+	global_order = atoi(pick_option(&c, &v, "i", "2"));
 	if (c != 5) {
 		fprintf(stderr, "usage:\n\t%s width height in out\n", *v);
 		return EXIT_FAILURE;
