@@ -838,7 +838,42 @@ int main_cpu(int c, char *v[])
 	return r - 1;
 }
 
+static char *help_string_name     = "cpu";
+static char *help_string_version  = "cpu 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "interactive display of an image";
+static char *help_string_usage    = "usage:\n\tcpu image.png";
+static char *help_string_long     =
+"Cpu is an interface for displaying and exploring a single image.\n"
+"\n"
+"Usage: cpu image.tiff\n"
+"   or: cat image.tiff | cpu\n"
+"\n"
+"Keys:\n"
+" q,ESC  quit the program\n"
+" +,-    zoom in,out by a factor of 2\n"
+" a,A    increase, decrease contrast\n"
+" hjkl   pan image left, down, up, right (by 10 pixels)\n"
+" ^hjkl  pan image left, down, up, right (by 100 pixels)\n"
+" HJKL   pan image left, down, up, right (by 1 pixel)\n"
+" c      cycle between color balance modes (MIN-MAX,AVG-STD,MED-IQD)\n"
+" n      normalize the contrast (globally)\n"
+" N      toggle local contrast (using only the viewport data)\n"
+" 2      reload the image\n"
+" r      toggle display of local spectrum\n"
+"\n"
+"Mouse:\n"
+" WHEEL          zoom in/out\n"
+" LEFT-DRAG      pan the image domain\n"
+" SHIFT-WHEEL    change local contrast span\n"
+" RIGHT-CLICK    reset zoom and position\n"
+"\n"
+"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>.\n"
+;
+
+#include "help_stuff.c"
 int main(int c, char *v[])
 {
+	if (c == 2)
+		if_help_is_requested_print_it_and_exit_the_program(v[1]);
 	return main_cpu(c, v);
 }
