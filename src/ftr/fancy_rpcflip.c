@@ -1863,7 +1863,7 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 	{
 		pan_repaint(e, w, h);
 		struct pan_view *v = obtain_view(e);
-		int buf_len = 2*FILENAME_MAX + 10;
+		int buf_len = 2*FILENAME_MAX + 30;
 		char buf[buf_len];
 		snprintf(buf, buf_len, "%s/%s_%d.png", outdir, outnam, i);
 		iio_write_image_uint8_vec(buf, v->display, w, h, 3);
