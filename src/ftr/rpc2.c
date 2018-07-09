@@ -132,7 +132,7 @@ static double get_tagged_number(char *tag, char *line)
 	char buf[0x100];
 	double x;
 	int r = sscanf(line, "%[^:]: %lf", buf, &x);
-	strcpy(tag, buf);
+	strncpy(tag, buf, 0x100);
 	if (r == 2) {
 		return x;
 	} else return NAN;
@@ -144,7 +144,7 @@ static double get_xml_tagged_number(char *tag, char *line)
 	char buf[0x100], buf2[0x100];
 	double x;
 	int r = sscanf(line, " <%[^>]>%lf</%[^>]>", buf, &x, buf2);
-	strcpy(tag, buf);
+	strncpy(tag, buf, 0x100);
 	if (r == 3) {
 		return x;
 	} else return NAN;
@@ -160,7 +160,7 @@ static int get_xml_tagged_list(double *x, char *tag, char *line)
 			"%lf %lf %lf %lf %lf %lf %lf %lf %lf</%[^>]>", buf, x, x+1, x+2,
 			x+3, x+4, x+5, x+6, x+7, x+8, x+9, x+10, x+11, x+12, x+13, x+14,
 			x+15, x+16, x+17, x+18, x+19, buf2);
-	strcpy(tag, buf);
+	strncpy(tag, buf, 0x100);
 	return r;
 }
 
@@ -226,9 +226,9 @@ void read_rpc_file_xml_worldview(struct rpc *p, char *filename)
 			int r = get_xml_tagged_list(y, tag, line);
 			if (r == 22)
 				for (int i = 0; i < 20; i++) {
-					char tmp[4]; sprintf(tmp, "_%d", i+1);
-					char tag_i[16]; strcpy(tag_i, tag);
-					add_tag_to_rpc(p, strcat(tag_i, tmp), y[i]);
+					char buf[0x200];
+					snprintf(buf, 0x200, "%s_%i", tag, i+1);
+					add_tag_to_rpc(p, buf, y[i]);
 				}
 		}
 	}

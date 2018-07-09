@@ -147,7 +147,7 @@ static TIFF *tiffopen_fancy(char *filename, char *mode)
 	if (aftercomma != ndigits) goto def;
 
 	char buf[FILENAME_MAX];
-	strncpy(buf, filename, FILENAME_MAX);
+	snprintf(buf, FILENAME_MAX, "%s", filename);
 	comma = strrchr(buf, ',');
 	*comma = '\0';
 	int index = atoi(comma + 1);
@@ -156,7 +156,7 @@ static TIFF *tiffopen_fancy(char *filename, char *mode)
 	if (!tif) return tif;
 	for (int i = 0; i < index; i++)
 		TIFFReadDirectory(tif);
-	
+
 	return tif;
 }
 
@@ -1513,7 +1513,7 @@ struct tiff_tile_cache {
 void tiff_tile_cache_init(struct tiff_tile_cache *t, char *fname, int megabytes)
 {
 	// set up essential data
-	strncpy(t->filename, fname, FILENAME_MAX);
+	snprintf(t->filename, FILENAME_MAX, "%s", fname);
 	get_tiff_info_filename(t->i, fname);
 	if (t->i->bps < 8 || t->i->packed)
 		fail("caching of packed samples is not supported");

@@ -538,14 +538,10 @@ int main_viewcircs(int c, char *v[])
 	double (*p)[3] = (void*)read_ascii_doubles(stdin, &n);
 	n /= 3;
 
-	if (w == -1) for (int i = 0; i < n; i++) {
+	if (w == -1) for (int i = 0; i < n; i++)
 			if (w < lrint(p[i][0])) w = lrint(p[i][0]);
-			if (w < lrint(p[i][2])) w = lrint(p[i][2]);
-		}
-	if (h == -1) for (int i = 0; i < n; i++) {
+	if (h == -1) for (int i = 0; i < n; i++)
 			if (h < lrint(p[i][1])) h = lrint(p[i][1]);
-			if (h < lrint(p[i][3])) h = lrint(p[i][3]);
-		}
 
 	uint8_t (*o)[w] = xmalloc(w*h);
 	for (int j = 0; j < h; j++)
@@ -578,14 +574,10 @@ int main_gviewcircs(int c, char *v[])
 	double (*p)[3] = (void*)read_ascii_doubles(stdin, &n);
 	n /= 3;
 
-	if (w == -1) for (int i = 0; i < n; i++) {
+	if (w == -1) for (int i = 0; i < n; i++)
 			if (w < lrint(p[i][0])) w = lrint(p[i][0]);
-			if (w < lrint(p[i][2])) w = lrint(p[i][2]);
-		}
-	if (h == -1) for (int i = 0; i < n; i++) {
+	if (h == -1) for (int i = 0; i < n; i++)
 			if (h < lrint(p[i][1])) h = lrint(p[i][1]);
-			if (h < lrint(p[i][3])) h = lrint(p[i][3]);
-		}
 
 	float *o = xmalloc(2*w*h*sizeof*o);
 	for (int i = 0; i < w*h*2; i++)

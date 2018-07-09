@@ -412,7 +412,7 @@ static void fill_temporary_filename(char *out)
 		static char buf[L_tmpnam+1];
 		char *tfn = tmpnam(buf);
 #endif//I_CAN_HAS_MKSTEMP
-		strncpy(out, tfn, FILENAME_MAX);
+		snprintf(out, FILENAME_MAX, "%s", tfn);
 }
 
 
@@ -1446,8 +1446,8 @@ static TIFF *tiffopen_fancy(const char *filename, char *mode)
 
 	if (aftercomma != ndigits) goto def;
 
-	char buf[FILENAME_MAX];
-	strncpy(buf, filename, FILENAME_MAX);
+	char buf[strlen(filename)];
+	snprintf(buf, strlen(filename), "%s", filename);
 	comma = strrchr(buf, ',');
 	*comma = '\0';
 	int index = atoi(comma + 1);
@@ -2554,7 +2554,8 @@ static int read_beheaded_vrt(struct iio_image *x,
 	int pos[4] = {0,0,0,0}, pos_cx = 0, has_fname = 0;
 
 	// obtain the path where the vrt file is located
-	strncpy(dirvrt, global_variable_containing_the_name_of_the_last_opened_file, n);
+	snprintf(dirvrt, n, "%s",
+		global_variable_containing_the_name_of_the_last_opened_file);
 	char* dirvrt2 = dirname(dirvrt);
 
 	while (1) {
@@ -3457,7 +3458,7 @@ static bool comma_named_tiff(const char *filename)
 	if (lnumber != ldigits) return false;
 
 	char rfilename[FILENAME_MAX];
-	strncpy(rfilename, filename, FILENAME_MAX);
+	snprintf(rfilename, FILENAME_MAX, "%s", filename);
 	comma = rfilename + (comma - filename);
 	*comma = '\0';
 
