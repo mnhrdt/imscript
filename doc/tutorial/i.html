@@ -88,8 +88,8 @@ body {max-width: 91ex; margin-left:1em;}
 	- <a href="#sec-veco">veco</a>: generic pixel-wise expressions for gray images, gray output
 	- <a href="#sec-vecov">vecov</a>: generic pixel-wise expressions for color images, color output
 	- <a href="#sec-vecoh">vecoh</a>: generic pixel-wise operations for gray images, color output
-	- <a href="#sec-tbcat">tbcat</a>: concatenate two image (top-bottom)
-	- <a href="#sec-lrcat">lrcat</a>: concatenate two image (left-right)
+	- <a href="#sec-tbcat">tbcat</a>: concatenate images top-bottom
+	- <a href="#sec-lrcat">lrcat</a>: concatenate images left-right
 
 3. <a href="#sec-queries">Queries</a>: extract data from one image
 	- <a href="#sec-imprintf">imprintf</a>: print a formatted string of image data
@@ -465,13 +465,14 @@ plambda b.jpg ":i 8 fmod not  :j 30 fmod not  or 99 * +" -o b_grid.png
 <a name="sec-lrcat"></a>
 <a name="sec-tbcat"></a>
 <p>
-The <b>lrcat</b> and <b>tbcat</b> programs concatenate two images horizontally or vertically.
-They need not be of the same size.
+The <b>lrcat</b> and <b>tbcat</b> programs concatenate images horizontally or vertically.
+The images need not be of the same size.  Any missing space is filled-in by the
+value on the environment variable <tt>BACKGROUND</tt>.
 <pre class="script">
-lrcat a.jpg b.jpg ab_lr.png
-tbcat a.jpg b.jpg ab_tb.png
-lrcat a.jpg b.jpg | tbcat - lena.png ab_montage.png
-lrcat a.jpg b.jpg | BACKGROUND=255 tbcat - lena.png ab_montage2.png
+lrcat a.jpg b.jpg -o ab_lr.png
+tbcat a.jpg b.jpg -o ab_tb.png
+lrcat a.jpg b.jpg | tbcat - lena.png -o ab_montage.png
+lrcat a.jpg b.jpg | BACKGROUND=255 tbcat - lena.png -o ab_montage2.png
 </pre>
 <div class="gallery" style="height:512px">
 	<ul class="index">
@@ -920,25 +921,48 @@ The <b>downsa</b> program creates a smaller image by combining blocks of
 <i>n&times;n</i> pixels into one.
 
 <pre class="script">
-qeasy 0 255 masked.tif masked.png
-cat masked.tif | nnint             - out_nnint.png        # nearest-neighbor
-cat masked.tif | bdint -a min      - out_bdmin.png        # boundary minimum
-cat masked.tif | bdint -a max      - out_bdmax.png        # boundary maximum
-cat masked.tif | bdint -a avg      - out_bdavg.png        # boundary average
-cat masked.tif | simpois          -o out_laplace.png      # harmonic
-cat masked.tif | simpois -t -0.08 -o out_biharm.png       # biharmonic
+downsa v 2 masked.png downsa_avg_2.png  # zoom-out by 2x2 blocks aVerage
+downsa i 2 masked.png downsa_min_2.png  # zoom-out by 2x2 blocks mInimum
+downsa a 2 masked.png downsa_max_2.png  # zoom-out by 2x2 blocks mAximum
+downsa e 2 masked.png downsa_med_2.png  # zoom-out by 2x2 blocks mEdian
+downsa f 2 masked.png downsa_1st_2.png  # zoom-out by 2x2 blocks First pixel
+downsa l 2 masked.png downsa_lst_2.png  # zoom-out by 2x2 blocks Last pixel
+downsa r 2 masked.png downsa_rnd_2.png  # zoom-out by 2x2 blocks Random pixel
 </pre>
-<div class="gallery selsecond" style="height:572px">
+<div class="gallery selfirst" style="height:572px">
 	<ul class="index">
-		<li><a>masked.png<span><img src="f/masked.png" /></span></a>
-		<li><a>out_nnint.png<span><img src="f/out_nnint.png" /></span></a>
-		<li><a>out_bdmin.png<span><img src="f/out_bdmin.png" /></span></a>
-		<li><a>out_bdmax.png<span><img src="f/out_bdmax.png" /></span></a>
-		<li><a>out_bdavg.png<span><img src="f/out_bdavg.png" /></span></a>
-		<li><a>out_laplace.png<span><img src="f/out_laplace.png" /></span></a>
-		<li><a>out_biharm.png<span><img src="f/out_biharm.png" /></span></a>
-		<li><a>out_amle.png<span><img src="f/out_amle.png" /></span></a>
-		<li><a>mask.png<span><img src="f/mask.png" /></span></a>
+		<li><a>downsa_avg_2.png<span><img src="f/downsa_avg_2.png" /></span></a>
+		<li><a>downsa_min_2.png<span><img src="f/downsa_min_2.png" /></span></a>
+		<li><a>downsa_max_2.png<span><img src="f/downsa_max_2.png" /></span></a>
+		<li><a>downsa_med_2.png<span><img src="f/downsa_med_2.png" /></span></a>
+		<li><a>downsa_1st_2.png<span><img src="f/downsa_1st_2.png" /></span></a>
+		<li><a>downsa_lst_2.png<span><img src="f/downsa_lst_2.png" /></span></a>
+		<li><a>downsa_rnd_2.png<span><img src="f/downsa_rnd_2.png" /></span></a>
+	</ul>
+</div>
+
+<pre class="script">
+downsa a 9 masked.png downsa_max_9.png
+downsa a 8 masked.png downsa_max_8.png
+downsa a 7 masked.png downsa_max_7.png
+downsa a 6 masked.png downsa_max_6.png
+downsa a 5 masked.png downsa_max_5.png
+downsa a 4 masked.png downsa_max_4.png
+downsa a 3 masked.png downsa_max_3.png
+downsa a 2 masked.png downsa_max_2.png
+downsa a 1 masked.png downsa_max_1.png
+</pre>
+<div class="gallery selfirst" style="height:572px">
+	<ul class="index">
+		<li><a>downsa_max_9.png<span><img src="f/downsa_max_9.png" /></span></a>
+		<li><a>downsa_max_8.png<span><img src="f/downsa_max_8.png" /></span></a>
+		<li><a>downsa_max_7.png<span><img src="f/downsa_max_7.png" /></span></a>
+		<li><a>downsa_max_6.png<span><img src="f/downsa_max_6.png" /></span></a>
+		<li><a>downsa_max_5.png<span><img src="f/downsa_max_5.png" /></span></a>
+		<li><a>downsa_max_4.png<span><img src="f/downsa_max_4.png" /></span></a>
+		<li><a>downsa_max_3.png<span><img src="f/downsa_max_3.png" /></span></a>
+		<li><a>downsa_max_2.png<span><img src="f/downsa_max_2.png" /></span></a>
+		<li><a>downsa_max_1.png<span><img src="f/downsa_max_1.png" /></span></a>
 	</ul>
 </div>
 
