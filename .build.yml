@@ -8,4 +8,5 @@ packages:
 sources:
         - https://git.sr.ht/~coco/imscript/
 tasks:
-        - make -C imscript test
+        - build: make -C imscript
+        - test: make -C imscript test
