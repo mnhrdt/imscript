@@ -2,9 +2,10 @@
 
 image: archlinux
 packages:
-        - png
-        - tiff
-        - jpeg
+        - libpng
+        - libtiff
+        - libjpeg
+        - libfftw3f
 sources:
         - https://git.sr.ht/~coco/imscript/
 tasks:
