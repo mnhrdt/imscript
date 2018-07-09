@@ -1,3 +1,4 @@
+<!doctype html>
 
 <!-- This document is a "semi-literate" program.  To re-compute the figures,
 	run the script "build.sh" from inside the directory "f".  Note that you can
@@ -5,9 +6,8 @@
 	or the layout will be broken.
 -->
 
-<html>
-	<head>
-		<style>
+<title>imscript tutorial</title>
+<style>
 body {max-width: 91ex; margin-left:1em;}
 .gallery {position:relative;width:auto;height:400px}
 .gallery .index{padding:0;margin:0;width:11em;list-style:none}
@@ -25,54 +25,50 @@ body {max-width: 91ex; margin-left:1em;}
 .script {border:1px solid black;background-color:#fff;width:91ex;padding:1ex;}
 .sscript {border:1px solid black;background-color:#fff;width:91ex;padding:1ex;}
 .oscript {background-color:#ddd;width:91ex;padding:1ex;}
-		</style>
+</style>
 
-		<title>imscript tutorial</title>
-	</head>
-
-	<body>
-		<h1>imscript tutorial</h1>
+<h1>imscript tutorial</h1>
 
 
 		<p>
 		Imscript is a collection of simple programs for doing image
 		processing in a Unix environment.
-		</p>
+		
 
 		<h2>0. Philosophy</h2>
 
 		<p>
 		This is just vanilla unix philosophy with some specificities for
 		images:
-		</p>
+		
 
 		<ul>
-			<li>each program does one thing and does it well</li>
-			<li>programs work together</li>
-			<li>offer mechanism, not policy</li>
-			<li>images are arrays of numbers, representable by text files</li>
+			<li>each program does one thing and does it well
+			<li>programs work together
+			<li>offer mechanism, not policy
+			<li>images are arrays of numbers, representable by text files
 		</ul>
 
 		<p>
 		Notice that imscript programs will read any common image format, but
 		will only write asc, pnm, png, and tiff.
-		</p>
+		
 
 		<h2>1. Overview</h2>
 
 		<!--
 		<ol>
-			<li><b>Filters:</b> read one image and write one image of the same size</li>
+			<li><b>Filters:</b> read one image and write one image of the same size
 				<ul>
-					<li><code>blur</code>: convolve an image by a shift-invariant user-specified kernel</li>
-					<li><code>morsi</code>: apply a morphological operation with a user-specified element</li>
-					<li><code>qeasy</code>: re-scale the dynamic range of an image</li>
-					<li><code>qauto</code>: re-scale the dynamic range of an image, automatically</li>
-					<li><code>palette</code>: colorize a grayscale image using a palette</li>
-					<li><code>dither</code>: binarize an image by error diffusion</li>
-					<li><code>iion</code>: copy named input to named output (useful to change file format)</li>
+					<li><code>blur</code>: convolve an image by a shift-invariant user-specified kernel
+					<li><code>morsi</code>: apply a morphological operation with a user-specified element
+					<li><code>qeasy</code>: re-scale the dynamic range of an image
+					<li><code>qauto</code>: re-scale the dynamic range of an image, automatically
+					<li><code>palette</code>: colorize a grayscale image using a palette
+					<li><code>dither</code>: binarize an image by error diffusion
+					<li><code>iion</code>: copy named input to named output (useful to change file format)
 				</ul>
-			</li>
+			
 		</ol>
 		-->
 
@@ -176,13 +172,13 @@ blur gaussian 8 A.png A_gaussian_8.png
 
 <div class="gallery selsecond" style="height:321">
 	<ul class="index">
-		<li><a>A.png<span><img src="f/A.png" /></span></a></li>
-		<li><a>A_gaussian_1.png<span><img src="f/A_gaussian_1.png" /></span></a></li>
-		<li><a>A_gaussian_3.png<span><img src="f/A_gaussian_3.png" /></span></a></li>
-		<li><a>A_gaussian_8.png<span><img src="f/A_gaussian_8.png" /></span></a></li>
+		<li><a>A.png<span><img src="f/A.png" /></span></a>
+		<li><a>A_gaussian_1.png<span><img src="f/A_gaussian_1.png" /></span></a>
+		<li><a>A_gaussian_3.png<span><img src="f/A_gaussian_3.png" /></span></a>
+		<li><a>A_gaussian_8.png<span><img src="f/A_gaussian_8.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 <p>
 Gaussian <b>blur</b> with different <b>boundary conditions</b>:
@@ -193,13 +189,13 @@ blur gaussian 5 -z A.png A_gaussian_5_z.png    # zero boundary
 </pre>
 <div class="gallery selsecond" style="height:321px">
 	<ul class="index">
-		<li><a>A.png<span><img src="f/A.png" /></span></a></li>
-		<li><a>A_gaussian_5_s.png<span><img src="f/A_gaussian_5_s.png" /></span></a></li>
-		<li><a>A_gaussian_5_p.png<span><img src="f/A_gaussian_5_p.png" /></span></a></li>
-		<li><a>A_gaussian_5_z.png<span><img src="f/A_gaussian_5_z.png" /></span></a></li>
+		<li><a>A.png<span><img src="f/A.png" /></span></a>
+		<li><a>A_gaussian_5_s.png<span><img src="f/A_gaussian_5_s.png" /></span></a>
+		<li><a>A_gaussian_5_p.png<span><img src="f/A_gaussian_5_p.png" /></span></a>
+		<li><a>A_gaussian_5_z.png<span><img src="f/A_gaussian_5_z.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 
 <p>
@@ -214,16 +210,16 @@ blur inverse  1 -p A.png | qauto -i -p 1 - A_i.png
 </pre>
 <div class="gallery selsecond" style="height:321px">
 	<ul class="index">
-		<li><a>A.png<span><img src="f/A.png" /></span></a></li>
-		<li><a>A_s.png<span><img src="f/A_s.png" /></span></a></li>
-		<li><a>A_g.png<span><img src="f/A_g.png" /></span></a></li>
-		<li><a>A_l.png<span><img src="f/A_l.png" /></span></a></li>
-		<li><a>A_d.png<span><img src="f/A_d.png" /></span></a></li>
-		<li><a>A_c.png<span><img src="f/A_c.png" /></span></a></li>
-		<li><a>A_i.png<span><img src="f/A_i.png" /></span></a></li>
+		<li><a>A.png<span><img src="f/A.png" /></span></a>
+		<li><a>A_s.png<span><img src="f/A_s.png" /></span></a>
+		<li><a>A_g.png<span><img src="f/A_g.png" /></span></a>
+		<li><a>A_l.png<span><img src="f/A_l.png" /></span></a>
+		<li><a>A_d.png<span><img src="f/A_d.png" /></span></a>
+		<li><a>A_c.png<span><img src="f/A_c.png" /></span></a>
+		<li><a>A_i.png<span><img src="f/A_i.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 <a name="sec-morsi"></a>
 <p>
@@ -245,23 +241,23 @@ morsi cross oscillation   A.png | qeasy  0 60 - A_x_oscillation.png
 </pre>
 <div class="gallery selsecond" style="height:521px">
 	<ul class="index">
-		<li><a>A<span><img src="f/A.png" /></span></a></li>
-		<li><a>A_x_erosion.png<span><img src="f/A_x_erosion.png" /></span></a></li>
-		<li><a>A_x_dilation.png<span><img src="f/A_x_dilation.png" /></span></a></li>
-		<li><a>A_x_median.png<span><img src="f/A_x_median.png" /></span></a></li>
-		<li><a>A_x_opening.png<span><img src="f/A_x_opening.png" /></span></a></li>
-		<li><a>A_x_closing.png<span><img src="f/A_x_closing.png" /></span></a></li>
-		<li><a>A_x_gradient.png<span><img src="f/A_x_gradient.png" /></span></a></li>
-		<li><a>A_x_igradient.png<span><img src="f/A_x_igradient.png" /></span></a></li>
-		<li><a>A_x_egradient.png<span><img src="f/A_x_egradient.png" /></span></a></li>
-		<li><a>A_x_laplacian.png<span><img src="f/A_x_laplacian.png" /></span></a></li>
-		<li><a>A_x_enhance.png<span><img src="f/A_x_enhance.png" /></span></a></li>
-		<li><a>A_x_tophat.png<span><img src="f/A_x_tophat.png" /></span></a></li>
-		<li><a>A_x_bothat.png<span><img src="f/A_x_bothat.png" /></span></a></li>
-		<li><a>A_x_oscillation.png<span><img src="f/A_x_oscillation.png" /></span></a></li>
+		<li><a>A<span><img src="f/A.png" /></span></a>
+		<li><a>A_x_erosion.png<span><img src="f/A_x_erosion.png" /></span></a>
+		<li><a>A_x_dilation.png<span><img src="f/A_x_dilation.png" /></span></a>
+		<li><a>A_x_median.png<span><img src="f/A_x_median.png" /></span></a>
+		<li><a>A_x_opening.png<span><img src="f/A_x_opening.png" /></span></a>
+		<li><a>A_x_closing.png<span><img src="f/A_x_closing.png" /></span></a>
+		<li><a>A_x_gradient.png<span><img src="f/A_x_gradient.png" /></span></a>
+		<li><a>A_x_igradient.png<span><img src="f/A_x_igradient.png" /></span></a>
+		<li><a>A_x_egradient.png<span><img src="f/A_x_egradient.png" /></span></a>
+		<li><a>A_x_laplacian.png<span><img src="f/A_x_laplacian.png" /></span></a>
+		<li><a>A_x_enhance.png<span><img src="f/A_x_enhance.png" /></span></a>
+		<li><a>A_x_tophat.png<span><img src="f/A_x_tophat.png" /></span></a>
+		<li><a>A_x_bothat.png<span><img src="f/A_x_bothat.png" /></span></a>
+		<li><a>A_x_oscillation.png<span><img src="f/A_x_oscillation.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 <p>
 <b>morsi disk5:</b> morphological operations with disk structuring element of radius 5 pixels:
@@ -282,23 +278,23 @@ morsi disk5 oscillation   A.png | qeasy 0 100 - A_d5_oscillation.png
 </pre>
 <div class="gallery selsecond" style="height:521px">
 	<ul class="index">
-		<li><a>A.png<span><img src="f/A.png" /></span></a></li>
-		<li><a>A_d5_erosion.png<span><img src="f/A_d5_erosion.png" /></span></a></li>
-		<li><a>A_d5_dilation.png<span><img src="f/A_d5_dilation.png" /></span></a></li>
-		<li><a>A_d5_median.png<span><img src="f/A_d5_median.png" /></span></a></li>
-		<li><a>A_d5_opening.png<span><img src="f/A_d5_opening.png" /></span></a></li>
-		<li><a>A_d5_closing.png<span><img src="f/A_d5_closing.png" /></span></a></li>
-		<li><a>A_d5_gradient.png<span><img src="f/A_d5_gradient.png" /></span></a></li>
-		<li><a>A_d5_igradient.png<span><img src="f/A_d5_igradient.png" /></span></a></li>
-		<li><a>A_d5_egradient.png<span><img src="f/A_d5_egradient.png" /></span></a></li>
-		<li><a>A_d5_laplacian.png<span><img src="f/A_d5_laplacian.png" /></span></a></li>
-		<li><a>A_d5_enhance.png<span><img src="f/A_d5_enhance.png" /></span></a></li>
-		<li><a>A_d5_tophat.png<span><img src="f/A_d5_tophat.png" /></span></a></li>
-		<li><a>A_d5_bothat.png<span><img src="f/A_d5_bothat.png" /></span></a></li>
-		<li><a>A_d5_oscillation.png<span><img src="f/A_d5_oscillation.png" /></span></a></li>
+		<li><a>A.png<span><img src="f/A.png" /></span></a>
+		<li><a>A_d5_erosion.png<span><img src="f/A_d5_erosion.png" /></span></a>
+		<li><a>A_d5_dilation.png<span><img src="f/A_d5_dilation.png" /></span></a>
+		<li><a>A_d5_median.png<span><img src="f/A_d5_median.png" /></span></a>
+		<li><a>A_d5_opening.png<span><img src="f/A_d5_opening.png" /></span></a>
+		<li><a>A_d5_closing.png<span><img src="f/A_d5_closing.png" /></span></a>
+		<li><a>A_d5_gradient.png<span><img src="f/A_d5_gradient.png" /></span></a>
+		<li><a>A_d5_igradient.png<span><img src="f/A_d5_igradient.png" /></span></a>
+		<li><a>A_d5_egradient.png<span><img src="f/A_d5_egradient.png" /></span></a>
+		<li><a>A_d5_laplacian.png<span><img src="f/A_d5_laplacian.png" /></span></a>
+		<li><a>A_d5_enhance.png<span><img src="f/A_d5_enhance.png" /></span></a>
+		<li><a>A_d5_tophat.png<span><img src="f/A_d5_tophat.png" /></span></a>
+		<li><a>A_d5_bothat.png<span><img src="f/A_d5_bothat.png" /></span></a>
+		<li><a>A_d5_oscillation.png<span><img src="f/A_d5_oscillation.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 <a name="sec-qeasy"></a>
 <p>
@@ -310,13 +306,13 @@ qeasy -300 300 A.png A_bleached.png
 </pre>
 <div class="gallery selsecond" style="height:321px">
 	<ul class="index">
-		<li><a>A.png<span><img src="f/A.png" /></span></a></li>
-		<li><a>A_saturated.png<span><img src="f/A_saturated.png" /></span></a></li>
-		<li><a>A_darkened.png<span><img src="f/A_darkened.png" /></span></a></li>
-		<li><a>A_bleached.png<span><img src="f/A_bleached.png" /></span></a></li>
+		<li><a>A.png<span><img src="f/A.png" /></span></a>
+		<li><a>A_saturated.png<span><img src="f/A_saturated.png" /></span></a>
+		<li><a>A_darkened.png<span><img src="f/A_darkened.png" /></span></a>
+		<li><a>A_bleached.png<span><img src="f/A_bleached.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 <a name="sec-qauto"></a>
 <p>
@@ -329,18 +325,18 @@ qauto -i    lenac.png lenac_qauto_i.png
 <div class="gallery selfirst" style="height:321px">
 	<ul class="index">
 		<!--
-		<li><a>input image    <span><img src="f/lenac.png" /></span></a></li>
-		<li><a>qauto<span><img src="f/lenac_qauto.png" /></span></a></li>
-		<li><a>qauto -p 10<span><img src="f/lenac_p10_qauto.png" /></span></a></li>
-		<li><a>qauto -i<span><img src="f/lenac_iqauto.png" /></span></a></li>
+		<li><a>input image    <span><img src="f/lenac.png" /></span></a>
+		<li><a>qauto<span><img src="f/lenac_qauto.png" /></span></a>
+		<li><a>qauto -p 10<span><img src="f/lenac_p10_qauto.png" /></span></a>
+		<li><a>qauto -i<span><img src="f/lenac_iqauto.png" /></span></a>
 		-->
-		<li><a>lenac.png<span><img src="f/lenac.png" /></span></a></li>
-		<li><a>lenac_qauto.png<span><img src="f/lenac_qauto.png" /></span></a></li>
-		<li><a>lenac_qauto_p10.png<span><img src="f/lenac_qauto_p10.png" /></span></a></li>
-		<li><a>lenac_qauto_i.png<span><img src="f/lenac_qauto_i.png" /></span></a></li>
+		<li><a>lenac.png<span><img src="f/lenac.png" /></span></a>
+		<li><a>lenac_qauto.png<span><img src="f/lenac_qauto.png" /></span></a>
+		<li><a>lenac_qauto_p10.png<span><img src="f/lenac_qauto_p10.png" /></span></a>
+		<li><a>lenac_qauto_i.png<span><img src="f/lenac_qauto_i.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 <a name="sec-palette"></a>
 <p>
@@ -359,17 +355,17 @@ palette 0 2000 nnice     X.tif X_nnice.png      -l leg_nnice.png
 </pre>
 <div class="gallery selsecond" style="height:512px">
 	<ul class="index">
-		<li><a>X.png        <span><img src="f/X.png"         /></span></a></li>
-		<li><a>X_dem1000.png<span><img src="f/X_dem1000.png" /><img src="f/leg_dem1000.png" /></span></a></li>
-		<li><a>X_dem2000.png<span><img src="f/X_dem2000.png" /><img src="f/leg_dem2000.png" /></span></a></li>
-		<li><a>X_dem500.png <span><img src="f/X_dem500.png"  /><img src="f/leg_dem500.png" /></span></a></li>
-		<li><a>X_gray.png   <span><img src="f/X_gray.png"    /><img src="f/leg_gray.png" /></span></a></li>
-		<li><a>X_jet.png    <span><img src="f/X_jet.png"     /><img src="f/leg_jet.png" /></span></a></li>
-		<li><a>X_nice.png   <span><img src="f/X_nice.png"    /><img src="f/leg_nice.png" /></span></a></li>
-		<li><a>X_nnice.png  <span><img src="f/X_nnice.png"   /><img src="f/leg_nnice.png" /></span></a></li>
+		<li><a>X.png        <span><img src="f/X.png"         /></span></a>
+		<li><a>X_dem1000.png<span><img src="f/X_dem1000.png" /><img src="f/leg_dem1000.png" /></span></a>
+		<li><a>X_dem2000.png<span><img src="f/X_dem2000.png" /><img src="f/leg_dem2000.png" /></span></a>
+		<li><a>X_dem500.png <span><img src="f/X_dem500.png"  /><img src="f/leg_dem500.png" /></span></a>
+		<li><a>X_gray.png   <span><img src="f/X_gray.png"    /><img src="f/leg_gray.png" /></span></a>
+		<li><a>X_jet.png    <span><img src="f/X_jet.png"     /><img src="f/leg_jet.png" /></span></a>
+		<li><a>X_nice.png   <span><img src="f/X_nice.png"    /><img src="f/leg_nice.png" /></span></a>
+		<li><a>X_nnice.png  <span><img src="f/X_nnice.png"   /><img src="f/leg_nnice.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 <a name="sec-dither"></a>
 <p>
@@ -380,23 +376,23 @@ blur C 1 lena.png | qauto | dither - lena_dithered_c.png
 </pre>
 <div class="gallery selsecond" style="height:256px">
 	<ul class="index">
-		<li><a>lena.png<span><img src="f/lena.png" /></span></a></li>
-		<li><a>lena_dithered.png<span><img src="f/lena_dithered.png" /></span></a></li>
-		<li><a>lena_dithered_c.png<span><img src="f/lena_dithered_c.png" /></span></a></li>
+		<li><a>lena.png<span><img src="f/lena.png" /></span></a>
+		<li><a>lena_dithered.png<span><img src="f/lena_dithered.png" /></span></a>
+		<li><a>lena_dithered_c.png<span><img src="f/lena_dithered_c.png" /></span></a>
 		<!--
 dither A.png dithered_A.png
 blur C 1 A.png | qauto | dither - cauchydithered_A.png
 blur C 1 A.png | qauto -i | dither - cauchydithered_iA.png
 blur -s C 1 A.png | qauto -i | dither - scauchydithered_iA.png
-		<li><a>input image A<span><img src="f/A.png" /></span></a></li>
-		<li><a>dither<span><img src="f/dithered_A.png" /></span></a></li>
-		<li><a>blur C 1 | dither<span><img src="f/cauchydithered_A.png" /></span></a></li>
-		<li><a>blur C 1 | qauto -i | dither<span><img src="f/cauchydithered_iA.png" /></span></a></li>
-		<li><a>blur -s C 1 | qauto -i | dither<span><img src="f/scauchydithered_iA.png" /></span></a></li>
+		<li><a>input image A<span><img src="f/A.png" /></span></a>
+		<li><a>dither<span><img src="f/dithered_A.png" /></span></a>
+		<li><a>blur C 1 | dither<span><img src="f/cauchydithered_A.png" /></span></a>
+		<li><a>blur C 1 | qauto -i | dither<span><img src="f/cauchydithered_iA.png" /></span></a>
+		<li><a>blur -s C 1 | qauto -i | dither<span><img src="f/scauchydithered_iA.png" /></span></a>
 		-->
 	</ul>
 </div>
-</p>
+
 
 <a name="sec-accumulators"></a>
 <h3>2.2. Accumulators</h3>
@@ -420,18 +416,18 @@ plambda a.jpg b.jpg fmax     -o ab_max.png
 </pre>
 <div class="gallery selsecond" style="height:321px">
 	<ul class="index">
-		<li><a>a.jpg &nbsp; &nbsp; b.jpg<span><img src="f/a.jpg" /><img src="f/b.jpg" /></span></a></li>
-		<li><a>ab_sum.png<span><img src="f/ab_sum.png" /></span></a></li>
-		<li><a>ab_dif.png<span><img src="f/ab_dif.png" /></span></a></li>
-		<li><a>ab_mul.png<span><img src="f/ab_mul.png" /></span></a></li>
-		<li><a>ab_div.png<span><img src="f/ab_div.png" /></span></a></li>
-		<li><a>ab_avg.png<span><img src="f/ab_avg.png" /></span></a></li>
-		<li><a>ab_geo.png<span><img src="f/ab_geo.png" /></span></a></li>
-		<li><a>ab_min.png<span><img src="f/ab_min.png" /></span></a></li>
-		<li><a>ab_max.png<span><img src="f/ab_max.png" /></span></a></li>
+		<li><a>a.jpg &nbsp; &nbsp; b.jpg<span><img src="f/a.jpg" /><img src="f/b.jpg" /></span></a>
+		<li><a>ab_sum.png<span><img src="f/ab_sum.png" /></span></a>
+		<li><a>ab_dif.png<span><img src="f/ab_dif.png" /></span></a>
+		<li><a>ab_mul.png<span><img src="f/ab_mul.png" /></span></a>
+		<li><a>ab_div.png<span><img src="f/ab_div.png" /></span></a>
+		<li><a>ab_avg.png<span><img src="f/ab_avg.png" /></span></a>
+		<li><a>ab_geo.png<span><img src="f/ab_geo.png" /></span></a>
+		<li><a>ab_min.png<span><img src="f/ab_min.png" /></span></a>
+		<li><a>ab_max.png<span><img src="f/ab_max.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 <p>
 The <b>plambda</b> language allows many operations, even when applied to a single image.
@@ -451,20 +447,20 @@ plambda b.jpg ":i 8 fmod not  :j 30 fmod not  or 99 * +" -o b_grid.png
 </pre>
 <div class="gallery selsecond" style="height:421px">
 	<ul class="index">
-		<li><a>b.jpg<span><img     src="f/b.jpg" /></span></a></li>
-		<li><a>b_bgr.png<span><img src="f/b_bgr.png" /></span></a></li>
-		<li><a>b_rgb.png<span><img src="f/b_rgb.png" /></span></a></li>
-		<li><a>b_noisy.png<span><img src="f/b_noisy.png" /></span></a></li>
-		<li><a>b_dx.png<span><img src="f/b_dx.png" /></span></a></li>
-		<li><a>b_dx_127.png<span><img src="f/b_dx_127.png" /></span></a></li>
-		<li><a>b_dx_alt.png<span><img src="f/b_dx_alt.png" /></span></a></li>
-		<li><a>b_edges.png<span><img src="f/b_edges.png" /></span></a></li>
-		<li><a>b_bands.png<span><img src="f/b_bands.png" /></span></a></li>
-		<li><a>b_rings.png<span><img src="f/b_rings.png" /></span></a></li>
-		<li><a>b_grid.png<span><img src="f/b_grid.png" /></span></a></li>
+		<li><a>b.jpg<span><img     src="f/b.jpg" /></span></a>
+		<li><a>b_bgr.png<span><img src="f/b_bgr.png" /></span></a>
+		<li><a>b_rgb.png<span><img src="f/b_rgb.png" /></span></a>
+		<li><a>b_noisy.png<span><img src="f/b_noisy.png" /></span></a>
+		<li><a>b_dx.png<span><img src="f/b_dx.png" /></span></a>
+		<li><a>b_dx_127.png<span><img src="f/b_dx_127.png" /></span></a>
+		<li><a>b_dx_alt.png<span><img src="f/b_dx_alt.png" /></span></a>
+		<li><a>b_edges.png<span><img src="f/b_edges.png" /></span></a>
+		<li><a>b_bands.png<span><img src="f/b_bands.png" /></span></a>
+		<li><a>b_rings.png<span><img src="f/b_rings.png" /></span></a>
+		<li><a>b_grid.png<span><img src="f/b_grid.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 <a name="sec-lrcat"></a>
 <a name="sec-tbcat"></a>
@@ -479,13 +475,13 @@ lrcat a.jpg b.jpg | BACKGROUND=255 tbcat - lena.png ab_montage2.png
 </pre>
 <div class="gallery" style="height:512px">
 	<ul class="index">
-		<li><a>ab_lr.png<span><img src="f/ab_lr.png" /></span></a></li>
-		<li><a>ab_tb.png<span><img src="f/ab_tb.png" /></span></a></li>
-		<li><a>ab_montage.png<span><img src="f/ab_montage.png" /></span></a></li>
-		<li><a>ab_montage2.png<span><img src="f/ab_montage2.png" /></span></a></li>
+		<li><a>ab_lr.png<span><img src="f/ab_lr.png" /></span></a>
+		<li><a>ab_tb.png<span><img src="f/ab_tb.png" /></span></a>
+		<li><a>ab_montage.png<span><img src="f/ab_montage.png" /></span></a>
+		<li><a>ab_montage2.png<span><img src="f/ab_montage2.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 <a name="sec-vecov"></a>
 <p>
@@ -499,26 +495,26 @@ vecov modc pRi*.jpg -o outv_modc.png    # component-wise mode
 </pre>
 <div class="gallery selfirst" style="height:572px">
 	<ul class="index">
-		<li><a>outv_avg.png<span><img src="f/outv_avg.png" /></span></a></li>
-		<li><a>outv_min.png<span><img src="f/outv_min.png" /></span></a></li>
-		<li><a>outv_max.png<span><img src="f/outv_max.png" /></span></a></li>
-		<li><a>outv_med.png<span><img src="f/outv_med.png" /></span></a></li>
-		<li><a>outv_modc.png<span><img src="f/outv_modc.png" /></span></a></li>
-		<li><a>pRi00.jpg<span><img src="f/pRi00.jpg" /></span></a></li>
-		<li><a>pRi01.jpg<span><img src="f/pRi01.jpg" /></span></a></li>
-		<li><a>pRi02.jpg<span><img src="f/pRi02.jpg" /></span></a></li>
-		<li><a>pRi03.jpg<span><img src="f/pRi03.jpg" /></span></a></li>
-		<li><a>pRi04.jpg<span><img src="f/pRi04.jpg" /></span></a></li>
-		<li><a>pRi05.jpg<span><img src="f/pRi05.jpg" /></span></a></li>
-		<li><a>pRi06.jpg<span><img src="f/pRi06.jpg" /></span></a></li>
-		<li><a>pRi07.jpg<span><img src="f/pRi07.jpg" /></span></a></li>
-		<li><a>pRi08.jpg<span><img src="f/pRi08.jpg" /></span></a></li>
-		<li><a>pRi09.jpg<span><img src="f/pRi09.jpg" /></span></a></li>
-		<li><a>pRi10.jpg<span><img src="f/pRi10.jpg" /></span></a></li>
-		<li><a>pRi11.jpg<span><img src="f/pRi11.jpg" /></span></a></li>
+		<li><a>outv_avg.png<span><img src="f/outv_avg.png" /></span></a>
+		<li><a>outv_min.png<span><img src="f/outv_min.png" /></span></a>
+		<li><a>outv_max.png<span><img src="f/outv_max.png" /></span></a>
+		<li><a>outv_med.png<span><img src="f/outv_med.png" /></span></a>
+		<li><a>outv_modc.png<span><img src="f/outv_modc.png" /></span></a>
+		<li><a>pRi00.jpg<span><img src="f/pRi00.jpg" /></span></a>
+		<li><a>pRi01.jpg<span><img src="f/pRi01.jpg" /></span></a>
+		<li><a>pRi02.jpg<span><img src="f/pRi02.jpg" /></span></a>
+		<li><a>pRi03.jpg<span><img src="f/pRi03.jpg" /></span></a>
+		<li><a>pRi04.jpg<span><img src="f/pRi04.jpg" /></span></a>
+		<li><a>pRi05.jpg<span><img src="f/pRi05.jpg" /></span></a>
+		<li><a>pRi06.jpg<span><img src="f/pRi06.jpg" /></span></a>
+		<li><a>pRi07.jpg<span><img src="f/pRi07.jpg" /></span></a>
+		<li><a>pRi08.jpg<span><img src="f/pRi08.jpg" /></span></a>
+		<li><a>pRi09.jpg<span><img src="f/pRi09.jpg" /></span></a>
+		<li><a>pRi10.jpg<span><img src="f/pRi10.jpg" /></span></a>
+		<li><a>pRi11.jpg<span><img src="f/pRi11.jpg" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 <a name="sec-veco"></a>
 <p>
@@ -543,24 +539,24 @@ veco iqd gpRi*.jpg | qeasy 0 20 - out_iqd.png    # interquartile distance
 </pre>
 <div class="gallery selfirst" style="height:532px">
 	<ul class="index">
-		<li><a>out_max.png<span><img src="f/out_max.png" /></span></a></li>
-		<li><a>out_euc.png<span><img src="f/out_euc.png" /></span></a></li>
-		<li><a>out_avg.png<span><img src="f/out_avg.png" /></span></a></li>
-		<li><a>out_geo.png<span><img src="f/out_geo.png" /></span></a></li>
-		<li><a>out_har.png<span><img src="f/out_har.png" /></span></a></li>
-		<li><a>out_min.png<span><img src="f/out_min.png" /></span></a></li>
-		<li><a>out_lav.png<span><img src="f/out_lav.png" /></span></a></li>
-		<li><a>out_lse.png<span><img src="f/out_lse.png" /></span></a></li>
-		<li><a>out_mod.png<span><img src="f/out_mod.png" /></span></a></li>
-		<li><a>out_med.png<span><img src="f/out_med.png" /></span></a></li>
-		<li><a>out_q25.png<span><img src="f/out_q25.png" /></span></a></li>
-		<li><a>out_q75.png<span><img src="f/out_q75.png" /></span></a></li>
-		<li><a>out_rnd.png<span><img src="f/out_rnd.png" /></span></a></li>
-		<li><a>out_std.png<span><img src="f/out_std.png" /></span></a></li>
-		<li><a>out_iqd.png<span><img src="f/out_iqd.png" /></span></a></li>
+		<li><a>out_max.png<span><img src="f/out_max.png" /></span></a>
+		<li><a>out_euc.png<span><img src="f/out_euc.png" /></span></a>
+		<li><a>out_avg.png<span><img src="f/out_avg.png" /></span></a>
+		<li><a>out_geo.png<span><img src="f/out_geo.png" /></span></a>
+		<li><a>out_har.png<span><img src="f/out_har.png" /></span></a>
+		<li><a>out_min.png<span><img src="f/out_min.png" /></span></a>
+		<li><a>out_lav.png<span><img src="f/out_lav.png" /></span></a>
+		<li><a>out_lse.png<span><img src="f/out_lse.png" /></span></a>
+		<li><a>out_mod.png<span><img src="f/out_mod.png" /></span></a>
+		<li><a>out_med.png<span><img src="f/out_med.png" /></span></a>
+		<li><a>out_q25.png<span><img src="f/out_q25.png" /></span></a>
+		<li><a>out_q75.png<span><img src="f/out_q75.png" /></span></a>
+		<li><a>out_rnd.png<span><img src="f/out_rnd.png" /></span></a>
+		<li><a>out_std.png<span><img src="f/out_std.png" /></span></a>
+		<li><a>out_iqd.png<span><img src="f/out_iqd.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 <!-- NOTE: commented because there are problems with this algorithm
 <p>
@@ -584,27 +580,27 @@ veco F0.1 gpRi*jpg -o out_F01.png
 </pre>
 <div class="gallery selfirst" style="height:532px">
 	<ul class="index">
-		<li><a>out_F21.png<span><img src="f/out_F21.png" /></span></a></li>
-		<li><a>out_F20.png<span><img src="f/out_F20.png" /></span></a></li>
-		<li><a>out_avg.png<span><img src="f/out_avg.png" /></span></a></li>
-		<li><a>out_F19.png<span><img src="f/out_F19.png" /></span></a></li>
-		<li><a>out_F15.png<span><img src="f/out_F15.png" /></span></a></li>
-		<li><a>out_F11.png<span><img src="f/out_F11.png" /></span></a></li>
-		<li><a>out_F10.png<span><img src="f/out_F10.png" /></span></a></li>
-		<li><a>out_med.png<span><img src="f/out_med.png" /></span></a></li>
-		<li><a>out_F09.png<span><img src="f/out_F09.png" /></span></a></li>
-		<li><a>out_F08.png<span><img src="f/out_F08.png" /></span></a></li>
-		<li><a>out_F07.png<span><img src="f/out_F07.png" /></span></a></li>
-		<li><a>out_F06.png<span><img src="f/out_F06.png" /></span></a></li>
-		<li><a>out_F05.png<span><img src="f/out_F05.png" /></span></a></li>
-		<li><a>out_F04.png<span><img src="f/out_F04.png" /></span></a></li>
-		<li><a>out_F03.png<span><img src="f/out_F03.png" /></span></a></li>
-		<li><a>out_F02.png<span><img src="f/out_F02.png" /></span></a></li>
-		<li><a>out_F01.png<span><img src="f/out_F01.png" /></span></a></li>
-		<li><a>out_mod.png<span><img src="f/out_mod.png" /></span></a></li>
+		<li><a>out_F21.png<span><img src="f/out_F21.png" /></span></a>
+		<li><a>out_F20.png<span><img src="f/out_F20.png" /></span></a>
+		<li><a>out_avg.png<span><img src="f/out_avg.png" /></span></a>
+		<li><a>out_F19.png<span><img src="f/out_F19.png" /></span></a>
+		<li><a>out_F15.png<span><img src="f/out_F15.png" /></span></a>
+		<li><a>out_F11.png<span><img src="f/out_F11.png" /></span></a>
+		<li><a>out_F10.png<span><img src="f/out_F10.png" /></span></a>
+		<li><a>out_med.png<span><img src="f/out_med.png" /></span></a>
+		<li><a>out_F09.png<span><img src="f/out_F09.png" /></span></a>
+		<li><a>out_F08.png<span><img src="f/out_F08.png" /></span></a>
+		<li><a>out_F07.png<span><img src="f/out_F07.png" /></span></a>
+		<li><a>out_F06.png<span><img src="f/out_F06.png" /></span></a>
+		<li><a>out_F05.png<span><img src="f/out_F05.png" /></span></a>
+		<li><a>out_F04.png<span><img src="f/out_F04.png" /></span></a>
+		<li><a>out_F03.png<span><img src="f/out_F03.png" /></span></a>
+		<li><a>out_F02.png<span><img src="f/out_F02.png" /></span></a>
+		<li><a>out_F01.png<span><img src="f/out_F01.png" /></span></a>
+		<li><a>out_mod.png<span><img src="f/out_mod.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 -->
 
 <a name="sec-vecoh"></a>
@@ -629,22 +625,22 @@ vecoh contrario gpRi*jpg | plambda - "x[2]"        -o contrario_k2.png
 </pre>
 <div class="gallery selfirst" style="height:532px">
 	<ul class="index">
-		<li><a>kmeans_count.png<span><img src="f/kmeans_count.png" /></span></a></li>
-		<li><a>kmedians_count.png<span><img src="f/kmedians_count.png" /></span></a></li>
-		<li><a>contrario_count.png<span><img src="f/contrario_count.png" /></span></a></li>
-		<li><a>kmeans_k1.png<span><img src="f/kmeans_k1.png" /></span></a></li>
-		<li><a>kmeans_k2.png<span><img src="f/kmeans_k2.png" /></span></a></li>
-		<li><a>kmeans_k3.png<span><img src="f/kmeans_k3.png" /></span></a></li>
-		<li><a>kmeans_k4.png<span><img src="f/kmeans_k4.png" /></span></a></li>
-		<li><a>kmedians_k1.png<span><img src="f/kmedians_k1.png" /></span></a></li>
-		<li><a>kmedians_k2.png<span><img src="f/kmedians_k2.png" /></span></a></li>
-		<li><a>kmedians_k3.png<span><img src="f/kmedians_k3.png" /></span></a></li>
-		<li><a>kmedians_k4.png<span><img src="f/kmedians_k4.png" /></span></a></li>
-		<li><a>contrario_k1.png<span><img src="f/contrario_k1.png" /></span></a></li>
-		<li><a>contrario_k2.png<span><img src="f/contrario_k2.png" /></span></a></li>
+		<li><a>kmeans_count.png<span><img src="f/kmeans_count.png" /></span></a>
+		<li><a>kmedians_count.png<span><img src="f/kmedians_count.png" /></span></a>
+		<li><a>contrario_count.png<span><img src="f/contrario_count.png" /></span></a>
+		<li><a>kmeans_k1.png<span><img src="f/kmeans_k1.png" /></span></a>
+		<li><a>kmeans_k2.png<span><img src="f/kmeans_k2.png" /></span></a>
+		<li><a>kmeans_k3.png<span><img src="f/kmeans_k3.png" /></span></a>
+		<li><a>kmeans_k4.png<span><img src="f/kmeans_k4.png" /></span></a>
+		<li><a>kmedians_k1.png<span><img src="f/kmedians_k1.png" /></span></a>
+		<li><a>kmedians_k2.png<span><img src="f/kmedians_k2.png" /></span></a>
+		<li><a>kmedians_k3.png<span><img src="f/kmedians_k3.png" /></span></a>
+		<li><a>kmedians_k4.png<span><img src="f/kmedians_k4.png" /></span></a>
+		<li><a>contrario_k1.png<span><img src="f/contrario_k1.png" /></span></a>
+		<li><a>contrario_k2.png<span><img src="f/contrario_k2.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 
 <a name="sec-queries"></a>
@@ -708,13 +704,13 @@ blur g 0.4 lena.png                 | ghisto -p | gnuplot > glena_ghisto.png
 </pre>
 <div class="gallery selfirst" style="height:572px">
 	<ul class="index">
-		<li><a>lena_ghisto.png<span><img src="f/lena_ghisto.png" /></span></a></li>
-		<li><a>q10lena_ghisto.png<span><img src="f/q10lena_ghisto.png" /></span></a></li>
-		<li><a>q40lena_ghisto.png<span><img src="f/q40lena_ghisto.png" /></span></a></li>
-		<li><a>glena_ghisto.png<span><img src="f/glena_ghisto.png" /></span></a></li>
+		<li><a>lena_ghisto.png<span><img src="f/lena_ghisto.png" /></span></a>
+		<li><a>q10lena_ghisto.png<span><img src="f/q10lena_ghisto.png" /></span></a>
+		<li><a>q40lena_ghisto.png<span><img src="f/q40lena_ghisto.png" /></span></a>
+		<li><a>glena_ghisto.png<span><img src="f/glena_ghisto.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 
 <a name="sec-contihist"></a>
@@ -741,23 +737,23 @@ cat lena.png | contihist 10000  0 255  - -p | gnuplot > lena_contih_10000.png
 </pre>
 <div class="gallery selsecond" style="height:572px">
 	<ul class="index">
-		<li><a>lena_contih_100.png<span><img   src="f/lena_contih_100.png" /></span></a></li>
+		<li><a>lena_contih_100.png<span><img   src="f/lena_contih_100.png" /></span></a>
 		<!--
-		<li><a>lena_contih_200.png<span><img   src="f/lena_contih_200.png" /></span></a></li>
-		<li><a>lena_contih_300.png<span><img   src="f/lena_contih_300.png" /></span></a></li>
-		<li><a>lena_contih_400.png<span><img   src="f/lena_contih_400.png" /></span></a></li>
-		<li><a>lena_contih_500.png<span><img   src="f/lena_contih_500.png" /></span></a></li>
-		<li><a>lena_contih_600.png<span><img   src="f/lena_contih_600.png" /></span></a></li>
-		<li><a>lena_contih_700.png<span><img   src="f/lena_contih_700.png" /></span></a></li>
-		<li><a>lena_contih_800.png<span><img   src="f/lena_contih_800.png" /></span></a></li>
-		<li><a>lena_contih_900.png<span><img   src="f/lena_contih_900.png" /></span></a></li>
+		<li><a>lena_contih_200.png<span><img   src="f/lena_contih_200.png" /></span></a>
+		<li><a>lena_contih_300.png<span><img   src="f/lena_contih_300.png" /></span></a>
+		<li><a>lena_contih_400.png<span><img   src="f/lena_contih_400.png" /></span></a>
+		<li><a>lena_contih_500.png<span><img   src="f/lena_contih_500.png" /></span></a>
+		<li><a>lena_contih_600.png<span><img   src="f/lena_contih_600.png" /></span></a>
+		<li><a>lena_contih_700.png<span><img   src="f/lena_contih_700.png" /></span></a>
+		<li><a>lena_contih_800.png<span><img   src="f/lena_contih_800.png" /></span></a>
+		<li><a>lena_contih_900.png<span><img   src="f/lena_contih_900.png" /></span></a>
 		-->
-		<li><a>lena_contih_1000.png<span><img  src="f/lena_contih_1000.png" /></span></a></li>
-		<li><a>lena_contih_2000.png<span><img  src="f/lena_contih_2000.png" /></span></a></li>
-		<li><a>lena_contih_10000.png<span><img src="f/lena_contih_10000.png" /></span></a></li>
+		<li><a>lena_contih_1000.png<span><img  src="f/lena_contih_1000.png" /></span></a>
+		<li><a>lena_contih_2000.png<span><img  src="f/lena_contih_2000.png" /></span></a>
+		<li><a>lena_contih_10000.png<span><img src="f/lena_contih_10000.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 <a name="sec-viewflow"></a>
 <a name="sec-flowarrows"></a>
@@ -780,14 +776,14 @@ cat wheel.tiff | plambda "split dup join3" | qeasy -2    2    - wheel_xyy.png
 </pre>
 <div class="gallery selfirst" style="height:300">
 	<ul class="index">
-		<li><a>wheel_colors.png<span><img src="f/wheel_colors.png"/></span></a></li>
-		<li><a>wheel_lines.png<span><img  src="f/wheel_lines.png"/></span></a></li>
-		<li><a>wheel_arrows.png<span><img src="f/wheel_arrows.png"/></span></a></li>
-		<li><a>wheel_x.png<span><img      src="f/wheel_x.png" /></span></a></li>
-		<li><a>wheel_y.png<span><img      src="f/wheel_y.png" /></span></a></li>
-		<li><a>wheel_abs.png<span><img    src="f/wheel_abs.png" /></span></a></li>
-		<li><a>wheel_arg.png<span><img    src="f/wheel_arg.png" /></span></a></li>
-		<li><a>wheel_xyy.png<span><img    src="f/wheel_xyy.png" /></span></a></li>
+		<li><a>wheel_colors.png<span><img src="f/wheel_colors.png"/></span></a>
+		<li><a>wheel_lines.png<span><img  src="f/wheel_lines.png"/></span></a>
+		<li><a>wheel_arrows.png<span><img src="f/wheel_arrows.png"/></span></a>
+		<li><a>wheel_x.png<span><img      src="f/wheel_x.png" /></span></a>
+		<li><a>wheel_y.png<span><img      src="f/wheel_y.png" /></span></a>
+		<li><a>wheel_abs.png<span><img    src="f/wheel_abs.png" /></span></a>
+		<li><a>wheel_arg.png<span><img    src="f/wheel_arg.png" /></span></a>
+		<li><a>wheel_xyy.png<span><img    src="f/wheel_xyy.png" /></span></a>
 	</ul>
 </div>
 <pre class="script">
@@ -802,14 +798,14 @@ plambda lena.png x,g | plambda "split dup join3"          | qauto - g_xyy.png
 </pre>
 <div class="gallery selfirst" style="height:300">
 	<ul class="index">
-		<li><a>g_colors.png<span><img src="f/g_colors.png"/></span></a></li>
-		<li><a>g_lines.png<span><img  src="f/g_lines.png"/></span></a></li>
-		<li><a>g_arrows.png<span><img src="f/g_arrows.png"/></span></a></li>
-		<li><a>g_x.png<span><img      src="f/g_x.png" /></span></a></li>
-		<li><a>g_y.png<span><img      src="f/g_y.png" /></span></a></li>
-		<li><a>g_abs.png<span><img    src="f/g_abs.png" /></span></a></li>
-		<li><a>g_arg.png<span><img    src="f/g_arg.png" /></span></a></li>
-		<li><a>g_xyy.png<span><img    src="f/g_xyy.png" /></span></a></li>
+		<li><a>g_colors.png<span><img src="f/g_colors.png"/></span></a>
+		<li><a>g_lines.png<span><img  src="f/g_lines.png"/></span></a>
+		<li><a>g_arrows.png<span><img src="f/g_arrows.png"/></span></a>
+		<li><a>g_x.png<span><img      src="f/g_x.png" /></span></a>
+		<li><a>g_y.png<span><img      src="f/g_y.png" /></span></a>
+		<li><a>g_abs.png<span><img    src="f/g_abs.png" /></span></a>
+		<li><a>g_arg.png<span><img    src="f/g_arg.png" /></span></a>
+		<li><a>g_xyy.png<span><img    src="f/g_xyy.png" /></span></a>
 	</ul>
 </div>
 <pre class="script">
@@ -824,14 +820,14 @@ cat slc.tiff | plambda "split dup join3"          | qauto - slc_xyy.png
 </pre>
 <div class="gallery selfirst" style="height:300">
 	<ul class="index">
-		<li><a>slc_colors.png<span><img src="f/slc_colors.png"/></span></a></li>
-		<li><a>slc_lines.png<span><img  src="f/slc_lines.png"/></span></a></li>
-		<li><a>slc_arrows.png<span><img src="f/slc_arrows.png"/></span></a></li>
-		<li><a>slc_x.png<span><img      src="f/slc_x.png" /></span></a></li>
-		<li><a>slc_y.png<span><img      src="f/slc_y.png" /></span></a></li>
-		<li><a>slc_abs.png<span><img    src="f/slc_abs.png" /></span></a></li>
-		<li><a>slc_arg.png<span><img    src="f/slc_arg.png" /></span></a></li>
-		<li><a>slc_xyy.png<span><img    src="f/slc_xyy.png" /></span></a></li>
+		<li><a>slc_colors.png<span><img src="f/slc_colors.png"/></span></a>
+		<li><a>slc_lines.png<span><img  src="f/slc_lines.png"/></span></a>
+		<li><a>slc_arrows.png<span><img src="f/slc_arrows.png"/></span></a>
+		<li><a>slc_x.png<span><img      src="f/slc_x.png" /></span></a>
+		<li><a>slc_y.png<span><img      src="f/slc_y.png" /></span></a>
+		<li><a>slc_abs.png<span><img    src="f/slc_abs.png" /></span></a>
+		<li><a>slc_arg.png<span><img    src="f/slc_arg.png" /></span></a>
+		<li><a>slc_xyy.png<span><img    src="f/slc_xyy.png" /></span></a>
 	</ul>
 </div>
 <!--
@@ -847,18 +843,18 @@ cat slc.tiff | plambda "split dup join3"          | qauto - slc_xyy.png
 # </pre>
 # <div class="gallery selfirst" style="height:300">
 # 	<ul class="index">
-# 		<li><a>bf_colors.png<span><img src="f/bf_colors.png"/></span></a></li>
-# 		<li><a>bf_lines.png<span><img  src="f/bf_lines.png"/></span></a></li>
-# 		<li><a>bf_arrows.png<span><img src="f/bf_arrows.png"/></span></a></li>
-# 		<li><a>bf_x.png<span><img      src="f/bf_x.png" /></span></a></li>
-# 		<li><a>bf_y.png<span><img      src="f/bf_y.png" /></span></a></li>
-# 		<li><a>bf_abs.png<span><img    src="f/bf_abs.png" /></span></a></li>
-# 		<li><a>bf_arg.png<span><img    src="f/bf_arg.png" /></span></a></li>
-# 		<li><a>bf_xyy.png<span><img    src="f/bf_xyy.png" /></span></a></li>
+# 		<li><a>bf_colors.png<span><img src="f/bf_colors.png"/></span></a>
+# 		<li><a>bf_lines.png<span><img  src="f/bf_lines.png"/></span></a>
+# 		<li><a>bf_arrows.png<span><img src="f/bf_arrows.png"/></span></a>
+# 		<li><a>bf_x.png<span><img      src="f/bf_x.png" /></span></a>
+# 		<li><a>bf_y.png<span><img      src="f/bf_y.png" /></span></a>
+# 		<li><a>bf_abs.png<span><img    src="f/bf_abs.png" /></span></a>
+# 		<li><a>bf_arg.png<span><img    src="f/bf_arg.png" /></span></a>
+# 		<li><a>bf_xyy.png<span><img    src="f/bf_xyy.png" /></span></a>
 # 	</ul>
 # </div>
 -->
-</p>
+
 
 <a name="sec-interpolators"></a>
 <h3>2.4. Interpolators</h3>
@@ -889,21 +885,27 @@ cat masked.tif | simpois -t -0.08 -o out_biharm.png       # biharmonic
 </pre>
 <div class="gallery selsecond" style="height:572px">
 	<ul class="index">
-		<li><a>masked.png<span><img src="f/masked.png" /></span></a></li>
-		<li><a>out_nnint.png<span><img src="f/out_nnint.png" /></span></a></li>
-		<li><a>out_bdmin.png<span><img src="f/out_bdmin.png" /></span></a></li>
-		<li><a>out_bdmax.png<span><img src="f/out_bdmax.png" /></span></a></li>
-		<li><a>out_bdavg.png<span><img src="f/out_bdavg.png" /></span></a></li>
-		<li><a>out_laplace.png<span><img src="f/out_laplace.png" /></span></a></li>
-		<li><a>out_biharm.png<span><img src="f/out_biharm.png" /></span></a></li>
-		<li><a>out_amle.png<span><img src="f/out_amle.png" /></span></a></li>
-		<li><a>mask.png<span><img src="f/mask.png" /></span></a></li>
+		<li><a>masked.png<span><img src="f/masked.png" /></span></a>
+		<li><a>out_nnint.png<span><img src="f/out_nnint.png" /></span></a>
+		<li><a>out_bdmin.png<span><img src="f/out_bdmin.png" /></span></a>
+		<li><a>out_bdmax.png<span><img src="f/out_bdmax.png" /></span></a>
+		<li><a>out_bdavg.png<span><img src="f/out_bdavg.png" /></span></a>
+		<li><a>out_laplace.png<span><img src="f/out_laplace.png" /></span></a>
+		<li><a>out_biharm.png<span><img src="f/out_biharm.png" /></span></a>
+		<li><a>out_amle.png<span><img src="f/out_amle.png" /></span></a>
+		<li><a>mask.png<span><img src="f/mask.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 <a name="sec-rescalers"></a>
 <h3>2.5. Rescalers</h3>
+
+<p>
+<i>Zoom-in</i> is a particular case of interpolation when the data values are
+on a regular grid.
+<i>Zoom-out</i> is a very different problem, typically achieved by filtering
+the input image and then sampling it at a coarser grid.
 
 <!--
 	downsa
@@ -912,6 +914,33 @@ cat masked.tif | simpois -t -0.08 -o out_biharm.png       # biharmonic
 	imflip
 	homwarp
 -->
+
+<p>
+The <b>downsa</b> program creates a smaller image by combining blocks of
+<i>n&times;n</i> pixels into one.
+
+<pre class="script">
+qeasy 0 255 masked.tif masked.png
+cat masked.tif | nnint             - out_nnint.png        # nearest-neighbor
+cat masked.tif | bdint -a min      - out_bdmin.png        # boundary minimum
+cat masked.tif | bdint -a max      - out_bdmax.png        # boundary maximum
+cat masked.tif | bdint -a avg      - out_bdavg.png        # boundary average
+cat masked.tif | simpois          -o out_laplace.png      # harmonic
+cat masked.tif | simpois -t -0.08 -o out_biharm.png       # biharmonic
+</pre>
+<div class="gallery selsecond" style="height:572px">
+	<ul class="index">
+		<li><a>masked.png<span><img src="f/masked.png" /></span></a>
+		<li><a>out_nnint.png<span><img src="f/out_nnint.png" /></span></a>
+		<li><a>out_bdmin.png<span><img src="f/out_bdmin.png" /></span></a>
+		<li><a>out_bdmax.png<span><img src="f/out_bdmax.png" /></span></a>
+		<li><a>out_bdavg.png<span><img src="f/out_bdavg.png" /></span></a>
+		<li><a>out_laplace.png<span><img src="f/out_laplace.png" /></span></a>
+		<li><a>out_biharm.png<span><img src="f/out_biharm.png" /></span></a>
+		<li><a>out_amle.png<span><img src="f/out_amle.png" /></span></a>
+		<li><a>mask.png<span><img src="f/mask.png" /></span></a>
+	</ul>
+</div>
 
 
 <a name="sec-transforms"></a>
@@ -947,19 +976,19 @@ cat barb.png | dct | plambda fabs        | qauto -p 1 - barb_dct_abs.png
 </pre>
 <div class="gallery selsecond" style="height:572px">
 	<ul class="index">
-		<li><a>barb.png<span><img src="f/barb.png" /></span></a></li>
-		<li><a>barb_dft_abs.png<span><img src="f/barb_dft_abs.png" /></span></a></li>
-		<li><a>barb_dft_re.png<span><img src="f/barb_dft_re.png" /></span></a></li>
-		<li><a>barb_dft_im.png<span><img src="f/barb_dft_im.png" /></span></a></li>
-		<li><a>barb_dft_are.png<span><img src="f/barb_dft_are.png" /></span></a></li>
-		<li><a>barb_dft_aim.png<span><img src="f/barb_dft_aim.png" /></span></a></li>
-		<li><a>barb_dht.png<span><img src="f/barb_dht.png" /></span></a></li>
-		<li><a>barb_dht_abs.png<span><img src="f/barb_dht_abs.png" /></span></a></li>
-		<li><a>barb_dct.png<span><img src="f/barb_dct.png" /></span></a></li>
-		<li><a>barb_dct_abs.png<span><img src="f/barb_dct_abs.png" /></span></a></li>
+		<li><a>barb.png<span><img src="f/barb.png" /></span></a>
+		<li><a>barb_dft_abs.png<span><img src="f/barb_dft_abs.png" /></span></a>
+		<li><a>barb_dft_re.png<span><img src="f/barb_dft_re.png" /></span></a>
+		<li><a>barb_dft_im.png<span><img src="f/barb_dft_im.png" /></span></a>
+		<li><a>barb_dft_are.png<span><img src="f/barb_dft_are.png" /></span></a>
+		<li><a>barb_dft_aim.png<span><img src="f/barb_dft_aim.png" /></span></a>
+		<li><a>barb_dht.png<span><img src="f/barb_dht.png" /></span></a>
+		<li><a>barb_dht_abs.png<span><img src="f/barb_dht_abs.png" /></span></a>
+		<li><a>barb_dct.png<span><img src="f/barb_dct.png" /></span></a>
+		<li><a>barb_dct_abs.png<span><img src="f/barb_dct_abs.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 <a name="sec-fftshift"></a>
 The <b>fftshift</b> filter applies a periodic half-size shift to an image so
@@ -973,14 +1002,14 @@ cat barb.png | dht                 | fftshift | qauto -p 1 - barb_dht_s.png
 </pre>
 <div class="gallery selsecond" style="height:572px">
 	<ul class="index">
-		<li><a>barb.png<span><img src="f/barb.png" /></span></a></li>
-		<li><a>barb_s.png<span><img src="f/barb_s.png" /></span></a></li>
-		<li><a>barb_dft_s.png<span><img src="f/barb_dft_s.png" /></span></a></li>
-		<li><a>barb_dht_abs_s.png<span><img src="f/barb_dht_abs_s.png" /></span></a></li>
-		<li><a>barb_dht_s.png<span><img src="f/barb_dht_s.png" /></span></a></li>
+		<li><a>barb.png<span><img src="f/barb.png" /></span></a>
+		<li><a>barb_s.png<span><img src="f/barb_s.png" /></span></a>
+		<li><a>barb_dft_s.png<span><img src="f/barb_dft_s.png" /></span></a>
+		<li><a>barb_dht_abs_s.png<span><img src="f/barb_dht_abs_s.png" /></span></a>
+		<li><a>barb_dht_s.png<span><img src="f/barb_dht_s.png" /></span></a>
 	</ul>
 </div>
-</p>
+
 
 
 <a name="sec-points"></a>
@@ -1039,7 +1068,7 @@ cat barb.png | dht                 | fftshift | qauto -p 1 - barb_dht_s.png
 
 <h2>3. Constructions</h2>
 
-<p>end</p>
+<p>end
 
 	</body>
 </html>
