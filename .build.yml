@@ -1,13 +1,16 @@
 # build manifest for builds.sr.ht
 
 image: archlinux
+
 packages:
         - libpng
         - libtiff
         - libjpeg
-        - fftw
+#        - fftw
+
 sources:
         - https://git.sr.ht/~coco/imscript/
+
 tasks:
-        - build: make -C imscript
+#        - build: make -C imscript
         - test: make -C imscript test
