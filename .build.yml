@@ -5,7 +5,7 @@ packages:
         - libpng
         - libtiff
         - libjpeg
-        - libfftw3f
+        - fftw
 sources:
         - https://git.sr.ht/~coco/imscript/
 tasks:
