@@ -126,7 +126,7 @@ static TIFF *tiffopen_fancy(char *filename, char *mode)
 	if (aftercomma != ndigits) goto def;
 
 	char buf[FILENAME_MAX];
-	strncpy(buf, filename, FILENAME_MAX);
+	snprintf(buf, FILENAME_MAX, "%s", filename);
 	comma = strrchr(buf, ',');
 	*comma = '\0';
 	int index = atoi(comma + 1);

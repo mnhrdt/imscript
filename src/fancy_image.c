@@ -216,7 +216,7 @@ static void interpret_options(struct FI *f, char *options_arg)
 
 	int n = 1 + strlen(options_arg);
 	char o[n];
-	strncpy(o, options_arg, n);
+	snprintf(o, n, "%s", options_arg);
 	char *tok = strtok(o, ",");
 	while (tok) {
 		//fprintf(stderr, "TOKEN \"%s\"\n", tok);
@@ -332,7 +332,7 @@ void generic_read(struct FI *f, char *filename)
 	} else {
 		f->x = iio_read_image_float_vec(filename, &f->w, &f->h, &f->pd);
 		f->no = build_pyramid(f, f->max_octaves);
-		strncpy(f->x_filename, filename, FILENAME_MAX);
+		snprintf(f->x_filename, FILENAME_MAX, "%s", filename);
 		f->x_changed = false;
 	}
 }

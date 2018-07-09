@@ -1816,8 +1816,8 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 		if (*tok == 'b') base_h = atoi(tok+1);
 		if (*tok == 'i') interpord = atoi(tok+1);
 		if (*tok == 'z') zoom = atof(tok+1);
-		if (*tok == 'd') strncpy(outdir, tok+1, FILENAME_MAX);
-		if (*tok == 'o') strncpy(outnam, tok+1, FILENAME_MAX);
+		if (*tok == 'd') snprintf(outdir, FILENAME_MAX, "%s", tok+1);
+		if (*tok == 'o') snprintf(outnam, FILENAME_MAX, "%s", tok+1);
 		if (*tok == 'c') qauto = atoi(tok+1);
 		if (*tok == 'p') {
 			struct pan_view *v = e->view;
