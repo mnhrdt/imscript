@@ -1607,7 +1607,7 @@ static char *collection_of_varnames_add(struct collection_of_varnames *x,
 		if (x->n+1 >= PLAMBDA_MAX_TOKENS)
 			fail("caca");
 		r = xmalloc(1+strlen(s));
-		strcpy(r, s);
+		snprintf(r, 1+strlen(s), "%s", s);
 		x->t[x->n] = r;
 		x->n += 1;
 	} else {
@@ -1643,7 +1643,7 @@ static void collection_of_varnames_sort(struct collection_of_varnames *x)
 static void process_token(struct plambda_program *p, const char *tokke)
 {
 	char tok[1+strlen(tokke)];             // the string of the token
-	strcpy(tok, tokke);
+	snprintf(tok, 1+strlen(tokke), "%s", tokke);
 	struct plambda_token *t = p->t + p->n; // the compiled token
 
 	int tok_id;
@@ -1743,7 +1743,7 @@ static void update_variable_indices(struct plambda_program *p)
 static void plambda_compile_program(struct plambda_program *p, const char *str)
 {
 	char s[1+strlen(str)], *spacing = " \n\t";
-	strcpy(s, str);
+	snprintf(s, 1+strlen(str), "%s", str);
 
 	collection_of_varnames_init(p->var);
 	p->n = 0;
