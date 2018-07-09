@@ -1,0 +1,11 @@
+# build manifest for builds.sr.ht
+
+image: archlinux
+packages:
+        - png
+        - tiff
+        - jpeg
+sources:
+        - https://git.sr.ht/~coco/imscript/
+tasks:
+        - make -C imscript test
