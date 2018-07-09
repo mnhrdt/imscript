@@ -82,8 +82,8 @@ int main_tbcat(int c, char *v[])
 	int ok = 0;
 	for (int k = 0; k < n; k++)
 	{
-		for (int j = 0; j < h[0]; j++)
-		for (int i = 0; i < w[0]; i++)
+		for (int j = 0; j < h[k]; j++)
+		for (int i = 0; i < w[k]; i++)
 		for (int l = 0; l < pd[2]; l++) {
 			float s = getsample_1(x[k], w[k], h[k], pd[k], i, j, l);
 			setsample_0(x[n], w[n], h[n], pd[n], i, j+ok, l, s);

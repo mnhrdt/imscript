@@ -29,7 +29,7 @@ A: struct
 B: typedef struct
 C: class
 
-A: fig, postscript, text file with numbers
+A: fig, postscript, text file with coordinates
 B: svg
 C: wmf, pdf, ai
 

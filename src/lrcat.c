@@ -54,11 +54,11 @@ int main_lrcat_two(int c, char *v[])
 int main_lrcat(int c, char *v[])
 {
 	char *filename_out = pick_option(&c, &v, "o", "");
-	if (!*filename_out && c != 3 && c != 4) {
-		fprintf(stderr, "usage:\n\t%s a b [ab]\n", *v);
-		//                          0 1 2  3
-		return 1;
-	}
+	//if (!*filename_out && c != 3 && c != 4) {
+	//	fprintf(stderr, "usage:\n\t%s a b [ab]\n", *v);
+	//	//                          0 1 2  3
+	//	return 1;
+	//}
 	int n = *filename_out ? c - 1 : 2;
 	char *filename[n+1];
 	filename[n] = *filename_out ? filename_out : "-";
@@ -82,8 +82,8 @@ int main_lrcat(int c, char *v[])
 	int ok = 0;
 	for (int k = 0; k < n; k++)
 	{
-		for (int j = 0; j < h[0]; j++)
-		for (int i = 0; i < w[0]; i++)
+		for (int j = 0; j < h[k]; j++)
+		for (int i = 0; i < w[k]; i++)
 		for (int l = 0; l < pd[2]; l++) {
 			float s = getsample_1(x[k], w[k], h[k], pd[k], i, j, l);
 			setsample_0(x[n], w[n], h[n], pd[n], i+ok, j, l, s);
