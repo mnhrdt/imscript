@@ -918,7 +918,9 @@ the input image and then sampling it at a coarser grid.
 
 <p>
 The <b>downsa</b> program creates a smaller image by combining blocks of
-<i>n&times;n</i> pixels into one.
+<i>n&times;n</i> pixels into one.  The first argument is the <i>rule</i> to
+combine several pixel values into one.  The rule is specified by a single
+letter:
 
 <pre class="script">
 downsa v 2 masked.png downsa_avg_2.png  # zoom-out by 2x2 blocks aVerage
@@ -940,6 +942,10 @@ downsa r 2 masked.png downsa_rnd_2.png  # zoom-out by 2x2 blocks Random pixel
 		<li><a>downsa_rnd_2.png<span><img src="f/downsa_rnd_2.png" /></span></a>
 	</ul>
 </div>
+
+<p>
+The second argument to the <b>downsa</b> program is the zoom factor, always a
+positive integer:
 
 <pre class="script">
 downsa a 9 masked.png downsa_max_9.png
