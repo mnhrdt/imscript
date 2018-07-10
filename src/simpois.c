@@ -241,14 +241,14 @@ static void zoom_in_by_factor_two(float *out, int ow, int oh,
 #include "cleant_cgpois.c"
 
 #include "smapa.h"
-SMART_PARAMETER(PMSFAC,3)
-SMART_PARAMETER(PONLIT,0)
+SMART_PARAMETER_SILENT(PMSFAC,3)
+SMART_PARAMETER_SILENT(PONLIT,0)
 
 void poisson_rec(float *u, float *g, float *f, int w, int h,
 		float tstep, int niter, int scale, int cgit)
 {
-	fprintf(stderr, "PREC %dx%d (niter,scale,cgit)=(%d %d %d)\n",
-			w, h, niter, scale, cgit);
+	//fprintf(stderr, "PREC %dx%d (niter,scale,cgit)=(%d %d %d)\n",
+	//		w, h, niter, scale, cgit);
 	float *init = xmalloc(w*h*sizeof*init);
 	if (scale > 1 && (w > 1 || h > 1))
 	{

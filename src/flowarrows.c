@@ -44,9 +44,9 @@ static void put_black_ball(float *v, int w, int h, float p, float q)
 }
 
 #include "smapa.h"
-SMART_PARAMETER(FLOWARR_MAXLEN,100)
-SMART_PARAMETER(FLOWARR_MINDOT,1)
-SMART_PARAMETER(FLOWARR_DODRAW,3)
+SMART_PARAMETER_SILENT(FLOWARR_MAXLEN,100)
+SMART_PARAMETER_SILENT(FLOWARR_MINDOT,1)
+SMART_PARAMETER_SILENT(FLOWARR_DODRAW,3)
 
 static void putarrow(float *x, int w, int h, float p, float q, float u, float v)
 {

@@ -9,7 +9,7 @@
 
 #define BAD_MAX(a,b) (a)<(b)?(b):(a);
 
-SMART_PARAMETER(BACKGROUND,0)
+SMART_PARAMETER_SILENT(BACKGROUND,0)
 
 int main_tbcat_two(int c, char *v[])
 {

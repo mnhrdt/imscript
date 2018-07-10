@@ -155,7 +155,7 @@ static float *get_gpl_nodes(char *filename, int *n)
 		float *t = nodes + 4*nnodes;
 		*t = nnodes;
 		if (3 == sscanf(buf, "%g %g %g", t+1, t+2, t+3)) {
-			fprintf(stderr, "\tnod[%d] = %g %g %g\n", nnodes, t[1], t[2], t[3]);
+			//fprintf(stderr, "\tnod[%d] = %g %g %g\n", nnodes, t[1], t[2], t[3]);
 			nnodes += 1;
 		}
 	}
@@ -178,7 +178,7 @@ static float *get_gpf_nodes(char *filename, int *n)
 			t[1] = round(t[1] * 255);
 			t[2] = round(t[2] * 255);
 			t[3] = round(t[3] * 255);
-			fprintf(stderr, "\tnod[%d]{%g} = %g %g %g\n", nnodes, t[0], t[1], t[2], t[3]);
+			//fprintf(stderr, "\tnod[%d]{%g} = %g %g %g\n", nnodes, t[0], t[1], t[2], t[3]);
 			nnodes += 1;
 		}
 	}
@@ -249,7 +249,7 @@ static void get_palette_color(uint8_t *rgb, struct palette *p, float x)
 }
 
 #include "smapa.h"
-SMART_PARAMETER(PALMAXEPS,0)
+SMART_PARAMETER_SILENT(PALMAXEPS,0)
 
 static void get_min_max(float *min, float *max, float *x, int n)
 {
@@ -291,16 +291,16 @@ void apply_palette(uint8_t *y, float *x, int n, char *s, float *m, float *M)
 #include "fonts/xfonts_all.c"
 
 
-SMART_PARAMETER(PLEGEND_WIDTH,64)
-SMART_PARAMETER(PLEGEND_HEIGHT,256)
-SMART_PARAMETER(PLEGEND_MARGIN_LEFT,12)
-SMART_PARAMETER(PLEGEND_MARGIN_RIGHT,36)
-SMART_PARAMETER(PLEGEND_MARGIN_TOP,12)
-SMART_PARAMETER(PLEGEND_MARGIN_BOTTOM,12)
-SMART_PARAMETER(PLEGEND_TICKWIDTH,3)
-SMART_PARAMETER(PLEGEND_TEXT_XOFFSET,4)
-SMART_PARAMETER(PLEGEND_TEXT_YOFFSET,0)
-SMART_PARAMETER(PLEGEND_NTICKS,3)
+SMART_PARAMETER_SILENT(PLEGEND_WIDTH,64)
+SMART_PARAMETER_SILENT(PLEGEND_HEIGHT,256)
+SMART_PARAMETER_SILENT(PLEGEND_MARGIN_LEFT,12)
+SMART_PARAMETER_SILENT(PLEGEND_MARGIN_RIGHT,36)
+SMART_PARAMETER_SILENT(PLEGEND_MARGIN_TOP,12)
+SMART_PARAMETER_SILENT(PLEGEND_MARGIN_BOTTOM,12)
+SMART_PARAMETER_SILENT(PLEGEND_TICKWIDTH,3)
+SMART_PARAMETER_SILENT(PLEGEND_TEXT_XOFFSET,4)
+SMART_PARAMETER_SILENT(PLEGEND_TEXT_YOFFSET,0)
+SMART_PARAMETER_SILENT(PLEGEND_NTICKS,3)
 void save_legend(char *filename_legend, char *palette_id, float m, float M)
 {
 	// palette and font structs

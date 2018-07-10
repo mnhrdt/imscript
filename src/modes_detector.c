@@ -5,8 +5,8 @@
 #include <math.h>
 
 #include "smapa.h"
-SMART_PARAMETER(BINWIDTH, 5)
-SMART_PARAMETER(VERBOSE, 0)
+SMART_PARAMETER_SILENT(BINWIDTH, 5)
+SMART_PARAMETER_SILENT(VERBOSE, 0)
 
 // compute the cumulative sum of an array of ints
 static void cumsum(int *output, int *input, int n)

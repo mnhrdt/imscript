@@ -17,7 +17,7 @@
 #define FORL(n) for(int l=0;l<(n);l++)
 
 
-
+#include "smapa.h"
 #include "fail.c"
 #include "drawsegment.c"
 #include "colorcoordsf.c"
@@ -132,47 +132,8 @@ void middlebury_computeColor(float fx, float fy, unsigned char *pix)
     }
 }
 
-// a smart parameter is just like a regular parameter, but it can be
-// re-defined at the shell-environment.  Instead of
-//
-// 	#define NUMBER 42
-// 	...
-// 	printf("%g", NUMBER);
-//
-// do
-// 	SMART_PARAMETER(NUMBER,42)
-// 	...
-// 	printf("%g", NUMBER());
-//
-// Notice that the environment only gets queried once, at the first use.
-//
-#define SMART_PARAMETER(n,v) static double n(void)\
-{\
-	static bool smapa_known_ ## n = false;\
-	static double smapa_value_ ## n = v;\
-	if (!smapa_known_ ## n)\
-	{\
-		fprintf(stderr,"scanning the environment for \"%s\"... ", #n);\
-		int r;\
-		char *sv = getenv(#n);\
-		double y;\
-		if (sv)\
-			r = sscanf(sv, "%lf", &y);\
-		if (sv && r == 1)\
-		{\
-			fprintf(stderr, "got value %g\n", y);\
-			smapa_value_ ## n = y;\
-		} else {\
-			fprintf(stderr, "kept default value %g\n",\
-					smapa_value_ ## n);\
-		}\
-		smapa_known_ ## n = true;\
-	}\
-	return smapa_value_ ## n;\
-}
 
-
-SMART_PARAMETER(MRANGE,0)
+SMART_PARAMETER_SILENT(MRANGE,0)
 
 static bool middlebury_toolarge(float *v)
 {
@@ -252,7 +213,7 @@ static void overlay_level_line_in_black(uint8_t (**y)[3],
 	free(s);
 }
 
-SMART_PARAMETER(NOVERLINES,51)
+SMART_PARAMETER_SILENT(NOVERLINES,51)
 
 static void *matrix_build(int w, int h, size_t n)
 {
@@ -298,7 +259,7 @@ int main_viewflow(int c, char *v[])
 	float satscale = atof(v[1]);
 	if (0 == satscale) {
 		satscale = pick_scale(flow[0], w*h);
-		fprintf(stderr, "computed scale = %g\n", satscale);
+		//fprintf(stderr, "computed scale = %g\n", satscale);
 	}
 
 	//viewflow_pd(view, flow, w, h, fabs(satscale));

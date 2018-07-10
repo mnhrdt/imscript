@@ -13,7 +13,7 @@
 
 // TODO: remove these environment variables, use explicit options instead
 #include "smapa.h"
-SMART_PARAMETER(PRECISION,10)
+SMART_PARAMETER_SILENT(PRECISION,10)
 SMART_PARAMETER_SILENT(NUMBER_OF_KMEANS_ITERATIONS,5)
 
 
