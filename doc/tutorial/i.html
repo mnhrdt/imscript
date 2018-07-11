@@ -972,6 +972,117 @@ downsa a 1 masked.png downsa_max_1.png
 	</ul>
 </div>
 
+<p>
+The <b>ntiply</b> program is an inverse of <b>downsa</b>: it creates a larger
+image by <i>replicating</i> each pixel into a block of <i>n&times;n</i>.  The
+dimensions of the images are multiplied by <i>n</i>, exactly.
+
+<pre class="script">
+downsa a 9 masked.png | ntiply 9 - ntiply_9.png
+downsa a 8 masked.png | ntiply 8 - ntiply_8.png
+downsa a 7 masked.png | ntiply 7 - ntiply_7.png
+downsa a 6 masked.png | ntiply 6 - ntiply_6.png
+downsa a 5 masked.png | ntiply 5 - ntiply_5.png
+downsa a 4 masked.png | ntiply 4 - ntiply_4.png
+downsa a 3 masked.png | ntiply 3 - ntiply_3.png
+downsa a 2 masked.png | ntiply 2 - ntiply_2.png
+downsa a 1 masked.png | ntiply 1 - ntiply_1.png
+</pre>
+<div class="gallery selfirst" style="height:572px">
+	<ul class="index">
+		<li><a>ntiply_9.png<span><img src="f/ntiply_9.png" /></span></a>
+		<li><a>ntiply_8.png<span><img src="f/ntiply_8.png" /></span></a>
+		<li><a>ntiply_7.png<span><img src="f/ntiply_7.png" /></span></a>
+		<li><a>ntiply_6.png<span><img src="f/ntiply_6.png" /></span></a>
+		<li><a>ntiply_5.png<span><img src="f/ntiply_5.png" /></span></a>
+		<li><a>ntiply_4.png<span><img src="f/ntiply_4.png" /></span></a>
+		<li><a>ntiply_3.png<span><img src="f/ntiply_3.png" /></span></a>
+		<li><a>ntiply_2.png<span><img src="f/ntiply_2.png" /></span></a>
+		<li><a>ntiply_1.png<span><img src="f/ntiply_1.png" /></span></a>
+	</ul>
+</div>
+
+<p>
+The <b>upsa</b> program is <i>another</i> inverse of <b>downsa</b>: it creates
+a larger image by interpolating the pixel values on a grid with
+<i>n&times;n</i> the resolution.  Notice that an image of size
+<i>W&ntimes;H</i> is transformed into an image of size
+<i>(nW-n)&times;(nH-n)</i>, because the interpolator needs values at both sides
+of the new samples.  The second argument is the order of the spline used to
+interpolate:
+
+<pre class="script">
+downsa v 7 A.png A_downsa7.png
+downsa v 7 A.png | upsa 7 0 - upsa_7_0.png    # nearest-neighbor interpolation
+downsa v 7 A.png | upsa 7 1 - upsa_7_1.png    # piecewise linear
+downsa v 7 A.png | upsa 7 2 - upsa_7_2.png    # bilinear
+downsa v 7 A.png | upsa 7 3 - upsa_7_3.png    # bicubic
+downsa v 7 A.png | upsa 7 -2 - upsa_7_-2.png  # bilinear with Quilez fading
+downsa v 7 A.png | upsa 7 -3 - upsa_7_-3.png  # bicubic with Quilez fading
+</pre>
+<div class="gallery selsecond" style="height:321">
+	<ul class="index">
+		<li><a>A_downsa7.png<span><img src="f/A_downsa7.png" /></span></a>
+		<li><a>upsa_7_0.png<span><img src="f/upsa_7_0.png" /></span></a>
+		<li><a>upsa_7_1.png<span><img src="f/upsa_7_1.png" /></span></a>
+		<li><a>upsa_7_2.png<span><img src="f/upsa_7_2.png" /></span></a>
+		<li><a>upsa_7_3.png<span><img src="f/upsa_7_3.png" /></span></a>
+		<li><a>upsa_7_-2.png<span><img src="f/upsa_7_-2.png" /></span></a>
+		<li><a>upsa_7_-3.png<span><img src="f/upsa_7_-3.png" /></span></a>
+	</ul>
+</div>
+
+
+<p>
+Notice that <b>upsa</b> with nearest-neighbor interpolation looks similar to
+<b>ntiply</b>, but it is not identical (the images have different size).
+
+<pre class="script">
+downsa v 20 b.jpg | upsa 20 0 - b_upsa_20.png
+downsa v 20 b.jpg | ntiply 20 - b_ntiply_20.png
+downsa v 20 b.jpg|upsa 20 0|GETPIXEL=0 plambda zero:240x240 - "x y(-10,-10)" -o b_upsabg_20.png
+</pre>
+<div class="gallery selfirst" style="height:250">
+	<ul class="index">
+		<li><a>b_upsa_20.png<span><img src="f/b_upsa_20.png" /></span></a>
+		<li><a>b_ntiply_20.png<span><img src="f/b_ntiply_20.png" /></span></a>
+		<li><a>b_upsabg_20.png<span><img src="f/b_upsabg_20.png" /></span></a>
+	</ul>
+</div>
+
+<p>
+The program <b>homwarp</b> allows a finer control of the transformation: you
+get to specify the 9 coefficients of an arbitrary homography and the desired
+size of the output image.  Notice that this generalizes <b>upsa</b> and
+<b>ntiply</b> but it does much more: it allows for arbitrary rotations and
+scalings.
+
+<p>
+A very common particular case of rotations are those of straight angles.  They
+are directly performed by the program <b>imflip</b>:
+<pre class="script">
+imflip r90       b.jpg b_r90.png
+imflip r180      b.jpg b_r180.png
+imflip r270      b.jpg b_r270.png
+imflip leftright b.jpg b_leftright.png
+imflip topdown   b.jpg b_topdown.png
+imflip transpose b.jpg b_transpose.png
+imflip posetrans b.jpg b_posetrans.png
+imflip identity  b.jpg b_identity.png
+</pre>
+<div class="gallery selfirst" style="height:250">
+	<ul class="index">
+		<li><a>b_r90.png<span><img src="f/b_r90.png" /></span></a>
+		<li><a>b_r180.png<span><img src="f/b_r180.png" /></span></a>
+		<li><a>b_r270.png<span><img src="f/b_r270.png" /></span></a>
+		<li><a>b_leftright.png<span><img src="f/b_leftright.png" /></span></a>
+		<li><a>b_topdown.png<span><img src="f/b_topdown.png" /></span></a>
+		<li><a>b_transpose.png<span><img src="f/b_transpose.png" /></span></a>
+		<li><a>b_posetrans.png<span><img src="f/b_posetrans.png" /></span></a>
+		<li><a>b_identity.png<span><img src="f/b_identity.png" /></span></a>
+	</ul>
+</div>
+
 
 <a name="sec-transforms"></a>
 <h3>2.6. Transforms</h3>
