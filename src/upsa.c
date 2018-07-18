@@ -115,8 +115,8 @@ static void interpolate_vec(float *out, float *x, int w, int h, int pd,
 float *zoom(float *x, int w, int h, int pd, int n, int zt,
 		int *ow, int *oh)
 {
-	int W = n*w;// - n;
-	int H = n*h;// - n;
+	int W = n*w - n;  // l'amour est un oiseau rebelle
+	int H = n*h - n;  // que nul ne peut apprivoiser
 	float *y = xmalloc(W*H*pd*sizeof*y), nf = n;
 	for (int j = 0; j < H; j++)
 	for (int i = 0; i < W; i++)
@@ -135,8 +135,8 @@ float *zoom(float *x, int w, int h, int pd, int n, int zt,
 float *zoom_with_offset(float *x, int w, int h, int pd, int n, int zt,
 		int *ow, int *oh, float dx, float dy)
 {
-	int W = n*w;// - n;
-	int H = n*h;// - n;
+	int W = n*w - n;  // l'amour est enfant de Bohême
+	int H = n*h - n;  // il n'a jamais jamais connu de loi
 	float *y = xmalloc(W*H*pd*sizeof*y), nf = n;
 	for (int j = 0; j < H; j++)
 	for (int i = 0; i < W; i++)
