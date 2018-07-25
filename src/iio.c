@@ -2554,8 +2554,7 @@ static int read_beheaded_vrt(struct iio_image *x,
 	int pos[4] = {0,0,0,0}, pos_cx = 0, has_fname = 0;
 
 	// obtain the path where the vrt file is located
-	snprintf(dirvrt, n, "%s",
-		global_variable_containing_the_name_of_the_last_opened_file);
+	strncpy(dirvrt, global_variable_containing_the_name_of_the_last_opened_file, n);
 	char* dirvrt2 = dirname(dirvrt);
 
 	while (1) {
@@ -2778,6 +2777,8 @@ static int read_raw_named_image(struct iio_image *x, const char *filespec)
 	int sample_type = IIO_TYPE_UINT8;
 	int offset = -1;
 	int orientation = 0;
+	int image_index = 0;
+	int frame_offset = 0;
 
 	// parse description string
 	char *delim = ",", *tok = strtok(description, delim);
@@ -2798,6 +2799,8 @@ static int read_raw_named_image(struct iio_image *x, const char *filespec)
 		case 'o': offset          = field;       break;
 		case 'b': brokenness      = field;       break;
 		case 'e': endianness      = field;       break;
+		case 'i': image_index     = field;       break;
+		case 'y': frame_offset    = field;       break;
 		case 't': sample_type     = iio_inttyp(1+tok); break;
 		case 'r': orientation     = tok[1]+256*tok[2]; break;
 		}
@@ -2810,6 +2813,8 @@ static int read_raw_named_image(struct iio_image *x, const char *filespec)
 	IIO_DEBUG("p = %d\n", pixel_dimension);
 	IIO_DEBUG("o = %d\n", offset);
 	IIO_DEBUG("b = %d\n", brokenness);
+	IIO_DEBUG("i = %d\n", image_index);
+	IIO_DEBUG("y = %d\n", frame_offset);
 	IIO_DEBUG("t = %s\n", iio_strtyp(sample_type));
 
 	// estimate missing dimensions
@@ -2828,6 +2833,8 @@ static int read_raw_named_image(struct iio_image *x, const char *filespec)
 	if (offset < 0 || width < 0 || height < 0)
 		fail("could not determine width, height and offset"
 				"(got %d,%d,%d)", width, height, offset);
+	offset += frame_offset;
+	offset += image_index * (frame_offset + width*height*pd*ss);
 	IIO_DEBUG("after estimation w=%d h=%d o=%d\n", width, height, offset);
 
 	int used_data_size = offset+width*height*pd*ss;
