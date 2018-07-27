@@ -23,7 +23,7 @@ static void get_rminmax(float *rmin, float *rmax, float *x, int n, float rb)
 		if (!isnan(x[i]))
 			tx[N++] = x[i];
 	int irb = round(rb);
-	if (irb >= N/2) {
+	if (N < 1) {
 		fprintf(stderr, "too many NANs (rb N) = %g %d", rb, N);
 		abort();
 	}
