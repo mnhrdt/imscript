@@ -338,6 +338,7 @@ static double logic_le     (double a, double b) { return a <= b; }
 static double logic_ne     (double a, double b) { return a != b; }
 static double logic_if (double a, double b, double c) { return a ? b : c; }
 static double logic_or (double a, double b) { return a || b; }
+static double logic_xor (double a, double b) { return !a != !b; }
 static double logic_and (double a, double b) { return a && b; }
 static double logic_not (double a) { return !a; }
 
@@ -831,6 +832,7 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(logic_if,"if",3),
 	REGISTER_FUNCTIONN(logic_and,"and",2),
 	REGISTER_FUNCTIONN(logic_or,"or",2),
+	REGISTER_FUNCTIONN(logic_xor,"xor",2),
 	REGISTER_FUNCTIONN(logic_not,"not",1),
 	REGISTER_FUNCTIONN(function_isfinite,"isfinite",1),
 	REGISTER_FUNCTIONN(function_isinf,"isinf",1),
