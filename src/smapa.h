@@ -23,7 +23,7 @@
 	if (!smapa_known_ ## n)\
 	{\
 		fprintf(stderr,"scanning the environment for \"%s\"... ", #n);\
-		int r;\
+		int r = 0;\
 		char *sv = getenv(#n);\
 		double y;\
 		if (sv)\
@@ -47,7 +47,7 @@
 	static double smapa_value_ ## n = v;\
 	if (!smapa_known_ ## n)\
 	{\
-		int r;\
+		int r = 0;\
 		char *sv = getenv(#n);\
 		double y;\
 		if (sv)\
