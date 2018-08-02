@@ -74,7 +74,7 @@ bin/% : src/misc/%.o $(OBJ)
 
 # single, fat, busybox-like executable
 BINOBJ = $(BIN:bin/%=src/%.o) $(BIN_FTR:bin/%=src/ftr/%.o)
-bin/im : src/im.o $(BINOBJ) $(OBJ_ALL)
+bin/im : src/im.o $(BINOBJ) $(OBJ_ALL) src/misc/overflow.o
 	$(CC) $(LDFLAGS) -Wl,--allow-multiple-definition -o $@ $^ $(LDLIBS_FTR)
 
 # some ftr executable, but compiled for the terminal backend

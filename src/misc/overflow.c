@@ -80,7 +80,7 @@ static void overflow_f(FILE *fs,
 	//fail("fins aquí");
 }
 
-int main(int c, char *v[])
+int main_overflow(int c, char *v[])
 {
 	// treat input arguments
 	if (c != 8) {
@@ -125,3 +125,7 @@ int main(int c, char *v[])
 	free(ox); free(oy); free(of);
 	return 0;
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_overflow(c, v); }
+#endif
