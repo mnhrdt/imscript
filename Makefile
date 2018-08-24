@@ -1,4 +1,4 @@
-CFLAGS ?= -march=native -O3 -DNDEBUG -Wall -Wno-unused
+CFLAGS ?= -Os -DNDEBUG -Wall -Wno-unused
 LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm #-lgdal
 
 OBJ = src/iio.o src/fancy_image.o
@@ -73,9 +73,10 @@ bin/% : src/misc/%.o $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS_MSC)
 
 # single, fat, busybox-like executable
-BINOBJ = $(BIN:bin/%=src/%.o) $(BIN_FTR:bin/%=src/ftr/%.o)
-bin/im : src/im.o $(BINOBJ) $(OBJ_ALL) src/misc/overflow.o
-	$(CC) $(LDFLAGS) -Wl,--allow-multiple-definition -o $@ $^ $(LDLIBS_FTR)
+BINOBJ = $(BIN:bin/%=src/%.o) #$(BIN_FTR:bin/%=src/ftr/%.o)
+L = -lfftw3f -lpng -ltiff -ljpeg -llzma -lz
+bin/im : src/im.o $(BINOBJ) $(OBJ) src/misc/overflow.o
+	$(CC) $(LDFLAGS) -static -Wl,--allow-multiple-definition -o $@ $^ $L
 
 # some ftr executable, but compiled for the terminal backend
 OBJ_FTR_TERM = src/ftr/ftr_term.o $(filter-out src/ftr/ftr.o,$(OBJ_FTR))
