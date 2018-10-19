@@ -555,6 +555,22 @@ float fancy_image_getsample_oct(struct fancy_image *fi,
 	return NAN;
 }
 
+// API: load a rectangle of data
+int fancy_image_getrectangle_oct(float *out, struct fancy_image *fi,
+		int octave, int x0, int y0, int xf, int yf)
+{
+	struct FI *f = (void*)fi;
+	if (f->megabytes > 0) // if we have our own cache, we use it
+	{
+		for (int j = x0; j <= xf; j++)
+		for (int i = x0; i <= xf; i++)
+		for (int l = 0; l < f->pd; l++)
+			*out++ = fancy_image_getsample_oct(fi, octave, i, j, l);
+		return true;
+	}
+	return false;
+}
+
 // API: set a sample of an image
 int fancy_image_setsample(struct fancy_image *fi, int i, int j, int l, float v)
 {

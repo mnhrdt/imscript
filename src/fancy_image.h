@@ -38,6 +38,8 @@ struct fancy_image {
 // Options for creating a new file
 // 	"c,width=*,height=*,pd=*,type=*[,tw=*,th=*]"
 //
+// Note: if megabytes=0 then the cache is disabled and the
+// data can only be accessed by get_rectangle.
 struct fancy_image *fancy_image_open(char *filename, char *options);
 
 
@@ -64,7 +66,10 @@ int fancy_image_setsample(struct fancy_image *f, int i, int j, int l, float v);
 // (if the point is outside the image domain, return NAN)
 float fancy_image_getsample(struct fancy_image *f, int i,int j, int l);
 
-
+// load a rectangle from disk
+// the output buffer must be pre-allocated to the required size
+int fancy_image_getrectangle_oct(float *out, struct fancy_image *f,
+		int octave, int x0, int y0, int xf, int yf);
 
 
 
