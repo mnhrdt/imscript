@@ -187,6 +187,13 @@ static void get_tiff_info(struct tiff_info *t, TIFF *tif)
 		t->bps /= 2;
 		t->fmt = SAMPLEFORMAT_INT;
 	}
+
+	if (!t->broken && t->fmt == SAMPLEFORMAT_COMPLEXIEEEFP)
+	{
+		t->spp *= 2;
+		t->bps /= 2;
+		t->fmt = SAMPLEFORMAT_IEEEFP;
+	}
 }
 
 static bool get_tiff_info_filename_e(struct tiff_info *t, char *fname)
