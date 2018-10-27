@@ -1326,7 +1326,7 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 				return 1;
 			}
 			if (magic == 'q') {
-				int qpos = round(qq*w*h*pd/100.0);
+				int qpos = round(qq*(w*(h*pd/100.0)));
 				qpos = bound(0, qpos, w*h*pd-1);
 				*out = ti->sorted_samples[qpos];
 				return 1;
@@ -1338,7 +1338,7 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 				return 1;
 			}
 			if (magic == 'q') {
-				int qpos = round(qq*w*h/100.0);
+				int qpos = round(qq*(w*(h/100.0)));
 				qpos = bound(0, qpos, w*h-1);
 				*out = ti->sorted_components[comp][qpos];
 				return 1;
@@ -1347,7 +1347,7 @@ static int eval_magicvar(float *out, int magic, int img_index, int comp, int qq,
 	} else if (magic == 'O') {
 		compute_ordered_component_stats(ti, x, w, h, pd);
 		FORI(pd) {
-			int qposi = round(qq*w*h/100.0);
+			int qposi = round(qq*(w*(h/100.0)));
 			qposi = bound(0, qposi, w*h-1);
 			out[i] = ti->sorted_components[i][qposi];
 		}
