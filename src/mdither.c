@@ -258,6 +258,7 @@ int main_mdencode(int c, char *v[])
 	float *x = iio_read_image_float(filename_in, &w, &h);
 	float *y = malloc(w*h*sizeof*x);
 	int n = image_capacity_in_bits(x, w, h);
+	fprintf(stderr, "cap(%d,%d)=%d\n", w, h, n);
 	int *b = malloc(n*sizeof*b);
 	read_n_bits_from_file(b, n, stdin);
 	int m = encode_bits_into_image(y, x, w, h, b, n);
