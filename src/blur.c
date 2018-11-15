@@ -493,7 +493,7 @@ static char *help_string_long     =
 " laplace  a Laplace kernel of the given variance\n"
 " cauchy   a Cauchy kernel of the given scale\n"
 " q        Log-cauchy kernel\n"
-" u        \"good-caucy\"\n"
+" u        \"good-cauchy\"\n"
 " p        powerlaw\n"
 " a        pareto\n"
 " i        inverse distance (useful for Shepard interpolation)\n"

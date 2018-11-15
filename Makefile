@@ -74,7 +74,7 @@ bin/% : src/misc/%.o $(OBJ)
 
 # single, fat, busybox-like executable
 BINOBJ = $(BIN:bin/%=src/%.o) #$(BIN_FTR:bin/%=src/ftr/%.o)
-L = -lfftw3f -lpng -ltiff -ljpeg -llzma -lz
+L = -lfftw3f -lpng -ltiff -ljpeg -llzma -lz -lm -ljbig
 bin/im : src/im.o $(BINOBJ) $(OBJ) src/misc/overflow.o
 	$(CC) $(LDFLAGS) -static -Wl,--allow-multiple-definition -o $@ $^ $L
 
