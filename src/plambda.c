@@ -304,6 +304,19 @@
 #define IMAGEOP_GRAD 1002
 #define IMAGEOP_DIV 1003
 #define IMAGEOP_SHADOW 1004
+#define IMAGEOP_M_ERO 2000 //E
+#define IMAGEOP_M_DIL 2001 //D
+#define IMAGEOP_M_OPE 2002 //O
+#define IMAGEOP_M_CLO 2003 //C
+#define IMAGEOP_M_MED 2004 //M
+#define IMAGEOP_M_LAP 2005 //L
+#define IMAGEOP_M_ENH 2006 //X
+#define IMAGEOP_M_GRA 2007 //G
+#define IMAGEOP_M_IGR 2008 //I
+#define IMAGEOP_M_EGR 2009 //Y
+#define IMAGEOP_M_TOP 2010 //T
+#define IMAGEOP_M_BOT 2011 //B
+#define IMAGEOP_M_OSC 2012 //Z
 
 #define SCHEME_FORWARD 0
 #define SCHEME_BACKWARD 1
@@ -319,6 +332,10 @@
 #define SCHEME_MORPHO9_FORWARD 11
 #define SCHEME_MORPHO9_BACKWARD 12
 #define SCHEME_MORPHO9_CENTERED 13
+#define SCHEME_CROSS 14
+#define SCHEME_NCROSS 15
+#define SCHEME_SQUARE 16
+#define SCHEME_NSQUARE 17
 
 
 // local functions {{{1
@@ -1448,6 +1465,7 @@ static int token_is_stackop(const char *t)
 	if (0 == strcmp(t, "join")) return PLAMBDA_STACKOP_VMERGE;
 	if (0 == strcmp(t, "merge3")) return PLAMBDA_STACKOP_VMERGE3;
 	if (0 == strcmp(t, "join3")) return PLAMBDA_STACKOP_VMERGE3;
+	if (0 == strcmp(t, "rgb")) return PLAMBDA_STACKOP_VMERGE3;
 	if (0 == strcmp(t, "mergeall")) return PLAMBDA_STACKOP_VMERGEALL;
 	if (0 == strcmp(t, "joinall")) return PLAMBDA_STACKOP_VMERGEALL;
 	if (0 == strcmp(t, "ajoin")) return PLAMBDA_STACKOP_VMERGEALL;
@@ -1574,16 +1592,34 @@ static void parse_imageop(const char *s, int *op, int *scheme)
 	else if (hasprefix(s, "g")) *op = IMAGEOP_GRAD;
 	else if (hasprefix(s, "d")) *op = IMAGEOP_DIV;
 	else if (hasprefix(s, "S")) *op = IMAGEOP_SHADOW;
+	else if (hasprefix(s, "E")) *op = IMAGEOP_M_ERO;
+	else if (hasprefix(s, "D")) *op = IMAGEOP_M_DIL;
+//	else if (hasprefix(s, "O")) *op = IMAGEOP_M_OPE;
+//	else if (hasprefix(s, "C")) *op = IMAGEOP_M_CLO;
+	else if (hasprefix(s, "M")) *op = IMAGEOP_M_MED;
+	else if (hasprefix(s, "L")) *op = IMAGEOP_M_LAP;
+	else if (hasprefix(s, "X")) *op = IMAGEOP_M_ENH;
+	else if (hasprefix(s, "G")) *op = IMAGEOP_M_GRA;
+	else if (hasprefix(s, "I")) *op = IMAGEOP_M_IGR;
+	else if (hasprefix(s, "Y")) *op = IMAGEOP_M_EGR;
+//	else if (hasprefix(s, "T")) *op = IMAGEOP_M_TOP;
+//	else if (hasprefix(s, "B")) *op = IMAGEOP_M_BOT;
+//	else if (hasprefix(s, "Z")) *op = IMAGEOP_M_OSC;
 	//else if (hasprefix(s, "k")) *op = IMAGEOP_CURV;
 	//else fail("unrecognized comma modifier \",%s\"", s);
 	*scheme = SCHEME_SOBEL;
 	if (*op == IMAGEOP_XY) *scheme = SCHEME_CENTERED;
+	if (*op >= 2000) *scheme = SCHEME_CROSS;
 	if (false) ;
 	else if (hassuffix(s, "f")) *scheme = SCHEME_FORWARD;
 	else if (hassuffix(s, "b")) *scheme = SCHEME_BACKWARD;
 	else if (hassuffix(s, "c")) *scheme = SCHEME_CENTERED;
 	else if (hassuffix(s, "s")) *scheme = SCHEME_SOBEL;
 	else if (hassuffix(s, "p")) *scheme = SCHEME_PREWITT;
+	else if (hassuffix(s, "5")) *scheme = SCHEME_CROSS;
+	else if (hassuffix(s, "4")) *scheme = SCHEME_NCROSS;
+	else if (hassuffix(s, "9")) *scheme = SCHEME_SQUARE;
+	else if (hassuffix(s, "8")) *scheme = SCHEME_NSQUARE;
 }
 
 static void collection_of_varnames_init(struct collection_of_varnames *x)
@@ -2210,6 +2246,10 @@ static float stencil_3x3_dxy_4point[9] =  {-Q,0,Q,  0,0,0, Q,0,-Q};
 static float stencil_3x3_dxy_7point[9] =  {0,-H,H,  -H,1,-H, H,-H,0};
 static float stencil_3x3_dxy_forward[9] =  {0,0,0,  0,-1,1, 0,1,-1};
 static float stencil_3x3_dxy_backward[9] =  {-1,1,0,  1,-1,0, 0,0,0};
+static float stencil_3x3_m_cross[9] =   {0,1,0,  1,1,1, 0,1,0};
+static float stencil_3x3_m_ncross[9] =  {0,1,0,  1,0,1, 0,1,0};
+static float stencil_3x3_m_square[9] =  {1,1,1,  1,1,1, 1,1,1};
+static float stencil_3x3_m_nsquare[9] = {1,1,1,  1,0,1, 1,1,1};
 #undef H
 #undef Q
 #undef O
@@ -2225,7 +2265,7 @@ static float *get_stencil_3x3(int operator, int scheme)
 			 case SCHEME_SOBEL: return stencil_3x3_dxy_7point;
 			 case SCHEME_FORWARD: return stencil_3x3_dxy_forward;
 			 case SCHEME_BACKWARD: return stencil_3x3_dxy_backward;
-			 default: fail("unrecognized stencil,xy scheme %d");
+			 default: fail("unrecognized stencil,xy %d", scheme);
 			 }
 		}
 	case IMAGEOP_X: { switch(scheme) {
@@ -2234,7 +2274,7 @@ static float *get_stencil_3x3(int operator, int scheme)
 			case SCHEME_CENTERED: return stencil_3x3_dx_centered;
 			case SCHEME_SOBEL: return stencil_3x3_dx_sobel;
 			case SCHEME_PREWITT: return stencil_3x3_dx_prewitt;
-			default: fail("unrecognized stencil,x scheme %d");
+			default: fail("unrecognized stencil,x %d", scheme);
 			}
 		}
 	case IMAGEOP_Y: { switch(scheme) {
@@ -2243,7 +2283,18 @@ static float *get_stencil_3x3(int operator, int scheme)
 			case SCHEME_CENTERED: return stencil_3x3_dy_centered;
 			case SCHEME_SOBEL: return stencil_3x3_dy_sobel;
 			case SCHEME_PREWITT: return stencil_3x3_dy_prewitt;
-			default: fail("unrecognized stencil,y scheme %d");
+			default: fail("unrecognized stencil,y %d", scheme);
+			}
+		}
+	case IMAGEOP_M_ERO: case IMAGEOP_M_DIL: case IMAGEOP_M_MED:
+	case IMAGEOP_M_GRA: case IMAGEOP_M_IGR: case IMAGEOP_M_EGR:
+	case IMAGEOP_M_LAP: case IMAGEOP_M_ENH:
+			{ switch(scheme) {
+			case SCHEME_CROSS: return stencil_3x3_m_cross;
+			case SCHEME_NCROSS: return stencil_3x3_m_ncross;
+			case SCHEME_SQUARE: return stencil_3x3_m_square;
+			case SCHEME_NSQUARE: return stencil_3x3_m_nsquare;
+			default: fail("unrecognized element %d", scheme);
 			}
 		}
 	case IMAGEOP_IDENTITY: return stencil_3x3_identity;
@@ -2262,6 +2313,37 @@ static float apply_3x3_stencil(float *img, int w, int h, int pd,
 	return r;
 }
 
+static float apply_3x3_mstencil(float *img, int w, int h, int pd,
+		int ai, int aj, int channel, float *s, int op)
+{
+	assert(s);
+	getsample_operator P = getsample_cfg;
+	int nv = 0; // number of elements inside the structuring element
+	float v[9]; // pixel values
+	for (int i = 0; i < 9; i++)
+		if (s[i])
+			v[nv++] = P(img, w, h, pd, ai-1+i%3, aj-1+i/3, channel);
+	float e =  INFINITY; FORI(nv) e = fmin(e, v[i]); // erosion (the min)
+	float d = -INFINITY; FORI(nv) d = fmax(d, v[i]); // dilation (the max)
+	float x =  P(img, w, h, pd, ai, aj, channel);    // value of the image
+	float r = NAN;                                   // return value
+	switch (op) {
+	case IMAGEOP_M_MED:
+		qsort(v, nv, sizeof*v, compare_floats);
+		r = v[nv/2];
+		break;
+	case IMAGEOP_M_ERO: r = e           ; break;
+	case IMAGEOP_M_DIL: r = d           ; break;
+	case IMAGEOP_M_GRA: r = d - e       ; break;
+	case IMAGEOP_M_IGR: r = x - e       ; break;
+	case IMAGEOP_M_EGR: r = d - x       ; break;
+	case IMAGEOP_M_LAP: r = d + e - 2*x ; break;
+	case IMAGEOP_M_ENH: r = 3*x - d - e ; break;
+	// TODO: implementn the missing operations (OPENING, CLOSING, HATS)
+	}
+	return r;
+}
+
 //static float imageop_scalar_old(float *img, int w, int h, int pd,
 //		int ai, int aj, int al, struct plambda_token *t)
 //{
@@ -2273,9 +2355,13 @@ static float imageop_scalar(float *img, int w, int h, int pd,
 		int ai, int aj, int al, struct plambda_token *t)
 {
 	float *s = get_stencil_3x3(t->imageop_operator, t->imageop_scheme);
-	if (s)
-		return apply_3x3_stencil(img, w, h, pd, ai, aj, al, s);
-	else {
+	if (s) {
+		if (t->imageop_operator < IMAGEOP_M_ERO)
+			return apply_3x3_stencil(img, w, h, pd, ai, aj, al, s);
+		else
+			return apply_3x3_mstencil(img, w, h, pd, ai, aj, al, s,
+					t->imageop_operator);
+	} else {
 		switch(t->imageop_operator) {
 		case IMAGEOP_NGRAD:
 			{
@@ -2346,7 +2432,7 @@ static int imageop(float *out, float *img, int w, int h, int pd,
 	int pi = ai + t->displacement[0];
 	int pj = aj + t->displacement[1];
 	int channel = t->component;
-	if (t->imageop_operator > 1000)
+	if (t->imageop_operator > 1000 && t->imageop_operator < 2000)
 		return imageop_vector(out, img, w, h, pd, pi, pj, t);
 	if (channel < 0) { // means the whole of it
 		retval = pd;
@@ -2740,6 +2826,15 @@ verbosity>0?
 " a,xc\tx-derivative, centered differences\n"
 " a,xs\tx-derivative, sobel\n"
 " a,xp\tx-derivative, prewitt\n"
+" a,E\tmorphological erosion (using \"cross\" structuring element)\n"
+" a,D\tmorphological dilation\n"
+" a,M\tmedian filtering\n"
+" a,L\tmorphological Laplacian\n"
+" a,X\tmorphological enhancement\n"
+" a,I\tmorphological inner gradient\n"
+" a,Y\tmorphological outer gradient\n"
+" a,G\tmorphological centered gradient\n"
+" a,E9\tmorphological erosion (using \"square\" structuring element)\n"
 " etc\n"
 "\n"
 "Stack operators (allow direct manipulation of the stack):\n"

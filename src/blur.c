@@ -475,7 +475,7 @@ static char *help_string_name     = "blur";
 static char *help_string_version  = "blur 1.0\n\nWritten by eml";
 static char *help_string_oneliner = "smooth a 2D image using the selected kernel";
 static char *help_string_usage    = "usage:\n\t"
-"qauto [-p 5] [-i] [-f]  [in [out]]";
+"blur [-p 5] [-i] [-f]  [in [out]]";
 static char *help_string_long     =
 "Blur convolves the input image by the requested positive kernel.\n"
 "Only the first letter of the kernel name is considered.\n"
