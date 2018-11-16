@@ -186,7 +186,7 @@
 //		plambda lena.png "x[0] 0 x[2] join3"
 //
 //	Naive Canny filter (in all its glory, using explicit coordinates):
-//		cat lena.png | gblur 2 | plambda - "x(1,0) 2 * x(1,1) x(1,-1) + + x(-1,0) 2 * x(-1,1) x(-1,-1) + + - >1 x(0,1) 2 * x(1,1) x(-1,1) + + x(0,-1) 2 * x(1,-1) x(-1,-1) + + - >2 <1 <2 hypot <2 <1 atan2 join" | plambda - "x[0] 4 > >1 x[1] fabs pi 4 / > x[1] fabs pi 4 / 3 * < * >2 x[1] fabs pi 4 / < x[1] fabs pi 4 / 3 * > + >3 x[0] x[0](0,1) > x[0] x[0](0,-1) > * >4 x[0] x[0](1,0) > x[0] x[0](-1,0) > * >5 <1 <3 <5 * * <1 <2 <4 * * + x[0] *" | qauto | display
+//		cat lena.png | blur g 2 | plambda - "x(1,0) 2 * x(1,1) x(1,-1) + + x(-1,0) 2 * x(-1,1) x(-1,-1) + + - >1 x(0,1) 2 * x(1,1) x(-1,1) + + x(0,-1) 2 * x(1,-1) x(-1,-1) + + - >2 <1 <2 hypot <2 <1 atan2 join" | plambda - "x[0] 4 > >1 x[1] fabs pi 4 / > x[1] fabs pi 4 / 3 * < * >2 x[1] fabs pi 4 / < x[1] fabs pi 4 / 3 * > + >3 x[0] x[0](0,1) > x[0] x[0](0,-1) > * >4 x[0] x[0](1,0) > x[0] x[0](-1,0) > * >5 <1 <3 <5 * * <1 <2 <4 * * + x[0] *" | qauto | display
 //
 //	Anti-Lalpacian (solve Poisson equation):
 //		cat lena.png | fft 1 | plambda ":I :I * :J :J * + / -1 *" | fft -1 | qauto | display
@@ -2924,6 +2924,92 @@ verbosity>0?
 	return 0;
 }
 
+static int print_examples(void)
+{
+	printf(
+"PLAMBDA EXAMPLES\n"
+"\n"
+"Sum two images (to standard output):\n"
+"	plambda a.png b.png +\n"
+"\n"
+"Sum two images (to the named file):\n"
+"	plambda a.png b.png + -o aplusb.png\n"
+"\n"
+"Add a gaussian to half of lena:\n"
+"	plambda /tmp/lena.png \"2 / :r :r * -1 * 40 * exp 200 * +\"\n"
+"\n"
+"Forward differences to compute the derivative in vertical direction:\n"
+"	plambda lena.png \"x(0,1) x -\"\n"
+"\n"
+"Forward differences (shorthand of the above):\n"
+"	plambda lena.png \"x,y\"\n"
+"\n"
+"Sobel edge detector (explicit version in coordinates):\n"
+"	plambda lena.png \"x(1,0) 2 * x(1,1) x(1,-1) + + x(-1,0) 2 * x(-1,1) x(-1,-1) + + - x(0,1) 2 * x(1,1) x(-1,1) + + x(0,-1) 2 * x(1,-1) x(-1,-1) + + - hypot\"\n"
+"\n"
+"Sobel edge detector (equivalent, using vectorial operators):\n"
+"	plambda lena.png \"x,gs vnorm\"\n"
+"\n"
+"Sobel edge detector (still equivalent, using even more vectorial ops):\n"
+"	plambda lena.png x,ns\n"
+"\n"
+"Color to gray (in explicit coordinates):\n"
+"	plambda lena.png \"x[0] x[1] x[2] + + 3 /\"\n"
+"\n"
+"Color to gray (equivalent, using vector operations):\n"
+"	plambda lena.png vavg\n"
+"\n"
+"Pick the blue channel of a RGB image:\n"
+"	plambda lena.png \"x[2]\"\n"
+"\n"
+"Swap the blue an green channels of a RGB image (6 equivalent ways):\n"
+"	plambda lena.png \"x[0] x[2] x[1] rgb\"\n"
+"	plambda lena.png \"x[0] x[2] x[1] join join\"\n"
+"	plambda lena.png \"x[0] x[1] x[2] rot rgb\"\n"
+"	plambda lena.png \"x[0] x[1] x[2] rot join join\"\n"
+"	plambda lena.png \"x split rot join join\"\n"
+"	plambda lena.png \"x split rot rgb\"\n"
+"\n"
+"Merge the two components of a vector field into a single file\n"
+"	plambda x.tiff y.tiff join -o xy.tiff\n"
+"\n"
+"Set to 0 the green component of a RGB image\n"
+"	plambda lena.png \"x[0] 0 x[2] rgb\"\n"
+"\n"
+"Naive Canny filter (in all its glory, using explicit coordinates):\n"
+"	cat lena.png | blur g 2 | plambda - \"x(1,0) 2 * x(1,1) x(1,-1) + + x(-1,0) 2 * x(-1,1) x(-1,-1) + + - >1 x(0,1) 2 * x(1,1) x(-1,1) + + x(0,-1) 2 * x(1,-1) x(-1,-1) + + - >2 <1 <2 hypot <2 <1 atan2 join\" | plambda - \"x[0] 4 > >1 x[1] fabs pi 4 / > x[1] fabs pi 4 / 3 * < * >2 x[1] fabs pi 4 / < x[1] fabs pi 4 / 3 * > + >3 x[0] x[0](0,1) > x[0] x[0](0,-1) > * >4 x[0] x[0](1,0) > x[0] x[0](-1,0) > * >5 <1 <3 <5 * * <1 <2 <4 * * + x[0] *\" | qauto | display\n"
+"\n"
+"Anti-Lalpacian (solve Poisson equation):\n"
+"	cat lena.png | fft 1 | plambda \":I :I * :J :J * + / -1 *\" | fft -1 | qauto | display\n"
+"\n"
+"Wiener Filter (for real kernels):\n"
+"	P=0.01  # precision\n"
+"	plambda kernel.fft image.fft \"h[0] dup dup * $P + / y *\"\n"
+"\n"
+"Deconvolution using max frequency cut (for real kernels):\n"
+"	F=80  # frequency cut\n"
+"	plambda kernel.fft image.fft \":I :J hypot $F < y h[0] / 0 if\"\n"
+"\n"
+"Generate a U(-1,1) scalar field with gaussian grain of size WxH\n"
+"	G=7 # grain size\n"
+"	plambda zero:WxH randn|blur g $G|plambda - \"$G * pi sqrt * 2 * 2 sqrt / erf\"\n"
+"\n"
+"Generate a N(0,1) scalar field with gaussian grain\n"
+"	plambda zero:WxH randn|blur g $G|plambda - \"$G * pi sqrt * 2 *\"\n"
+"\n"
+"Generate a L(0,sigma=1) scalar field with gaussian grain\n"
+"	plambda zero:WxH \"randn randn randn randn  4 njoin $G * pi sqrt * 2 *\"|blur g $G|plambda - \"x[0] x[1] * x[2] x[3] * - 2 sqrt /\"\n"
+"\n"
+"Periodic component of an image\n"
+"	  cat image|fftsym|fft|plambda \":I :I * :J :J * + *\"|ifft|crop 0 0 `imprintf \"%%w %%h\" image`|fft|plambda \":I :I * :J :J * + / 4 /\"|ifft >pcomponent\n"
+"\n"
+"Periodic component of an image (faster, using external tool)\n"
+"	cat image.png | ppsmooth > pcomponent.png\n"
+);
+
+	return 0;
+}
+
 static int do_man(void)
 {
 #ifdef __OpenBSD__
@@ -2940,6 +3026,7 @@ int main_plambda(int c, char **v)
 	if (c == 1) return print_help(*v, 0);
 	if (c == 2 && 0 == strcmp(v[1], "-h")) return print_help(*v,0);
 	if (c == 2 && 0 == strcmp(v[1], "--help")) return print_help(*v,1);
+	if (c == 2 && 0 == strcmp(v[1], "--examples")) return print_examples();
 	if (c == 2 && 0 == strcmp(v[1], "--version")) return print_version();
 	if (c == 2 && 0 == strcmp(v[1], "--man")) return do_man();
 
