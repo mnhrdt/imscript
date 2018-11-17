@@ -78,13 +78,37 @@ void squared_euclidean_distance_to_nonzeros(
 	squared_distances_2d(x, w, h);
 }
 
+#include <stdlib.h>
+void signed_distance_to_mask(float *x, int w, int h)
+{
+	float *tp = malloc(w * h * sizeof*tp);
+	float *tm = malloc(w * h * sizeof*tm);
+	for (long i = 0; i < w*h; i++)
+	{
+		tp[i] = x[i] > 0;
+		tm[i] = !tp[i];
+	}
+	squared_euclidean_distance_to_nonzeros(tp, w, h);
+	squared_euclidean_distance_to_nonzeros(tm, w, h);
+	for (long i = 0; i < w*h; i++)
+		x[i] = x[i] > 0 ? sqrt(tm[i])-0.5:0.5-sqrt(tp[i]);
+	free(tp);
+	free(tm);
+}
+
 #include "iio.h"
+#include "pickopt.c"
 int main(int c, char *v[])
 {
+	_Bool s = pick_option(&c, &v, "s", NULL);
 	if (c != 3) return 3;
 	int w, h;
 	float *x = iio_read_image_float(v[1], &w, &h);
-	squared_euclidean_distance_to_nonzeros(x, w, h);
+	if (!s)
+		squared_euclidean_distance_to_nonzeros(x, w, h);
+	else
+		signed_distance_to_mask(x, w, h);
+
 	iio_write_image_float(v[2], x, w, h);
 	return 0;
 }
