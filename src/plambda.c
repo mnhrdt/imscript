@@ -2748,6 +2748,7 @@ static int print_help(char *v, int verbosity)
 " -c\t\tact as a symbolic calculator\n"
 " -h\t\tdisplay short help message\n"
 " --help\t\tdisplay longer help message\n"
+" --examples\tshow more usage examples\n"
 //" --version\tdisplay version\n"
 //" --man\tdisplay manpage\n"
 "\n"
