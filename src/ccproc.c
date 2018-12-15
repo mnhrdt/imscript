@@ -619,11 +619,12 @@ int main(int c, char *v[])
 	int *out_all = xmalloc(w*h*sizeof*out_size);
 	int *out_first = xmalloc(w*h*sizeof*out_size);
 	int *out_idx = xmalloc(w*h*sizeof*out_size);
+	int *out_size2 = xmalloc(w*h*sizeof*out_size);
 
 	int r = ccproc(out_size, out_bdsize, out_all, out_first, out_idx,
 			x, w, h,
-			float_eq_isnan
-			//floatnan_equality
+			//float_eq_isnan
+			floatnan_equality
 			);
 
 	fprintf(stderr, "ccproc returned %d\n", r);
@@ -658,7 +659,13 @@ int main(int c, char *v[])
 	iio_write_image_float("ccproc_yyy.tiff", x, w, h);
 
 
+	for (int i = 0; i < w*h; i++)
+		out_size2[i] = out_size[ out_idx[i] ] < 10;
+	iio_write_image_int("ccproc_siz.tiff", out_size2, w, h);
+
+
 	free(out_size);
+	free(out_size2);
 	free(out_bdsize);
 	free(out_all);
 	free(out_first);

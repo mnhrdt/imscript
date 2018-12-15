@@ -17,7 +17,6 @@ int main()
 	putchar(EOF);
 	fclose(f);
 	char buf[0x100];
-	sprintf(buf, "fpan %s &", fname);
-	system(buf);
-	return 0;
+	sprintf(buf, "cpu %s &", fname);
+	return system(buf);
 }

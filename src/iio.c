@@ -2571,7 +2571,7 @@ static int read_beheaded_vrt(struct iio_image *x,
 			int wt, ht;
 			snprintf(fullfname,FILENAME_MAX,"%s/%s",dirvrt2,fname);
 			float *xt = iio_read_image_float(fullfname, &wt, &ht);
-			if (!xt) fail("cannot get VRT subimage %s\n", fullfname);
+			if (!xt) return 4;
 			for (int j = 0; j < pos[3]; j++)
 			for (int i = 0; i < pos[2]; i++)
 			{
@@ -3364,9 +3364,11 @@ static int guess_format(FILE *f, char *buf, int *nbuf, int bufmax)
 
 #ifdef I_CAN_HAS_LIBJPEG
 	if (b[0]==0xff && b[1]==0xd8 && b[2]==0xff) {
-		if (b[3]==0xe0 && b[6]=='J' && b[7]=='F')
+		if (b[3]==0xe0 && b[6]=='J' && b[7]=='F') // JFIF
 			return IIO_FORMAT_JPEG;
-		if (b[3]==0xe1 && b[6]=='E' && b[7]=='x')
+		if (b[3]==0xe1 && b[6]=='E' && b[7]=='x') // EXIF
+			return IIO_FORMAT_JPEG;
+		if (b[3]==0xe2 && b[6]=='I' && b[7]=='C') // ICC_PROFILE
 			return IIO_FORMAT_JPEG;
 		if (b[3]==0xee || b[3]==0xed) // Adobe JPEG
 			return IIO_FORMAT_JPEG;
