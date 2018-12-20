@@ -17,6 +17,6 @@ int main()
 	putchar(EOF);
 	fclose(f);
 	char buf[0x100];
-	sprintf(buf, "cpu %s &", fname);
+	sprintf(buf, "cpu %s 2>/dev/null >/dev/null &", fname);
 	return system(buf);
 }

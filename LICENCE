@@ -1,0 +1,18 @@
+Imscript is a loose collection of independent programs.  Apart from a few
+exceptional files (see below), the collection is distributed under a dual
+licence:
+
+1) The AGPL version 3.0; found on file doc/agpl.txt
+2) A commercial licence; please contact the authors for details
+
+If you want to use or re-distribute imscript you can choose either licence.
+
+
+
+The following files are copied verbatim (or with trivial changes) from their
+original sources.  They are included for convenience and they are not essential
+for imscript.  They are not distributed under the dual-licence agreement above, but under their own licences specified inside each file.
+
+spline.c                : written by Lionel Moisan and Pascal Monasse
+svd.c, lk.c, optimiz.c  : written by Daniel A. Atkinson, part of CCMATH
+vvector.h               : written by Linas Vepstas
