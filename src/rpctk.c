@@ -41,6 +41,9 @@ static void cholesky(double *B, double *A, int n)
 		else
 			b[i][j] = ( a[i][j] - r ) / b[j][j];
 	}
+
+	// note: if the input is not a positive definite matrix,
+	// this algorithm fills the last part of the matrix with NAN
 }
 
 // solve an upper triangular system A' * x = b
@@ -181,6 +184,13 @@ void rpcfit33(double p[20], double q[20], double (*x)[3], double *f, int n)
 	// and positive definite.  The solution is not 0 since
 	// the zero-degree coefficient of q is fixed at 1.
 	// Thus the system has size 39x39.
+	//
+	// Note: this algorithm fails in two cases
+	// 1) when the data points fit exactly to a rational function of lower
+	// degree (e.g., a pinhole camera)
+	// 2) when there are not enough data points
+	// In these cases the matrix of the linear problem is degenerate and
+	// the current solver fails, giving all-NAN, parameters.
 	//
 
 	// initialize q
