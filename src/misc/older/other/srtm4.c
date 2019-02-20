@@ -249,6 +249,27 @@ static char *my_strtok(char *str)
 	return begin;
 }
 
+// this function is like regular strtok, but faster
+// the delimiter list is, implicitly, spaces
+static char *my_strtok(char *x)
+{
+	static const int spacing[0x100] = {
+		[' '] = 1, ['\t'] = 1, ['\f'] = 1, ['\n'] = 1, ['\r'] = 1
+	};
+	static char *n;       // points to the remaining part of the string
+	char *b = x ? x : n;  // beginning of word to be returned
+	char *s = b;          // pointer to iterate through the string
+	if    (!*s)                 return NULL;
+	while ( *s && !spacing(*s)) s++;
+	if    (!*s)                 return b;
+	while ( *s &&  spacing(*s)) s++;
+	if    (!*s)                 return b;
+	s--;
+	*s = '\0';
+	n = s + 1;
+	return b;
+}
+
 // parse a tile file into memory
 // (this function is ugly due to the error checking)
 static float *malloc_tile_data(char *tile_filename)

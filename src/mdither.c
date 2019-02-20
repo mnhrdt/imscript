@@ -56,6 +56,8 @@ const int table_encoder_2x2[16][2] = {
 #include <string.h>
 #include <stdbool.h>
 
+#include "xfopen.c"
+
 
 // extract the bits encoded in a pattern
 // return value: number of decoded bits
@@ -248,11 +250,14 @@ int main_mddecode(int c, char *v[])
 // CLI for encoding
 int main_mdencode(int c, char *v[])
 {
-	if (c != 3)
-		return fprintf(stderr, "usage:\n\t%s in out < bytes\n", *v);
-		//                                 0 1  2
-	char *filename_in  = v[1];
-	char *filename_out = v[2];
+	if (c != 4)
+		return fprintf(stderr, "usage:\n\t%s in out bytes\n", *v);
+		//                                 0 1  2   3
+	char *filename_in     = v[1];
+	char *filename_out    = v[2];
+	char *filename_bytes  = v[3];
+
+	FILE *f_bytes = xfopen(filename_bytes, "r");
 
 	int w, h;
 	float *x = iio_read_image_float(filename_in, &w, &h);
@@ -260,7 +265,7 @@ int main_mdencode(int c, char *v[])
 	int n = image_capacity_in_bits(x, w, h);
 	fprintf(stderr, "cap(%d,%d)=%d\n", w, h, n);
 	int *b = malloc(n*sizeof*b);
-	read_n_bits_from_file(b, n, stdin);
+	read_n_bits_from_file(b, n, f_bytes);
 	int m = encode_bits_into_image(y, x, w, h, b, n);
 	fprintf(stderr, "encoded %d bits into an image of size %dx%d\n",m,w,h);
 	for (int i = 0; i < w*h; i++)
