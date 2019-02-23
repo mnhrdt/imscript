@@ -27,8 +27,9 @@ struct rpc {
 	double ideny[20];
 	double iscale[3], ioffset[3];
 
-	double dmval[4]; // row/col bounding box
-	double imval[4]; // lon/lat bounding box
+	double dmval[4]; // row/col bounding box (i_0  , j_0  , i_f  , j_f)
+	double imval[4]; // lon/lat bounding box (lon_0, lat_0, lon_f, lat_f)
+	                 //                       0      1      2      3
 };
 
 // set all the values of an rpc model to NAN
@@ -145,8 +146,16 @@ static double get_xml_tagged_number(char *tag, char *line)
 {
 	char buf[0x100], buf2[0x100];
 	double x;
+	//fprintf(stderr, "gxtn line : \"%s\"\n", line);
 	int r = sscanf(line, " <%[^>]>%lf</%[^>]>", buf, &x, buf2);
-	strncpy(tag, buf, 0x100);
+	if (r != 3)
+		return NAN;
+	//fprintf(stderr, "\tr = \"%d\"\n", r);
+	//fprintf(stderr, "\tbuf = \"%s\"\n", buf);
+	//fprintf(stderr, "\tbuf2 = \"%s\"\n", buf);
+	//fprintf(stderr, "\tx = \"%g\"\n", x);
+	snprintf(tag, 0x100, "%s", buf);
+	//strncpy(tag, buf, 0x100);
 	if (r == 3) {
 		return x;
 	} else return NAN;
@@ -155,14 +164,14 @@ static double get_xml_tagged_number(char *tag, char *line)
 // process an input line (worldview rpc coefficients format)
 static int get_xml_tagged_list(double *x, char *tag, char *line)
 {
-	char buf[0x100], buf2[0x100];
+	char buf[0x1000], buf2[0x1000];
 	nan_array(x, 20);
 	// read 20 float values with sscanf
 	int r = sscanf(line, " <%[^>]>%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf"
 			"%lf %lf %lf %lf %lf %lf %lf %lf %lf</%[^>]>", buf, x, x+1, x+2,
 			x+3, x+4, x+5, x+6, x+7, x+8, x+9, x+10, x+11, x+12, x+13, x+14,
 			x+15, x+16, x+17, x+18, x+19, buf2);
-	strncpy(tag, buf, 0x100);
+	strncpy(tag, buf, 0x1000);
 	return r;
 }
 
@@ -202,11 +211,11 @@ void read_rpc_file_xml_pleiades(struct rpc *p, char *filename)
 	}
 	xfclose(f);
 
-    // pleiades rpcs use the convention that the top-left pixel is (1, 1) our
-    // convention is that the top left pixel is (0, 0). Thus here the line and
-    // columns offsets are decreased by one.
-    p->offset[0] -= 1;
-    p->offset[1] -= 1;
+	// pleiades rpcs use the convention that the top-left pixel is (1, 1)
+	// our convention is that the top left pixel is (0, 0). Thus here the
+	// line and columns offsets are decreased by one.
+	p->offset[0] -= 1;
+	p->offset[1] -= 1;
 	p->ioffset[2] = p->offset[2];
 	p->iscale[2] = p->scale[2];
 }

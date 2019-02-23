@@ -5,6 +5,8 @@
 // rpctk fit              < xyhXY.txt > rpc.txt
 // rpctk fitL             < ijhll.txt > rpc.xml
 // rpctk fitP             < llhij.txt > rpc.xml
+// rpctk fillL nx ny nh   > ijhll.txt
+// rpctk fillP nx ny nh   > llhij.txt
 
 
 #include <stdio.h>
@@ -102,37 +104,72 @@ static double rpc_fitL_full(struct rpc *r, double *ijhll, int n)
 		for (int j = 0; j < n; j++)
 			max[i] = fmax(max[i], ijhll[5*j+i]);
 	}
-	double min_i   = min[0], max_i   = max[0];
-	double min_j   = min[1], max_j   = max[1];
-	double min_h   = min[2], max_h   = max[2];
-	double min_lon = min[3], max_lon = max[3];
-	double min_lat = min[4], max_lat = max[4];
+	for (int j = 0; j < n; j++)
+		fprintf(stderr, "ijhll[%d] = %g %g %g %g %g\n",
+				j,
+				ijhll[5*j+0],
+				ijhll[5*j+1],
+				ijhll[5*j+2],
+				ijhll[5*j+3],
+				ijhll[5*j+4]);
+	double min_i   = min[0]; double max_i   = max[0];
+	double min_j   = min[1]; double max_j   = max[1];
+	double min_h   = min[2]; double max_h   = max[2];
+	double min_lon = min[3]; double max_lon = max[3];
+	double min_lat = min[4]; double max_lat = max[4];
+
+fprintf(stderr, "mima_i = %g %g\n", min_i, max_i);
+fprintf(stderr, "mima_j = %g %g\n", min_j, max_j);
+fprintf(stderr, "mima_h = %g %g\n", min_h, max_h);
+fprintf(stderr, "mima_lon = %g %g\n", min_lon, max_lon);
+fprintf(stderr, "mima_lat = %g %g\n", min_lat, max_lat);
 
 	// fill-in normalization factors
-	r->scale[0] = 1;
-	r->scale[1] = 1;
-	r->scale[2] = 1;
-	r->iscale[0] = 1;
-	r->iscale[1] = 1;
-	r->iscale[2] = 1;
-	r->offset[0] = 1;
-	r->offset[1] = 1;
-	r->offset[2] = 1;
-	r->ioffset[0] = 1;
-	r->ioffset[1] = 1;
-	r->ioffset[2] = 1;
+	r->scale[0]   = (max_i - min_i) / 2;
+	r->scale[1]   = (max_j - min_j) / 2;
+	r->scale[2]   = (max_h - min_h) / 2;
+	r->offset[0]  = (max_i + min_i) / 2;
+	r->offset[1]  = (max_j + min_j) / 2;
+	r->offset[2]  = (max_h + min_h) / 2;
+	r->iscale[0]  = (max_lon - min_lon) / 2;
+	r->iscale[1]  = (max_lat - min_lat) / 2;
+	r->iscale[2]  = (max_h   - min_h  ) / 2;
+	r->ioffset[0] = (max_lon + min_lon) / 2;
+	r->ioffset[1] = (max_lat + min_lat) / 2;
+	r->ioffset[2] = (max_h   + min_h  ) / 2;
+
+fprintf(stderr, "scale = %g %g %g\n", r->scale[0], r->scale[1], r->scale[2]);
+fprintf(stderr, "offst = %g %g %g\n",r->offset[0],r->offset[1],r->offset[2]);
+fprintf(stderr, "iscale = %g %g %g\n",r->iscale[0],r->iscale[1],r->iscale[2]);
+fprintf(stderr,"ioffst = %g %g %g\n",r->ioffset[0],r->ioffset[1],r->ioffset[2]);
 
 	// normalized input/outputs
-	long double *ijh = xmalloc(n * sizeof*ijh);
+	long double *ijh = xmalloc(3*n * sizeof*ijh);
 	long double *lon = xmalloc(n * sizeof*lon);
 	long double *lat = xmalloc(n * sizeof*lat);
 	for (int i = 0; i < n; i++)
 	{
-		ijh[3*i+0] = r->scale[0] * (ijhll[5*i+0] - r->offset[0]);
-		ijh[3*i+1] = r->scale[1] * (ijhll[5*i+1] - r->offset[1]);
-		ijh[3*i+2] = r->scale[2] * (ijhll[5*i+2] - r->offset[2]);
-		lon[i]     = ijhll[5*i+3] / r->iscale[0] + r->ioffset[0];
-		lat[i]     = ijhll[5*i+4] / r->iscale[1] + r->ioffset[1];
+		ijh[3*i+0] = (ijhll[5*i+0] - r->offset[0] ) / r->scale[0];
+		ijh[3*i+1] = (ijhll[5*i+1] - r->offset[1] ) / r->scale[1];
+		ijh[3*i+2] = (ijhll[5*i+2] - r->offset[2] ) / r->scale[2];
+		lon[i]     = (ijhll[5*i+3] - r->ioffset[0]) / r->iscale[0];
+		lat[i]     = (ijhll[5*i+4] - r->ioffset[1]) / r->iscale[1];
+		if (n < 2000)
+		{
+			fprintf(stderr,"%d: %g %g %g %g %g -> "
+					"%Lg %Lg %Lg %Lg %Lg\n",
+					i,
+					ijhll[5*i+0],
+					ijhll[5*i+1],
+					ijhll[5*i+2],
+					ijhll[5*i+3],
+					ijhll[5*i+4],
+					ijh[3*i+0],
+					ijh[3*i+1],
+					ijh[3*i+2],
+					lon[i],
+					lat[i]);
+		}
 	}
 
 	// fit the normalized model
@@ -154,7 +191,51 @@ static double rpc_fitL_full(struct rpc *r, double *ijhll, int n)
 
 	// return the un-normalized error
 	double e = e_lon * r->iscale[0] + e_lat * r->iscale[1];
+	fprintf(stderr, "e_lon = %g, e_lat = %g, e = %g\n", e_lon, e_lat, e);
 	return e;
+}
+
+int main_rpctk_fillL(int c, char *v[])
+{
+	if (c != 5)
+		return fprintf(stderr,"usage:\n\t"
+				"%s rpc.txt nx ny nh > ijh.txt\n",*v);
+	//                        0         1  2  3
+	char *filename_rpc = v[1];
+	int n[3] = { atoi(v[2]), atoi(v[3]), atoi(v[4]) };
+	int nn = n[0] * n[1] * n[2];
+
+	double *ijh = xmalloc(3 * nn * sizeof*ijh);
+
+	struct rpc r[1];
+	read_rpc_file_xml(r, filename_rpc);
+
+	double Ai = (r->dmval[2] - r->dmval[0]) / (n[0] - 1);
+	double Aj = (r->dmval[3] - r->dmval[1]) / (n[1] - 1);
+	double Bi = r->dmval[0];
+	double Bj = r->dmval[1];
+	double Ak = 100;
+	double Bk = 0;
+
+	fprintf(stderr, "Ai Bi = %g %g\n", Ai, Bi);
+	fprintf(stderr, "Aj Bj = %g %g\n", Aj, Bj);
+	fprintf(stderr, "Ak Bk = %g %g\n", Ak, Bk);
+
+	int cx = 0;
+	for (int k = 0; k < n[2]; k++)
+	for (int j = 0; j < n[1]; j++)
+	for (int i = 0; i < n[0]; i++)
+	{
+		ijh[cx++] = Ai * i + Bi;
+		ijh[cx++] = Aj * j + Bj;
+		ijh[cx++] = Ak * k + Bk;
+	}
+
+	for (int i = 0; i < nn; i++)
+		printf("%lf %lf %g\n", ijh[3*i+0], ijh[3*i+1], ijh[3*i+2]);
+
+	free(ijh);
+	return 0;
 }
 
 #include "parsenumbers.c"
@@ -173,6 +254,7 @@ int main_rpctk_fitL(int c, char *v[])
 
 	print_rpc(stdout, r, "");
 
+	free(ijhll);
 	return 0;
 }
 
@@ -183,9 +265,11 @@ int main(int c, char *v[])
 	if (0 == strcmp(v[1], "info"))     return main_rpctk_info(c-1, v+1);
 	if (0 == strcmp(v[1], "localize")) return main_rpctk_localize(c-1, v+1);
 	if (0 == strcmp(v[1], "project"))  return main_rpctk_project(c-1, v+1);
-	//if (0 == strcmp(v[1], "fit"))      return main_rpctk_fit(c-1, v+1);
 	if (0 == strcmp(v[1], "fitL"))     return main_rpctk_fitL(c-1, v+1);
-//	if (0 == strcmp(v[1], "fitP"))     return main_rpctk_fitP(c-1, v+1);
+	if (0 == strcmp(v[1], "fillL"))    return main_rpctk_fillL(c-1, v+1);
+	//if (0 == strcmp(v[1], "fit"))      return main_rpctk_fit(c-1, v+1);
+	//if (0 == strcmp(v[1], "fitP"))     return main_rpctk_fitP(c-1, v+1);
+	//if (0 == strcmp(v[1], "fillP"))     return main_rpctk_filPL(c-1, v+1);
 end:	return fprintf(stderr,
 			"usage:\n\t%s {info|localize|project|fit} ...\n", *v);
 }
