@@ -440,9 +440,7 @@ static void complex_division(float *xy, float *x, float *y)
 
 static double psubst(double x, double y, double z)
 {
-	float r = (x == y) ? z : x;
-	fprintf(stderr, "psubst(%g %g %g) = %g\n", x, y, z, r);
-	return r;
+	return (x == y) ? z : x;
 }
 
 
