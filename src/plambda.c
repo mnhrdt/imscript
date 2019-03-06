@@ -438,6 +438,13 @@ static void complex_division(float *xy, float *x, float *y)
 	xy[1] = ( -x[0]*y[1] + x[1]*y[0] ) / yn;
 }
 
+static double psubst(double x, double y, double z)
+{
+	float r = (x == y) ? z : x;
+	fprintf(stderr, "psubst(%g %g %g) = %g\n", x, y, z, r);
+	return r;
+}
+
 
 static void complex_exp(float *y, float *x)
 {
@@ -832,6 +839,7 @@ static struct predefined_function {
 	REGISTER_FUNCTION(nexttoward,2),
 	REGISTER_FUNCTION(pow,2),
 	REGISTER_FUNCTION(remainder,2),
+	REGISTER_FUNCTION(psubst,3),
 	REGISTER_FUNCTIONN(quantize_255,"q255",1),
 	REGISTER_FUNCTIONN(quantize_easy,"qe",3),
 	REGISTER_FUNCTIONN(unquantize_easy,"iqe",3),
