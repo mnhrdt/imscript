@@ -734,6 +734,18 @@ static int vector_norm(float *r, float *a, int n)
 }
 
 // instance of "univector_function"
+static int vector_std(float *r, float *a, int n)
+{
+	float m;
+	vector_avg(&m, a, n);
+	*r = 0;
+	for (int i = 0; i < n; i++)
+		*r = hypot(*r, a[i] - m);
+	*r /= sqrt(n);
+	return 1;
+}
+
+// instance of "univector_function"
 static int vector_dimension(float *r, float *a, int n)
 {
 	(void)a;
@@ -915,6 +927,7 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(vector_min,"vmin",-6),
 	REGISTER_FUNCTIONN(vector_max,"vmax",-6),
 	REGISTER_FUNCTIONN(vector_mul,"vmul",-6),
+	REGISTER_FUNCTIONN(vector_std,"vstd",-6),
 	REGISTER_FUNCTIONN(vector_norm,"vnorm",-6),
 	REGISTER_FUNCTIONN(vector_dimension,"vdim",-6),
 	REGISTER_FUNCTIONN(vector_rgb2gray,"vgray",-6),
