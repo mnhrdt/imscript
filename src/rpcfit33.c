@@ -129,7 +129,7 @@ long double rpc33_error(long double p[20], long double q[20],
 	long double r = 0;
 	for (int i = 0; i < n; i++)
 		r = pow(f[i] - v[i], 2);
-	return 100 * sqrt(r/n);
+	return sqrt(r/n);
 }
 
 // evaluate the error of a list of points by the given pq (sets q[0]=1)
@@ -184,6 +184,7 @@ long double rpcfit33(
 	}
 
 	long double best_error_so_far = INFINITY;
+	int best_iteration_so_far = -1;
 	int number_of_iterations = 13;
 	for (int iteration = 0; iteration < number_of_iterations; iteration++)
 	{
@@ -211,9 +212,11 @@ long double rpcfit33(
 
 		// update if it improves error
 		long double e = rpc33_errorpq(pq, x, f, n);
+		fprintf(stderr, "\terru = %Lg\n", e);
 		if (e < best_error_so_far)
 		{
 			best_error_so_far = e;
+			best_iteration_so_far = iteration;
 			for (int i = 0; i < 20; i++)
 				p[i] = pq[i];
 			for (int i = 1; i < 20; i++)
@@ -221,5 +224,7 @@ long double rpcfit33(
 		}
 	}
 
+	fprintf(stderr, "best_iteration = %d\n", best_iteration_so_far);
+	fprintf(stderr, "best_error = %Lg\n", best_error_so_far);
 	return best_error_so_far;
 }
