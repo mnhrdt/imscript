@@ -184,6 +184,15 @@ void morsi_enhance(float *y, float *x, int w, int h, int *e)
 	free(t);
 }
 
+void morsi_blur(float *y, float *x, int w, int h, int *e)
+{
+	float *t = xmalloc(w*h*sizeof*t);
+	morsi_laplacian(t, x, w, h, e);
+	for (int i = 0; i < w*h; i++)
+		y[i] = x[i] + t[i];
+	free(t);
+}
+
 void morsi_oscillation(float *y, float *x, int w, int h, int *e)
 {
 	float *a = xmalloc(w*h*sizeof*a);
@@ -396,6 +405,7 @@ static char *help_string_long     =
 " egradient   dilation minus image (outer boundaries)\n"
 " laplacian   difference between outer and inner gradient (signed boundaries)\n"
 " enhance     image minus laplacian (sharpen boundaries and details)\n"
+" blur        image plus laplacian (centered smoothing)\n"
 " tophat      image minus opening (select bright blobs)\n"
 " bothat      closing minus image (select dark blobs)\n"
 " oscillation closing minus opening (measure local oscillation)\n"
@@ -450,6 +460,7 @@ int main_morsi(int c, char **v)
 	if (0 == strcmp(v[2], "egradient"  )) operation = morsi_egradient;
 	if (0 == strcmp(v[2], "laplacian"  )) operation = morsi_laplacian;
 	if (0 == strcmp(v[2], "enhance"    )) operation = morsi_enhance;
+	if (0 == strcmp(v[2], "blur"       )) operation = morsi_blur;
 	if (0 == strcmp(v[2], "oscillation")) operation = morsi_oscillation;
 	if (0 == strcmp(v[2], "tophat"     )) operation = morsi_tophat;
 	if (0 == strcmp(v[2], "bothat"     )) operation = morsi_bothat;
