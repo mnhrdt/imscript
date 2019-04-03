@@ -4105,6 +4105,86 @@ static bool string_suffix(const char *s, const char *suf)
 	return 0 == strcmp(suf, s + (len_s - len_suf));
 }
 
+static int sidx(uint8_t *rgb)
+{
+	return 32*(rgb[0]/32) + 4*(rgb[1]/32) + rgb[2]/64;
+}
+
+void dump_sixels_to_stdout_rgb3(uint8_t *x, int w, int h)
+{
+	printf("\ePq\n");
+	for (int i = 0; i < 0x100; i++)
+		printf("#%d;2;%d;%d;%d", i,(int)(14.2857*(i/32)),
+				(int)(14.2857*((i/4)%8)), (int)(33.3333*(i%4)));
+	for (int j = 0; j < h/6; j++)
+	{
+		int m[0x100] = {0}, c = 0;
+		for (int i = 0; i < 6*w; i++)
+		{
+			int k = sidx(x+3*(6*j*w+i));
+			if (!m[k]) c += 1;
+			m[k] += 1;
+		}
+		for (int k = 0; k < 0x100; k++)
+		if (m[k])
+		{
+			int b[w], r[w], R[w], n = 0;
+			c -= 1;
+			for (int i = 0; i < w; i++)
+			{
+				int s = 0;
+				for (int l = 5; l >= 0; l--)
+					s = 2*s + (k==sidx(x+3*((6*j+l)*w+i)));
+				b[i] = s + 63;
+			}
+			for (int i = 0; i < w; i++)
+				R[i] = 1;
+			r[0] = *b;
+			for (int i = 1; i < w; i++)
+				if (b[i] == r[n])
+					R[n] += 1;
+				else
+					r[++n] = b[i];
+			printf("#%d", k);
+			for (int i = 0; i <= n; i++)
+				if (R[n] < 3)
+					for (int k = 0; k < R[i]; k++)
+						printf("%c", r[i]);
+				else
+					printf("!%d%c", R[i], r[i]);
+			printf(c ? "$\n" : "-\n");
+		}
+	}
+	printf("\e\\");
+}
+
+static void dump_sixels_to_stdout(struct iio_image *x)
+{
+	assert(x->pixel_dimension == 3);
+	char filename[] = "/tmp/iio_tmp_file_XXXXXX\0";
+	int r = mkstemp(filename);
+	if (r == -1) {
+		perror("hola");
+		fail("could not create tmp filename (for sixels)");
+	}
+	if (x->type != IIO_TYPE_UINT8) {
+		void *old_data = x->data;
+		int ss = iio_image_sample_size(x);
+		int nsamp = iio_image_number_of_samples(x);
+		x->data = xmalloc(nsamp*ss);
+		memcpy(x->data, old_data, nsamp*ss);
+		iio_convert_samples(x, IIO_TYPE_UINT8);
+		//iio_write_image_as_png(filename, x);//recursive
+		dump_sixels_to_stdout_rgb3(x->data, x->sizes[0], x->sizes[1]);
+		xfree(x->data);
+		x->data = old_data;
+	}
+	//char buf[2*FILENAME_MAX];
+	////snprintf(buf, 2*FILENAME_MAX, "img2sixel -P %s\n", filename);
+	//snprintf(buf, 2*FILENAME_MAX, "img2sixel %s\n", filename);
+	//system(buf);
+}
+
 // Note:
 // This function was written without being designed.  See file "saving.txt" for
 // an attempt at designing it.
@@ -4117,6 +4197,19 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 	//	r = write_raw_named_image(fname, x);
 	//	return;
 	//}
+	if (!strcmp(filename,"-") && isatty(fileno(stdout)))
+	{
+		//fprintf(stdout, "image %s %dx%d,%d\n",
+		//		iio_strtyp(x->type),
+		//	       	x->sizes[0],
+		//	       	x->sizes[1],
+		//		x->pixel_dimension
+		//		);
+		if (x->sizes[0] < 800 && x->sizes[1] < 800 &&
+			x->pixel_dimension==3)
+			dump_sixels_to_stdout(x);
+		return;
+	}
 	if (string_suffix(filename, ".uv") && typ == IIO_TYPE_FLOAT
 				&& x->pixel_dimension == 2) {
 		iio_write_image_as_juv(filename, x);

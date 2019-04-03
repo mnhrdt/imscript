@@ -1,5 +1,6 @@
 #CFLAGS ?= -march=native -O3 -DNDEBUG -Wall -Wno-unused
-CFLAGS ?= -march=native -O3 -Wall -Wextra -Wno-unused
+#CFLAGS ?= -march=native -O3 -Wall -Wextra -Wno-unused  -fsanitize=addre
+CFLAGS ?= -g -Wall -Wextra -Wno-unused #-fsanitize=address
 LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm #-lgdal
 
 OBJ = src/iio.o src/fancy_image.o
