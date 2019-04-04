@@ -22,4 +22,4 @@ shuntingyard simplest_inpainting sort sphereheights starfield startracker
 sterint strt sum tcregistration tdip testgblur thinpa_recsep tiffu
 tilt_and_shear tiny_lure tregistration tvint unalpha uncrop unshadow utm
 vecov_lm vecstack watermark zeropad zoombil monodisp sdistance segfilter
-mediatorw lowe_join neumann_inpainting hslice
+mediatorw lowe_join neumann_inpainting hslice img2six
