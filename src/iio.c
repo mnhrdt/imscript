@@ -4110,7 +4110,7 @@ static int sidx(uint8_t *rgb)
 	return 32*(rgb[0]/32) + 4*(rgb[1]/32) + rgb[2]/64;
 }
 
-void dump_sixels_to_stdout_rgb3(uint8_t *x, int w, int h)
+static void dump_sixels_to_stdout_rgb3(uint8_t *x, int w, int h)
 {
 	printf("\ePq\n");
 	for (int i = 0; i < 0x100; i++)
@@ -4158,31 +4158,65 @@ void dump_sixels_to_stdout_rgb3(uint8_t *x, int w, int h)
 	printf("\e\\");
 }
 
+static void dump_sixels_to_stdout_gray2(uint8_t *x, int w, int h)
+{
+	int Q = (1<<2); // quantization over [0..255]
+	printf("\ePq\n");
+	for (int i = 0; i < 0x100/Q; i++)
+		printf("#%d;2;%d;%d;%d",
+			i, (int)(Q*.39*i), (int)(Q*.39*i), (int)(Q*.39*i));
+	for (int j = 0; j < h/6; j++) {
+		int m[0x100] = {0}, c = 0;
+		for (int i = 0; i < 6*w; i++) {
+			int k = x[6*j*w+i]/Q;
+			if (!m[k]) c += 1;
+			m[k] += 1;
+		}
+		for (int k = 0; k < 0x100/Q; k++)
+		if (m[k]) {
+			int b[w], r[w], R[w], idx = 0;
+			c -= 1;
+			for (int i = 0; i < w; i++) {
+				b[i] = 0;
+				for (int l = 5; l >= 0; l--)
+					b[i] = 2*b[i] + (k == x[(6*j+l)*w+i]/Q);
+				b[i] += 63;
+			}
+			for (int i = 0; i < w; i++) R[i] = 1;
+			r[0] = *b;
+			for (int i = 1; i < w; i++)
+				if (b[i] == r[idx]) R[idx] += 1;
+				else r[++idx] = b[i];
+			printf("#%d", k);
+			for (int i = 0; i <= idx; i++)
+				if (R[idx] < 3)
+					for (int k = 0; k < R[i]; k++)
+						printf("%c", r[i]);
+				else
+					printf("!%d%c", R[i], r[i]);
+			printf(c ? "$\n" : "-\n");
+		}
+	}
+	printf("\e\\");
+}
+
 static void dump_sixels_to_stdout(struct iio_image *x)
 {
-	assert(x->pixel_dimension == 3);
-	char filename[] = "/tmp/iio_tmp_file_XXXXXX\0";
-	int r = mkstemp(filename);
-	if (r == -1) {
-		perror("hola");
-		fail("could not create tmp filename (for sixels)");
-	}
-	if (x->type != IIO_TYPE_UINT8) {
+	//if (x->type != IIO_TYPE_UINT8)
+	{
 		void *old_data = x->data;
 		int ss = iio_image_sample_size(x);
 		int nsamp = iio_image_number_of_samples(x);
 		x->data = xmalloc(nsamp*ss);
 		memcpy(x->data, old_data, nsamp*ss);
 		iio_convert_samples(x, IIO_TYPE_UINT8);
-		//iio_write_image_as_png(filename, x);//recursive
+		if (x->pixel_dimension==3)
 		dump_sixels_to_stdout_rgb3(x->data, x->sizes[0], x->sizes[1]);
+		else if (x->pixel_dimension==1)
+		dump_sixels_to_stdout_gray2(x->data, x->sizes[0], x->sizes[1]);
 		xfree(x->data);
 		x->data = old_data;
 	}
-	//char buf[2*FILENAME_MAX];
-	////snprintf(buf, 2*FILENAME_MAX, "img2sixel -P %s\n", filename);
-	//snprintf(buf, 2*FILENAME_MAX, "img2sixel %s\n", filename);
-	//system(buf);
 }
 
 // Note:
@@ -4206,8 +4240,13 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 		//		x->pixel_dimension
 		//		);
 		if (x->sizes[0] < 800 && x->sizes[1] < 800 &&
-			x->pixel_dimension==3)
+			(x->pixel_dimension==3 || x->pixel_dimension==1))
 			dump_sixels_to_stdout(x);
+		else
+			printf("IMAGE %dx%d,%d %s\n",
+					x->sizes[0], x->sizes[1],
+					x->pixel_dimension,
+					iio_strtyp(x->type));
 		return;
 	}
 	if (string_suffix(filename, ".uv") && typ == IIO_TYPE_FLOAT
