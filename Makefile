@@ -1,6 +1,7 @@
 #CFLAGS ?= -march=native -O3 -DNDEBUG -Wall -Wno-unused
 #CFLAGS ?= -march=native -O3 -Wall -Wextra -Wno-unused  -fsanitize=addre
-CFLAGS ?= -g -Wall -Wextra -Wno-unused #-fsanitize=address
+#CFLAGS ?= -g -Wall -Wextra -Wno-unused #-fsanitize=address
+CFLAGS ?= -march=native -O3 -DNDEBUG -Wall -Wno-unused
 LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm #-lgdal
 
 OBJ = src/iio.o src/fancy_image.o
@@ -10,7 +11,7 @@ BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
       srmatch tiffu siftu crop lrcat tbcat fftshift bmms registration imflip \
       fft dct dht flambda fancy_crop fancy_downsa autotrim iion mediator     \
       redim colormatch eucdist nonmaxsup gntiply idump warp heatd imhalve    \
-      mdither mdither2 rpctk
+      ppsmooth mdither mdither2 rpctk
 
 BIN := $(addprefix bin/,$(BIN))
 

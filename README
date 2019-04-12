@@ -49,7 +49,7 @@ It is useful if you have libtiff, libjpeg, and libpng for input/output.
 
 For the interactive tools you will need furthermore libX11.
 
-Some tools require furthermore libgsl and libgslcblas.
+Some tools on section "misc" require furthermore libgsl and libgslcblas.
 
 
 6. INSTALLATION

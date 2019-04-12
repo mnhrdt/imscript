@@ -11,7 +11,8 @@ If you want to use or re-distribute imscript you can choose either licence.
 
 The following files are copied verbatim (or with trivial changes) from their
 original sources.  They are included for convenience and they are not essential
-for imscript.  They are not distributed under the dual-licence agreement above, but under their own licences specified inside each file.
+for imscript.  They are not distributed under the dual-licence agreement above,
+but under their own licences specified inside each file.
 
 spline.c                : written by Lionel Moisan and Pascal Monasse
 svd.c, lk.c, optimiz.c  : written by Daniel A. Atkinson, part of CCMATH

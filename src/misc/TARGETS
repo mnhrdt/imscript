@@ -13,7 +13,7 @@ intimg ipol_watermark isingroot isoricci lapbediag lapbediag_sep lapcolo lgblur
 lgblur2 lgblur3 lic lk lk_omp lure lures maptp metatiler mima minimize mnehs
 mnehs_ms morsi_demo morsi_demo2 ofc overflow overpoints pairhom pairsinp
 pamle_rec paraflow periodize perms plyflatten plyroads plyroads_mini pmba pmba2
-poisson_rec polygonify posmax ppsmooth raddots radphar ranrecs
+poisson_rec polygonify posmax raddots radphar ranrecs
 really_simplest_inpainting remove_small_cc replicate rgbcube rgfield rgfields
 rgfieldst rpc rpc_angpair rpc_curvpair rpc_epicyl rpc_errfilt rpc_errpair
 rpc_errsingle rpc_eval rpc_mnehs rpc_pm rpc_pmn rpc_warpab rpc_warpabt rpcflow

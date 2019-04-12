@@ -129,6 +129,9 @@ static void fft_direct(float *y, float *x, int w, int h, int pd)
 	free(gc);
 }
 
+#define OMIT_PPSMOOTH_MAIN
+#include "ppsmooth.c"
+
 static void fft_2dfloat_loc(fftwf_complex *fx, float *x, int w, int h, int lw)
 {
 	// set background to 0
@@ -139,12 +142,13 @@ static void fft_2dfloat_loc(fftwf_complex *fx, float *x, int w, int h, int lw)
 	for (int oy = 0; oy+lw < h; oy += lw)
 	for (int ox = 0; ox+lw < w; ox += lw)
 	{
-		float x_loc[lw*lw];
+		float x_loc[lw*lw], x_loc_smooth[lw*lw];
 		fftwf_complex fx_loc[lw*lw], sfx_loc[lw*lw];
 		for (int j = 0; j < lw; j++)
 		for (int i = 0; i < lw; i++)
 			x_loc[j*lw+i] = x[(j+oy)*w+i+ox];
-		fft_2dfloat(fx_loc, x_loc, lw, lw);
+		ppsmooth(x_loc_smooth, x_loc, lw, lw);
+		fft_2dfloat(fx_loc, x_loc_smooth, lw, lw);
 		for (int j = 0; j < lw; j++)
 		for (int i = 0; i < lw; i++)
 		{

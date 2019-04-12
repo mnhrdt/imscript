@@ -215,34 +215,156 @@ void dump_sixels_to_stdout_rgb3(uint8_t *x, int w, int h)
 {
 	printf("\ePq\n");
 	for (int i = 0; i < 0x100; i++)
-		printf("#%d;2;%d;%d;%d", i,
-				(int)(14.2857*(i/32)),
-				(int)(14.2857*((i/4)%8)),
-				(int)(33.3333*(i%4))
-		);
-	for (int jj = 0; jj < h/6; jj++)
+		printf("#%d;2;%d;%d;%d", i,(int)(14.2857*(i/32)),
+				(int)(14.2857*((i/4)%8)), (int)(33.3333*(i%4)));
+	for (int j = 0; j < h/6; j++)
 	{
-		int m[0x100] = {0}, cnt = 0;
+		int m[0x100] = {0}, c = 0;
 		for (int i = 0; i < 6*w; i++)
 		{
-			int k = pidx(x+3*(6*jj*w+i));
-			if (!m[k]) cnt += 1;
+			int k = pidx(x+3*(6*j*w+i));
+			if (!m[k]) c += 1;
 			m[k] += 1;
 		}
 		for (int k = 0; k < 0x100; k++)
 		if (m[k])
 		{
-			uint8_t buf[w];
-			cnt -= 1;
+			int b[w], r[w], R[w], n = 0;
+			c -= 1;
 			for (int i = 0; i < w; i++)
 			{
-				int s[6];
-				for (int l = 0; l < 6; l++)
-					s[l] = k == pidx(x+3*((6*jj+l)*w+i));
-				int S = s[0] + 2*( s[1] + 2*( s[2] + 2*(
-					s[3] + 2*( s[4] + 2*( s[5] )))));
-				buf[i] = S + 63;
+				int s = 0;
+				for (int l = 5; l >= 0; l--)
+					s = 2*s + (k==pidx(x+3*((6*j+l)*w+i)));
+				b[i] = s + 63;
 			}
+			for (int i = 0; i < w; i++)
+				R[i] = 1;
+			r[0] = *b;
+			for (int i = 1; i < w; i++)
+				if (b[i] == r[n])
+					R[n] += 1;
+				else
+					r[++n] = b[i];
+			printf("#%d", k);
+			for (int i = 0; i <= n; i++)
+				if (R[n] < 3)
+					for (int k = 0; k < R[i]; k++)
+						printf("%c", r[i]);
+				else
+					printf("!%d%c", R[i], r[i]);
+			printf(c ? "$\n" : "-\n");
+		}
+	}
+	printf("\e\\");
+}
+
+static int sdx(uint8_t *rgb)
+{
+	return 32*(rgb[0]/32) + 4*(rgb[1]/32) + rgb[2]/64;
+}
+
+void dump_sixels_to_stdout_rgb4(uint8_t *x, int w, int h)
+{
+	printf("\ePq\n");
+	for (int i = 0; i < 0x100; i++)
+		printf("#%d;2;%d;%d;%d", i,(int)(14.2857*(i/32)),
+				(int)(14.2857*((i/4)%8)), (int)(33.3333*(i%4)));
+	for (int j = 0; j < h/6; j++) {
+		int m[0x100] = {0}, c = 0;
+		for (int i = 0; i < 6*w; i++) {
+			int k = sdx(x+3*(6*j*w+i));
+			if (!m[k]) c += 1;
+			m[k] += 1;
+		}
+		for (int k = 0; k < 0x100; k++)
+		if (m[k]) {
+			int b[w], r[w], R[w], n = 0;
+			c -= 1;
+			for (int i = 0; i < w; i++) {
+				b[i] = 0;
+				for (int l = 5; l >= 0; l--)
+					b[i]=2*b[i]+(k==sdx(x+3*((6*j+l)*w+i)));
+			}
+			for (int i = 0; i < w; i++) R[i] = 1;
+			r[0] = *b;
+			for (int i = 1; i < w; i++)
+				if (b[i] == r[n]) R[n] += 1;
+				else r[++n] = b[i];
+			printf("#%d", k);
+			for (int i = 0; i <= n; i++)
+				if (R[n] < 3) for (int k = 0; k < R[i]; k++)
+						printf("%c", r[i]);
+				else printf("!%d%c", R[i], r[i]);
+			printf(c ? "$\n" : "-\n");
+		}
+	}
+	printf("\e\\");
+}
+
+static int pal_gidx(uint8_t *g)
+{
+	return *g;
+	//uint8_t r = rgb[0]/32;
+	//uint8_t g = rgb[1]/32;
+	//uint8_t b = rgb[2]/64;
+	//int i = 32*r + 4*g + b;
+	//if (i > 255)
+	//	printf("BAD i=%d rgb=%d %d %d\n", i, r, g, b);
+	//return i;
+}
+
+void dump_sixels_to_stdout_gray(uint8_t *x, int w, int h)
+{
+	// beginning of sixel block
+	printf("\ePq\n");
+
+	int Q = (1<<2); // quantization over [0..255]
+
+	// dump palette (RGB 3+3+2 bits palette)
+	for (int i = 0; i < 0x100/Q; i++)
+		printf("#%d;2;%d;%d;%d", i, //i/32, (i/4)%8, i%4);
+				(int)(100.0*i/(0.0+0x100/Q)),
+				(int)(100.0*i/(0.0+0x100/Q)),
+				(int)(100.0*i/(0.0+0x100/Q))
+		);
+
+	// dump sixels
+	for (int jj = 0; jj < h/6; jj++) // traverse sixel stripes
+	{
+		// find colors that appear on this stripe
+		int m[0x100] = {0}, cnt = 0;
+		for (int i = 0; i < 6*w; i++)
+		{
+			int k = x[6*jj*w+i]/Q;
+			assert(k >= 0); assert(k < 0x100/Q);
+			if (!m[k]) cnt += 1;
+			m[k] += 1;
+		}
+
+		// for each color that appears, dump its binary mask
+		for (int k = 0; k < 0x100/Q; k++)
+		if (m[k])
+		{
+			uint8_t buf[w]; // sixels before run-length compression
+			cnt -= 1;
+			for (int i = 0; i < w; i++) // traverse sixels
+			{
+				int s[6]; // sixel binary mask
+				for (int l = 0; l < 6; l++)
+					s[l] = k == x[(6*jj+l)*w+i]/Q;
+				int S = s[0] + 2*( // sixel index
+					s[1] + 2*(
+					s[2] + 2*(
+					s[3] + 2*(
+					s[4] + 2*( s[5] )))));
+				assert(S >= 0 && S < 64);
+				buf[i] = S + 63;
+				//fprintf(stderr, "buf[i=%d]=%d\n", i, buf[i]);
+				//printf("%c", S + 63); // dump sixel
+			}
+
+			// run-lenght encode
 			uint8_t rle[w];
 			int rep[w] , idx = 0;
 			for (int i = 0; i < w; i++)
@@ -253,14 +375,67 @@ void dump_sixels_to_stdout_rgb3(uint8_t *x, int w, int h)
 					rep[idx] += 1;
 				else
 					rle[++idx] = buf[i];
-			printf("#%d", k);
+
+			//fprintf(stderr, "w=%d idx=%d\n", w, idx);
+			//fprintf(stderr, "buf = %d %d %d ...\n", buf[0], buf[1], buf[2]);
+			//fprintf(stderr, "rle = %d %d %d ...\n", rle[0], rle[1], rle[2]);
+			//fprintf(stderr, "rep = %d %d %d ...\n", rep[0], rep[1], rep[2]);
+
+			// dump sixels
+			printf("#%d", k); // select color k
+			//for (int i = 0; i < w; i++)
+			//	printf("%c", buf[i]);
 			for (int i = 0; i <= idx; i++)
 				if (rep[idx] < 3)
 					for (int k = 0; k < rep[i]; k++)
 						printf("%c", rle[i]);
 				else
 					printf("!%d%c", rep[i], rle[i]);
-			printf(cnt ? "$\n" : "-\n");
+			printf(cnt ? "$\n" : "-\n"); // signal end of line
+		}
+	}
+
+	// end of sixel block
+	printf("\e\\");
+}
+
+void dump_sixels_to_stdout_gray2(uint8_t *x, int w, int h)
+{
+	int Q = (1<<2); // quantization over [0..255]
+	printf("\ePq\n");
+	for (int i = 0; i < 0x100/Q; i++)
+		printf("#%d;2;%d;%d;%d",
+			i, (int)(Q*.39*i), (int)(Q*.39*i), (int)(Q*.39*i));
+	for (int j = 0; j < h/6; j++) {
+		int m[0x100] = {0}, c = 0;
+		for (int i = 0; i < 6*w; i++) {
+			int k = x[6*j*w+i]/Q;
+			if (!m[k]) c += 1;
+			m[k] += 1;
+		}
+		for (int k = 0; k < 0x100/Q; k++)
+		if (m[k]) {
+			int b[w], r[w], R[w], idx = 0;
+			c -= 1;
+			for (int i = 0; i < w; i++) {
+				b[i] = 0;
+				for (int l = 5; l >= 0; l--)
+					b[i] = 2*b[i] + (k == x[(6*j+l)*w+i]/Q);
+				b[i] += 63;
+			}
+			for (int i = 0; i < w; i++) R[i] = 1;
+			r[0] = *b;
+			for (int i = 1; i < w; i++)
+				if (b[i] == r[idx]) R[idx] += 1;
+				else r[++idx] = b[i];
+			printf("#%d", k);
+			for (int i = 0; i <= idx; i++)
+				if (R[idx] < 3)
+					for (int k = 0; k < R[i]; k++)
+						printf("%c", r[i]);
+				else
+					printf("!%d%c", R[i], r[i]);
+			printf(c ? "$\n" : "-\n");
 		}
 	}
 	printf("\e\\");
@@ -277,7 +452,9 @@ int main(int c, char *v[])
 	uint8_t *x = iio_read_image_uint8_vec(filename_in, &w, &h, &d);
 
 	if (d == 3)
-		dump_sixels_to_stdout_rgb2(x, w, h);
+		dump_sixels_to_stdout_rgb3(x, w, h);
+	else if (d == 1)
+		dump_sixels_to_stdout_gray2(x, w, h);
 	else
 		return fprintf(stderr, "d = %d not supported yet\n", d);
 

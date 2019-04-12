@@ -540,16 +540,17 @@ static void transform_roi_buffers(float *y, float *x, int n, int roi)
 			c[i] = x_p[3*i+l];
 		fft_2dfloat(fc, c, n, n);
 		for (int i = 0; i < n*n; i++)
-			ys[i] = cabs(fc[i]);
-			//ys[i] = 255*(log(cabs(fc[i])/255)+0.5)/5;
-		float fac = n*13;
+			//ys[i] = cabs(fc[i]);
+			ys[i] = 255*(log(cabs(fc[i])/255)+0.5)/5;
+		//float fac = n*13;
+		float fac = n*3;
 		for (int j = 0; j < n; j++)
 		for (int i = 0; i < n; i++)
 		{
 			int ii = (i + n/2) % n;
 			int jj = (j + n/2) % n;
 			float norm = hypot(i-n/2-1, j-n/2-1) / fac;
-			y[3*(j*n+i)+l] = ys[jj*n+ii] * norm;
+			y[3*(j*n+i)+l] = ys[jj*n+ii] * 1;//norm;
 		}
 	}
 	free(ys);

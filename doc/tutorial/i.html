@@ -1,9 +1,10 @@
 <!doctype html>
 
-<!-- This document is a "semi-literate" program.  To re-compute the figures,
-	run the script "build.sh" from inside the directory "f".  Note that you can
-	change the source images (A, B, X, ...), but they should be of a similar size
-	or the layout will be broken.
+<!--
+	This document is a "semi-literate" program.  To re-compute the
+	figures, run the script "build.sh" from inside the directory "f".
+	Note that you can change the source images (A, B, X, ...), but
+	they should be of a similar size or the layout will be broken.
 -->
 
 <title>imscript tutorial</title>
@@ -33,14 +34,14 @@ body {max-width: 91ex; margin-left:1em;}
 		<p>
 		Imscript is a collection of simple programs for doing image
 		processing in a Unix environment.
-		
+
 
 		<h2>0. Philosophy</h2>
 
 		<p>
 		This is just vanilla unix philosophy with some specificities for
 		images:
-		
+
 
 		<ul>
 			<li>each program does one thing and does it well
@@ -52,25 +53,9 @@ body {max-width: 91ex; margin-left:1em;}
 		<p>
 		Notice that imscript programs will read any common image format, but
 		will only write asc, pnm, png, and tiff.
-		
+
 
 		<h2>1. Overview</h2>
-
-		<!--
-		<ol>
-			<li><b>Filters:</b> read one image and write one image of the same size
-				<ul>
-					<li><code>blur</code>: convolve an image by a shift-invariant user-specified kernel
-					<li><code>morsi</code>: apply a morphological operation with a user-specified element
-					<li><code>qeasy</code>: re-scale the dynamic range of an image
-					<li><code>qauto</code>: re-scale the dynamic range of an image, automatically
-					<li><code>palette</code>: colorize a grayscale image using a palette
-					<li><code>dither</code>: binarize an image by error diffusion
-					<li><code>iion</code>: copy named input to named output (useful to change file format)
-				</ul>
-			
-		</ol>
-		-->
 
 <pre>
 

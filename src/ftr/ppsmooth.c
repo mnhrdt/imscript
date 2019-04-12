@@ -1,1 +1,1 @@
-../misc/ppsmooth.c
+../ppsmooth.c

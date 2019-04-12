@@ -182,7 +182,7 @@ void read_rpc_file_ikonos(struct rpc *p, char *filename)
 	while (1) {
 		char line[n], tag[n], *sl = fgets(line, n, f);;
 		if (!sl) break;
-        tag[0] = 'i';
+		tag[0] = 'i';
 		double x = get_tagged_number(tag+1, line);
 		if (isfinite(x)) {
 			//fprintf(stderr, "%s [%d]: %g\n", tag+o, o, x);

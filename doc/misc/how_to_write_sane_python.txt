@@ -15,7 +15,7 @@ H5. avoid any kind of boilerplate that helps for 2.7 compatibility
 NAMING
 
 N1. local variables are single letters.  No exceptions.
-N2. use unicode letters without fear: α, β, γ = alpha, beta, gamma
+N2. use unicode letters without fear: α, β, γ instead of alpha, beta, gamma
 N3. function names are long and descriptive
 N4. global variables have long and uppercase names
 N5. do not bring new mixed-case symbols into the world
