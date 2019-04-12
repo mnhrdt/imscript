@@ -1,6 +1,6 @@
 // CPU : the definitive interface for image processing practitioners
 
-// cc -O2 cpu.c iio.o -o cpu -lX11 -ltiff -ljpeg -lpng -lz -lm
+// cc -O2 cpu.c fancy_image.o iio.o ftr.o -o cpu -lX11 -lfftw3f -ltiff -ljpeg -lpng -lz -lm
 #include <assert.h>
 #include <math.h>
 #include <stdint.h>
@@ -600,6 +600,7 @@ static void expose_pixel_values(struct FTR *f)
 			window_to_image(p, e, ii, jj);
 			float c[3]; pixel_rgbf(c, e, p[0], p[1]);
 			uint8_t rgb[3]; colormap3(rgb, e, c);
+			uint8_t color_white[3] = {255, 255, 255};
 			uint8_t color_green[3] = {0, 255, 0};
 			uint8_t color_red[3] = {255, 0, 0};
 			uint8_t bg[3] = {0, 0, 0};
@@ -617,9 +618,18 @@ static void expose_pixel_values(struct FTR *f)
 			//if (c[0] == c[1] && c[0] == c[2])
 				l=snprintf(buf, 300, "%g", c[0]);
 			struct bitmap_font *font = get_font_for_zoom(e, zf);
+			uint8_t *rbg = zf>100?bg:NULL;
 			if (l) put_string_in_rgb_image(f->rgb, f->w, f->h,
 					ii-2.5*font->width, jj-1.5*font->height,
-					fg, NULL, 0, font, buf);
+					fg, rbg, 0, font, buf);
+			if (zf>100)
+			{
+				snprintf(buf,300,"%g %g\n", p[0]-0.5, p[1]-0.5);
+				put_string_in_rgb_image(f->rgb, f->w, f->h,
+					ii - zf/2,
+					jj - zf/2,
+					color_white,rbg,0,font,buf);
+			}
 		}
 
 	}
