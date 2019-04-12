@@ -144,14 +144,14 @@ fprintf(stderr, "iscale = %g %g %g\n",r->iscale[0],r->iscale[1],r->iscale[2]);
 fprintf(stderr,"ioffst = %g %g %g\n",r->ioffset[0],r->ioffset[1],r->ioffset[2]);
 
 	// normalized input/outputs
-	long double *ijh = xmalloc(3*n * sizeof*ijh);
+	long double (*ijh)[3] = xmalloc(n * sizeof*ijh);
 	long double *lon = xmalloc(n * sizeof*lon);
 	long double *lat = xmalloc(n * sizeof*lat);
 	for (int i = 0; i < n; i++)
 	{
-		ijh[3*i+0] = (ijhll[5*i+0] - r->offset[0] ) / r->scale[0];
-		ijh[3*i+1] = (ijhll[5*i+1] - r->offset[1] ) / r->scale[1];
-		ijh[3*i+2] = (ijhll[5*i+2] - r->offset[2] ) / r->scale[2];
+		ijh[i][0] = (ijhll[5*i+0] - r->offset[0] ) / r->scale[0];
+		ijh[i][1] = (ijhll[5*i+1] - r->offset[1] ) / r->scale[1];
+		ijh[i][2] = (ijhll[5*i+2] - r->offset[2] ) / r->scale[2];
 		lon[i]     = (ijhll[5*i+3] - r->ioffset[0]) / r->iscale[0];
 		lat[i]     = (ijhll[5*i+4] - r->ioffset[1]) / r->iscale[1];
 		if (n < 2000)
@@ -164,9 +164,9 @@ fprintf(stderr,"ioffst = %g %g %g\n",r->ioffset[0],r->ioffset[1],r->ioffset[2]);
 					ijhll[5*i+2],
 					ijhll[5*i+3],
 					ijhll[5*i+4],
-					ijh[3*i+0],
-					ijh[3*i+1],
-					ijh[3*i+2],
+					ijh[i][0],
+					ijh[i][1],
+					ijh[i][2],
 					lon[i],
 					lat[i]);
 		}
