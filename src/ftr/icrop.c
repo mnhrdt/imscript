@@ -131,6 +131,7 @@ int main_icrop2_panable(int c, char *v[])
 
 	// show image in window
 	int win[2] = { w, h};//320, 200 };
+	//int win[2] = { 800, 600 };
 	struct FTR f = ftr_new_window_with_image_uint8_rgb(x, win[0], win[1]);
 	struct icrop2_state e = {x,w,h, 0,0,0, 0,0,0};
 	f.userdata = &e;

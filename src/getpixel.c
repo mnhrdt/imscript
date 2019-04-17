@@ -118,7 +118,13 @@ float getsample_constant(float *x, int w, int h, int pd, int i, int j, int l)
 #if defined(_STRING_H) || defined(_STRING_H_)
 static getsample_operator get_sample_operator(getsample_operator o)
 {
-	char *option = getenv("GETPIXEL"), *endptr;
+	static char *option = NULL;
+	static int env_getpixel_checked = 0;
+	if (!env_getpixel_checked)
+	{
+		env_getpixel_checked = 1;
+		option = getenv("GETPIXEL");
+	}
 	if (!option) return o;
 #ifdef NAN
 	if (0 == strcmp(option, "nan"      ))  return getsample_nan;
@@ -132,6 +138,7 @@ static getsample_operator get_sample_operator(getsample_operator o)
 	if (0 == strcmp(option, "nearest"   )) return getsample_1;
 	if (0 == strcmp(option, "reflex"   ))  return getsample_2;
 	if (0 == strcmp(option, "symmetric"))  return getsample_2;
+	char *endptr;
 	float value = strtof(option, &endptr);
 	if (endptr != option) {
 		getsample_constant(&value, 0, 0, 0, 0, 0, 0);

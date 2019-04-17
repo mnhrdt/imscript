@@ -1,0 +1,33 @@
+Simple vector graphics as God intended
+======================================
+
+By simple vector graphics I mean simple stuff in the plane: a few polygons and
+circles with the occasional letter here and there.  Typically, if you want
+vector things today, you use a SVG library, that can read svg files and
+display them in opengl canvases, and everything.  This sucks, because the svg
+file format is complicated to edit manually, and the object structure is
+complicated also.
+
+I rather prefer to use a trivial and very limited file format, where every
+line contains the complete description of an object, this is trival to parse,
+and the resulting graphics are trivial to edit (e.g., by doing arithmetic with
+awk.)
+
+# example file containing a point, a segment, a triangle and a text label
+dot 33.34 282.9
+segment 12.1 35.5 180.2 18.75
+polygon 10 20 30 40 50 60
+label 13 25 hello world
+
+
+An important idea of this format is that objects have no color, lines have no
+width, and text has no font nor size.  Thus, this format gives a higher-level
+abstraction of the vector graphics as svg, and does not describe an exact
+visualization.  In the intended usage, different vector graphics will be stored
+on different files, and the user will be able to flip between them, or show
+them in different colors.
+
+A further, and essential, limitation is that the maximum number of objects in a
+file is 1000.  If a user pays enough, we can grundingly increase this number up
+to 1200, but no more.  This is an important design decision intended to
+encourage brute-force algorithms over these data structures.

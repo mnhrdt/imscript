@@ -3266,6 +3266,7 @@ static void iio_write_image_as_rim_cimage(const char *fname, struct iio_image *x
 	xfclose(f);
 }
 
+// SIX writer                                                               {{{2
 // guess format using magic                                                 {{{1
 
 
@@ -3301,6 +3302,9 @@ static int guess_format(FILE *f, char *buf, int *nbuf, int bufmax)
 	//
 	// hand-crafted state machine follows
 	//
+
+	if (getenv("IIO_RAW"))
+		return IIO_FORMAT_RAW;
 
 	b[0] = add_to_header_buffer(f, b, nbuf, bufmax);
 	b[1] = add_to_header_buffer(f, b, nbuf, bufmax);
@@ -3420,9 +3424,6 @@ static int guess_format(FILE *f, char *buf, int *nbuf, int bufmax)
 	bool buffer_statistics_agree_with_dlm(uint8_t*, int);
 	if (buffer_statistics_agree_with_dlm(b, bufmax))
 		return IIO_FORMAT_DLM;
-
-	if (getenv("IIO_RAW"))
-		return IIO_FORMAT_RAW;
 
 	return IIO_FORMAT_UNRECOGNIZED;
 }
@@ -4107,15 +4108,69 @@ static bool string_suffix(const char *s, const char *suf)
 
 static int sidx(uint8_t *rgb)
 {
-	return 32*(rgb[0]/32) + 4*(rgb[1]/32) + rgb[2]/64;
+	int r = 0;
+	r += (rgb[0] >> 5) << 5;
+	r += (rgb[1] >> 5) << 2;
+	r += rgb[2] >> 6;
+	return r;
+	//return 32*(rgb[0]/32) + 4*(rgb[1]/32) + rgb[2]/64;
 }
 
-static void dump_sixels_to_stdout_rgb3(uint8_t *x, int w, int h)
+
+struct bytestream {
+	int n, ntop;
+	uint8_t *t;
+};
+
+static void bytestream_init(struct bytestream *s)
 {
-	printf("\ePq\n");
+	s->ntop = 1024;
+	s->n = 0;
+	s->t = xmalloc(s->ntop);
+}
+
+static void bs_putchar(struct bytestream *s, uint8_t x)
+{
+	if (s->n >= s->ntop)
+	{
+		s->ntop *= 2;
+		s->t = xrealloc(s->t, s->ntop);
+	}
+	s->t[s->n++] = x;
+}
+
+static void bs_puts(struct bytestream *s, char *x)
+{
+	while (*x)
+		bs_putchar(s, *x++);
+}
+
+static int bs_printf(struct bytestream *s, char *fmt, ...)
+{
+	va_list argp;
+	char buf[0x1000];
+	va_start(argp, fmt);
+	int r = vsnprintf(buf, 0x1000, fmt, argp);
+	bs_puts(s, buf);
+	va_end(argp);
+	return r;
+}
+
+static void bytestream_free(struct bytestream *s)
+{
+	xfree(s->t);
+}
+
+static void dump_sixels_to_bytestream_rgb3(
+		struct bytestream *out,
+		uint8_t *x, int w, int h)
+{
+	bs_puts(out, "\ePq\n");
 	for (int i = 0; i < 0x100; i++)
-		printf("#%d;2;%d;%d;%d", i,(int)(14.2857*(i/32)),
-				(int)(14.2857*((i/4)%8)), (int)(33.3333*(i%4)));
+		bs_printf(out, "#%d;2;%d;%d;%d", i,
+				(int)(14.2857*(i/32)),
+				(int)(14.2857*((i/4)%8)),
+				(int)(33.3333*(i%4)));
 	for (int j = 0; j < h/6; j++)
 	{
 		int m[0x100] = {0}, c = 0;
@@ -4145,25 +4200,27 @@ static void dump_sixels_to_stdout_rgb3(uint8_t *x, int w, int h)
 					R[n] += 1;
 				else
 					r[++n] = b[i];
-			printf("#%d", k);
+			bs_printf(out, "#%d", k);
 			for (int i = 0; i <= n; i++)
 				if (R[n] < 3)
 					for (int k = 0; k < R[i]; k++)
-						printf("%c", r[i]);
+						bs_putchar(out, r[i]);
 				else
-					printf("!%d%c", R[i], r[i]);
-			printf(c ? "$\n" : "-\n");
+					bs_printf(out, "!%d%c", R[i], r[i]);
+			bs_puts(out, c ? "$\n" : "-\n");
 		}
 	}
-	printf("\e\\");
+	bs_puts(out, "\e\\");
 }
 
-static void dump_sixels_to_stdout_gray2(uint8_t *x, int w, int h)
+static void dump_sixels_to_bytestream_gray2(
+		struct bytestream *out,
+		uint8_t *x, int w, int h)
 {
 	int Q = (1<<2); // quantization over [0..255]
-	printf("\ePq\n");
+	bs_printf(out, "\ePq\n");
 	for (int i = 0; i < 0x100/Q; i++)
-		printf("#%d;2;%d;%d;%d",
+		bs_printf(out, "#%d;2;%d;%d;%d",
 			i, (int)(Q*.39*i), (int)(Q*.39*i), (int)(Q*.39*i));
 	for (int j = 0; j < h/6; j++) {
 		int m[0x100] = {0}, c = 0;
@@ -4187,17 +4244,150 @@ static void dump_sixels_to_stdout_gray2(uint8_t *x, int w, int h)
 			for (int i = 1; i < w; i++)
 				if (b[i] == r[idx]) R[idx] += 1;
 				else r[++idx] = b[i];
-			printf("#%d", k);
+			bs_printf(out, "#%d", k);
 			for (int i = 0; i <= idx; i++)
 				if (R[idx] < 3)
 					for (int k = 0; k < R[i]; k++)
-						printf("%c", r[i]);
+						bs_printf(out, "%c", r[i]);
 				else
-					printf("!%d%c", R[i], r[i]);
-			printf(c ? "$\n" : "-\n");
+					bs_printf(out, "!%d%c", R[i], r[i]);
+			bs_printf(out, c ? "$\n" : "-\n");
 		}
 	}
-	printf("\e\\");
+	bs_printf(out, "\e\\");
+}
+
+//static void dump_sixels_to_stdout_rgb3(uint8_t *x, int w, int h)
+//{
+//	struct bytestream s[1];
+//	bytestream_init(s);
+//	dump_sixels_to_bytestream_rgb3(s, x, w, h);
+//	for (int i = 0; i < s->n; i++)
+//		putchar(s->t[i]);
+//	bytestream_free(s);
+//	//printf("\ePq\n");
+//	//for (int i = 0; i < 0x100; i++)
+//	//	printf("#%d;2;%d;%d;%d", i,(int)(14.2857*(i/32)),
+//	//			(int)(14.2857*((i/4)%8)), (int)(33.3333*(i%4)));
+//	//for (int j = 0; j < h/6; j++)
+//	//{
+//	//	int m[0x100] = {0}, c = 0;
+//	//	for (int i = 0; i < 6*w; i++)
+//	//	{
+//	//		int k = sidx(x+3*(6*j*w+i));
+//	//		if (!m[k]) c += 1;
+//	//		m[k] += 1;
+//	//	}
+//	//	for (int k = 0; k < 0x100; k++)
+//	//	if (m[k])
+//	//	{
+//	//		int b[w], r[w], R[w], n = 0;
+//	//		c -= 1;
+//	//		for (int i = 0; i < w; i++)
+//	//		{
+//	//			int s = 0;
+//	//			for (int l = 5; l >= 0; l--)
+//	//				s = 2*s + (k==sidx(x+3*((6*j+l)*w+i)));
+//	//			b[i] = s + 63;
+//	//		}
+//	//		for (int i = 0; i < w; i++)
+//	//			R[i] = 1;
+//	//		r[0] = *b;
+//	//		for (int i = 1; i < w; i++)
+//	//			if (b[i] == r[n])
+//	//				R[n] += 1;
+//	//			else
+//	//				r[++n] = b[i];
+//	//		printf("#%d", k);
+//	//		for (int i = 0; i <= n; i++)
+//	//			if (R[n] < 3)
+//	//				for (int k = 0; k < R[i]; k++)
+//	//					printf("%c", r[i]);
+//	//			else
+//	//				printf("!%d%c", R[i], r[i]);
+//	//		printf(c ? "$\n" : "-\n");
+//	//	}
+//	//}
+//	//printf("\e\\");
+//}
+
+//static void dump_sixels_to_stdout_gray2(uint8_t *x, int w, int h)
+//{
+//	int Q = (1<<2); // quantization over [0..255]
+//	printf("\ePq\n");
+//	for (int i = 0; i < 0x100/Q; i++)
+//		printf("#%d;2;%d;%d;%d",
+//			i, (int)(Q*.39*i), (int)(Q*.39*i), (int)(Q*.39*i));
+//	for (int j = 0; j < h/6; j++) {
+//		int m[0x100] = {0}, c = 0;
+//		for (int i = 0; i < 6*w; i++) {
+//			int k = x[6*j*w+i]/Q;
+//			if (!m[k]) c += 1;
+//			m[k] += 1;
+//		}
+//		for (int k = 0; k < 0x100/Q; k++)
+//		if (m[k]) {
+//			int b[w], r[w], R[w], idx = 0;
+//			c -= 1;
+//			for (int i = 0; i < w; i++) {
+//				b[i] = 0;
+//				for (int l = 5; l >= 0; l--)
+//					b[i] = 2*b[i] + (k == x[(6*j+l)*w+i]/Q);
+//				b[i] += 63;
+//			}
+//			for (int i = 0; i < w; i++) R[i] = 1;
+//			r[0] = *b;
+//			for (int i = 1; i < w; i++)
+//				if (b[i] == r[idx]) R[idx] += 1;
+//				else r[++idx] = b[i];
+//			printf("#%d", k);
+//			for (int i = 0; i <= idx; i++)
+//				if (R[idx] < 3)
+//					for (int k = 0; k < R[i]; k++)
+//						printf("%c", r[i]);
+//				else
+//					printf("!%d%c", R[i], r[i]);
+//			printf(c ? "$\n" : "-\n");
+//		}
+//	}
+//	printf("\e\\");
+//}
+
+static void penetrate_screen(struct bytestream *z, struct bytestream *s)
+{
+	//bs_puts(z, "PENETRATE SCREEN\n");
+	bs_puts(z, "\x1bP");
+	for (int i = 0; i < s->n; i++)
+	{
+		int c = s->t[i];
+		     if (c == '\x90') bs_puts(z, "\x1bP");
+		else if (c == '\x9c') bs_puts(z, "\x1b\x1b\\\x1bP\\");
+		else if (c == '\x1b' && i+1 < s->n && s->t[i] == '\\')
+		{
+			bs_puts(z, "\x1b\x1b\\\x1bP\\");
+			i += 1;
+		}
+		else bs_putchar(z, c);
+	}
+	bs_puts(z, "\x1b\\");
+}
+
+static void dump_sixels_to_stdout_uint8(uint8_t *x, int w, int h, int pd)
+{
+
+	struct bytestream s[1];
+	bytestream_init(s);
+	if (pd == 3) dump_sixels_to_bytestream_rgb3(s, x, w, h);
+	if (pd == 1) dump_sixels_to_bytestream_gray2(s, x, w, h);
+	struct bytestream *S = s;
+	bool screen = strstr(getenv("TERM"), "screen");
+	struct bytestream z[1];
+	if (screen) bytestream_init(z);
+	if (screen) penetrate_screen(S = z, s);
+	for (int i = 0; i < S->n; i++)
+		putchar(S->t[i]);
+	bytestream_free(s);
+	if (screen) bytestream_free(z);
 }
 
 static void dump_sixels_to_stdout(struct iio_image *x)
@@ -4210,10 +4400,12 @@ static void dump_sixels_to_stdout(struct iio_image *x)
 		x->data = xmalloc(nsamp*ss);
 		memcpy(x->data, old_data, nsamp*ss);
 		iio_convert_samples(x, IIO_TYPE_UINT8);
-		if (x->pixel_dimension==3)
-		dump_sixels_to_stdout_rgb3(x->data, x->sizes[0], x->sizes[1]);
-		else if (x->pixel_dimension==1)
-		dump_sixels_to_stdout_gray2(x->data, x->sizes[0], x->sizes[1]);
+		dump_sixels_to_stdout_uint8(x->data, x->sizes[0], x->sizes[1],
+				x->pixel_dimension);
+		//if (x->pixel_dimension==3)
+		//dump_sixels_to_stdout_rgb3(x->data, x->sizes[0], x->sizes[1]);
+		//else if (x->pixel_dimension==1)
+		//dump_sixels_to_stdout_gray2(x->data,x->sizes[0],x->sizes[1]);
 		xfree(x->data);
 		x->data = old_data;
 	}
