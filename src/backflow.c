@@ -125,6 +125,7 @@ static void env_interpolate_at(float *out,
 static void invflow(float *ou, float *flo, float *pin, int w, int h, int pd)
 {
 	float (*out)[w][pd] = (void*)ou;
+	float (*in)[win][pd] = (void*)pin;
 	float (*flow)[w][2] = (void*)flo;
 	float *flowdiv = NULL;
 	float *flowdet = NULL;
@@ -143,7 +144,7 @@ static void invflow(float *ou, float *flo, float *pin, int w, int h, int pd)
 		float p[2] = {i + flow[j][i][0], j + flow[j][i][1]};
 		float result[pd];
 
-		env_interpolate_at(result, pin, w, h, pd, p[0], p[1]);
+		env_interpolate_at(result, pin, win, hin, pd, p[0], p[1]);
 
 		float factor = 1;
 		if (flowdiv)
@@ -186,11 +187,9 @@ int main_backflow(int c, char *v[])
 	int iw, ih;
 	float *in = iio_read_image_float_vec(inname, &iw, &ih, &pd);
 	//fprintf(stderr, "w h pd P = %d %d %d %d\n", iw, ih, pd, iw*ih*pd);
-	if (iw != w || ih != h)
-		fail("flow and image size mismatch\n");
 	float *out = xmalloc(w*h*pd*sizeof*out);
 	//fprintf(stderr, "p = %p\n", (void*)out);
-	invflow(out, flow, in, w, h, pd);
+	invflow(out, flow, in, w, h, pd, iw, ih);
 	iio_write_image_float_vec(outname, out, w, h, pd);
 	return EXIT_SUCCESS;
 }
