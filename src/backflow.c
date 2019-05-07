@@ -122,7 +122,7 @@ static void env_interpolate_at(float *out,
 		bicubic_interpolation_boundary(out, x, w,h,pd, p,q, BFBOUND());
 }
 
-static void invflow(float *ou, float *flo, float *pin, int w, int h, int pd)
+static void invflow(float *ou, float *flo, float *pin, int w, int h, int pd, int win, int hin)
 {
 	float (*out)[w][pd] = (void*)ou;
 	float (*in)[win][pd] = (void*)pin;
