@@ -388,8 +388,8 @@ static float epipolar_error(float *fm, float *pair, void *usr)
 {
 	ransac_error_evaluation_function *f;
 	//f = epipolar_algebraic_error;
-	//f = epipolar_euclidean_error;
-	f = epipolar_euclidean_error_sym;
+	f = epipolar_euclidean_error;
+	//f = epipolar_euclidean_error_sym;
 	return f(fm, pair, usr);
 }
 
