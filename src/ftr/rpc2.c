@@ -167,18 +167,21 @@ static int get_xml_tagged_list(double *x, char *tag, char *line)
 	char buf[0x1000], buf2[0x1000];
 	nan_array(x, 20);
 	// read 20 float values with sscanf
-	int r = sscanf(line, " <%[^>]>%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf"
-			"%lf %lf %lf %lf %lf %lf %lf %lf %lf</%[^>]>", buf, x, x+1, x+2,
-			x+3, x+4, x+5, x+6, x+7, x+8, x+9, x+10, x+11, x+12, x+13, x+14,
-			x+15, x+16, x+17, x+18, x+19, buf2);
-	strncpy(tag, buf, 0x1000);
+	int r = sscanf(line, " <%[^>]>"
+			"%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf "
+			"%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf"
+			"</%[^>]>", buf,
+			x,   x+1, x+2, x+3, x+4, x+5, x+6, x+7, x+8, x+9,
+			x+10,x+11,x+12,x+13,x+14,x+15,x+16,x+17,x+18,x+19,
+			buf2);
+	snprintf(tag, 0x100, "%s", buf);
 	return r;
 }
 
 void read_rpc_file_ikonos(struct rpc *p, char *filename)
 {
 	FILE *f = xfopen(filename, "r");
-	int n = 0x100;
+	int n = 0x1000;
 	while (1) {
 		char line[n], tag[n], *sl = fgets(line, n, f);;
 		if (!sl) break;
@@ -232,7 +235,7 @@ void read_rpc_file_xml_worldview(struct rpc *p, char *filename)
 			add_tag_to_rpc(p, tag, x);
 			continue;
 		}
-		if (0 == strhas(tag, "COEF")) {
+		if (0 == strhas(line, "COEF>")) {
 			double y[20];
 			int r = get_xml_tagged_list(y, tag, line);
 			if (r == 22)
@@ -254,27 +257,28 @@ void read_rpc_file_xml(struct rpc *p, char *filename)
 {
 	nan_rpc(p);
 	FILE *f = xfopen(filename, "r");
-	int n = 0x100, found = 0;
+	int n = 0x1000, found = 0;
 	while (!found) {
 		char line[n], *sl = fgets(line, n, f);;
 		if (!sl) break;
-        if (0 == strhas(line, "LINE_OFF:")) {
-            found = 1; char tag[n];
-		    double x = get_tagged_number(tag, line);
+		if (0 == strhas(line, "LINE_OFF:")) {
+			found = 1; char tag[n];
+			double x = get_tagged_number(tag, line);
 			if (isfinite(x)) add_tag_to_rpc(p, tag, x);
-            read_rpc_file_ikonos(p, filename);
-        }
-		if (0 == strhas(line, "<SATID>") && 0 == strhas(line, "WV0")) {
+			read_rpc_file_ikonos(p, filename);
+		}
+		if (0 == strhas(line, "<SATID>")
+				&& 0 == strhas(line, "WV0")) {
 			found = 1;
 			read_rpc_file_xml_worldview(p, filename);
 		}
-		if (0 == strhas(line, "<METADATA_PROFILE>") && 0 == strhas(line,
-					"PHR_SENSOR")) {
+		if (0 == strhas(line, "<METADATA_PROFILE>")
+				&& 0 == strhas(line, "PHR_SENSOR")) {
 			found = 1;
 			read_rpc_file_xml_pleiades(p, filename);
 		}
-		if (0 == strhas(line, "<METADATA_PROFILE>") && 0 == strhas(line,
-					"S6_SENSOR")) {
+		if (0 == strhas(line, "<METADATA_PROFILE>")
+				&& 0 == strhas(line, "S6_SENSOR")) {
 			found = 1;
 			read_rpc_file_xml_pleiades(p, filename);
 		}
@@ -358,20 +362,6 @@ double eval_pol20_dz(double c[20], double x, double y, double z)
 	return r;
 }
 
-// evaluate the normalized inverse rpc model
-static void eval_nrpci(double *result,
-		struct rpc *p, double x, double y, double z)
-{
-	double numx = eval_pol20(p->inumx, x, y, z);
-	double denx = eval_pol20(p->idenx, x, y, z);
-	double numy = eval_pol20(p->inumy, x, y, z);
-	double deny = eval_pol20(p->ideny, x, y, z);
-	result[0] = numx/denx;
-	result[1] = numy/deny;
-	//fprintf(stderr, "\t\tnrpci{%p}(%g %g %g)=>",p,x,y,z);
-	//fprintf(stderr, "(%g %g)\n", result[0], result[1]);
-}
-
 static double l2_squared_dist(double a[2], double b[2])
 {
 	double d[2];
@@ -397,6 +387,9 @@ static void decompose_vector_basis(double a[2], double x[2], double u[2],
 	a[0] /= det;
 	a[1] /= det;
 }
+
+static void eval_nrpc(double *, struct rpc *, double, double, double);
+static void eval_nrpci(double *, struct rpc *, double, double, double);
 
 // evaluate the normalized direct rpc model, iteratively from the inverse rpc
 // model
@@ -430,6 +423,37 @@ static void eval_nrpc_iterative(double *result,
 	result[1] = lat;
 }
 
+static void eval_nrpci_iterative(double *result,
+		struct rpc *p, double x, double y, double z)
+{
+	assert(isfinite(p->numx[0]));
+	double a[2];
+	double x0[2];
+	double x1[2];
+	double x2[2];
+	double xf[2] = {x, y};
+	double lon = -1, lat = -1, eps = 2;
+	eval_nrpc(x0, p, lon, lat, z);
+	eval_nrpc(x1, p, lon + eps, lat, z);
+	eval_nrpc(x2, p, lon, lat + eps, z);
+	//fprintf(stderr, "x0: (%g, %g), x1: (%g, %g), x2: (%g, %g)\n", x0[0], x0[1],
+	//        x1[0], x1[1], x2[0], x2[1]);
+	while (l2_squared_dist(x0, xf) > 1e-18) {
+		double u [2] = {xf[0] - x0[0], xf[1] - x0[1]};
+		double e1[2] = {x1[0] - x0[0], x1[1] - x0[1]};
+		double e2[2] = {x2[0] - x0[0], x2[1] - x0[1]};
+		decompose_vector_basis(a, u, e1, e2);
+		lon += a[0] * eps;
+		lat += a[1] * eps;
+		eps = 0.1;
+		eval_nrpc(x0, p, lon, lat, z);
+		eval_nrpc(x1, p, lon + eps, lat, z);
+		eval_nrpc(x2, p, lon, lat + eps, z);
+	}
+	result[0] = lon;
+	result[1] = lat;
+}
+
 // evaluate the normalized direct rpc model
 static void eval_nrpc(double *result,
 		struct rpc *p, double x, double y, double z)
@@ -444,6 +468,23 @@ static void eval_nrpc(double *result,
 		//fprintf(stderr, "\t\tnrpc{%p}(%g %g %g)=>(%g %g)\n", p, x, y, z, result[0], result[1]);
 	} else eval_nrpc_iterative(result, p, x, y, z);
 }
+
+// evaluate the normalized inverse rpc model
+static void eval_nrpci(double *result,
+		struct rpc *p, double x, double y, double z)
+{
+	if (isfinite(p->inumx[0])) {
+		double numx = eval_pol20(p->inumx, x, y, z);
+		double denx = eval_pol20(p->idenx, x, y, z);
+		double numy = eval_pol20(p->inumy, x, y, z);
+		double deny = eval_pol20(p->ideny, x, y, z);
+		result[0] = numx/denx;
+		result[1] = numy/deny;
+		//fprintf(stderr, "\t\tnrpci{%p}(%g %g %g)=>",p,x,y,z);
+		//fprintf(stderr, "(%g %g)\n", result[0], result[1]);
+	} else eval_nrpci_iterative(result, p, x, y, z);
+}
+
 
 // evaluate the direct rpc model
 void eval_rpc(double *result,
