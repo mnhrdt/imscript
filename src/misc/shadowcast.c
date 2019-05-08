@@ -197,9 +197,12 @@ int main(int c, char *v[])
 #include <stdio.h>
 #include <stdlib.h>
 #include "iio.h"      // library for image input/output
+#include "pickopt.c"  // function "pick_option" for processing args
 int main(int c, char *v[])
 {
 	// process input arguments
+	_Bool m = pick_option(&c, &v, "m", NULL);
+	_Bool M = pick_option(&c, &v, "M", NULL);
 	if (c < 4 || c > 6) {
 		fprintf(stderr, "usage:\n\t%s p q r [dem_in [dem_out]]\n", *v);
 		//                          0 1 2 3  4       5
@@ -222,29 +225,14 @@ int main(int c, char *v[])
 			x[i] /= pd;
 	}
 
-
+	// cast the shadows
 	cast_shadows(x, w, h, param_p, param_q, param_r);
 
-
-	//int *o = xmalloc( (w*h + 2*(w+h)) * sizeof*o);
-	//compute_the_bresenham_parkour(o, w, h, param_p, param_q);
-	//for (int i = 0; i < w*h; i++)
-	//	x[i] = -1;
-	//int cx = 0;
-	//for (int i = 0; i < w*h+2*(w+h); i++)
-	//	if (o[i] >= 0)
-	//	{
-	//		assert(o[i] < w*h);
-	//		x[o[i]] = cx++;
-	//	}
-	//free(o);
-
-	//// cast the vertical shadows
-	//cast_vertical_shadows(x, w, h, alpha);
-
-	//// if mask is requested, create a binary mask
-	//if (m) for (int i = 0; i < w*h; i++)
-	//	x[i] = 255*isnan(x[i]);
+	// if mask is requested, create a binary mask
+	if (m) for (int i = 0; i < w*h; i++)
+		x[i] = 255*isnan(x[i]);
+	else if (M) for (int i = 0; i < w*h; i++)
+		x[i] = 255*!isnan(x[i]);
 
 	// save the output image
 	iio_write_image_float_split(filename_out, x, w, h, 1);
