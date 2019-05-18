@@ -238,8 +238,8 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 
 	f->w = w;
 	f->h = h;
-	f->max_w = 2000;
-	f->max_h = 2000;
+	f->max_w = 4000;
+	f->max_h = 3000;
 	f->rgb = malloc(f->max_w * f->max_h * 3);
 	for (int i = 0; i < 3*w*h; i++)
 		f->rgb[i] = x? x[i] : 0;
