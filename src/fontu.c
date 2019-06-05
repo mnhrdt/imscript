@@ -776,8 +776,8 @@ static int main_dumptry(int c, char **v)
 static int main_puts(int c, char **v)
 {
 	int kerning = atoi(pick_option(&c, &v, "k", "0"));
-	char *fgcolorname = pick_option(&c, &v, "c", "000");
-	char *bgcolorname = pick_option(&c, &v, "b", "000");
+	char *fgcolorname = pick_option(&c, &v, "c", "fff");
+	char *bgcolorname = pick_option(&c, &v, "b", "t");
 	if (c != 5 && c != 6 && c != 7) {
 		fprintf(stderr, "usage:\n\t"
 			"%s font.bdf px py \"string\" [in [out]]\n", *v);
@@ -805,7 +805,9 @@ static int main_puts(int c, char **v)
 	if (pd == (int)strlen(bgcolorname))
 		for (int i = 0; i < pd; i++)
 			bg[i] = (unsigned char)((255*(bgcolorname[i]-'0'))/8);
-	put_string_in_float_image(x, w,h,pd, px,py, fg, bg,  kerning, &f, text);
+	put_string_in_float_image(x, w,h,pd, px,py,
+			fg, *bgcolorname=='t'?0:bg,
+			kerning, &f, text);
 
 	iio_write_image_float_vec(filename_out, x, w, h, pd);
 
