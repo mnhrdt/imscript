@@ -286,6 +286,9 @@ void poisson_solver_separable(float *out, float *in, float *dat,
 		int w, int h, int pd,
 		float tstep, int niter, int scale, float cgrad)
 {
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
 	for (int l = 0; l < pd; l++)
 	{
 		float *outl = out + w*h*l;

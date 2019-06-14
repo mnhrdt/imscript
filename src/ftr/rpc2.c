@@ -175,7 +175,7 @@ static int get_xml_tagged_list(double *x, char *tag, char *line)
 			x,   x+1, x+2, x+3, x+4, x+5, x+6, x+7, x+8, x+9,
 			x+10,x+11,x+12,x+13,x+14,x+15,x+16,x+17,x+18,x+19,
 			buf2);
-	snprintf(tag, 0x100, "%s", buf);
+	snprintf(tag, 0x1000, "%s", buf);
 	return r;
 }
 
@@ -227,7 +227,7 @@ void read_rpc_file_xml_pleiades(struct rpc *p, char *filename)
 void read_rpc_file_xml_worldview(struct rpc *p, char *filename)
 {
 	FILE *f = xfopen(filename, "r");
-	int n = 0x400;
+	int n = 0x4000;
 	while (1) {
 		char line[n], tag[n], *sl = fgets(line, n, f);
 		if (!sl) break;
