@@ -117,6 +117,25 @@ void morsi_median(float *y, float *x, int w, int h, int *e)
 	}
 }
 
+void morsi_rank(float *y, float *x, int w, int h, int *e)
+{
+	getpixel_operator p = getpixel_nan;
+
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		int cx = 0;
+		float u = p(x,w,h, i, j);
+		for (int k = 0; k < e[0]; k++)
+		{
+			float v = p(x,w,h, i-e[2]+e[2*k+4], j-e[3]+e[2*k+5]);
+			if (isfinite(v))
+				cx += v < u;
+		}
+		y[j*w+i] = cx;
+	}
+}
+
 void morsi_opening(float *y, float *x, int w, int h, int *e)
 {
 	float *t = xmalloc(w*h*sizeof*t);
@@ -453,6 +472,7 @@ int main_morsi(int c, char **v)
 	if (0 == strcmp(v[2], "erosion"    )) operation = morsi_erosion;
 	if (0 == strcmp(v[2], "dilation"   )) operation = morsi_dilation;
 	if (0 == strcmp(v[2], "median"     )) operation = morsi_median;
+	if (0 == strcmp(v[2], "rank"       )) operation = morsi_rank;
 	if (0 == strcmp(v[2], "opening"    )) operation = morsi_opening;
 	if (0 == strcmp(v[2], "closing"    )) operation = morsi_closing;
 	if (0 == strcmp(v[2], "gradient"   )) operation = morsi_gradient;
