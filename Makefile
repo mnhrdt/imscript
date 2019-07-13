@@ -1,7 +1,9 @@
+CFLAGS ?= -O3 -march=native
 #CFLAGS ?= -march=native -O3 -DNDEBUG -Wall -Wno-unused
 #CFLAGS ?= -march=native -O3 -Wall -Wextra -Wno-unused  -fsanitize=addre
-#CFLAGS ?= -g -Wall -Wextra -Wno-unused #-fsanitize=address
-CFLAGS ?= -march=native -O3 -DNDEBUG -Wall -Wno-unused
+#CFLAGS ?= -O3 -march=native -Wall -Wextra -Wno-unused -Wno-unused-parameter $F #-fsanitize=address
+#CFLAGS ?= -march=native -O3 -DNDEBUG -Wall -Wno-unused
+#CFLAGS ?= -march=native -O3 -Wall -Wextra -Wno-unused
 LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm #-lgdal
 
 OBJ = src/iio.o src/fancy_image.o
@@ -11,7 +13,7 @@ BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
       srmatch tiffu siftu crop lrcat tbcat fftshift bmms registration imflip \
       fft dct dht flambda fancy_crop fancy_downsa autotrim iion mediator     \
       redim colormatch eucdist nonmaxsup gntiply idump warp heatd imhalve    \
-      ppsmooth mdither mdither2 rpctk
+      ppsmooth mdither mdither2 rpctk getbands
 
 BIN := $(addprefix bin/,$(BIN))
 
@@ -58,6 +60,7 @@ BIN_MSC = $(shell cat src/misc/TARGETS)
 BIN_FTR := $(addprefix bin/,$(BIN_FTR))
 BIN_MSC := $(addprefix bin/,$(BIN_MSC))
 
+LDLIBS_FTR = $(LDLIBS) -lGL -lglut
 LDLIBS_FTR = $(LDLIBS) -lX11
 LDLIBS_MSC = $(LDLIBS) -lgsl -lgslcblas
 
