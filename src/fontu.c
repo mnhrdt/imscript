@@ -10,6 +10,7 @@
 #include "xfopen.c"
 #include "fail.c"
 
+
 // TODO: fix data leaks when callinc "alloc_and_transform" functions
 
 enum font_data_format {
@@ -48,6 +49,8 @@ struct bitmap_font {
 	char *name; // optional field
 	unsigned char *data;
 };
+
+#include "fonts/xfonts_all.c"
 
 //#define SETBIT(x,i) ((x)|=(1<<(i)))
 //#define GETBIT(x,i) (bool)((x)&(1<<(i)))
@@ -780,7 +783,7 @@ static int main_puts(int c, char **v)
 	char *bgcolorname = pick_option(&c, &v, "b", "t");
 	if (c != 5 && c != 6 && c != 7) {
 		fprintf(stderr, "usage:\n\t"
-			"%s font.bdf px py \"string\" [in [out]]\n", *v);
+			"%s font px py \"string\" [in [out]]\n", *v);
 		//        0  1       2  3    4         5   6
 		return 1;
 	}
@@ -791,8 +794,13 @@ static int main_puts(int c, char **v)
 	char *filename_in = c > 5 ? v[5] : "-";
 	char *filename_out = c > 6 ? v[6] : "-";
 
-	struct bitmap_font f;
-	font_fill_from_bdf(&f, bdf);
+	struct bitmap_font f[1];
+	struct bitmap_font **F = xfonts_all;
+	do if (0 == strcmp(6+(*F)->name, bdf)) break; while(*++F);
+	if (*F)
+		f[0] = reformat_font(**F, UNPACKED);
+	else
+		font_fill_from_bdf(f, bdf);
 
 	int w, h, pd;
 	float *x = iio_read_image_float_vec(filename_in, &w, &h, &pd);
@@ -807,12 +815,19 @@ static int main_puts(int c, char **v)
 			bg[i] = (unsigned char)((255*(bgcolorname[i]-'0'))/8);
 	put_string_in_float_image(x, w,h,pd, px,py,
 			fg, *bgcolorname=='t'?0:bg,
-			kerning, &f, text);
+			kerning, f, text);
 
 	iio_write_image_float_vec(filename_out, x, w, h, pd);
 
-	free(f.data);
+	free(f->data);
 	free(x);
+	return 0;
+}
+
+int main_list(int c, char *v[])
+{
+	struct bitmap_font **f = xfonts_all;
+	do puts(6 + (*f)->name); while (*++f);
 	return 0;
 }
 
@@ -823,8 +838,9 @@ int main_fontu(int c, char **v)
 	else if (0 == strcmp(v[1], "cdumpf")) return main_cdumpf(c-1, v+1);
 	else if (0 == strcmp(v[1], "dumptry")) return main_dumptry(c-1, v+1);
 	else if (0 == strcmp(v[1], "puts")) return main_puts(c-1, v+1);
+	else if (0 == strcmp(v[1], "list")) return main_list(c-1, v+1);
 	else {
-	usage: fprintf(stderr, "usage:\n\t%s {cdump|puts} params\n", *v);
+	usage: fprintf(stderr, "usage:\n\t%s {cdump|puts|list} params\n", *v);
 	       return 1;
 	}
 }
