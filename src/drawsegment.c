@@ -81,7 +81,7 @@ void traverse_segment_aa2(float px, float py, float qx, float qy,
 	else {
 		if (fabs(qx - px) > qy - py) { // horitzontal
 			float slope = (qy - py); slope /= (qx - px);
-			assert(px < qx);
+			//assert(px < qx);
 			assert(fabs(slope) <= 1);
 			for (int i = 0; i <= qx-px; i++) {
 				float exact = py + i*slope;

@@ -50,7 +50,6 @@ struct bitmap_font {
 	unsigned char *data;
 };
 
-#include "fonts/xfonts_all.c"
 
 //#define SETBIT(x,i) ((x)|=(1<<(i)))
 //#define GETBIT(x,i) (bool)((x)&(1<<(i)))
@@ -689,6 +688,7 @@ static void put_string_in_rgb_image(uint8_t *x, int w, int h,
 #endif//OMIT_MAIN_FONTU
 
 #ifdef MAIN_FONTU
+#include "fonts/xfonts_all.c"
 
 // fontu cdump name {packed|unpacked|zrle|huffman|lzw|mhuffman} [in.bdf [out.c]]
 // fontu puts [-f bdf] [-c color] "string" [in.png [out.png]]

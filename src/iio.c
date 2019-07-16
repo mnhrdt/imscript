@@ -4431,7 +4431,7 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 		//	       	x->sizes[1],
 		//		x->pixel_dimension
 		//		);
-		if (x->sizes[0] < 800 && x->sizes[1] < 800 &&
+		if (x->sizes[0] <= 855 && x->sizes[1] <= 800 &&
 			(x->pixel_dimension==3 || x->pixel_dimension==1))
 			dump_sixels_to_stdout(x);
 		else
