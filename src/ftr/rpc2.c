@@ -406,8 +406,8 @@ static void eval_nrpc_iterative(double *result,
 	eval_nrpci(x0, p, lon, lat, z);
 	eval_nrpci(x1, p, lon + eps, lat, z);
 	eval_nrpci(x2, p, lon, lat + eps, z);
-	//fprintf(stderr, "x0: (%g, %g), x1: (%g, %g), x2: (%g, %g)\n", x0[0], x0[1],
-	//        x1[0], x1[1], x2[0], x2[1]);
+	fprintf(stderr, "\t\tnrpc_iter x0: (%g, %g), x1: (%g, %g), x2: (%g, %g)\n", x0[0], x0[1],
+	        x1[0], x1[1], x2[0], x2[1]);
 	while (l2_squared_dist(x0, xf) > 1e-18) {
 		double u [2] = {xf[0] - x0[0], xf[1] - x0[1]};
 		double e1[2] = {x1[0] - x0[0], x1[1] - x0[1]};
@@ -437,8 +437,8 @@ static void eval_nrpci_iterative(double *result,
 	eval_nrpc(x0, p, lon, lat, z);
 	eval_nrpc(x1, p, lon + eps, lat, z);
 	eval_nrpc(x2, p, lon, lat + eps, z);
-	//fprintf(stderr, "x0: (%g, %g), x1: (%g, %g), x2: (%g, %g)\n", x0[0], x0[1],
-	//        x1[0], x1[1], x2[0], x2[1]);
+	fprintf(stderr, "\t\tnrpci_iter x0: (%g, %g), x1: (%g, %g), x2: (%g, %g)\n", x0[0], x0[1],
+	        x1[0], x1[1], x2[0], x2[1]);
 	while (l2_squared_dist(x0, xf) > 1e-18) {
 		double u [2] = {xf[0] - x0[0], xf[1] - x0[1]};
 		double e1[2] = {x1[0] - x0[0], x1[1] - x0[1]};
@@ -486,6 +486,9 @@ static void eval_nrpci(double *result,
 	} else eval_nrpci_iterative(result, p, x, y, z);
 }
 
+#include "smapa.h"
+SMART_PARAMETER(EVAL_RPC_DEBUG,0)
+
 
 // evaluate the direct rpc model
 void eval_rpc(double *result,
@@ -498,6 +501,9 @@ void eval_rpc(double *result,
 	eval_nrpc(tmp, p, nx, ny, nz);
 	result[0] = tmp[0] * p->iscale[0] + p->ioffset[0];
 	result[1] = tmp[1] * p->iscale[1] + p->ioffset[1];
+	if (EVAL_RPC_DEBUG() > 0)
+		fprintf(stderr, "\tL( %g , %g , %g ) = %g %g\n",
+				x, y, z, result[0], result[1]);
 }
 
 // evaluate the inverse rpc model
@@ -511,6 +517,9 @@ void eval_rpci(double *result,
 	eval_nrpci(tmp, p, nx, ny, nz);
 	result[0] = tmp[0] * p->scale[0] + p->offset[0];
 	result[1] = tmp[1] * p->scale[1] + p->offset[1];
+	if (EVAL_RPC_DEBUG() > 0)
+		fprintf(stderr, "\tP( %g %g %g ) = %g %g\n",
+				x, y, z, result[0], result[1]);
 }
 
 // evaluate a correspondence between two images given their rpc
