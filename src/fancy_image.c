@@ -102,6 +102,9 @@ struct FI {
 // (if this line fails, increase the padding at the struct fancy_image on fi.h)
 typedef char check_FI_size[sizeof(struct FI)<=sizeof(struct fancy_image)?1:-1];
 
+#include "smapa.h"
+SMART_PARAMETER_SILENT(FANCY_IMAGE_MINSIDE,2000)
+
 
 // check whether a filename corresponds to a small image or a tiled tiff
 static bool filename_corresponds_to_tiffo(char *filename)
@@ -120,7 +123,9 @@ static bool filename_corresponds_to_tiffo(char *filename)
 			return false;
 		return ti->tiled;
 	}
-	return ti->tiled;
+	return ti->tiled &&
+		(ti->w > FANCY_IMAGE_MINSIDE()
+			|| ti->h > FANCY_IMAGE_MINSIDE());
 #else
 	return false;
 #endif
