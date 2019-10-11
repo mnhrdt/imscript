@@ -403,6 +403,11 @@ static int obtain_octave(struct pan_state *e)
 	}
 }
 
+//static void debug_view_info(struct pan_state *e)
+//{
+//	struct pan_view *v = obtain_view(e);
+//
+//}
 
 // affine approximation of the projection function {{{1
 static void window_to_image_exh(double*,struct pan_state*,double,double,double);
@@ -1124,6 +1129,7 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 	if (e->image_space)      win_to_img = window_to_image_apm;
 	else if (e->force_exact) win_to_img = window_to_image_ex;
 
+	//int o = 0;
 	int o = obtain_octave(e);
 	int interp = e->interpolation_order;
 
@@ -1463,6 +1469,7 @@ static void action_select_view(struct FTR *f, int i, int x, int y)
 			reposition_in_image_space(f, e->current_view, i, x, y);
 		e->current_view = i;
 		f->changed = 1;
+		//debug_view_info(e);
 	}
 }
 
@@ -1470,7 +1477,7 @@ static void action_select_interpolator(struct FTR *f, int k)
 {
 	struct pan_state *e = f->userdata;
 	if (k >= 0 || k < 3 || k == 4)
-	       	e->interpolation_order = k;
+		e->interpolation_order = k;
 	request_repaints(f);
 }
 
