@@ -123,6 +123,7 @@
 #define IIO_FORMAT_VRT 28
 #define IIO_FORMAT_FFD 29
 #define IIO_FORMAT_DLM 30
+#define IIO_FORMAT_NPY 31
 #define IIO_FORMAT_UNRECOGNIZED (-1)
 
 //
@@ -593,7 +594,7 @@ static const char *iio_strfmt(int format)
 	M(VTK); M(CIMG); M(PAU); M(DICOM); M(PFM); M(NIFTI);
 	M(PCX); M(GIF); M(XPM); M(RAFA); M(FLO); M(LUM); M(JUV);
 	M(PCM); M(ASC); M(RAW); M(RWA); M(PDS); M(CSV); M(VRT);
-	M(FFD); M(DLM);
+	M(FFD); M(DLM); M(NPY);
 	M(UNRECOGNIZED);
 	default: fail("caca de la grossa (%d)", format);
 	}
@@ -1491,6 +1492,9 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 	if(r) IIO_DEBUG("tiff get field fmt %d (r=%d)\n", fmt, r);
 
 	// TODO: consider the missing cases (run through PerlMagick's format database)
+	uint32_t rps = 0;
+	r = TIFFGetField(tif, TIFFTAG_ROWSPERSTRIP, &rps);
+	IIO_DEBUG("rps %d (r=%d)\n", rps, r);
 
 	IIO_DEBUG("fmt  = %d\n", fmt);
 
@@ -1552,10 +1556,10 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 	if ((int)scanline_size != sls)
 		fprintf(stderr, "scanline_size,sls = %d,%d\n", (int)scanline_size,sls);
 	//assert((int)scanline_size == sls);
-	if (!broken)
-		assert((int)scanline_size == sls);
-	else
-		assert((int)scanline_size == spp*sls);
+	//if (!broken)
+	//	assert((int)scanline_size == sls);
+	//else
+	//	assert((int)scanline_size == spp*sls);
 	assert((int)scanline_size >= sls);
 	uint8_t *data = xmalloc(w * h * spp * rbps);
 	uint8_t *buf = xmalloc(scanline_size);
@@ -2177,7 +2181,7 @@ static int read_beheaded_bmp(struct iio_image *x,
 	char *bmp = load_rest_of_file(&len, f, header, nheader);
 	(void)bmp; (void)x;
 
-	fail("BMP reader not yet finished");
+	fail("BMP reader not yet written");
 
 	xfree(bmp);
 
@@ -2609,6 +2613,66 @@ static int read_beheaded_ffd(struct iio_image *x,
 	uint32_t r = fread(x->data, 2, w*h*4, fin);
 	if (r != w*h*4) return 1;
 	switch_2endianness(x->data, r);
+	return 0;
+}
+
+// NUMPY reader                                                             {{{2
+static int read_beheaded_npy(struct iio_image *x,
+		FILE *fin, char *header, int nheader)
+{
+	(void)header;
+	assert(nheader == 4);
+	int s[6]; // remaining part of the fixed-size header
+	for (int i = 0; i < 6; i++)
+		s[i] = pick_char_for_sure(fin);
+	if (s[2] != 1 || s[3] != 0) return 1; // only NPY 1.0 is supported
+	int npy_header_size = s[4] + 0x100 * s[5];
+	char npy_header[npy_header_size]; // variable-size header
+	for (int i = 0; i < npy_header_size; i++)
+		npy_header[i] = pick_char_for_sure(fin);
+
+	// extract fields from the npy header
+	char descr[10];
+	char order[10];
+	int w, h, pd, n;
+	n = sscanf(npy_header, "{'descr': '%[^']', 'fortran_order': %[^,],"
+			" 'shape': (%d, %d, %d", descr, order, &w, &h, &pd);
+	if (n < 5) pd = 1;
+	if (n < 4) h = 1;
+	if (n < 3) return 2; // badly formed npy header
+
+	// parse type string
+	char *desc = descr; // pointer to the bare description
+	if (*descr=='<' || *descr=='>' || *descr=='=')
+		desc += 1;
+	if (false) ;
+	else if (0 == strcmp(desc, "f8")) x->type = IIO_TYPE_DOUBLE;
+	else if (0 == strcmp(desc, "f4")) x->type = IIO_TYPE_FLOAT;
+	else if (0 == strcmp(desc, "u1")) x->type = IIO_TYPE_UINT8;
+	else if (0 == strcmp(desc, "u2")) x->type = IIO_TYPE_UINT16;
+	else if (0 == strcmp(desc, "u4")) x->type = IIO_TYPE_UINT32;
+	else if (0 == strcmp(desc, "u8")) x->type = IIO_TYPE_UINT64;
+	else if (0 == strcmp(desc, "i1")) x->type = IIO_TYPE_INT8;
+	else if (0 == strcmp(desc, "i2")) x->type = IIO_TYPE_INT16;
+	else if (0 == strcmp(desc, "i4")) x->type = IIO_TYPE_INT32;
+	else if (0 == strcmp(desc, "i8")) x->type = IIO_TYPE_INT64;
+	else if (0 == strcmp(desc, "c8")) x->type = IIO_TYPE_FLOAT;
+	else if (0 == strcmp(desc, "c16")) x->type = IIO_TYPE_DOUBLE;
+	else return fprintf(stderr,
+			"IIO ERROR: unrecognized npy type \"%s\"\n", desc); 
+	if (*desc == 'c') pd *= 2; // 1 complex = 2 reals
+
+	// fill image struct
+	x->dimension = 2;
+	x->sizes[0] = w;
+	x->sizes[1] = h;
+	x->pixel_dimension = pd;
+	x->contiguous_data = false;
+	int bps = iio_type_size(x->type);
+	x->data = xmalloc(w * h * pd * bps);
+	uint64_t r = fread(x->data, bps, w*h*pd, fin);
+	if (r != (uint64_t)w*h*pd)
+		fprintf(stderr,"IIO WARNING: npy file smaller than expected\n");
 	return 0;
 }
 
@@ -3362,6 +3426,10 @@ static int guess_format(FILE *f, char *buf, int *nbuf, int bufmax)
 	if (b[0]=='f' && b[1]=='a' && b[2]=='r' && b[3]=='b')
 		return IIO_FORMAT_FFD; // farbfeld
 
+	if (b[0]==0x93 &&b[1]=='N' && b[2]=='U' && b[3]=='M')
+		// && b[4]=='P' &&b [5]=='Y')
+		return IIO_FORMAT_NPY; // Numpy
+
 	b[4] = add_to_header_buffer(f, b, nbuf, bufmax);
 	b[5] = add_to_header_buffer(f, b, nbuf, bufmax);
 	b[6] = add_to_header_buffer(f, b, nbuf, bufmax);
@@ -3381,6 +3449,7 @@ static int guess_format(FILE *f, char *buf, int *nbuf, int bufmax)
 			return IIO_FORMAT_JPEG;
 	}
 #endif//I_CAN_HAS_LIBPNG
+
 
 
 	if (!strchr((char*)b, '\n')) // protect against very short ASC headers
@@ -3510,6 +3579,7 @@ int read_beheaded_image(struct iio_image *x, FILE *f, char *h, int hn, int fmt)
 	case IIO_FORMAT_VRT:   return read_beheaded_vrt (x, f, h, hn);
 	case IIO_FORMAT_FFD:   return read_beheaded_ffd (x, f, h, hn);
 	case IIO_FORMAT_DLM:   return read_beheaded_dlm (x, f, h, hn);
+	case IIO_FORMAT_NPY:   return read_beheaded_npy (x, f, h, hn);
 
 #ifdef I_CAN_HAS_LIBPNG
 	case IIO_FORMAT_PNG:   return read_beheaded_png (x, f, h, hn);
