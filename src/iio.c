@@ -4528,18 +4528,8 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 	IIO_DEBUG("going to write into filename \"%s\"\n", filename);
 	int typ = normalize_type(x->type);
 	if (x->dimension != 2) fail("de moment només escrivim 2D");
-	//if (raw_prefix(fname)) {
-	//	r = write_raw_named_image(fname, x);
-	//	return;
-	//}
 	if (!strcmp(filename,"-") && isatty(fileno(stdout)))
 	{
-		//fprintf(stdout, "image %s %dx%d,%d\n",
-		//		iio_strtyp(x->type),
-		//	       	x->sizes[0],
-		//	       	x->sizes[1],
-		//		x->pixel_dimension
-		//		);
 		if (x->sizes[0] <= 855 && x->sizes[1] <= 800 &&
 			(x->pixel_dimension==3 || x->pixel_dimension==1))
 			dump_sixels_to_stdout(x);
@@ -4601,17 +4591,7 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 		iio_write_image_as_asc(filename, x);
 		return;
 	}
-#ifdef I_CAN_HAS_LIBTIFF
-	if (x->pixel_dimension != 1 && x->pixel_dimension != 3 && x->pixel_dimension != 4 && x->pixel_dimension != 2 )
-	{
-		IIO_DEBUG("strange case (pd=%d), forcing tiff format\n",
-				x->pixel_dimension);
-		iio_write_image_as_tiff_smarter(filename, x);
-		return;
-	}
-#endif//I_CAN_HAS_LIBTIFF
-	if (typ != IIO_TYPE_DOUBLE && typ != IIO_TYPE_FLOAT && typ != IIO_TYPE_UINT8 && typ != IIO_TYPE_INT16 && typ != IIO_TYPE_INT8 && typ != IIO_TYPE_UINT32 && typ != IIO_TYPE_UINT16)
-		fail("de moment només fem floats o bytes (got %d)",typ);
+
 	int nsamp = iio_image_number_of_samples(x);
 	if (typ == IIO_TYPE_FLOAT &&
 			these_floats_are_actually_bytes(x->data, nsamp))
@@ -4770,12 +4750,7 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 			fwrite(data, w*h, 1, f);
 		}
 	} else
-#ifdef I_CAN_HAS_LIBTIFF
-		iio_write_image_as_tiff_smarter(filename, x);
-#else
-		fail("\n\n\nThis particular data format can not yet be saved."
-				"\nPlease, ask enric.\n");
-#endif//I_CAN_HAS_LIBTIFF
+		iio_write_image_as_npy(filename, x);
 	xfclose(f);
 }
 
