@@ -3280,6 +3280,45 @@ static void iio_write_image_as_csv(const char *filename, struct iio_image *x)
 	xfclose(f);
 }
 
+// NPY writer                                                               {{{2
+static void iio_write_image_as_npy(const char *filename, struct iio_image *x)
+{
+	char *descr = 0; // string to identify the number type (by numpy)
+	switch (x->type) {
+		case IIO_TYPE_CHAR   :
+		case IIO_TYPE_UINT8  : descr = "<u1"; break;
+		case IIO_TYPE_UINT16 : descr = "<u2"; break;
+		case IIO_TYPE_UINT32 : descr = "<u4"; break;
+		case IIO_TYPE_UINT64 : descr = "<u8"; break;
+		case IIO_TYPE_INT8   : descr = "<i1"; break;
+		case IIO_TYPE_INT16  : descr = "<i2"; break;
+		case IIO_TYPE_INT32  : descr = "<i4"; break;
+		case IIO_TYPE_INT64  : descr = "<i8"; break;
+		case IIO_TYPE_FLOAT  : descr = "<f4"; break;
+		case IIO_TYPE_DOUBLE : descr = "<f8"; break;
+		default: fail("unrecognized internal type %d\n", x->type);
+	}
+	char buf[1000] = {0x93, 'N', 'U', 'M', 'P', 'Y', 1, 0, 0}; // magic
+	int n = 10;               // size of magic before header string
+	n += snprintf(buf+n, 1000-n, "{'descr': '%s', 'fortran_order': "
+			"False, 'shape': (", descr);
+	for (int i = 0; i < x->dimension; i++)
+		n += snprintf(buf+n, 1000-n, "%d, ", x->sizes[i]);
+	n += snprintf(buf+n, 1000-n, "%d)}", x->pixel_dimension);
+	int m = ((n+15+1)/16)*16; // next multiple of 16 (plus 1)
+	buf[8] = (m-10) % 0x100;  // fill-in header size (minus sub-header)
+	buf[9] = (m-10) / 0x100;  //
+	for (int i = n; i < m-1; i++)
+		buf[i] = ' ';     // pad with spaces
+	buf[m-1] = '\n';          // must end in EOL.  Note: not 0-finished!
+
+	FILE *f = xfopen(filename, "w");
+	fwrite(buf, 1, m, f);                               // write the header
+	fwrite(x->data, iio_image_sample_size(x),           // write the data
+			iio_image_number_of_samples(x), f);
+	xfclose(f);
+}
+
 // RIM writer                                                               {{{2
 
 static void rim_putshort(FILE *f, uint16_t n)
@@ -4534,6 +4573,10 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 	if (string_suffix(filename, ".pfm") && typ == IIO_TYPE_FLOAT
 		&& (x->pixel_dimension == 1 || x->pixel_dimension == 3)) {
 		iio_write_image_as_pfm(filename, x);
+		return;
+	}
+	if (string_suffix(filename, ".npy")) {
+		iio_write_image_as_npy(filename, x);
 		return;
 	}
 	if (string_suffix(filename, ".csv") &&
