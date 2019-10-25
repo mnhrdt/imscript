@@ -4698,60 +4698,60 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 #ifdef IIO_SHOW_DEBUG_MESSAGES
 	iio_print_image_info(stderr, x);
 #endif
-	FILE *f = xfopen(filename, "w");
-	if (x->pixel_dimension == 1 && typ == IIO_TYPE_FLOAT) {
-		int m = these_floats_are_actually_bytes(x->data,x->sizes[0]*x->sizes[1]) ? 255 : 65535;
-		fprintf(f, "P2\n%d %d\n%d\n", x->sizes[0], x->sizes[1], m);
-		float *data = x->data;
-		FORI(x->sizes[0]*x->sizes[1])
-			fprintf(f, "%a\n", data[i]);
-	} else if (x->pixel_dimension == 3 && typ == IIO_TYPE_FLOAT) {
-		int m = these_floats_are_actually_bytes(x->data,3*x->sizes[0]*x->sizes[1]) ? 255 : 65535;
-		float *data = x->data;
-		fprintf(f, "P3\n%d %d\n%d\n", x->sizes[0], x->sizes[1], m);
-		FORI(3*x->sizes[0]*x->sizes[1]) {
-			fprintf(f, "%g\n", data[i]);
-		}
-	} else if (x->pixel_dimension == 3 && typ == IIO_TYPE_UINT8) {
-		uint8_t *data = x->data;
-		int w = x->sizes[0];
-		int h = x->sizes[1];
-		if (w*h <= 10000) {
-			fprintf(f, "P3\n%d %d\n255\n", w, h);
-			FORI(3*w*h) {
-				int datum = data[i];
-				fprintf(f, "%d\n", datum);
-			}
-		} else {
-			fprintf(f, "P6\n%d %d\n255\n", w, h);
-			fwrite(data, 3*w*h, 1, f);
-		}
-	} else if (x->pixel_dimension == 4 && typ == IIO_TYPE_UINT8) {
-		fprintf(stderr, "IIO WARNING: assuming 4 chanels mean RGBA\n");
-		uint8_t *data = x->data;
-		fprintf(f, "P3\n%d %d\n255\n", x->sizes[0], x->sizes[1]);
-		FORI(4*x->sizes[0]*x->sizes[1]) {
-			if (i%4 == 3) continue;
-			int datum = data[i];
-			fprintf(f, "%d\n", datum);
-		}
-	} else if (x->pixel_dimension == 1 && typ == IIO_TYPE_UINT8) {
-		uint8_t *data = x->data;
-		int w = x->sizes[0];
-		int h = x->sizes[1];
-		if (w*h <= 10000) {
-			fprintf(f, "P2\n%d %d\n255\n", w, h);
-			FORI(w*h) {
-				int datum = data[i];
-				fprintf(f, "%d\n", datum);
-			}
-		} else {
-			fprintf(f, "P5\n%d %d\n255\n", w, h);
-			fwrite(data, w*h, 1, f);
-		}
-	} else
+	//FILE *f = xfopen(filename, "w");
+	//if (x->pixel_dimension == 1 && typ == IIO_TYPE_FLOAT) {
+	//	int m = these_floats_are_actually_bytes(x->data,x->sizes[0]*x->sizes[1]) ? 255 : 65535;
+	//	fprintf(f, "P2\n%d %d\n%d\n", x->sizes[0], x->sizes[1], m);
+	//	float *data = x->data;
+	//	FORI(x->sizes[0]*x->sizes[1])
+	//		fprintf(f, "%a\n", data[i]);
+	//} else if (x->pixel_dimension == 3 && typ == IIO_TYPE_FLOAT) {
+	//	int m = these_floats_are_actually_bytes(x->data,3*x->sizes[0]*x->sizes[1]) ? 255 : 65535;
+	//	float *data = x->data;
+	//	fprintf(f, "P3\n%d %d\n%d\n", x->sizes[0], x->sizes[1], m);
+	//	FORI(3*x->sizes[0]*x->sizes[1]) {
+	//		fprintf(f, "%g\n", data[i]);
+	//	}
+	//} else if (x->pixel_dimension == 3 && typ == IIO_TYPE_UINT8) {
+	//	uint8_t *data = x->data;
+	//	int w = x->sizes[0];
+	//	int h = x->sizes[1];
+	//	if (w*h <= 10000) {
+	//		fprintf(f, "P3\n%d %d\n255\n", w, h);
+	//		FORI(3*w*h) {
+	//			int datum = data[i];
+	//			fprintf(f, "%d\n", datum);
+	//		}
+	//	} else {
+	//		fprintf(f, "P6\n%d %d\n255\n", w, h);
+	//		fwrite(data, 3*w*h, 1, f);
+	//	}
+	//} else if (x->pixel_dimension == 4 && typ == IIO_TYPE_UINT8) {
+	//	fprintf(stderr, "IIO WARNING: assuming 4 chanels mean RGBA\n");
+	//	uint8_t *data = x->data;
+	//	fprintf(f, "P3\n%d %d\n255\n", x->sizes[0], x->sizes[1]);
+	//	FORI(4*x->sizes[0]*x->sizes[1]) {
+	//		if (i%4 == 3) continue;
+	//		int datum = data[i];
+	//		fprintf(f, "%d\n", datum);
+	//	}
+	//} else if (x->pixel_dimension == 1 && typ == IIO_TYPE_UINT8) {
+	//	uint8_t *data = x->data;
+	//	int w = x->sizes[0];
+	//	int h = x->sizes[1];
+	//	if (w*h <= 10000) {
+	//		fprintf(f, "P2\n%d %d\n255\n", w, h);
+	//		FORI(w*h) {
+	//			int datum = data[i];
+	//			fprintf(f, "%d\n", datum);
+	//		}
+	//	} else {
+	//		fprintf(f, "P5\n%d %d\n255\n", w, h);
+	//		fwrite(data, w*h, 1, f);
+	//	}
+	//} else
 		iio_write_image_as_npy(filename, x);
-	xfclose(f);
+	//xfclose(f);
 }
 
 void iio_write_image_uint8_matrix_rgb(char *filename, uint8_t (**data)[3],
