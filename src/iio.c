@@ -34,6 +34,17 @@
 #define I_CAN_HAS_WHATEVER
 //#define I_CAN_KEEP_TMP_FILES
 
+
+//#define IIO_SHOW_DEBUG_MESSAGES
+#ifdef IIO_SHOW_DEBUG_MESSAGES
+#  define IIO_DEBUG(...) do {\
+	fprintf(stderr,"DEBUG(%s:%d:%s): ",__FILE__,__LINE__,__PRETTY_FUNCTION__);\
+	fprintf(stderr,__VA_ARGS__);} while(0)
+#else//IIO_SHOW_DEBUG_MESSAGES
+#  define IIO_DEBUG(...) do { do_nop(__VA_ARGS__); } while(0) /* nothing */
+#endif//IIO_SHOW_DEBUG_MESSAGES
+
+
 #ifdef IIO_DISABLE_LIBEXR
 #undef I_CAN_HAS_LIBEXR
 #endif
@@ -58,7 +69,6 @@
 #endif
 
 
-#define IIO_MAX_DIMENSION 20
 
 //
 // portability macros to choose OS features
@@ -66,6 +76,10 @@
 //
 #define I_CAN_POSIX
 #define I_CAN_LINUX
+
+
+// internal shit
+#define IIO_MAX_DIMENSION 20
 
 //
 // enum-like, only used internally
@@ -133,15 +147,6 @@
 #define FORJ(n) for(int j=0;j<(int)(n);j++)
 #define FORK(n) for(int k=0;k<(int)(n);k++)
 #define FORL(n) for(int l=0;l<(int)(n);l++)
-
-//#define IIO_SHOW_DEBUG_MESSAGES
-#ifdef IIO_SHOW_DEBUG_MESSAGES
-#  define IIO_DEBUG(...) do {\
-	fprintf(stderr,"DEBUG(%s:%d:%s): ",__FILE__,__LINE__,__PRETTY_FUNCTION__);\
-	fprintf(stderr,__VA_ARGS__);} while(0)
-#else//IIO_SHOW_DEBUG_MESSAGES
-#  define IIO_DEBUG(...) do { do_nop(__VA_ARGS__); } while(0) /* nothing */
-#endif//IIO_SHOW_DEBUG_MESSAGES
 
 //
 // hacks
@@ -1553,9 +1558,28 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 	IIO_DEBUG("uss = %d\n", (int)uscanline_size);
 	int sls = TIFFScanlineSize(tif);
 	IIO_DEBUG("sls(r) = %d\n", (int)sls);
+
 	if ((int)scanline_size != sls)
-		fprintf(stderr, "scanline_size,sls = %d,%d\n", (int)scanline_size,sls);
-	//assert((int)scanline_size == sls);
+	{
+		fprintf(stderr, "IIO TIFF WARN: scanline_size,sls = %d,%d\n",
+				(int)scanline_size,sls);
+		IIO_DEBUG("tiff read RGBA image interfacing:\n");
+		IIO_DEBUG("\tw = %d\n", w);
+		IIO_DEBUG("\th = %d\n", h);
+		x->dimension = 2;
+		x->sizes[0] = w;
+		x->sizes[1] = h;
+		x->pixel_dimension = 4;
+		x->type = IIO_TYPE_UINT8;
+		x->data = xmalloc(w*h*4);
+		r = TIFFReadRGBAImage(tif, w, h, (uint32_t*)x->data, 0);
+		IIO_DEBUG("\tr = %d\n", r);
+		if (!r) fail("TIFFReadRGBAImage(\"%s\") failed\n", filename);
+		x->contiguous_data = false;
+		x->format = x->meta = -42;
+		return 0;
+	}
+	assert((int)scanline_size == sls);
 	//if (!broken)
 	//	assert((int)scanline_size == sls);
 	//else
@@ -1617,38 +1641,40 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 		xfree(tbuf);
 	} else {
 
-	// dump scanline data
-	if (broken && bps < 8) fail("cannot unpack broken scanlines");
-	if (!broken) FORI(h) {
-		r = TIFFReadScanline(tif, buf, i, 0);
-		if (r < 0) fail("error reading tiff row %d/%d", i, (int)h);
+		// dump scanline data
+		if (broken && bps < 8) fail("cannot unpack broken scanlines");
+		if (!broken) FORI(h) {
+			r = TIFFReadScanline(tif, buf, i, 0);
+			if (r < 0) fail("error read tiff row %d/%d", i, (int)h);
 
-		if (bps < 8) {
-			//fprintf(stderr, "unpacking %dth scanline\n", i);
-			unpack_to_bytes_here(data + i*uscanline_size, buf,
-					scanline_size, bps);
-			fmt_iio = IIO_TYPE_UINT8;
-		} else {
-			memcpy(data + i*sls, buf, sls);
-		}
-	}
-	else {
-		FORI(h)
-		{
-			FORJ(spp)
-			{
-				r = TIFFReadScanline(tif, buf, i, j);
-				if (r < 0)
-					fail("tiff bad %d/%d;%d", i, (int)h, j);
-				memcpy(data + i*spp*sls + j*sls, buf, sls);
+			if (bps < 8) {
+				//fprintf(stderr,"unpacking %dth scanline\n",i);
+				unpack_to_bytes_here(data + i*uscanline_size,
+						buf, scanline_size, bps);
+				fmt_iio = IIO_TYPE_UINT8;
+			} else {
+				memcpy(data + i*sls, buf, sls);
 			}
-			repair_broken_pixels_inplace(data + i*spp*sls,
-					w, spp, bps/8);
+		}
+		else {
+			FORI(h)
+			{
+				FORJ(spp)
+				{
+					r = TIFFReadScanline(tif, buf, i, j);
+					if (r < 0)
+						fail("tiff bad %d/%d;%d",
+								i, (int)h, j);
+					memcpy(data + i*spp*sls + j*sls,
+							buf, sls);
+				}
+				repair_broken_pixels_inplace(data + i*spp*sls,
+						w, spp, bps/8);
+			}
 		}
 	}
-    }
-	TIFFClose(tif);
 
+	TIFFClose(tif);
 
 	xfree(buf);
 
@@ -3636,7 +3662,7 @@ int read_beheaded_image(struct iio_image *x, FILE *f, char *h, int hn, int fmt)
 	case IIO_FORMAT_EXR:   return read_beheaded_exr (x, f, h, hn);
 #endif
 
-		/*
+	/*
 	case IIO_FORMAT_JP2:   return read_beheaded_jp2 (x, f, h, hn);
 	case IIO_FORMAT_VTK:   return read_beheaded_vtk (x, f, h, hn);
 	case IIO_FORMAT_CIMG:  return read_beheaded_cimg(x, f, h, hn);
