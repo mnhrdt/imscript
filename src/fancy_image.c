@@ -78,6 +78,7 @@ struct FI {
 	int option_w, option_h, option_tw, option_th, option_spp, option_bps;
 	int option_fmt; // SAMPLEFORMAT_UINT, etc.
 	int option_compressed;
+	bool option_octa;
 
 	// implementation details
 	float *x, *pyr_x[MAX_OCTAVES];
@@ -150,12 +151,19 @@ static void zoom_out_by_factor_two(float *out, int ow, int oh,
 	for (int i = 0; i < ow; i++)
 	for (int l = 0; l < pd; l++)
 	{
-		float a[4];
+		float a[4], A = 0;
 		a[0] = getsample_zero(in, iw, ih, pd, 2*i  , 2*j  , l);
 		a[1] = getsample_zero(in, iw, ih, pd, 2*i+1, 2*j  , l);
 		a[2] = getsample_zero(in, iw, ih, pd, 2*i  , 2*j+1, l);
 		a[3] = getsample_zero(in, iw, ih, pd, 2*i+1, 2*j+1, l);
-		out[pd*(ow*j + i)+l] = (a[0] + a[1] + a[2] + a[3])/4;
+		int n = 0;
+		for (int i = 0; i < 4; i++)
+			if (!isnan(a[i]))
+			{
+				A += a[i];
+				n += 1;
+			}
+		out[pd*(ow*j + i)+l] = n ? A/n : NAN;
 	}
 }
 
@@ -236,6 +244,7 @@ static void interpret_options(struct FI *f, char *options_arg)
 		if (0 == strcmp(tok, "c"   ))  f->option_creat = true;
 		if (0 == strcmp(tok, "creat")) f->option_creat = true;
 		if (0 == strcmp(tok, "k"   ))  f->option_compressed = true;
+		if (0 == strcmp(tok, "o"   ))  f->option_octa = true;
 		if (0 == strcmp(tok, "compressed"))f->option_compressed = true;
 		double x;
 		if (1 == sscanf(tok, "megabytes=%lf",&x)) f->megabytes      = x;
@@ -264,8 +273,6 @@ static void interpret_options(struct FI *f, char *options_arg)
 	// when c, complete the missing options in a consistent way
 	if (f->option_creat)
 		f->option_write = 1;
-	
-
 }
 
 void create_iio_file(char *filename, int w, int h, int spp)
