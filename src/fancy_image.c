@@ -25,6 +25,12 @@
 #undef FANCY_GDAL
 #endif
 
+// act upon external definitions
+#ifdef IIO_DISABLE_IMGLIBS
+#undef FANCY_TIFF
+#undef FANCY_GDAL
+#endif
+
 // Note: there are 3 backends for "fancy_image"
 // 0) the "iio" fallback, internally using (optionally) tiff, png, and jpeg
 // 1) the "TIFF" backend, uses pyramidal tiff using libtiff
