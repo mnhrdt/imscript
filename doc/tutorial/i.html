@@ -8,6 +8,7 @@
 -->
 
 <title>imscript tutorial</title>
+
 <style>
 body {max-width: 91ex; margin-left:1em;}
 .gallery {position:relative;width:auto;height:400px}
@@ -28,34 +29,34 @@ body {max-width: 91ex; margin-left:1em;}
 .oscript {background-color:#ddd;width:91ex;padding:1ex;}
 </style>
 
+
 <h1>imscript tutorial</h1>
 
 
-		<p>
-		Imscript is a collection of simple programs for doing image
-		processing in a Unix environment.
+<p>
+Imscript is a collection of simple programs for doing image
+processing in a Unix environment.
 
 
-		<h2>0. Philosophy</h2>
+<h2>0. Philosophy</h2>
 
-		<p>
-		This is just vanilla unix philosophy with some specificities for
-		images:
+<p>
+This is just vanilla unix philosophy with some specificities for
+images:
+
+<ul>
+	<li>each program does one thing and does it well
+	<li>programs work together
+	<li>offer mechanism, not policy
+	<li>images are arrays of numbers, representable by text files
+</ul>
+
+<p>
+Notice that imscript programs will read any common image format, but
+will only write asc, pnm, png, and tiff.
 
 
-		<ul>
-			<li>each program does one thing and does it well
-			<li>programs work together
-			<li>offer mechanism, not policy
-			<li>images are arrays of numbers, representable by text files
-		</ul>
-
-		<p>
-		Notice that imscript programs will read any common image format, but
-		will only write asc, pnm, png, and tiff.
-
-
-		<h2>1. Overview</h2>
+<h2>1. Overview</h2>
 
 <pre>
 
@@ -1195,9 +1196,6 @@ cat barb.png | dht                 | fftshift | qauto -p 1 - barb_dht_s.png
 <h2>3. Constructions</h2>
 
 <p>end
-
-	</body>
-</html>
 
 <!-- vim: ts=2 sw=2 spell spelllang=en
 -->

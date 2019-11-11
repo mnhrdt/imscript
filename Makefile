@@ -1,9 +1,4 @@
 CFLAGS ?= -O3 -march=native
-#CFLAGS ?= -march=native -O3 -DNDEBUG -Wall -Wno-unused
-#CFLAGS ?= -march=native -O3 -Wall -Wextra -Wno-unused  -fsanitize=addre
-#CFLAGS ?= -O3 -march=native -Wall -Wextra -Wno-unused -Wno-unused-parameter $F #-fsanitize=address
-#CFLAGS ?= -march=native -O3 -DNDEBUG -Wall -Wno-unused
-#CFLAGS ?= -march=native -O3 -Wall -Wextra -Wno-unused
 LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm #-lgdal
 
 OBJ = src/iio.o src/fancy_image.o
@@ -36,18 +31,6 @@ test: bin/plambda bin/imprintf
 	| grep -q 3775241.440161.730120.0037888911.8794
 
 
-# hack (compatibility flags for old compilers)
-#
-# The following conditional statement appends "-std=gnu99" to CFLAGS when the
-# compiler does not define __STDC_VERSION__.  The idea is that many older
-# compilers are able to compile standard C when given that option.
-# This hack seems to work for all versions of gcc, clang and icc.
-ifeq (,$(shell $(CC) $(CFLAGS) -dM -E -< /dev/null | grep __STDC_VERSION_))
-CFLAGS := $(CFLAGS) -std=gnu99
-endif
-
-
-
 # exotic targets, not built by default
 # FTR: interactive tools, require X11 or freeglut
 # MSC: "misc" tools, or those requiring GSL
@@ -78,13 +61,17 @@ bin/% : src/ftr/%.o $(OBJ_FTR)
 bin/% : src/misc/%.o $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS_MSC)
 
+
+
+
 # single, fat, busybox-like executable
 BINOBJ = $(BIN:bin/%=src/%.o) #$(BIN_FTR:bin/%=src/ftr/%.o)
 L = -lfftw3f -lpng -ltiff -ljpeg -llzma -lz -lm -ljbig
 bin/im : src/im.o $(BINOBJ) $(OBJ) src/misc/overflow.o
 	$(CC) $(LDFLAGS) -static -Wl,--allow-multiple-definition -o $@ $^ $L
 
-# some ftr executable, but compiled for the terminal backend
+
+# some ftr executables, but compiled for the terminal backend
 OBJ_FTR_TERM = src/ftr/ftr_term.o $(filter-out src/ftr/ftr.o,$(OBJ_FTR))
 bin/%_term : src/ftr/%.o $(OBJ_FTR_TERM)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
@@ -94,8 +81,22 @@ clean: ; @$(RM) $(BIN_ALL) bin/im src/*.o src/ftr/*.o src/misc/*.o
 .PHONY: default full ftr misc clean
 .PRECIOUS: %.o
 
+
+# hack (compatibility flags for old compilers)
+#
+# The following conditional statement appends "-std=gnu99" to CFLAGS when the
+# compiler does not define __STDC_VERSION__.  The idea is that many older
+# compilers are able to compile standard C when given that option.
+# This hack seems to work for all versions of gcc, clang and icc.
+ifeq (,$(shell $(CC) $(CFLAGS) -dM -E -< /dev/null | grep __STDC_VERSION_))
+CFLAGS := $(CFLAGS) -std=gnu99
+endif
+
+
+
+
 # non-standard file dependences
 # (this is needed because some .c files include other .c files directly)
 DIRS = src src/ftr src/misc
-.deps.mk: ; for i in $(DIRS);do cc -MM $$i/*.c|sed "\:^[^ ]:s:^:$$i/:g";done>$@
+.deps.mk:;for i in $(DIRS);do $(CC) -MM $$i/*.c|sed "\:^[^ ]:s:^:$$i/:g";done>$@
 -include .deps.mk

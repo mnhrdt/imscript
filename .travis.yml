@@ -1,3 +1,5 @@
+# build manifest for travis-ci.com
+
 language: c
 
 matrix:
