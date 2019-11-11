@@ -2,8 +2,8 @@
 
 image: alpine/edge
 
-sources:
-        - https://git.sr.ht/~coco/imscript/
+#sources:
+#        - https://git.sr.ht/~coco/imscript/
 
 tasks:
         - test: make -C imscript test LDLIBS="" CFLAGS="-DIIO_DISABLE_IMGLIBS"
