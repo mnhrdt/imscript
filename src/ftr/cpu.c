@@ -257,9 +257,11 @@ void compute_split_position_and_size(
 	float *t = xmalloc(n * sizeof *t);
 	for (int l = 0; l < d; l++)
 	{
+		int N = 0;
 		for (int i = 0; i < n; i++)
-			t[i] = x[i*d+l];
-		compute_scalar_position_and_size(m + l, s + l, t, n, p);
+			if (isfinite(x[i*d+l]))
+				t[N++] = x[i*d+l];
+		compute_scalar_position_and_size(m + l, s + l, t, N, p);
 	}
 	free(t);
 }
@@ -566,7 +568,7 @@ static void colormap3(unsigned char *rgb, struct pan_state *e, float *frgb)
 	for (int l = 0; l < 3; l++)
 	{
 		if (!isfinite(frgb[l]))
-			rgb[l] = 0;
+			rgb[l] = l==2?127:0; // show NAN as dark blue
 		else {
 			//float g = e->a * c[l] + e->b;
 			float g = e->a * frgb[l] + e->bbb[l];
