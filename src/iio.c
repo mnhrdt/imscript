@@ -1504,11 +1504,13 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 	IIO_DEBUG("fmt  = %d\n", fmt);
 
 	// deal with complex issues
+	bool complicated = false; // complicated = complex and broken
 	if (fmt == SAMPLEFORMAT_COMPLEXINT || fmt == SAMPLEFORMAT_COMPLEXIEEEFP)
 	{
 		IIO_DEBUG("complex TIFF!\n");
 		spp *= 2;
 		bps /= 2;
+		complicated = true; // to be updated later
 	}
 	if (fmt == SAMPLEFORMAT_COMPLEXINT   ) fmt = SAMPLEFORMAT_INT;
 	if (fmt == SAMPLEFORMAT_COMPLEXIEEEFP) fmt = SAMPLEFORMAT_IEEEFP;
@@ -1546,6 +1548,7 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 	r = TIFFGetField(tif, TIFFTAG_PLANARCONFIG, &planarity);
 	if (r != 1) planarity = PLANARCONFIG_CONTIG;
 	bool broken = planarity == PLANARCONFIG_SEPARATE;
+	complicated = complicated && broken; // complicated = complex and broken
 
 
 	// acquire memory block
@@ -1558,9 +1561,12 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 	IIO_DEBUG("uss = %d\n", (int)uscanline_size);
 	int sls = TIFFScanlineSize(tif);
 	IIO_DEBUG("sls(r) = %d\n", (int)sls);
+	IIO_DEBUG("planarity = %s\n", broken?"broken":"normal");
 
 	if ((int)scanline_size != sls)
 	{
+		// use basic RGBA reader for inconsistently reported images
+		// this may happen when each channel has a different format
 		fprintf(stderr, "IIO TIFF WARN: scanline_size,sls = %d,%d\n",
 				(int)scanline_size,sls);
 		IIO_DEBUG("tiff read RGBA image interfacing:\n");
@@ -1585,7 +1591,7 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 	//else
 	//	assert((int)scanline_size == spp*sls);
 	assert((int)scanline_size >= sls);
-	uint8_t *data = xmalloc(w * h * spp * rbps);
+	uint8_t *data = xmalloc(w * h * spp * rbps * (complicated?2:1));
 	uint8_t *buf = xmalloc(scanline_size);
 
 	// use a particular reader for tiled tiff
@@ -1619,7 +1625,7 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 			int L = l, Spp = spp;
 			if (broken) {
 				TIFFReadTile(tif, tbuf, tx, ty, 0, l);
-				L = 0; 
+				L = 0;
 				Spp = 1;
 			}
 			for (uint32_t j = 0; j < tilelength; j++)
@@ -1657,19 +1663,21 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 			}
 		}
 		else {
+			int f = complicated ? 2 : 1; // bizarre case, squeeze!
 			FORI(h)
 			{
-				FORJ(spp)
+				void *dest = data + i*spp*sls/f;
+				FORJ(spp/f)
 				{
 					r = TIFFReadScanline(tif, buf, i, j);
 					if (r < 0)
-						fail("tiff bad %d/%d;%d",
-								i, (int)h, j);
-					memcpy(data + i*spp*sls + j*sls,
-							buf, sls);
+						fail("tiff bad %d/%d;%d (%d)",
+								i, (int)h, j,f);
+					memcpy(dest + j*sls, buf, sls);
 				}
-				repair_broken_pixels_inplace(data + i*spp*sls,
-						w, spp, bps/8);
+				if (!complicated)
+					repair_broken_pixels_inplace(dest,
+							w, spp, bps/8);
 			}
 		}
 	}
@@ -2074,6 +2082,22 @@ static void switch_4endianness(void *tt, int n)
 		t += 4;
 	}
 }
+//static void switch_8endianness(void *tt, int n)
+//{
+//	char *t = tt;
+//	FORI(n) {
+//		char tmp[8] = {t[0], t[1], t[2], t[3], t[4], t[5], t[6], t[7]};
+//		t[0] = tmp[7];
+//		t[1] = tmp[6];
+//		t[2] = tmp[5];
+//		t[3] = tmp[4];
+//		t[4] = tmp[3];
+//		t[5] = tmp[2];
+//		t[6] = tmp[1];
+//		t[7] = tmp[0];
+//		t += 8;
+//	}
+//}
 
 // PFM reader                                                               {{{2
 static int read_beheaded_pfm(struct iio_image *x,
@@ -2662,14 +2686,21 @@ static int read_beheaded_npy(struct iio_image *x,
 	char order[10];
 	int w, h, pd, n;
 	n = sscanf(npy_header, "{'descr': '%[^']', 'fortran_order': %[^,],"
-			" 'shape': (%d, %d, %d", descr, order, &w, &h, &pd);
+			" 'shape': (%d, %d, %d", descr, order, &h, &w, &pd);
 	if (n < 5) pd = 1;
 	if (n < 4) h = 1;
 	if (n < 3) return 2; // badly formed npy header
 
+	if (h==1 && w>1 && pd>1) // squeeze
+	{
+		h = w;
+		w = pd;
+		pd = 1;
+	}
+
 	// parse type string
 	char *desc = descr; // pointer to the bare description
-	if (*descr=='<' || *descr=='>' || *descr=='=')
+	if (*descr=='<' || *descr=='>' || *descr=='=' || *descr=='|')
 		desc += 1;
 	if (false) ;
 	else if (0 == strcmp(desc, "f8")) x->type = IIO_TYPE_DOUBLE;
@@ -3328,7 +3359,7 @@ static void iio_write_image_as_npy(const char *filename, struct iio_image *x)
 	int n = 10;               // size of magic before header string
 	n += snprintf(buf+n, 1000-n, "{'descr': '%s', 'fortran_order': "
 			"False, 'shape': (", descr);
-	for (int i = 0; i < x->dimension; i++)
+	for (int i = x->dimension-1; i >= 0; i--)
 		n += snprintf(buf+n, 1000-n, "%d, ", x->sizes[i]);
 	n += snprintf(buf+n, 1000-n, "%d)}", x->pixel_dimension);
 	int m = ((n+15+1)/16)*16; // next multiple of 16 (plus 1)
