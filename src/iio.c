@@ -4587,7 +4587,7 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 	IIO_DEBUG("going to write into filename \"%s\"\n", filename);
 	int typ = normalize_type(x->type);
 	if (x->dimension != 2) fail("de moment només escrivim 2D");
-	if (!strcmp(filename,"-") && isatty(fileno(stdout)))
+	if (!strcmp(filename,"-") && isatty(1))
 	{
 		if (x->sizes[0] <= 855 && x->sizes[1] <= 800 &&
 			(x->pixel_dimension==3 || x->pixel_dimension==1))

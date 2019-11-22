@@ -39,6 +39,8 @@
 // 	w	toggle horizon
 // 	.	toggle grid points
 //
+// 	d	dump homography data
+//
 //
 // Compilation:
 //
@@ -703,6 +705,29 @@ static void paint_state(struct FTR *f)
 
 // SECTION 8. User-Interface Actions and Events                             {{{1
 
+// action: print debugging info
+static void dump_homography_data(struct viewer_state *e)
+{
+	fprintf(stderr, "c = %g %g  %g %g  %g %g  %g %g\n",
+			e->c[0][0], e->c[0][1], e->c[1][0], e->c[1][1],
+			e->c[2][0], e->c[2][1], e->c[3][0], e->c[3][1]);
+	fprintf(stderr, "p = %g %g  %g %g  %g %g  %g %g\n",
+			e->p[0][0], e->p[0][1], e->p[1][0], e->p[1][1],
+			e->p[2][0], e->p[2][1], e->p[3][0], e->p[3][1]);
+
+	double H[3][3], iH[3][3];;
+	obtain_current_homography(H, e);
+	fprintf(stderr, "H = %g %g %g  %g %g %g  %g %g %g\n",
+			H[0][0], H[0][1], H[0][2],
+			H[1][0], H[1][1], H[1][2],
+			H[2][0], H[2][1], H[2][2]);
+	invert_homography(iH, H);
+	fprintf(stderr, "iH = %g %g %g  %g %g %g  %g %g %g\n",
+			iH[0][0], iH[0][1], iH[0][2],
+			iH[1][0], iH[1][1], iH[1][2],
+			iH[2][0], iH[2][1], iH[2][2]);
+}
+
 // action: viewport translation
 static void change_view_offset(struct viewer_state *e, double dx, double dy)
 {
@@ -782,6 +807,7 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if (k >= '0' && k <= '9') e->interpolation_order = k - '0';
 	if (k == '.') e->show_grid_points = !e->show_grid_points;
 	if (k == 'a') e->restrict_to_affine = !e->restrict_to_affine;
+	if (k == 'd') dump_homography_data(e);
 
 	e->dragging_window_point = e->dragging_image_point = false;
 	f->changed = 1;
