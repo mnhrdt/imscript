@@ -91,6 +91,11 @@ struct viewer_state {
 	bool show_horizon;
 	bool show_grid_points;
 	bool restrict_to_affine;
+
+	// background image (optional)
+	float *bg;
+	int bg_w, bg_h, bg_pd;
+	float bg_alpha;
 };
 
 
@@ -137,6 +142,7 @@ static void center_view(struct FTR *f)
 	e->show_horizon = false;
 	e->show_grid_points = false;
 	e->restrict_to_affine = false;
+	e->bg_alpha = 0.5;
 
 	f->changed = 1;
 }
@@ -685,6 +691,40 @@ static void draw_horizon(struct FTR *f)
 
 }
 
+// overlay the background image
+static void overlay_transparent_background(struct FTR *f)
+{
+	struct viewer_state *e = f->userdata;
+
+	double alpha = e->bg_alpha;
+	double beta = 1 - alpha;
+	double gamma = 0;
+	extrapolator_t OUT = obtain_extrapolator(e);
+	if (e->bg_alpha < 0) {
+		gamma = 127;
+		beta = -alpha;
+		float black = 0;
+		getsample_cons(&black, 0, 0, 0, 0, 0, 0);
+		OUT = getsample_cons;
+	}
+
+	for (int j = 0; j < f->h; j++)
+	for (int i = 0; i < f->w; i++)
+	{
+		double pq[2], ij[2] = {i, j};
+		map_window_to_view(e, pq, ij);
+		//extrapolator_t OUT      = obtain_extrapolator(e);
+		interpolator_t EVAL     = obtain_interpolator(e);
+		for (int l = 0; l < 3; l++)
+		{
+			float v = EVAL(e->bg, e->bg_w, e->bg_h, e->bg_pd,
+					pq[0], pq[1], l, OUT);
+			int idx = l + 3 * (f->w * j + i);
+			f->rgb[idx] = beta*f->rgb[idx] + alpha*v + gamma;
+		}
+	}
+}
+
 // Paint the whole scene
 // This function is called whenever the window needs to be redisplayed.
 static void paint_state(struct FTR *f)
@@ -699,6 +739,9 @@ static void paint_state(struct FTR *f)
 	draw_four_control_points(f);
 	if (e->show_horizon)
 		draw_horizon(f);
+
+	if (e->bg)
+		overlay_transparent_background(f);
 }
 
 
@@ -803,6 +846,7 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if (k == '+') change_view_scale(e, f->w/2, f->h/2, ZOOM_FACTOR);
 	if (k == '-') change_view_scale(e, f->w/2, f->h/2, 1.0/ZOOM_FACTOR);
 	if (k == 'p') e->tile_plane = !e->tile_plane;
+	if (k == 's') e->bg_alpha *= -1;
 	if (k == 'w') e->show_horizon = !e->show_horizon;
 	if (k >= '0' && k <= '9') e->interpolation_order = k - '0';
 	if (k == '.') e->show_grid_points = !e->show_grid_points;
@@ -964,14 +1008,15 @@ static void event_expose(struct FTR *f, int b, int m, int x, int y)
 
 // SECTION 10. Main Program                                                 {{{1
 
-// library for image input-output
-#include "iio.h"
+#include "iio.h"      // functions for image input-output
+#include "pickopt.c"  // process command line arguments
 
 // main function
 int main_viho(int argc, char *argv[])
 {
+	char *filename_bg = pick_option(&argc, &argv, "b", "");
 	if (argc != 2 && argc != 1) {
-		fprintf(stderr, "usage:\n\t%s [image.png]\n", *argv);
+		fprintf(stderr, "usage:\n\t%s image.png [-b bg.png]\n", *argv);
 		return 1;
 	}
 	char *filename_in = argc == 2 ? argv[1] : "/tmp/lenak.png";
@@ -981,6 +1026,9 @@ int main_viho(int argc, char *argv[])
 	f.userdata = e;
 
 	e->img = iio_read_image_float_vec(filename_in, &e->iw, &e->ih, &e->pd);
+
+	e->bg = *filename_bg ? iio_read_image_float_vec(filename_bg,
+				&e->bg_w, &e->bg_h, &e->bg_pd) : 0;
 
 	//struct image_pyramid p[1];
 	//do_pyramid(p, e->img, e->iw, e->ih, e->pd);
