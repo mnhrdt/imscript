@@ -2603,7 +2603,7 @@ static void add_hidden_variables(char *out, int maxplen, int newvars, char *in)
 {
 	int pos = 0;
 	for (int i = 0; i < newvars; i++)
-		pos += snprintf(out + pos, maxplen - pos, "hidden_%02d ", i);
+		pos += snprintf(out + pos, maxplen - pos, "hidden%02d ", i);
 	snprintf(out + pos, maxplen - pos, "%s", in);
 	//fprintf(stderr, "HIVA: %s\n", out);
 }
