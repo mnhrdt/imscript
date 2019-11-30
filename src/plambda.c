@@ -1511,7 +1511,7 @@ static int token_is_word(const char *t, const char **endptr)
 	}
 	int n = 1;
 	while (t[n]) {
-		if  (!(isalnum(t[n])||t[n]=='_')) {
+		if  (!isalnum(t[n])) {
 			*endptr = t+n;
 			//return (t[n]=='('||t[n]=='['||t[n]=='%'||t[n]==';')?n:0;
 			return ispunct(t[n]) ? n : 0;
@@ -1799,7 +1799,7 @@ static void update_variable_indices(struct plambda_program *p)
 
 static void plambda_compile_program(struct plambda_program *p, const char *str)
 {
-	char s[1+strlen(str)], *spacing = " \n\t";
+	char s[1+strlen(str)], *spacing = " \n\t_";
 	snprintf(s, 1+strlen(str), "%s", str);
 
 	collection_of_varnames_init(p->var);
