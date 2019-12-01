@@ -624,9 +624,10 @@ static void expose_pixel_values(struct FTR *f)
 			if (l) put_string_in_rgb_image(f->rgb, f->w, f->h,
 					ii-2.5*font->width, jj-1.5*font->height,
 					fg, rbg, 0, font, buf);
-			if (zf>100)
+			if (zf>129)
 			{
-				snprintf(buf,300,"%g %g\n", p[0]-0.5, p[1]-0.5);
+				snprintf(buf,300,"%g %g\n",
+						floor(p[0]), floor(p[1]));
 				put_string_in_rgb_image(f->rgb, f->w, f->h,
 					ii - zf/2,
 					jj - zf/2,

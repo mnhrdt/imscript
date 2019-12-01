@@ -741,9 +741,12 @@ static void inplace_trim(struct iio_image *x,
 		int trim_left, int trim_bottom, int trim_right, int trim_top)
 {
 	IIO_DEBUG("inplace trim (%dx%d) le=%d bo=%d ri=%d to=%d\n",
-			x->sizes[0], x->sizes[1], trim_left, trim_bottom, trim_right, trim_top);
+			x->sizes[0], x->sizes[1],
+			trim_left, trim_bottom, trim_right, trim_top);
 	assert(2 == x->dimension);
-	int ps = x->pixel_dimension * iio_image_sample_size(x); // pixel_size
+	int pd = x->pixel_dimension;
+	int ss = iio_image_sample_size(x);
+	int ps = pd * ss;
 	int w = x->sizes[0];
 	int h = x->sizes[1];
 	int nw = w - trim_left - trim_right; // new width
@@ -751,8 +754,15 @@ static void inplace_trim(struct iio_image *x,
 	assert(nw > 0 && nh > 0);
 	char *old_data = x->data;
 	char *new_data = xmalloc(nw * nh * ps);
-	for (int i = 0; i < nw*nh*ps; i++)
-		((char*)new_data)[i] = 1;
+	if (ss == sizeof(float))
+		for (int i = 0; i < nw*nh*pd; i++)
+			((float*)new_data)[i] = NAN;
+	else if (ss == sizeof(double))
+		for (int i = 0; i < nw*nh*pd; i++)
+			((double*)new_data)[i] = NAN;
+	else
+		for (int i = 0; i < nw*nh*ps; i++)
+			((char*)new_data)[i] = 0;
 	for (int j = 0; j < nh; j++)
 	for (int i = 0; i < nw; i++)
 	if (insideP(w, h, i+trim_left, j+trim_top))
