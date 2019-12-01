@@ -3056,6 +3056,35 @@ static void trans_flip(struct iio_image *x, char *s)
 	if (2 == strlen(s)) inplace_reorient(x, s[0] + s[1]*0x100);
 }
 
+static int read_image_f(struct iio_image*, FILE *);
+static void iio_write_image_default(const char *filename, struct iio_image *x);
+
+// filter the image "x" through the command "p"
+static void trans_pipe(struct iio_image *x, const char *p)
+{
+	char i[FILENAME_MAX];       // input filename
+	char o[FILENAME_MAX];       // output filename
+	char c[3*FILENAME_MAX];     // command to run the pipe
+	fill_temporary_filename(i);
+	fill_temporary_filename(o);
+	snprintf(c, 3*FILENAME_MAX, "(unset IIO_TRANS; %s) <%s >%s", p, i, o);
+
+	iio_write_image_default(i, x);
+
+	fprintf(stderr, "IIO_TRANS: running pipe \"%s\"\n", p);
+	if (!system(c))
+	{
+		// the monkey flies between two branches
+		xfree(x->data);
+		FILE *f = xfopen(o, "r");
+		read_image_f(x, f);
+		xfclose(f);
+	}
+
+	delete_temporary_file(i);
+	delete_temporary_file(o);
+}
+
 static int trans_apply(struct iio_image *x, const char *f)
 {
 	// extract tranformation from augmented filename
@@ -3074,16 +3103,15 @@ static int trans_apply(struct iio_image *x, const char *f)
 		int r = sscanf(tok, "%[^=]=%[^]]", o, v);
 		if (r != 2) goto cont;
 
+		int V = atoi(v), w = x->sizes[0], h = x->sizes[1];
+
 		if (false) ;
 		else if (0 == strcmp(o, "flip")) trans_flip(x, v);
-		else if (0 == strcmp(o, "x")) inplace_trim(x, atoi(v), 0, 0, 0);
-		else if (0 == strcmp(o, "y")) inplace_trim(x, 0, 0, 0, atoi(v));
-		else if (0 == strcmp(o, "w"))
-			inplace_trim(x, 0, 0, x->sizes[0] - atoi(v), 0);
-		else if (0 == strcmp(o, "h"))
-			inplace_trim(x, 0, x->sizes[1] - atoi(v), 0, 0);
-		//else if (0 == strcmp(op, "pipe")) trans_pipe(x, val);
-
+		else if (0 == strcmp(o, "pipe")) trans_pipe(x, v);
+		else if (0 == strcmp(o, "x")) inplace_trim(x, V,   0,   0, 0);
+		else if (0 == strcmp(o, "y")) inplace_trim(x, 0,   0,   0, V);
+		else if (0 == strcmp(o, "w")) inplace_trim(x, 0,   0, w-V, 0);
+		else if (0 == strcmp(o, "h")) inplace_trim(x, 0, h-V,   0, 0);
 	cont:	tok = strtok(NULL, delim);
 	}
 
@@ -4240,6 +4268,11 @@ static int read_image(struct iio_image *x, const char *fname)
 	IIO_DEBUG("READ IMAGE pixel_dimension = %d\n",x->pixel_dimension);
 	IIO_DEBUG("READ IMAGE type = %s\n", iio_strtyp(x->type));
 	IIO_DEBUG("READ IMAGE contiguous_data = %d\n",x->contiguous_data);
+
+	char *trans = getenv("IIO_TRANS");
+	if (trans)
+		r += trans_apply(x, trans);
+
 
 	return r;
 }
