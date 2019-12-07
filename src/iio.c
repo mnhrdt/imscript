@@ -138,6 +138,7 @@
 #define IIO_FORMAT_FFD 29
 #define IIO_FORMAT_DLM 30
 #define IIO_FORMAT_NPY 31
+#define IIO_FORMAT_VIC 32
 #define IIO_FORMAT_UNRECOGNIZED (-1)
 
 //
@@ -599,7 +600,7 @@ static const char *iio_strfmt(int format)
 	M(VTK); M(CIMG); M(PAU); M(DICOM); M(PFM); M(NIFTI);
 	M(PCX); M(GIF); M(XPM); M(RAFA); M(FLO); M(LUM); M(JUV);
 	M(PCM); M(ASC); M(RAW); M(RWA); M(PDS); M(CSV); M(VRT);
-	M(FFD); M(DLM); M(NPY);
+	M(FFD); M(DLM); M(NPY); M(VIC);
 	M(UNRECOGNIZED);
 	default: fail("caca de la grossa (%d)", format);
 	}
@@ -2777,6 +2778,115 @@ static int read_beheaded_npy(struct iio_image *x,
 	return 0;
 }
 
+// VICAR reader                                                             {{{2
+static int read_beheaded_vic(struct iio_image *x,
+		FILE *fin, char *header, int nheader)
+{
+	(void)header;
+	assert(nheader == 8);
+
+	// read label size (first tag)
+	char s[10] = {0}; // remaining part of the fixed-size header
+	int i = 0;
+	do
+		s[i++] = pick_char_for_sure(fin);
+	while (i < 9 && s[i] != '0');
+	IIO_DEBUG("VICAR LBLSIZE = %d\n", atoi(s));
+
+	// read the rest of the label
+	int n = atoi(s);      // label size
+	char *l = xmalloc(n); // label data (after the first tag)
+	for (int k = 0; k < n - i - 8; k++)
+		l[k] = pick_char_for_sure(fin);
+	l[n-i-9] = 0;
+
+	// VICAR fields with placeholder values
+	int f_recsize = -1; // record size in bytes
+	char f_format[99] = {0}; // sample type (byte,half,full,real,doubl,comp)
+	char f_type[99] = {0};   // file type (always "image")
+	char f_org[99] = {0};    // brokennes order (only "bsq"=broken is known)
+	int f_nl = -1;      // number of lines
+	int f_ns = -1;      // number of samples (per line)
+	int f_nb = -1;      // numbef of bands (pixel dimension)
+	int f_n1 = -1;      // 1st dimension
+	int f_n2 = -1;      // 2nd dimension
+	int f_n3 = -1;      // 3rd dimension
+	int f_nbb = 0;      // trim bytes at left of each line line
+	int f_nlb = 0;      // trim records at the beginning
+
+	// parse label tags
+	char *tok = strtok(l, " ");
+	while (tok) {
+		IIO_DEBUG("\tVICAR tok = \"%s\"\n", tok);
+		char k[n]; // key
+		char v[n]; // value
+		int r = sscanf(tok, "%[^=]=%s", k, v);
+		if (r != 2) goto cont;
+		IIO_DEBUG("\t\tr,k,v = %d, \"%s\", \"%s\"\n", r, k, v);
+
+		// extract VICAR fields
+		if (0 == strcmp(k, "RECSIZE")) f_recsize = atoi(v);
+		if (0 == strcmp(k, "FORMAT" )) strncpy(f_format, v, 99);
+		if (0 == strcmp(k, "TYPE"   )) strncpy(f_type, v, 99);
+		if (0 == strcmp(k, "ORG"    )) strncpy(f_org, v, 99);
+		if (0 == strcmp(k, "NL"     )) f_nl  = atoi(v);
+		if (0 == strcmp(k, "NS"     )) f_ns  = atoi(v);
+		if (0 == strcmp(k, "NB"     )) f_nb  = atoi(v);
+		if (0 == strcmp(k, "N1"     )) f_n1  = atoi(v);
+		if (0 == strcmp(k, "N2"     )) f_n2  = atoi(v);
+		if (0 == strcmp(k, "N3"     )) f_n3  = atoi(v);
+		if (0 == strcmp(k, "NBB"    )) f_nbb = atoi(v);
+		if (0 == strcmp(k, "NLB"    )) f_nlb = atoi(v);
+	cont:	 tok = strtok(0, " ");
+	}
+	free(l);
+
+	// verify sanity
+	if (0 != strcmp(f_type, "'IMAGE'"))
+		fail("VICAR reader only groks 'IMAGE' objects (got %s)",f_type);
+	if (0 != strcmp(f_org, "'BSQ'"))
+		fail("VICAR reader only groks 'BSQ' orgn (got %s)",f_org);
+	if (f_recsize <= 0)
+		fail("VICAR recsize must be positive");
+
+	// fill-in the struct fields
+	x->type = -1;
+	if (0==strcmp(f_format,"'BYTE'")) x->type = IIO_TYPE_UINT8;
+	if (0==strcmp(f_format,"'HALF'")) x->type = IIO_TYPE_INT16; // (!)
+	if (0==strcmp(f_format,"'FULL'")) x->type = IIO_TYPE_INT32;
+	if (0==strcmp(f_format,"'REAL'")) x->type = IIO_TYPE_FLOAT;
+	if (0==strcmp(f_format,"'DOUBL'")) x->type = IIO_TYPE_DOUBLE;
+	if (x->type < 0) fail("VICAR reader unknown format \"%s\"", f_format);
+	int bps = iio_type_size(x->type);
+	if (f_recsize != f_nbb + f_ns * bps)
+		fail("VICAR bad recsize %d != %d + %d * %d\n",
+				f_recsize, f_nbb, f_ns, bps);
+	x->dimension = 2;
+	x->sizes[0] = f_ns;
+	x->sizes[1] = f_nl;
+	x->pixel_dimension = f_nb;
+	x->contiguous_data = false;
+
+	// fill-in the data
+	x->data = xmalloc(x->sizes[0] * x->sizes[1] * x->pixel_dimension * bps);
+	int datac = 0;
+	char rec[f_recsize];
+	for (int i = 0; i < f_nlb; i++) // discard the first "nlb" records
+	{
+		int r = fread(rec, f_recsize, 1, fin);
+		if (r != 1) fail("could not read whole VICAR prefx");
+	}
+	for (int i = 0; i < f_nl * f_nb; i++) // read the good records
+	{
+		int r = fread(rec, f_recsize, 1, fin);
+		if (r != 1) fail("could not read whole VICAR file");
+		memcpy(x->data + datac, rec + f_nbb, f_ns*bps);
+		datac += f_ns*bps;
+	}
+
+	return 0;
+}
+
 // RAW reader                                                               {{{2
 
 // Note: there are two raw readers, either
@@ -3985,6 +4095,9 @@ static int guess_format(FILE *f, char *buf, int *nbuf, int bufmax)
 	}
 #endif//I_CAN_HAS_LIBPNG
 
+	if (b[0]=='L' && b[1]=='B' && b[2]=='L' && b[3]=='S' &&
+			b[4]=='I' && b[5]=='Z' && b[6]=='E' && b[7]=='=')
+		return IIO_FORMAT_VIC; // VICAR (a streamlined PDS variant)
 
 
 	if (!strchr((char*)b, '\n')) // protect against very short ASC headers
@@ -4115,6 +4228,7 @@ int read_beheaded_image(struct iio_image *x, FILE *f, char *h, int hn, int fmt)
 	case IIO_FORMAT_FFD:   return read_beheaded_ffd (x, f, h, hn);
 	case IIO_FORMAT_DLM:   return read_beheaded_dlm (x, f, h, hn);
 	case IIO_FORMAT_NPY:   return read_beheaded_npy (x, f, h, hn);
+	case IIO_FORMAT_VIC:   return read_beheaded_vic (x, f, h, hn);
 
 #ifdef I_CAN_HAS_LIBPNG
 	case IIO_FORMAT_PNG:   return read_beheaded_png (x, f, h, hn);
@@ -4173,7 +4287,7 @@ static int read_image_f(struct iio_image *x, FILE *f)
 	char buf[0x100] = {0};
 	format = guess_format(f, buf, &nbuf, bufmax);
 	IIO_DEBUG("iio file format guess: %s {%d}\n", iio_strfmt(format), nbuf);
-	assert(nbuf > 0);
+	//assert(nbuf > 0);
 	return read_beheaded_image(x, f, buf, nbuf, format);
 }
 
@@ -4280,7 +4394,7 @@ static int read_image(struct iio_image *x, const char *fname)
 	IIO_DEBUG("READ IMAGE contiguous_data = %d\n",x->contiguous_data);
 
 	char *trans = getenv("IIO_TRANS");
-	if (trans)
+	if (trans && *trans)
 		r += trans_apply(x, trans);
 
 
