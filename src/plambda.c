@@ -343,10 +343,7 @@
 static double sum_two_doubles      (double a, double b) { return a + b; }
 static double substract_two_doubles(double a, double b) { return a - b; }
 static double multiply_two_doubles (double a, double b) { return a * b; }
-static double divide_two_doubles   (double a, double b) {
-	if (!b && !a) return 0;
-	return a / b;
-}
+static double divide_two_doubles   (double a, double b) { return a / b; }
 static double logic_g      (double a, double b) { return a > b; }
 static double logic_l      (double a, double b) { return a < b; }
 static double logic_e      (double a, double b) { return a == b; }
