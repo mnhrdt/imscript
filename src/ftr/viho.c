@@ -91,6 +91,7 @@ struct viewer_state {
 	bool show_horizon;
 	bool show_grid_points;
 	bool restrict_to_affine;
+	int stratum; // 4=homography, 3=affinity, 2=similarity, 1=translation
 
 	// background image (optional)
 	float *bg;
@@ -110,9 +111,9 @@ static void center_view(struct FTR *f)
 	e->c[0][1] = margin;
 	e->c[1][0] = f->w - margin;
 	e->c[1][1] = margin;
-	e->c[2][0] = f->w - margin;
+	e->c[2][0] = margin;
 	e->c[2][1] = f->h - margin;
-	e->c[3][0] = margin;
+	e->c[3][0] = f->w - margin;
 	e->c[3][1] = f->h - margin;
 
 	// set control points exactly at the corners of the image
@@ -120,9 +121,9 @@ static void center_view(struct FTR *f)
 	e->p[0][1] = 0;
 	e->p[1][0] = e->iw - 1;
 	e->p[1][1] = 0;
-	e->p[2][0] = e->iw - 1;
+	e->p[2][0] = 0;
 	e->p[2][1] = e->ih - 1;
-	e->p[3][0] = 0;
+	e->p[3][0] = e->iw - 1;
 	e->p[3][1] = e->ih - 1;
 
 	// drag state
@@ -142,6 +143,7 @@ static void center_view(struct FTR *f)
 	e->show_horizon = false;
 	e->show_grid_points = false;
 	e->restrict_to_affine = false;
+	e->stratum = 4;
 	e->bg_alpha = 0.5;
 
 	f->changed = 1;
@@ -315,7 +317,23 @@ static double float_to_byte(double x)
 static void adjust_affine_corner(struct viewer_state *e)
 {
 	for (int i = 0; i < 2; i++)
-		e->c[2][i] = e->c[1][i] + ( e->c[3][i] - e->c[0][i] );
+		e->c[3][i] = e->c[1][i] + ( e->c[2][i] - e->c[0][i] );
+}
+
+static void adjust_other_corners(struct viewer_state *e)
+{
+	if (e->stratum <= 1)
+	{
+
+	}
+	if (e->stratum <= 2)
+	{
+		e->c[2][0] = e->c[0][0] + e->c[0][1] - e->c[1][1];
+		e->c[2][1] = e->c[0][1] + e->c[1][0] - e->c[0][0];
+	}
+	if (e->stratum <= 3)
+		for (int i = 0; i < 2; i++)
+			e->c[3][i] = e->c[1][i] + ( e->c[2][i] - e->c[0][i] );
 }
 
 
@@ -611,11 +629,12 @@ static void draw_four_red_segments(struct FTR *f)
 {
 	struct viewer_state *e = f->userdata;
 
+	int o[5] = {0, 1, 3, 2, 0}; // order of the points
 	for (int p = 0; p < 4; p++)
 	{
 		double x0[2], xf[2];
-		map_view_to_window(e, x0, e->c[p]);
-		map_view_to_window(e, xf, e->c[(p+1)%4]);
+		map_view_to_window(e, x0, e->c[o[p+0]]);
+		map_view_to_window(e, xf, e->c[o[p+1]]);
 		plot_segment_red(f, x0[0], x0[1], xf[0], xf[1]);
 	}
 }
@@ -625,9 +644,9 @@ static void draw_four_control_points(struct FTR *f)
 {
 	struct viewer_state *e = f->userdata;
 
-	for (int p = 0; p < 4; p++)
+	for (int p = 0; p < e->stratum; p++)
 	{
-		if (p == 2 && e->restrict_to_affine) continue;
+		//if (p == 3 && e->restrict_to_affine) continue;
 		double P[2];
 		map_view_to_window(e, P, e->c[p]);
 
@@ -795,8 +814,10 @@ static void drag_point_in_window_domain(struct viewer_state *e, int x, int y)
 	int p = e->dragged_point;
 	double X[2] = {x, y};
 	map_window_to_view(e, e->c[p], X);
-	if (e->restrict_to_affine)
-		adjust_affine_corner(e);
+	//if (e->restrict_to_affine)
+	//	adjust_affine_corner(e);
+	if (e->stratum < 4)
+		adjust_other_corners(e);
 }
 
 // action: drag a point in the image domain
@@ -813,9 +834,9 @@ static void drag_point_in_image_domain(struct viewer_state *e, int x, int y)
 // test whether (x,y) is inside one of the four control disks
 static int hit_point(struct viewer_state *e, double x, double y)
 {
-	for (int p = 0; p < 4; p++)
+	for (int p = 0; p < e->stratum; p++)
 	{
-		if (p == 2 && e->restrict_to_affine) continue;
+		//if (p == 3 && e->restrict_to_affine) continue;
 		double P[2];
 		map_view_to_window(e, P, e->c[p]);
 		if (hypot(P[0] - x, P[1] - y) < 2 + DISK_RADIUS)
@@ -850,7 +871,8 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'w') e->show_horizon = !e->show_horizon;
 	if (k >= '0' && k <= '9') e->interpolation_order = k - '0';
 	if (k == '.') e->show_grid_points = !e->show_grid_points;
-	if (k == 'a') e->restrict_to_affine = !e->restrict_to_affine;
+	//if (k == 'a') e->restrict_to_affine = !e->restrict_to_affine;
+	if (k == 'a') { e->stratum -=1; if (!e->stratum) e->stratum = 4; }
 	if (k == 'd') dump_homography_data(e);
 
 	e->dragging_window_point = e->dragging_image_point = false;

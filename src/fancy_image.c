@@ -580,7 +580,7 @@ int fancy_image_getrectangle_oct(float *out, struct fancy_image *fi,
 	struct FI *f = (void*)fi;
 	if (f->megabytes > 0) // if we have our own cache, we use it
 	{
-		for (int j = x0; j <= xf; j++)
+		for (int j = y0; j <= yf; j++)
 		for (int i = x0; i <= xf; i++)
 		for (int l = 0; l < f->pd; l++)
 			*out++ = fancy_image_getsample_oct(fi, octave, i, j, l);

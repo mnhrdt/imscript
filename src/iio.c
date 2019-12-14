@@ -35,7 +35,7 @@
 //#define I_CAN_KEEP_TMP_FILES
 
 
-//#define IIO_SHOW_DEBUG_MESSAGES
+#define IIO_SHOW_DEBUG_MESSAGES
 #ifdef IIO_SHOW_DEBUG_MESSAGES
 #  define IIO_DEBUG(...) do {\
 	fprintf(stderr,"DEBUG(%s:%d:%s): ",__FILE__,__LINE__,__PRETTY_FUNCTION__);\
@@ -139,6 +139,8 @@
 #define IIO_FORMAT_DLM 30
 #define IIO_FORMAT_NPY 31
 #define IIO_FORMAT_VIC 32
+#define IIO_FORMAT_CCS 33
+#define IIO_FORMAT_FIT 34
 #define IIO_FORMAT_UNRECOGNIZED (-1)
 
 //
@@ -272,12 +274,12 @@ static void fail(const char *fmt, ...)
 	longjmp(global_jump_buffer, 1);
 	//iio_single_jmpstuff(true, false);
 #else//IIO_ABORT_ON_ERROR
-#  ifdef NDEBUG
+//#  ifdef NDEBUG
 	exit(-1);
-#  else//NDEBUG
+//#  else//NDEBUG
 	//print_trace(stderr);
-	exit(*(int *)0x43);
-#  endif//NDEBUG
+//	exit(*(int *)0x43);
+//#  endif//NDEBUG
 #endif//IIO_ABORT_ON_ERROR
 }
 
@@ -600,7 +602,7 @@ static const char *iio_strfmt(int format)
 	M(VTK); M(CIMG); M(PAU); M(DICOM); M(PFM); M(NIFTI);
 	M(PCX); M(GIF); M(XPM); M(RAFA); M(FLO); M(LUM); M(JUV);
 	M(PCM); M(ASC); M(RAW); M(RWA); M(PDS); M(CSV); M(VRT);
-	M(FFD); M(DLM); M(NPY); M(VIC);
+	M(FFD); M(DLM); M(NPY); M(VIC); M(CCS); M(FIT);
 	M(UNRECOGNIZED);
 	default: fail("caca de la grossa (%d)", format);
 	}
@@ -2132,22 +2134,22 @@ static void switch_4endianness(void *tt, int n)
 		t += 4;
 	}
 }
-//static void switch_8endianness(void *tt, int n)
-//{
-//	char *t = tt;
-//	FORI(n) {
-//		char tmp[8] = {t[0], t[1], t[2], t[3], t[4], t[5], t[6], t[7]};
-//		t[0] = tmp[7];
-//		t[1] = tmp[6];
-//		t[2] = tmp[5];
-//		t[3] = tmp[4];
-//		t[4] = tmp[3];
-//		t[5] = tmp[2];
-//		t[6] = tmp[1];
-//		t[7] = tmp[0];
-//		t += 8;
-//	}
-//}
+static void switch_8endianness(void *tt, int n)
+{
+	char *t = tt;
+	FORI(n) {
+		char tmp[8] = {t[0], t[1], t[2], t[3], t[4], t[5], t[6], t[7]};
+		t[0] = tmp[7];
+		t[1] = tmp[6];
+		t[2] = tmp[5];
+		t[3] = tmp[4];
+		t[4] = tmp[3];
+		t[5] = tmp[2];
+		t[6] = tmp[1];
+		t[7] = tmp[0];
+		t += 8;
+	}
+}
 
 // PFM reader                                                               {{{2
 static int read_beheaded_pfm(struct iio_image *x,
@@ -2408,13 +2410,14 @@ static int read_beheaded_asc(struct iio_image *x,
 // read a line of text until either
 // 	- n characters are read
 // 	- a newline character is found
+// 	- a zero character is found
 // 	- the end of file is reached
 // returns the number of read characters, not including the end zero
 // Calling this functions should always result in a valid string on l
 static int getlinen(char *l, int n, FILE *f)
 {
 	int c, i = 0;
-	while (i < n-1 && (c = fgetc(f)) != EOF && c != '\n')
+	while (i < n-1 && (c = fgetc(f)) != EOF && c != '\n' && c)
 		if (isprint(c))
 			l[i++] = c;
 	if (c == EOF) return -1;
@@ -2446,10 +2449,10 @@ static int read_beheaded_pds(struct iio_image *x,
 {
 	(void)header; (void)nheader;
 	// check that the file is named, and not a pipe
-	const char *fn;
-	fn = global_variable_containing_the_name_of_the_last_opened_file;
-	if (!fn)
-		return 1;
+	//const char *fn;
+	//fn = global_variable_containing_the_name_of_the_last_opened_file;
+	//if (!fn)
+	//	return 1;
 
 	// get an object name, if different to "^IMAGE"
 	char *object_id = getenv("IIO_PDS_OBJECT");
@@ -2536,8 +2539,6 @@ static int read_beheaded_pds(struct iio_image *x,
 
 	// if necessary, transpose and trim data
 	if (flip_h) inplace_flip_horizontal(x);
-	if (flip_v) inplace_flip_vertical(x);
-	if (crop_left || crop_right)
 		inplace_trim(x, crop_left, 0, crop_right, 0);
 
 	// return
@@ -2805,6 +2806,7 @@ static int read_beheaded_vic(struct iio_image *x,
 	char f_format[99] = {0}; // sample type (byte,half,full,real,doubl,comp)
 	char f_type[99] = {0};   // file type (always "image")
 	char f_org[99] = {0};    // brokennes order (only "bsq"=broken is known)
+	char f_ifmt[99] = {0};   // endianness (high or low)
 	int f_nl = -1;      // number of lines
 	int f_ns = -1;      // number of samples (per line)
 	int f_nb = -1;      // numbef of bands (pixel dimension)
@@ -2829,6 +2831,7 @@ static int read_beheaded_vic(struct iio_image *x,
 		if (0 == strcmp(k, "FORMAT" )) strncpy(f_format, v, 99);
 		if (0 == strcmp(k, "TYPE"   )) strncpy(f_type, v, 99);
 		if (0 == strcmp(k, "ORG"    )) strncpy(f_org, v, 99);
+		if (0 == strcmp(k, "INTFMT" )) strncpy(f_ifmt, v, 99);
 		if (0 == strcmp(k, "NL"     )) f_nl  = atoi(v);
 		if (0 == strcmp(k, "NS"     )) f_ns  = atoi(v);
 		if (0 == strcmp(k, "NB"     )) f_nb  = atoi(v);
@@ -2883,6 +2886,140 @@ static int read_beheaded_vic(struct iio_image *x,
 		memcpy(x->data + datac, rec + f_nbb, f_ns*bps);
 		datac += f_ns*bps;
 	}
+
+	// fix endianness
+	if (bps==2 && 0==strcmp(f_ifmt,"'HIGH'"))
+		switch_2endianness(x->data, iio_image_number_of_samples(x));
+	if (bps==4 && 0==strcmp(f_ifmt,"'HIGH'"))
+		switch_4endianness(x->data, iio_image_number_of_samples(x));
+
+	return 0;
+}
+
+// CCSD3ZF reader                                                           {{{2
+
+// clean a short-padded string
+static void sanitize_label(char *s)
+{
+	int n = strlen(s);
+	if (n>1 && 0 == n%2 && !isalnum(s[n-1]))
+		s[n-1] = '\0';
+}
+
+static int read_beheaded_ccs(struct iio_image *x,
+		FILE *f, char *header, int nheader)
+{
+	// TODO: merge with the standard PDS reader, as except for the
+	// separators the description language is exactly the same
+	//
+
+	// note: kills just one file of the test collection (2065211)
+	return read_beheaded_pds(x, f, header, nheader);
+
+//	// get an object name, if different to "^IMAGE"
+//	char *object_id = getenv("IIO_PDS_OBJECT");
+//	if (!object_id)
+//		object_id = "^IMAGE";
+//
+//	int n, nmax = 1000, cx = 0;
+//	char line[nmax], key[nmax], value[nmax];
+//	int rbytes = -1, w = -1, h = -1, spp = 1, bps = 1, obj = -1, ehist = -1;
+//	int rtype = 'u';
+//	int sfmt = SAMPLEFORMAT_UINT;
+//	bool in_object = false;
+//	while ((n = getlinen(line, nmax, f)) >= 0 && cx++ < nmax)
+//	{
+//		pds_parse_line(key, value, line);
+//		if (!*key || !*value) continue;
+//		sanitize_label(value);
+	fail("implemented as PDS variant");
+	return 1;
+}
+
+
+// FITS reader                                                              {{{2
+
+static void fit_parse_line(char *k, char *v, char *l)
+{
+	int r = sscanf(l, "%s = %s", k, v);
+	if (r != 2)
+		*k = *v = '\0';
+}
+
+static int read_beheaded_fit(struct iio_image *x,
+		FILE *f, char *header, int nheader)
+{
+	(void*)header;
+	while (nheader++ < 80)
+		pick_char_for_sure(f);
+
+	int n = 0; // line counter
+	int bitpix = -1, w = -1, h = -1, pd = 1, d = 2;
+	while (1) {
+		n += 1;
+		char l[81] = {0}; // buffer for each line (80 chars + zero)
+		char k[81] = {0}; // "key" field of the line
+		char v[81] = {0}; // "value" field of the line
+		int r = fread(l, 1, 80, f);
+		if (r != 80) fail("FITS reader failed at line %d\n", n);
+		fprintf(stderr, "FITS(%d): \"%s\"\n", n, l);
+		if (l[0]=='E' && l[1]=='N' && l[2]=='D' && l[3]==' ')
+			break;
+
+		fit_parse_line(k, v, l);
+		fprintf(stderr, "\tk=\"%s\"\n", k);
+		fprintf(stderr, "\tv=\"%s\"\n", v);
+
+		if (!strcmp(k, "BITPIX")) bitpix = atoi(v);
+		if (!strcmp(k, "NAXIS" )) d = atoi(v);
+		if (!strcmp(k, "NAXIS1")) w = atoi(v);
+		if (!strcmp(k, "NAXIS2")) h = atoi(v);
+		if (!strcmp(k, "NAXIS3")) pd = atoi(v);
+	}
+
+	fprintf(stderr, "n = %d\n", n);
+
+	// read padding lines until the next multiple of 36
+	if (n % 36) while (++n % 36) {
+		char l[80];
+		if (80 != fread(l, 1, 80, f))
+			fail("FITS padding failed at line %d\n", n);
+	}
+	//fprintf(stderr, "n = %d\n", n);
+
+	int typ = -1;
+	if (bitpix ==   8) typ = IIO_TYPE_UINT8;
+	if (bitpix ==  16) typ = IIO_TYPE_INT16;
+	if (bitpix ==  32) typ = IIO_TYPE_INT32;
+	if (bitpix == -32) typ = IIO_TYPE_FLOAT;
+	if (bitpix == -64) typ = IIO_TYPE_DOUBLE;
+	if (typ < 0) fail("unrecognized FITS BITPIX=%d", bitpix);
+
+	fprintf(stderr, "w = %d\n", w);
+	fprintf(stderr, "h = %d\n", h);
+	fprintf(stderr, "pd = %d\n", pd);
+	fprintf(stderr, "d = %d\n", d);
+	fprintf(stderr, "typ = %s (%d)\n", iio_strtyp(typ), typ);
+
+	// fill-in the image struct
+	x->dimension = 2; // NOTE: "d" is ignored in practice
+	x->sizes[0] = w;
+	x->sizes[1] = h;
+	x->pixel_dimension = pd;
+	x->type = typ;
+	x->contiguous_data = false;
+	int s = w * h * pd * iio_image_sample_size(x);
+	x->data = xmalloc(s);
+	n = fread(x->data, s, 1, f);
+	if (n != 1) { xfree(x->data); return 4; }
+
+	// fix endianness
+	if (bitpix == 16)
+		switch_2endianness(x->data, iio_image_number_of_samples(x));
+	if (bitpix == 32 || bitpix == -32)
+		switch_4endianness(x->data, iio_image_number_of_samples(x));
+	if (bitpix == -64)
+		switch_8endianness(x->data, iio_image_number_of_samples(x));
 
 	return 0;
 }
@@ -4099,6 +4236,14 @@ static int guess_format(FILE *f, char *buf, int *nbuf, int bufmax)
 			b[4]=='I' && b[5]=='Z' && b[6]=='E' && b[7]=='=')
 		return IIO_FORMAT_VIC; // VICAR (a streamlined PDS variant)
 
+	if (b[0]=='S' && b[1]=='I' && b[2]=='M' && b[3]=='P' &&
+			b[4]=='L' && b[5]=='E' && b[6]==' ' && b[7]==' ')
+		return IIO_FORMAT_FIT; // FITS (standard astronomical images)
+
+	for (int j = 0; j < 3; j++) // allons-y chochotte
+	if (b[2-j]=='C' && b[3-j]=='C' && b[4-j]=='S' && b[5-j]=='D' &&
+			b[6-j]=='3' && b[7-j]=='Z')
+		return IIO_FORMAT_CCS; // CCSD (an ancient PDS-type label)
 
 	if (!strchr((char*)b, '\n')) // protect against very short ASC headers
 	{
@@ -4229,6 +4374,8 @@ int read_beheaded_image(struct iio_image *x, FILE *f, char *h, int hn, int fmt)
 	case IIO_FORMAT_DLM:   return read_beheaded_dlm (x, f, h, hn);
 	case IIO_FORMAT_NPY:   return read_beheaded_npy (x, f, h, hn);
 	case IIO_FORMAT_VIC:   return read_beheaded_vic (x, f, h, hn);
+	case IIO_FORMAT_FIT:   return read_beheaded_fit (x, f, h, hn);
+	case IIO_FORMAT_CCS:   return read_beheaded_ccs (x, f, h, hn);
 
 #ifdef I_CAN_HAS_LIBPNG
 	case IIO_FORMAT_PNG:   return read_beheaded_png (x, f, h, hn);
@@ -4381,6 +4528,7 @@ static int read_image(struct iio_image *x, const char *fname)
 	}
 
 	IIO_DEBUG("READ IMAGE return value = %d\n", r);
+	if (r) fail("read_image failed r = %d", r);
 	IIO_DEBUG("READ IMAGE dimension = %d\n", x->dimension);
 	switch(x->dimension) {
 	case 1: IIO_DEBUG("READ IMAGE sizes = %d\n",x->sizes[0]);break;
