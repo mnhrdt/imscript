@@ -275,9 +275,12 @@ void poisson_rec(float *u, float *g, float *f, int w, int h,
 	poisson_extension_with_init(u, f, g, w, h, tstep, niter, init);
 	free(init);
 
-	if (cgit) { // if requested, refine by Conjugate Gradient
+	if (cgit && tstep > 0) { // if requested, refine by Conjugate Gradient
 		float cg_eps = 1e-6;
 		poisson_extension_by_cg(u, g, f, w, h, u, cgit, cg_eps);
+	} else {
+		float cg_eps = 1e-6;
+		biharmonic_extension_by_cg(u, g, f, w, h, u, cgit, cg_eps);
 	}
 }
 
