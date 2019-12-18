@@ -35,6 +35,7 @@ enum font_data_format {
 	PCXX85,
 	RLEPCXX85,
 	RLEXORPCXX85,
+	UNKNOWN,
 };
 
 // a font is a three-dimensional binary image
@@ -221,9 +222,9 @@ static enum font_data_format packing_unstring(char *s)
 	casepack(PCXX85);
 	casepack(RLEPCXX85);
 	casepack(RLEXORPCXX85);
-#undef casepack
 	fail("unrecognized packing \"%s\"", s);
-	return -1;
+	casepack(UNKNOWN);
+#undef casepack
 }
 
 //static struct bitmap_font reformat_font(struct bitmap_font *f,

@@ -1718,7 +1718,7 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 			int f = complicated ? 2 : 1; // bizarre case, squeeze!
 			FORI(h)
 			{
-				void *dest = data + i*spp*sls/f;
+				unsigned char *dest = data + i*spp*sls/f;
 				FORJ(spp/f)
 				{
 					r = TIFFReadScanline(tif, buf, i, j);
@@ -2883,7 +2883,7 @@ static int read_beheaded_vic(struct iio_image *x,
 	{
 		int r = fread(rec, f_recsize, 1, fin);
 		if (r != 1) fail("could not read whole VICAR file");
-		memcpy(x->data + datac, rec + f_nbb, f_ns*bps);
+		memcpy(datac + (uint8_t*)x->data, rec + f_nbb, f_ns*bps);
 		datac += f_ns*bps;
 	}
 
@@ -2949,7 +2949,7 @@ static void fit_parse_line(char *k, char *v, char *l)
 static int read_beheaded_fit(struct iio_image *x,
 		FILE *f, char *header, int nheader)
 {
-	(void*)header;
+	(void)header;
 	while (nheader++ < 80)
 		pick_char_for_sure(f);
 
