@@ -279,7 +279,7 @@ void poisson_rec(float *u, float *g, float *f, int w, int h,
 		float cg_eps = 1e-6;
 		poisson_extension_by_cg(u, g, f, w, h, u, cgit, cg_eps);
 	} else {
-		float cg_eps = 1e-6;
+		float cg_eps = 1e-9;
 		biharmonic_extension_by_cg(u, g, f, w, h, u, cgit, cg_eps);
 	}
 }

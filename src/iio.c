@@ -1613,10 +1613,12 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 	IIO_DEBUG("uss = %d\n", (int)uscanline_size);
 	int sls = TIFFScanlineSize(tif);
 	IIO_DEBUG("sls(r) = %d\n", (int)sls);
-	IIO_DEBUG("planarity = %s\n", broken?"broken":"normal");
+	IIO_DEBUG("planarity = %d (%s)\n", r, broken?"broken":"normal");
 
 	if ((int)scanline_size != sls)
 	{
+		if (broken && sls*spp == (int)scanline_size)
+			goto go_on;
 		// use basic RGBA reader for inconsistently reported images
 		// this may happen when each channel has a different format
 		fprintf(stderr, "IIO TIFF WARN: scanline_size,sls = %d,%d\n",
@@ -1637,11 +1639,11 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 		x->format = x->meta = -42;
 		return 0;
 	}
-	assert((int)scanline_size == sls);
-	//if (!broken)
-	//	assert((int)scanline_size == sls);
-	//else
-	//	assert((int)scanline_size == spp*sls);
+go_on:
+	if (!broken)
+		assert((int)scanline_size == sls);
+	else
+		assert((int)scanline_size == spp*sls);
 	assert((int)scanline_size >= sls);
 	uint8_t *data = xmalloc(w * h * spp * rbps * (complicated?2:1));
 	uint8_t *buf = xmalloc(scanline_size);

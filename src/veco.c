@@ -53,6 +53,24 @@ static float float_max(float *x, int n)
 	return r;
 }
 
+static float float_pmin(float *x, int n)
+{
+	int j = 0;
+	for (int i = 1; i < n; i++)
+		if (x[i] < x[j])
+			j = i;
+	return j;
+}
+
+static float float_pmax(float *x, int n)
+{
+	int j = 0;
+	for (int i = 1; i < n; i++)
+		if (x[i] > x[j])
+			j = i;
+	return j;
+}
+
 int compare_floats(const void *a, const void *b)
 {
 	const float *da = (const float *) a;
@@ -484,6 +502,8 @@ int main_veco(int c, char *v[])
 	if (0 == strcmp(operation_name, "std"))   f = float_std;
 	if (0 == strcmp(operation_name, "iqd"))   f = float_iqd;
 	if (0 == strcmp(operation_name, "first")) f = float_first;
+	if (0 == strcmp(operation_name, "pmin"))   f = float_pmin;
+	if (0 == strcmp(operation_name, "pmax"))   f = float_pmax;
 	if (*operation_name == 'q') {
 		float p = atof(1 + operation_name);
 		f = float_percentile;
