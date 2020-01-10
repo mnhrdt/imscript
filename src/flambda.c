@@ -210,7 +210,7 @@
 // REPORTING BUGS                                                          {{{2
 //
 //	Download last version from https://github.com/mnhrdt
-//	Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>
+//	Report bugs to <enric.meinhardt@ens-paris-saclay.fr>
 //
 // TODO LIST                                                               {{{2
 //
@@ -2614,7 +2614,7 @@ static int print_help(char *v, int verbosity)
 " flambda a.tiff b.tiff \"x y +\" -o sum.tiff\tCompute the sum of two images.\n"
 "%s"
 "\n"
-"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>.\n",
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>.\n",
 verbosity>0?
 "\n"
 "EXPRESSIONS:\n\n"

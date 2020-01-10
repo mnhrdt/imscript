@@ -889,7 +889,7 @@ static char *help_string_long     =
 " SHIFT-WHEEL    change local contrast span\n"
 " RIGHT-CLICK    reset zoom and position\n"
 "\n"
-"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>.\n"
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>.\n"
 ;
 
 #include "help_stuff.c"

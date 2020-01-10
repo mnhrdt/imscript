@@ -222,7 +222,7 @@
 // REPORTING BUGS                                                          {{{2
 //
 //	Download last version from https://github.com/mnhrdt
-//	Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>
+//	Report bugs to <enric.meinhardt@ens-paris-saclay.fr>
 //
 // TODO LIST                                                               {{{2
 //
@@ -2734,216 +2734,219 @@ static int main_images(int c, char **v)
 	return EXIT_SUCCESS;
 }
 
-static int print_version(void)
-{
-	printf("plambda 1.0\n\n"
-	"Written by Enric Meinhardt-Llopis\n");
-	return 0;
-}
+static char *help_string_name     = "plambda";
+static char *help_string_version  = "plambda 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "evaluate an expression with "
+                                                         "images as variables";
 
-static int print_help(char *v, int verbosity)
-{
-	printf(
-"Plambda evaluates an expression with images as variables.\n"
-"\n"
-"The expression is written in reverse polish notation using common\n"
-"operators and functions from `math.h'.  The variables appearing on the\n"
-"expression are assigned to each input image in alphabetical order.\n"
+#define HMAN_TOP \
+"Plambda evaluates an expression with images as variables.\n\
+\n\
+The expression is written in reverse polish notation using common\n\
+operators and functions from `math.h'.  The variables appearing on the\n\
+expression are assigned to each input image in alphabetical order.\n\
+"
 //"The resulting image is printed to standard output.  The expression\n"
 //"should be written in reverse polish notation using common operators\n"
 //"and functions from `math.h'.  The variables appearing on the\n"
 //"expression are assigned to each input image in alphabetical order.\n"
-"%s"
-"\n"
-"Usage: %s a.png b.png c.png ... \"EXPRESSION\" > output\n"
-"   or: %s a.png b.png c.png ... \"EXPRESSION\" -o output.png\n"
-"   or: %s -c num1 num2 num3  ... \"EXPRESSION\"\n"
-"\n"
-"Options:\n"
-" -o file\tsave output to named file\n"
-" -c\t\tact as a symbolic calculator\n"
-" -h\t\tdisplay short help message\n"
-" --help\t\tdisplay longer help message\n"
-" --examples\tshow more usage examples\n"
-//" --version\tdisplay version\n"
-//" --man\tdisplay manpage\n"
-"\n"
-"Examples:\n"
-" plambda a.tiff b.tiff \"x y +\" > sum.tiff\tCompute the sum of two images.\n"
-" plambda -c \"1 atan 4 *\"\t\t\tPrint pi\n"
-"%s"
-"\n"
-"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>.\n",
-verbosity>0?
-"\n"
-"EXPRESSIONS:\n\n"
-"A \"plambda\" expression is a sequence of tokens.\nTokens may be constants,\n"
-"variables, or operators.  Constants and variables get their value\n"
-"computed and pushed to the stack.  Operators pop values from the stack,\n"
-"apply a function to them, and push back the results.\n"
-"\n"
-"CONSTANTS: numeric constants written in scientific notation, and \"pi\"\n"
-"\n"
-"OPERATORS: +, -, *, ^, /, <, >, ==, and all the functions from math.h\n"
-"\n"
-"LOGIC OPS: if, and, or, not\n"
-"\n"
-"VARIABLES: anything not recognized as a constant or operator.  There\n"
-"must be as many variables as input images, and they are assigned to\n"
-"images in alphabetical order.  If there are no variables, the input\n"
-"images are pushed to the stack.\n"
-"\n"
-"All operators (unary, binary and ternary) are vectorizable.  Thus, you can\n"
-"add a scalar to a vector, divide two vectors of the same size, and so on.\n"
-"The semantics of each operation follows the principle of least surprise.\n"
-"\n"
-"Some \"sugar\" is added to the language:\n"
-"\n"
-"Predefined variables (always preceeded by a colon):\n"
-" :i\thorizontal coordinate of the pixel\n"
-" :j\tvertical coordinate of the pixel\n"
-" :w\twidth of the image\n"
-" :h\theigth of the image\n"
-" :n\tnumber of pixels in the image\n"
-" :x\trelative horizontal coordinate of the pixel\n"
-" :y\trelative horizontal coordinate of the pixel\n"
-" :r\trelative distance to the center of the image\n"
-" :t\trelative angle from the center of the image\n"
-" :I\thorizontal coordinate of the pixel (centered)\n"
-" :J\tvertical coordinate of the pixel (centered)\n"
-" :P\thorizontal coordinate of the pixel (phased)\n"
-" :Q\tvertical coordinate of the pixel (phased)\n"
-" :R\tcentered distance to the center\n"
-" :L\tminus squared centered distance to the center\n"
-" :W\twidth of the image divided by 2*pi\n"
-" :H\theight of the image divided by 2*pi\n"
-"\n"
-"Variable modifiers acting on regular variables:\n"
-" x\t\tvalue of pixel (i,j)\n"
-" x(0,0)\t\tvalue of pixel (i,j)\n"
-" x(1,0)\t\tvalue of pixel (i+1,j)\n"
-" x(0,-1)\tvalue of pixel (i,j-1)\n"
-" x[0]\t\tvalue of first component of pixel (i,j)\n"
-" x[1]\t\tvalue of second component of pixel (i,j)\n"
-" x(1,2)[3]\tvalue of fourth component of pixel (i+1,j+2)\n"
-"\n"
-"Comma modifiers (pre-defined local operators):\n"
-" a,x\tx-derivative of the image a\n"
-" a,y\ty-derivative\n"
-" a,xx\tsecond x-derivative\n"
-" a,yy\tsecond y-derivative\n"
-" a,xy\tcrossed second derivative\n"
-" a,l\tLaplacian\n"
-" a,g\tgradient\n"
-" a,n\tgradient norm\n"
-" a,d\tdivergence\n"
-" a,S\tshadow operator\n"
-" a,xf\tx-derivative, forward differences\n"
-" a,xb\tx-derivative, backward differences\n"
-" a,xc\tx-derivative, centered differences\n"
-" a,xs\tx-derivative, sobel\n"
-" a,xp\tx-derivative, prewitt\n"
-" a,E\tmorphological erosion (using \"cross\" structuring element)\n"
-" a,D\tmorphological dilation\n"
-" a,M\tmedian filtering\n"
-" a,L\tmorphological Laplacian\n"
-" a,X\tmorphological enhancement\n"
-" a,I\tmorphological inner gradient\n"
-" a,Y\tmorphological outer gradient\n"
-" a,G\tmorphological centered gradient\n"
-" a,E9\tmorphological erosion (using \"square\" structuring element)\n"
-" etc\n"
-"\n"
-"Stack operators (allow direct manipulation of the stack):\n"
-" del\tremove the value at the top of the stack (ATTTOS)\n"
-" dup\tduplicate the value ATTTOS\n"
-" rot\tswap the two values ATTTOS\n"
-" split\tsplit the vector ATTTOS into scalar components\n"
-" join\tjoin the components of two vectors ATTOTS\n"
-" join3\tjoin the components of three vectors ATTOTS\n"
-" njoin\tjoin the components of n vectors\n"
-" halve\tsplit an even-sized vector ATTOTS into two equal-sized parts\n"
-" nstack\tcurrent number of elements in the stack (useful with njoin)\n"
-//" interleave\tinterleave\n"
-//" deinterleave\tdeinterleave\n"
-//" nsplit\tnsplit\n"
-"\n"
-//"Magic variable modifiers:\n"
-"Magic variable modifiers (global data associated to each input image):\n"
-" x%i\tvalue of the smallest sample of image x\n"
-" x%a\tvalue of the largest sample\n"
-" x%v\taverage sample value\n"
-" x%m\tmedian sample value\n"
-" x%s\tsum of all samples\n"
-" x%I\tvalue of the smallest pixel (in euclidean norm)\n"
-" x%A\tvalue of the largest pixel\n"
-" x%V\taverage pixel value\n"
-" x%S\tsum of all pixels\n"
-" x%Y\tcomponent-wise minimum of all pixels\n"
-" x%E\tcomponent-wise maximum of all pixels\n"
-" x%qn\tnth sample percentile\n"
-" x%On\tcomponent-wise nth percentile\n"
-" x%Wn\tcomponent-wise nth millionth part\n"
-" x%0n\tcomponent-wise nth order statistic\n"
-" x%9n\tcomponent-wise nth order statistic (from the right)\n"
-//" x[2]%i\tminimum value of the blue channel\n"
-//" \n"
-//" x%M\tmedian pixel value\n"
-"\n"
-"Random numbers (seeded by the SRAND environment variable):\n"
-" randu\tpush a random number with distribution Uniform(0,1)\n"
-" randn\tpush a random number with distribution Normal(0,1)\n"
-" randc\tpush a random number with distribution Cauchy(0,1)\n"
-" randl\tpush a random number with distribution Laplace(0,1)\n"
-" rande\tpush a random number with distribution Exponential(1)\n"
-" randp\tpush a random number with distribution Pareto(1)\n"
-" rand\tpush a random integer returned from rand(3)\n"
-"\n"
-"Vectorial operations (acting over vectors of a certain length):\n"
-" topolar\tconvert a 2-vector from cartesian to polar\n"
-" frompolar\tconvert a 2-vector from polar to cartesian\n"
-" hsv2rgb\tconvert a 3-vector from HSV to RGB\n"
-" rgb2hsv\tconvert a 3-vector from RGB to HSV\n"
-" xyz2rgb\tconvert a 3-vector from XYZ to RGB\n"
-" rgb2xyz\tconvert a 3-vector from RGB to XYZ\n"
-" cprod\t\tmultiply two 2-vectrs as complex numbers\n"
-" cexp\t\tcomplex exponential\n"
-" cpow\t\tcomplex power\n"
-" mprod\t\tmultiply two 2-vectrs as matrices (4-vector = 2x2 matrix, etc)\n"
-" vprod\t\tvector product of two 3-vectors\n"
-" sprod\t\tscalar product of two n-vectors\n"
-" mdet\t\tdeterminant of a n-matrix (a n*n-vector)\n"
-" mtrans\t\ttranspose of a matrix\n"
-" mtrace\t\ttrace of a matrix\n"
-" minv\t\tinverse of a matrix\n"
-" vavg\t\taverage value of a vector\n"
-" vsum\t\tsum of the components of a vector\n"
-" vmul\t\tproduct of the components of a vector\n"
-" vmax\t\tmax component of a vector\n"
-" vmin\t\tmin component of a vector\n"
-" vnorm\t\teuclidean norm of a vector\n"
-" vdim\t\tlength of a vector\n"
-"\n"
-"Registers (numbered from 1 to 9):\n"
-" >7\tcopy to register 7\n"
-" <3\tcopy from register 3\n"
-"\n"
+
+#define HMAN_BOT \
+"\n\
+Usage: plambda a.png b.png c.png ... \"EXPRESSION\" > output\n\
+   or: plambda a.png b.png c.png ... \"EXPRESSION\" -o output.png\n\
+   or: plambda -c num1 num2 num3  ... \"EXPRESSION\"\n\
+\n\
+Options:\n\
+ -o file\tsave output to named file\n\
+ -c\t\tact as a symbolic calculator\n\
+ -h\t\tdisplay short help message\n\
+ --help\t\tdisplay longer help message\n\
+ --examples\tshow more usage examples\n\
+\n\
+Examples:\n\
+ plambda a.tiff b.tiff \"x y +\" > sum.tiff\tCompute the sum of two images.\n\
+ plambda -c \"1 atan 4 *\"\t\t\tPrint pi\n\
+ plambda -c \"355 113 /\"\t\t\t\tPrint an approximation of pi\n\
+\n\
+Report bugs to <enric.meinhardt@ens-paris-saclay.fr>.\
+"
+//" --version\tdisplay version\n\
+//" --man\tdisplay manpage\n\
+
+#define HMAN_LONG \
+"\n\
+EXPRESSIONS:\n\n\
+A \"plambda\" expression is a sequence of tokens.\nTokens may be constants,\n\
+variables, or operators.  Constants and variables get their value\n\
+computed and pushed to the stack.  Operators pop values from the stack,\n\
+apply a function to them, and push back the results.\n\
+\n\
+CONSTANTS: numeric constants written in scientific notation, and \"pi\"\n\
+\n\
+OPERATORS: +, -, *, ^, /, <, >, ==, and all the functions from math.h\n\
+\n\
+LOGIC OPS: if, and, or, not\n\
+\n\
+VARIABLES: anything not recognized as a constant or operator.  There\n\
+must be as many variables as input images, and they are assigned to\n\
+images in alphabetical order.  If there are no variables, the input\n\
+images are pushed to the stack.\n\
+\n\
+All operators (unary, binary and ternary) are vectorizable.  Thus, you can\n\
+add a scalar to a vector, divide two vectors of the same size, and so on.\n\
+The semantics of each operation follows the principle of least surprise.\n\
+\n\
+Some \"sugar\" is added to the language:\n\
+\n\
+Predefined variables (always preceeded by a colon):\n\
+ :i\thorizontal coordinate of the pixel\n\
+ :j\tvertical coordinate of the pixel\n\
+ :w\twidth of the image\n\
+ :h\theigth of the image\n\
+ :n\tnumber of pixels in the image\n\
+ :x\trelative horizontal coordinate of the pixel\n\
+ :y\trelative horizontal coordinate of the pixel\n\
+ :r\trelative distance to the center of the image\n\
+ :t\trelative angle from the center of the image\n\
+ :I\thorizontal coordinate of the pixel (centered)\n\
+ :J\tvertical coordinate of the pixel (centered)\n\
+ :P\thorizontal coordinate of the pixel (phased)\n\
+ :Q\tvertical coordinate of the pixel (phased)\n\
+ :R\tcentered distance to the center\n\
+ :L\tminus squared centered distance to the center\n\
+ :W\twidth of the image divided by 2*pi\n\
+ :H\theight of the image divided by 2*pi\n\
+\n\
+Variable modifiers acting on regular variables:\n\
+ x\t\tvalue of pixel (i,j)\n\
+ x(0,0)\t\tvalue of pixel (i,j)\n\
+ x(1,0)\t\tvalue of pixel (i+1,j)\n\
+ x(0,-1)\tvalue of pixel (i,j-1)\n\
+ x[0]\t\tvalue of first component of pixel (i,j)\n\
+ x[1]\t\tvalue of second component of pixel (i,j)\n\
+ x(1,2)[3]\tvalue of fourth component of pixel (i+1,j+2)\n\
+\n\
+Comma modifiers (pre-defined local operators):\n\
+ a,x\tx-derivative of the image a\n\
+ a,y\ty-derivative\n\
+ a,xx\tsecond x-derivative\n\
+ a,yy\tsecond y-derivative\n\
+ a,xy\tcrossed second derivative\n\
+ a,l\tLaplacian\n\
+ a,g\tgradient\n\
+ a,n\tgradient norm\n\
+ a,d\tdivergence\n\
+ a,S\tshadow operator\n\
+ a,xf\tx-derivative, forward differences\n\
+ a,xb\tx-derivative, backward differences\n\
+ a,xc\tx-derivative, centered differences\n\
+ a,xs\tx-derivative, sobel\n\
+ a,xp\tx-derivative, prewitt\n\
+ a,E\tmorphological erosion (using \"cross\" structuring element)\n\
+ a,D\tmorphological dilation\n\
+ a,M\tmedian filtering\n\
+ a,L\tmorphological Laplacian\n\
+ a,X\tmorphological enhancement\n\
+ a,I\tmorphological inner gradient\n\
+ a,Y\tmorphological outer gradient\n\
+ a,G\tmorphological centered gradient\n\
+ a,E9\tmorphological erosion (using \"square\" structuring element)\n\
+ etc\n\
+\n\
+Stack operators (allow direct manipulation of the stack):\n\
+ del\tremove the value at the top of the stack (ATTTOS)\n\
+ dup\tduplicate the value ATTTOS\n\
+ rot\tswap the two values ATTTOS\n\
+ split\tsplit the vector ATTTOS into scalar components\n\
+ join\tjoin the components of two vectors ATTOTS\n\
+ join3\tjoin the components of three vectors ATTOTS\n\
+ njoin\tjoin the components of n vectors\n\
+ halve\tsplit an even-sized vector ATTOTS into two equal-sized parts\n\
+ nstack\tcurrent number of elements in the stack (useful with njoin)\n\
+\n\
+Magic variable modifiers (global data associated to each input image):\n\
+ x%i\tvalue of the smallest sample of image x\n\
+ x%a\tvalue of the largest sample\n\
+ x%v\taverage sample value\n\
+ x%m\tmedian sample value\n\
+ x%s\tsum of all samples\n\
+ x%I\tvalue of the smallest pixel (in euclidean norm)\n\
+ x%A\tvalue of the largest pixel\n\
+ x%V\taverage pixel value\n\
+ x%S\tsum of all pixels\n\
+ x%Y\tcomponent-wise minimum of all pixels\n\
+ x%E\tcomponent-wise maximum of all pixels\n\
+ x%qn\tnth sample percentile\n\
+ x%On\tcomponent-wise nth percentile\n\
+ x%Wn\tcomponent-wise nth millionth part\n\
+ x%0n\tcomponent-wise nth order statistic\n\
+ x%9n\tcomponent-wise nth order statistic (from the right)\n\
+\n\
+Random numbers (seeded by the SRAND environment variable):\n\
+ randu\tpush a random number with distribution Uniform(0,1)\n\
+ randn\tpush a random number with distribution Normal(0,1)\n\
+ randc\tpush a random number with distribution Cauchy(0,1)\n\
+ randl\tpush a random number with distribution Laplace(0,1)\n\
+ rande\tpush a random number with distribution Exponential(1)\n\
+ randp\tpush a random number with distribution Pareto(1)\n\
+ rand\tpush a random integer returned from rand(3)\n\
+\n\
+Vectorial operations (acting over vectors of a certain length):\n\
+ topolar\tconvert a 2-vector from cartesian to polar\n\
+ frompolar\tconvert a 2-vector from polar to cartesian\n\
+ hsv2rgb\tconvert a 3-vector from HSV to RGB\n\
+ rgb2hsv\tconvert a 3-vector from RGB to HSV\n\
+ xyz2rgb\tconvert a 3-vector from XYZ to RGB\n\
+ rgb2xyz\tconvert a 3-vector from RGB to XYZ\n\
+ cprod\t\tmultiply two 2-vectrs as complex numbers\n\
+ cexp\t\tcomplex exponential\n\
+ cpow\t\tcomplex power\n\
+ mprod\t\tmultiply two 2-vectrs as matrices (4-vector = 2x2 matrix, etc)\n\
+ vprod\t\tvector product of two 3-vectors\n\
+ sprod\t\tscalar product of two n-vectors\n\
+ mdet\t\tdeterminant of a n-matrix (a n*n-vector)\n\
+ mtrans\t\ttranspose of a matrix\n\
+ mtrace\t\ttrace of a matrix\n\
+ minv\t\tinverse of a matrix\n\
+ vavg\t\taverage value of a vector\n\
+ vsum\t\tsum of the components of a vector\n\
+ vmul\t\tproduct of the components of a vector\n\
+ vmax\t\tmax component of a vector\n\
+ vmin\t\tmin component of a vector\n\
+ vnorm\t\teuclidean norm of a vector\n\
+ vdim\t\tlength of a vector\n\
+\n\
+Registers (numbered from 1 to 9):\n\
+ >7\tcopy to register 7\n\
+ <3\tcopy from register 3\n\
+\n\
+"
+
+//" interleave\tinterleave\n\
+//" deinterleave\tdeinterleave\n\
+//" nsplit\tnsplit\n\
+//
+//" x[2]%i\tminimum value of the blue channel\n\
+//" \n\
+//" x%M\tmedian pixel value\n\
+//
 //"Environment:\n"
 //" SRAND\tseed of the random number generator (default=1)\n"
 //" CAFMT\tformat of the number printed by the calculator (default=%.15lf)\n"
-	:
-	"See the manual page for details on the syntax for expressions.\n"
-	,
-	v, v, v,
-	verbosity < 1 ? "" :
-	" plambda -c \"355 113 /\"\t\t\t\tPrint an approximation of pi\n"
-		);
-	return 0;
-}
+
+#define HMAN_SHORT \
+	"See the manual page for details \
+on the syntax for expressions.\n"
+
+
+static char *help_string_long     = HMAN_TOP HMAN_LONG  HMAN_BOT;
+static char *help_string_usage    = HMAN_TOP HMAN_SHORT HMAN_BOT;
+
 
 static int print_examples(void)
 {
-	printf(
+	return 0 * printf(
 "PLAMBDA EXAMPLES\n"
 "\n"
 "Sum two images (to standard output):\n"
@@ -3023,29 +3026,24 @@ static int print_examples(void)
 "Periodic component of an image (faster, using external tool)\n"
 "	cat image.png | ppsmooth > pcomponent.png\n"
 );
-
-	return 0;
 }
 
-static int do_man(void)
-{
-#ifdef __OpenBSD__
-#define MANPIPE "|mandoc -a"
-#else
-#define MANPIPE "|man -l -"
-#endif
-	return system("help2man -N -S imscript -n \"evaluate an expression "
-				"with images as variables\" plambda" MANPIPE);
-}
+//static int do_man(void)
+//{
+//#ifdef __OpenBSD__
+//#define MANPIPE "|mandoc -a"
+//#else
+//#define MANPIPE "|man -l -"
+//#endif
+//	return system("help2man -N -S imscript -n \"evaluate an expression "
+//				"with images as variables\" plambda" MANPIPE);
+//}
 
+#include "help_stuff.c"
 int main_plambda(int c, char **v)
 {
-	if (c == 1) return print_help(*v, 0);
-	if (c == 2 && 0 == strcmp(v[1], "-h")) return print_help(*v,0);
-	if (c == 2 && 0 == strcmp(v[1], "--help")) return print_help(*v,1);
-	if (c == 2 && 0 == strcmp(v[1], "--examples")) return print_examples();
-	if (c == 2 && 0 == strcmp(v[1], "--version")) return print_version();
-	if (c == 2 && 0 == strcmp(v[1], "--man")) return do_man();
+	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
+	if (c == 2 && 0 == strcmp(v[1], "--examples"))return print_examples();
 
 	int (*f)(int, char**) = **v=='c' ?  main_calc : main_images;
 	if (f == main_images && c > 2 && 0 == strcmp(v[1], "-c")) {

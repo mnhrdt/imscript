@@ -128,6 +128,7 @@ static char *help_string_long     =
 " -p -X\t\tset the mean to 127 and the standard deviation to X\n"
 " -f\t\tdo not quantize the output, only rescale the values\n"
 " -i\t\ttreat each pixel dimension independently\n"
+" -s\t\tforce a symmetric span around zero\n"
 " -v\t\tverbose mode (print details of the transformation)\n"
 " -h\t\tdisplay short help message\n"
 " --help\t\tdisplay longer help message\n"
@@ -136,7 +137,7 @@ static char *help_string_long     =
 " qauto in.tiff out.png          Quantize an image by simplest color balance.\n"
 " qauto -i in.png out.png        Remove color biases\n"
 "\n"
-"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>."
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
 ;
 #include "help_stuff.c" // functions that print the strings named above
 #include "pickopt.c"    // function to extract hyphenated command line options
@@ -150,6 +151,7 @@ int main_qauto(int c, char *v[])
 	float parameter = atof(pick_option(&c, &v, "p", "5"));
 	bool independent = pick_option(&c, &v, "i", 0);
 	bool dontquantize = pick_option(&c, &v, "f", 0);
+	bool symmetric = pick_option(&c, &v, "s", 0);
 	global_verbose_flag = !!pick_option(&c, &v, "v", 0);
 
 	// get positional arguments

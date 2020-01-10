@@ -114,7 +114,7 @@ static char *help_string_long     =
 "Examples:\n"
 " imflip leftright in.png out.png     Flip an image horizontally.\n"
 "\n"
-"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>."
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
 ;
 #include <ctype.h>
 #include <stdio.h>

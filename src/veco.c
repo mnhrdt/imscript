@@ -432,6 +432,8 @@ static char *help_string_long     =
 " medv         median of the good samples (average of 1 or 2 central samples)\n"
 " mod          mode of the good samples (the value that appears more times)\n"
 " cnt          number of good samples\n"
+" pmin         index of minimum sample\n"
+" pmax         index of maximum sample\n"
 " mul          product of all good samples\n"
 " first        the first good sample\n"
 " rnd          a randomly chosen good sample\n"
@@ -459,7 +461,7 @@ static char *help_string_long     =
 " veco avg i*.png -o avg.png     Compute the average of a bunch of images\n"
 " veco M0 -x 1 2 3               Compute the geometric mean of three numbers\n"
 "\n"
-"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>."
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
 ;
 #include "help_stuff.c"
 #include "pickopt.c"

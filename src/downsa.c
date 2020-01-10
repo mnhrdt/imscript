@@ -166,7 +166,7 @@ static char *help_string_long     =
 " downsa a 2 stars.png small_stars.png              morphological zoom-out\n"
 " cat big.png | blur g 1.6 | downsa f 2 > small     well-sampled zoom-out\n"
 "\n"
-"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>.";
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>.";
 #include "help_stuff.c" // functions that print the strings named above
 
 int main_downsa(int c, char *v[])

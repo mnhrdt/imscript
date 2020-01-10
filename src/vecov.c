@@ -252,7 +252,7 @@ static char *help_string_long     =
 "Examples:\n"
 " veco avg i*.png -o avg.png     Compute the average of a bunch of images\n"
 "\n"
-"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>."
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
 ;
 
 #include "help_stuff.c"

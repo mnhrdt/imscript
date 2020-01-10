@@ -789,7 +789,7 @@ static char *help_string_long     =
 " imprintf \"width=%w heigth=%h\\n\" a.png       use a fancier format string\n"
 " imprintf @9 a.png                           show table with all data\n"
 "\n"
-"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>."
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
 ;
 #include "help_stuff.c" // functions that print the strings named above
 

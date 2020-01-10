@@ -433,7 +433,7 @@ static char *help_string_long     =
 " morsi cross erosion i.png o.png    Erode by a \"cross\" structuring element\n"
 " morsi disk4.2 median i.png o.png   Median filtering of radius 4.2\n"
 "\n"
-"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>."
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
 ;
 #include "help_stuff.c" // functions that print the strings named above
 

@@ -144,7 +144,7 @@ static char *help_string_long     =
 " homwarp \"[-1,0,640;0,1,0;0,0,1];\" < in > out\tnon-numeric chars. are ignored\n"
 " homwarp homography.txt < in > out          \tread homography from file\n"
 "\n"
-"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>."
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
 ;
 
 #include <stdio.h>

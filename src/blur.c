@@ -514,7 +514,7 @@ static char *help_string_long     =
 " plambda - \"x,l -1 *\" | blur i 0.25    Laplacian square root\n"
 " plambda - \"x,l\" | blur z 0.25 | plambda - \"0 >\"      Linear dithering\n"
 "\n"
-"Report bugs to <enric.meinhardt@cmla.ens-cachan.fr>.\n"
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>.\n"
 ;
 #include "help_stuff.c"
 #include "parsenumbers.c"
