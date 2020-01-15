@@ -54,7 +54,7 @@ struct pan_view {
 	int w, h;                  // pixel dimensions of the P image
 	struct fancy_image *tg; // P
 	struct fancy_image *tc; // MS
-	int gray_only;
+	int gray_only, general_mode;
 
 	// RGB preview of the whole image
 	uint8_t *preview;
@@ -173,6 +173,7 @@ static void init_view(struct pan_view *v,
 	v->pfg = fgpre;
 	v->pfc = fcpre;
 	v->gray_only = 0;
+	v->general_mode = 0;
 
 	// load P and MS
 	//int megabytes = 0;
@@ -182,7 +183,14 @@ static void init_view(struct pan_view *v,
 	v->tg = fancy_image_open(fgtif, "r");
 	if (fctif)
 		v->tc = fancy_image_open(fctif, "r");
-	else v->gray_only = 1;//fail("not fctif\n"); //v->tc = NULL;
+	else {
+		if (v->tg->pd > 1)
+			v->general_mode = 1;
+		else
+			v->gray_only = 1;//fail("not fctif\n"); //v->tc = NULL;
+	}
+	fprintf(stderr, "GRAY_ONLY = %d\n", v->gray_only);
+	fprintf(stderr, "GENERAL_MODE = %d\n", v->general_mode);
 	v->w = -1;//v->tg->i->w;
 	v->h = -1;//v->tg->i->h;
 	v->rgbiox = v->rgbioy = 4; // normally untouched
@@ -205,6 +213,7 @@ static void init_view_no_preview(struct pan_view *v,
 	v->pfg = NULL;
 	v->pfc = NULL;
 	v->gray_only = 0;
+	v->general_mode = 0;
 
 	// load P and MS
 	//int megabytes = 0;
@@ -214,7 +223,14 @@ static void init_view_no_preview(struct pan_view *v,
 	v->tg = fancy_image_open(fgtif, "r");
 	if (fctif)
 		v->tc = fancy_image_open(fctif, "r");
-	else v->gray_only = 1;//fail("not fctif\n"); //v->tc = NULL;
+	else {
+		if (v->tg->pd > 1)
+			v->general_mode = 1;
+		else
+			v->gray_only = 1;//fail("not fctif\n"); //v->tc = NULL;
+	}
+	fprintf(stderr, "npGRAY_ONLY = %d\n", v->gray_only);
+	fprintf(stderr, "npGENERAL_MODE = %d\n", v->general_mode);
 	v->w = -1;//v->tg->i->w;
 	v->h = -1;//v->tg->i->h;
 	v->rgbiox = v->rgbioy = 4; // normally untouched
@@ -915,6 +931,7 @@ static void pixel_from_mso(float *out, struct pan_view *v, double p, double q,
 	out[2] = c[2] * g / nc;
 }
 
+// gray-only getpixel
 static void pixel_from_go(float *out, struct pan_view *v, double p, double q,
 		int i, int o)
 {
@@ -926,6 +943,29 @@ static void pixel_from_go(float *out, struct pan_view *v, double p, double q,
 	else if (i == 3) tiffo_getpixel_float_bicubic(c, v->tg, o, ipc, iqc);
 	else             tiffo_getpixel_float_1(c, v->tg, o, ipc, iqc);
 	out[0] = out[1] = out[2] = c[0];
+}
+
+
+// "general" getpixel
+static void pixel_from_ge(float *out, struct pan_view *v, double p, double q,
+		int i, int o)
+{
+	int ofac = 1 << (o);
+	float c[20];
+	float ipc = p / ofac;
+	float iqc = q / ofac;
+	if (i == 2)      tiffo_getpixel_float_bilinear(c, v->tg, o, ipc, iqc);
+	else if (i == 3) tiffo_getpixel_float_bicubic(c, v->tg, o, ipc, iqc);
+	else             tiffo_getpixel_float_1(c, v->tg, o, ipc, iqc);
+	out[0] = out[1] = out[2] = c[0];
+	if (v->tg->pd > 1) out[1] = c[1];
+	if (v->tg->pd > 2) out[2] = c[2];
+	if (v->tg->pd == 8)
+	{
+		out[0] = c[7] / c[6];
+		out[0] = c[2] / c[1];
+		out[0] = c[5] / c[4];
+	}
 }
 
 static void pixel_from_pms(float *out, struct pan_view *v, double p, double q,
@@ -965,6 +1005,8 @@ void pixel(float *out, struct pan_view *v, double p, double q, int o, int i)
 	}
 	if (v->gray_only)
 		pixel_from_go(out, v, p, q, i, o);
+	else if (v->general_mode)
+		pixel_from_ge(out, v, p, q, i, o);
 	else if (msoctaves_instead_of_preview) { // ms-octaves case
 		if (o == 0 || o == 1)
 			pixel_from_pms (out, v, p, q, i);
