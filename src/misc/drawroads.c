@@ -10,7 +10,8 @@ static int insideP(int w, int h, float x, float y)
 	return x >= 0 && y >= 0 && x < w && y < h;
 }
 
-static void render_roads(float *out, int w, int h, int offset_x, int offset_y,
+static void render_roads(float *out, int w, int h,
+		double offset_x, double offset_y, double scalex, double scaley,
 		double *e, double *n, int ne, int nn)
 {
 	// each edge becomes a rectangle with 4 vertices
@@ -31,8 +32,8 @@ static void render_roads(float *out, int w, int h, int offset_x, int offset_y,
 		assert(0 <= a); assert(a < nn);
 		assert(0 <= b); assert(b < nn);
 		//assert(a != b);
-		assert(n[3*a + 0] == a);
-		assert(n[3*b + 0] == b);
+		//assert(n[3*a + 0] == a);
+		//assert(n[3*b + 0] == b);
 
 		// p, q : 2D coordinates of road segment ends
 		double p[2] = { n[3*a + 1], n[3*a + 2] };
@@ -90,7 +91,8 @@ static void putvector(int i, int j, void *ee)
 
 // produce a vector field of road directions
 // (defined along the centre of the road, nan elsewhere)
-static void render_droads(float *out, int w, int h, int offset_x, int offset_y,
+static void render_droads(float *out, int w, int h,
+		double offset_x, double offset_y, double scalex, double scaley,
 		double *e, double *n, int ne, int nn)
 {
 	// set background to (nan,nan)
@@ -107,8 +109,8 @@ static void render_droads(float *out, int w, int h, int offset_x, int offset_y,
 		assert(0 <= a); assert(a < nn);
 		assert(0 <= b); assert(b < nn);
 		//assert(a != b);
-		assert(n[3*a + 0] == a);
-		assert(n[3*b + 0] == b);
+		//assert(n[3*a + 0] == a);
+		//assert(n[3*b + 0] == b);
 
 		// p, q : 2D coordinates of road segment ends
 		double p[2] = { n[3*a + 1], n[3*a + 2] };
@@ -123,7 +125,7 @@ static void render_droads(float *out, int w, int h, int offset_x, int offset_y,
 		v[1] /= nv;
 
 		// w : road segment width
-		double rwidth = 2 * (3 - e[5*i + 4]);
+		//double rwidth = 5; //2 * (3 - e[5*i + 4]);
 
 		// road segment projected normal vector
 		double u[2] = { q[1] - p[1], p[0] - q[0] };
@@ -132,8 +134,14 @@ static void render_droads(float *out, int w, int h, int offset_x, int offset_y,
 		u[1] /= unorm;
 
 		// draw segment
-		int ip[2] = {round(p[0] - offset_x), round(p[1] - offset_y)};
-		int iq[2] = {round(q[0] - offset_x), round(q[1] - offset_y)};
+		int ip[2] = {
+			round( (p[0] - offset_x)/scalex ),
+			round( (p[1] - offset_y)/scaley )
+		};
+		int iq[2] = {
+			round( (q[0] - offset_x)/scalex ),
+			round( (q[1] - offset_y)/scaley )
+		};
 		struct vect_state vst = { w, h, out, v[0], v[1] };
 		traverse_segment(ip[0], ip[1], iq[0], iq[1], putvector, &vst);
 	}
@@ -157,19 +165,19 @@ int main_drawroads(int c, char *v[])
 	// process input arguments
 	if (c != 11) {
 		fprintf(stderr, "usage:\n\t%s [-d]"
-		" edges.5cols nodes.3col x0 y0 w h e1 e2 e3 out.tiff\n", *v);
+		" edges.5cols nodes.3col x0 y0 w h sx sy e3 out.tiff\n", *v);
 		//1           2          3  4  5 6 7  8  9  10
 		return 1;
 	}
 	char *filename_e   = v[1];
 	char *filename_n   = v[2];
-	int param_x0       = atoi(v[3]);
-	int param_y0       = atoi(v[4]);
+	double param_x0    = atof(v[3]);
+	double param_y0    = atof(v[4]);
 	int w              = atoi(v[5]);
 	int h              = atoi(v[6]);
-	float param_e1     = atof(v[7]);
-	float param_e2     = atof(v[8]);
-	float param_e3     = atof(v[9]);
+	double param_sx    = atof(v[7]);
+	double param_sy    = atof(v[8]);
+	double param_e3    = atof(v[9]);
 	char *filename_out = v[10];
 
 	// read input lists
@@ -189,10 +197,12 @@ int main_drawroads(int c, char *v[])
 	// render
 	float *x = xmalloc(2*w*h*sizeof*x);
 	if (!draw_directions) {
-		render_roads(x, w, h, param_x0, param_y0, e, n, ne, nn);
+		render_roads(x, w, h, param_x0, param_y0, param_sx, param_sy,
+				e, n, ne, nn);
 		iio_write_image_float(filename_out, x, w, h);
 	} else {
-		render_droads(x, w, h, param_x0, param_y0, e, n, ne, nn);
+		render_droads(x, w, h, param_x0, param_y0, param_sx, param_sy,
+				e, n, ne, nn);
 		iio_write_image_float_vec(filename_out, x, w, h, 2);
 	}
 
