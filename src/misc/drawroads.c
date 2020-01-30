@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <math.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 
 static int insideP(int w, int h, float x, float y)
@@ -89,6 +90,19 @@ static void putvector(int i, int j, void *ee)
 	e->f[ (i + j*e->w)*2 + 1 ] = e->vy;
 }
 
+struct byte_state {
+	int w, h;
+	uint8_t *f, v;
+};
+
+static void putmask(int i, int j, void *ee)
+{
+	struct byte_state *e = ee;
+	if (i < 0 || j < 0 || i >= e->w || j >= e->h)
+		return;
+	e->f[ i + j*e->w ] = e->v;
+}
+
 // produce a vector field of road directions
 // (defined along the centre of the road, nan elsewhere)
 static void render_droads(float *out, int w, int h,
@@ -147,6 +161,47 @@ static void render_droads(float *out, int w, int h,
 	}
 }
 
+static void render_broads(uint8_t *out, int w, int h,
+		double offset_x, double offset_y, double scalex, double scaley,
+		double *e, double *n, int ne, int nn)
+{
+	// set background to 0
+	for (int i = 0; i < w*h; i++)
+		out[i] = 0;
+
+	// dump vertices
+	for (int i = 0; i < ne; i++)
+	{
+		// a, b : integer indeces of road segment ends
+		int a = e[5*i + 1];
+		int b = e[5*i + 2];
+		assert(0 <= a); assert(a < nn);
+		assert(0 <= b); assert(b < nn);
+
+		// p, q : 2D coordinates of road segment ends
+		double p[2] = { n[3*a + 1], n[3*a + 2] };
+		double q[2] = { n[3*b + 1], n[3*b + 2] };
+
+		// road segment projected normal vector
+		double u[2] = { q[1] - p[1], p[0] - q[0] };
+		double unorm = 2 * hypot(u[0], u[1]);
+		u[0] /= unorm;
+		u[1] /= unorm;
+
+		// draw segment
+		int ip[2] = {
+			round( (p[0] - offset_x)/scalex ),
+			round( (p[1] - offset_y)/scaley )
+		};
+		int iq[2] = {
+			round( (q[0] - offset_x)/scalex ),
+			round( (q[1] - offset_y)/scaley )
+		};
+		struct byte_state vst = { w, h, out, -1 };
+		traverse_segment(ip[0], ip[1], iq[0], iq[1], putmask, &vst);
+	}
+}
+
 // edges.5cols
 // idx from to length2 length2
 // 0   1    2  3        4
@@ -162,9 +217,10 @@ static void render_droads(float *out, int w, int h,
 int main_drawroads(int c, char *v[])
 {
 	bool draw_directions = pick_option(&c, &v, "d", NULL);
+	bool draw_binary = pick_option(&c, &v, "b", NULL);
 	// process input arguments
 	if (c != 11) {
-		fprintf(stderr, "usage:\n\t%s [-d]"
+		fprintf(stderr, "usage:\n\t%s [-d] [-b]"
 		" edges.5cols nodes.3col x0 y0 w h sx sy e3 out.tiff\n", *v);
 		//1           2          3  4  5 6 7  8  9  10
 		return 1;
@@ -186,13 +242,22 @@ int main_drawroads(int c, char *v[])
 	double *n = read_ascii_doubles_fn(filename_n, &nn);
 
 	// check consistency
-	if (ne%5 != 0)fail("file \"%s\" not %d cols (%d)\n", filename_e, 5, ne);
-	if (nn%3 != 0)fail("file \"%s\" not %d cols (%d)\n", filename_n, 3, nn);
+	if (ne%5 != 0)fail("file \"%s\" not %d cols (%d)\n", filename_e,5,ne);
+	if (nn%3 != 0)fail("file \"%s\" not %d cols (%d)\n", filename_n,3,nn);
 	ne /= 5;
 	nn /= 3;
 
 	// print debug info
 	fprintf(stderr, "got %d nodes connected by %d edges\n", nn, ne);
+
+	if (draw_binary)
+	{
+		uint8_t *x = xmalloc(w*h);
+		render_broads(x, w, h, param_x0, param_y0, param_sx, param_sy,
+				e, n, ne, nn);
+		iio_write_image_uint8_vec(filename_out, x, w, h, 1);
+		return 0;
+	}
 
 	// render
 	float *x = xmalloc(2*w*h*sizeof*x);
