@@ -29,13 +29,14 @@
 #define I_CAN_HAS_LIBPNG
 #define I_CAN_HAS_LIBJPEG
 #define I_CAN_HAS_LIBTIFF
+//#define I_CAN_HAS_LIBHDF5
 //#define I_CAN_HAS_LIBEXR
 #define I_CAN_HAS_WGET
 #define I_CAN_HAS_WHATEVER
 //#define I_CAN_KEEP_TMP_FILES
 
 
-//#define IIO_SHOW_DEBUG_MESSAGES
+#define IIO_SHOW_DEBUG_MESSAGES
 #ifdef IIO_SHOW_DEBUG_MESSAGES
 #  define IIO_DEBUG(...) do {\
 	fprintf(stderr,"DEBUG(%s:%d:%s): ",__FILE__,__LINE__,__PRETTY_FUNCTION__);\
@@ -61,11 +62,16 @@
 #undef I_CAN_HAS_LIBTIFF
 #endif
 
+#ifdef IIO_DISABLE_LIBHDF5
+#undef I_CAN_HAS_LIBHDF5
+#endif
+
 #ifdef IIO_DISABLE_IMGLIBS
 #undef I_CAN_HAS_LIBPNG
 #undef I_CAN_HAS_LIBJPEG
 #undef I_CAN_HAS_LIBTIFF
 #undef I_CAN_HAS_LIBEXR
+#undef I_CAN_HAS_LIBHDF5
 #endif
 
 
@@ -141,6 +147,7 @@
 #define IIO_FORMAT_VIC 32
 #define IIO_FORMAT_CCS 33
 #define IIO_FORMAT_FIT 34
+#define IIO_FORMAT_HDF5 35
 #define IIO_FORMAT_UNRECOGNIZED (-1)
 
 //
@@ -602,7 +609,7 @@ static const char *iio_strfmt(int format)
 	M(VTK); M(CIMG); M(PAU); M(DICOM); M(PFM); M(NIFTI);
 	M(PCX); M(GIF); M(XPM); M(RAFA); M(FLO); M(LUM); M(JUV);
 	M(PCM); M(ASC); M(RAW); M(RWA); M(PDS); M(CSV); M(VRT);
-	M(FFD); M(DLM); M(NPY); M(VIC); M(CCS); M(FIT);
+	M(FFD); M(DLM); M(NPY); M(VIC); M(CCS); M(FIT); M(HDF5);
 	M(UNRECOGNIZED);
 	default: fail("caca de la grossa (%d)", format);
 	}
@@ -1049,6 +1056,7 @@ static void iio_convert_samples(struct iio_image *x, int desired_type)
 {
 	assert(!x->contiguous_data);
 	int source_type = normalize_type(x->type);
+	desired_type = normalize_type(desired_type);
 	if (source_type == desired_type) return;
 	IIO_DEBUG("converting from %s to %s\n", iio_strtyp(x->type), iio_strtyp(desired_type));
 	int n = iio_image_number_of_samples(x);
@@ -1780,6 +1788,78 @@ static int read_beheaded_tiff(struct iio_image *x,
 }
 
 #endif//I_CAN_HAS_LIBTIFF
+
+// HDF5 reader                                                              {{{2
+#ifdef I_CAN_HAS_LIBHDF5
+#include <hdf5/serial/hdf5.h>
+
+// DISCLAIMER:
+//
+// By writing the code below, I do not condone by any means the usage and
+// proliferation of HDF5 files.  If I am adding support for them, it is because
+// somebody has to extract the damn numbers from these stupid files.  I firmly
+// believe that the perpetrators of the HDF5 file format and associated
+// libraries should be shot.  In front of their families.
+//
+
+static int read_whole_hdf5(struct iio_image *x, const char *filename)
+{
+	IIO_DEBUG("read whole hdf5 filename=\"%s\"\n", filename);
+
+	char *dataset_id = getenv("IIO_HDF5_DSET");
+	if (!dataset_id)
+		dataset_id = "/dset";
+
+	IIO_DEBUG("read whole hdf5 dataset=\"%s\"\n", dataset_id);
+
+	hid_t       f;  // file
+	hid_t       d;  // dataset
+	hid_t       t;  // data type
+	H5T_class_t c;  // data class (yes, you are in a world of pain now)
+
+	f = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
+	IIO_DEBUG("h5 f = %d\n", (int)f);
+	d = H5Dopen2(f, dataset_id, H5P_DEFAULT);
+	IIO_DEBUG("h5 d = %d\n", (int)d);
+
+	t = H5Dget_type(d);
+	c = H5Tget_class(t);
+	IIO_DEBUG("h5 t = %d\n", (int)t);
+	IIO_DEBUG("h5 c = %d\n", (int)c);
+
+
+	herr_t e; // error status code
+	e = H5Dclose(d);
+	IIO_DEBUG("h5 e(dclose) = %d\n", (int)e);
+
+	e = H5Fclose(f);
+	IIO_DEBUG("h5 e(fclose) = %d\n", (int)e);
+	return 0;
+}
+
+static int read_beheaded_hdf5(struct iio_image *x,
+		FILE *fin, char *header, int nheader)
+{
+	if (global_variable_containing_the_name_of_the_last_opened_file) {
+		int r = read_whole_hdf5(x,
+		global_variable_containing_the_name_of_the_last_opened_file);
+		if (r) fail("read whole tiff returned %d", r);
+		return 0;
+	}
+
+	long filesize;
+	void *filedata = load_rest_of_file(&filesize, fin, header, nheader);
+	char *filename = put_data_into_temporary_file(filedata, filesize);
+	xfree(filedata);
+
+	int r = read_whole_hdf5(x, filename);
+	if (r) fail("read whole hdf5 returned %d", r);
+
+	delete_temporary_file(filename);
+
+	return 0;
+}
+#endif//I_CAN_HAS_LIBHDF5
 
 // QNM readers                                                              {{{2
 
@@ -3722,7 +3802,7 @@ static void iio_write_image_as_csv(const char *filename, struct iio_image *x)
 static void iio_write_image_as_npy(const char *filename, struct iio_image *x)
 {
 	char *descr = 0; // string to identify the number type (by numpy)
-	switch (x->type) {
+	switch (normalize_type(x->type)) {
 		case IIO_TYPE_CHAR   :
 		case IIO_TYPE_UINT8  : descr = "<u1"; break;
 		case IIO_TYPE_UINT16 : descr = "<u2"; break;
@@ -4210,9 +4290,14 @@ static int guess_format(FILE *f, char *buf, int *nbuf, int bufmax)
 	if (b[0]=='f' && b[1]=='a' && b[2]=='r' && b[3]=='b')
 		return IIO_FORMAT_FFD; // farbfeld
 
-	if (b[0]==0x93 &&b[1]=='N' && b[2]=='U' && b[3]=='M')
+	if (b[0]==0x93 &&b [1]=='N' && b[2]=='U' && b[3]=='M')
 		// && b[4]=='P' &&b [5]=='Y')
 		return IIO_FORMAT_NPY; // Numpy
+
+#ifdef I_CAN_HAS_LIBHDF5
+	if (b[0]==0x89 && b[1]=='H' && b[2]=='D' && b[3]=='F')
+		return IIO_FORMAT_HDF5;
+#endif//I_CAN_HAS_LIBHDF5
 
 	b[4] = add_to_header_buffer(f, b, nbuf, bufmax);
 	b[5] = add_to_header_buffer(f, b, nbuf, bufmax);
@@ -4378,6 +4463,10 @@ int read_beheaded_image(struct iio_image *x, FILE *f, char *h, int hn, int fmt)
 	case IIO_FORMAT_VIC:   return read_beheaded_vic (x, f, h, hn);
 	case IIO_FORMAT_FIT:   return read_beheaded_fit (x, f, h, hn);
 	case IIO_FORMAT_CCS:   return read_beheaded_ccs (x, f, h, hn);
+
+#ifdef I_CAN_HAS_LIBHDF5
+	case IIO_FORMAT_HDF5:   return read_beheaded_hdf5 (x, f, h, hn);
+#endif
 
 #ifdef I_CAN_HAS_LIBPNG
 	case IIO_FORMAT_PNG:   return read_beheaded_png (x, f, h, hn);
