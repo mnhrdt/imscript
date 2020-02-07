@@ -919,9 +919,9 @@ static void pixel_from_mso(float *out, struct pan_view *v, double p, double q,
 	float c[20];
 	float ipc = (p + v->rgbiox) / ofac;
 	float iqc = (q + v->rgbioy) / ofac;
-	if (i == 2)      tiffo_getpixel_float_bilinear(c, v->tc, o-2, ipc, iqc);
-	else if (i == 3) tiffo_getpixel_float_bicubic(c, v->tc, o-2, ipc, iqc);
-	else             tiffo_getpixel_float_1(c, v->tc, o-2, ipc, iqc);
+	if (i == 2)      tiffo_getpixel_float_bilinear(c, v->tc, o, ipc, iqc);
+	else if (i == 3) tiffo_getpixel_float_bicubic(c, v->tc, o, ipc, iqc);
+	else             tiffo_getpixel_float_1(c, v->tc, o, ipc, iqc);
 	//rgbi_to_rgb_inplace(c);
 	rgbi_to_rgb_inplace_n(c, v->tc->pd);
 	float g = (c[0] + c[1] + c[2] + c[3]) / 4;
@@ -962,9 +962,11 @@ static void pixel_from_ge(float *out, struct pan_view *v, double p, double q,
 	if (v->tg->pd > 2) out[2] = c[2];
 	if (v->tg->pd == 8)
 	{
-		out[0] = c[7] / c[6];
-		out[0] = c[2] / c[1];
-		out[0] = c[5] / c[4];
+		out[0] = c[7] / c[5];
+		//out[1] = out[0];
+		//out[2] = out[0];
+		out[1] = c[6] / c[5];
+		out[2] = c[2] / c[1];
 	}
 }
 
@@ -1004,16 +1006,16 @@ void pixel(float *out, struct pan_view *v, double p, double q, int o, int i)
 		return;
 	}
 	if (v->gray_only)
-		pixel_from_go(out, v, p, q, i, o);
+		pixel_from_go(out, v, p, q, i, o-2);
 	else if (v->general_mode)
-		pixel_from_ge(out, v, p, q, i, o);
+		pixel_from_ge(out, v, p, q, i, o-2);
 	else if (msoctaves_instead_of_preview) { // ms-octaves case
 		if (o == 0 || o == 1)
 			pixel_from_pms (out, v, p, q, i);
 		else if (o == 2)
 			pixel_from_ms  (out, v, p, q, i);
 		else
-			pixel_from_mso (out, v, p, q, i, o);
+			pixel_from_mso (out, v, p, q, i, o-2);
 	} else { // regular case
 		if (o == 0)      pixel_from_preview (out, v, p, q, i);
 		else if (o == 1) pixel_from_ms      (out, v, p, q, i);
@@ -1173,6 +1175,7 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 
 	//int o = 0;
 	int o = obtain_octave(e);
+	fprintf(stderr, "o = %d\n", o);
 	int interp = e->interpolation_order;
 
 //#pragma omp parallel for
@@ -1187,8 +1190,8 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 			if (so < 0) so = 0;
 			if (!i && !j)
 			{
-				fprintf(stderr, "z=%g, so=%d ofac=%d\n",
-						e->zoom_factor, so, 1 << so);
+				fprintf(stderr, "z=%g, o=%d, so=%d ofac=%d\n",
+						e->zoom_factor, o, so, 1 << so);
 				so = -so;
 			}
 			double hhh = 0;//srtm4o(ll[0], ll[1], so) + egm96(ll[0], ll[1]);
@@ -1628,6 +1631,61 @@ static void action_dump_raw(struct FTR *f)
 	raw_view_counter += 1;
 }
 
+static void action_dump_raw_ms(struct FTR *f)
+{
+	static int raw_view_counter = 0;
+	int pid = getpid();
+	char fname_ms[FILENAME_MAX];
+	char *fmt_ms = "/tmp/rpcflip_raw_ms_%d_%d.tiff";
+	snprintf(fname_ms, FILENAME_MAX, fmt_ms, pid, raw_view_counter);
+	fprintf(stderr, "going to dump raw ms to file \"%s\"\n", fname_ms);
+	struct pan_state *e = f->userdata;
+	struct pan_view  *v = obtain_view(e);
+	fprintf(stderr, "\tgray_only = %d\n", v->gray_only);
+	fprintf(stderr, "\tgeneral_mode = %d\n", v->general_mode);
+	fprintf(stderr, "\tv = %p\n", (void*)v);
+	fprintf(stderr, "\tv->tg = %p\n", (void*)(v->tg));
+	fprintf(stderr, "\tv->tc = %p\n", (void*)(v->tc));
+	int pd = v->tg->pd;
+	fprintf(stderr, "\tpd = %d\n", pd);
+	fprintf(stderr, "\tv->dw = %d\n", v->dw);
+	fprintf(stderr, "\tv->dh = %d\n", v->dh);
+	float *buf = xmalloc(pd * v->dw * v->dh * sizeof(float));
+	for (int j = 0; j < v->dh; j++)
+	for (int i = 0; i < v->dw; i++)
+	{
+		// basically, redo the function "pan_repaint"
+		static
+		void (*win_to_img)(double p[2],struct pan_state*,double,double);
+		win_to_img = window_to_image_apm;
+		if (e->image_space)      win_to_img = window_to_image_apm;
+		else if (e->force_exact) win_to_img = window_to_image_ex;
+		//if (!e->image_space) continue;
+		double p[2];
+		win_to_img(p, e, i, j);
+		if (!i && !j) fprintf(stderr, "\tp00 = %d g %g\n", p[0], p[1]);
+		if (p[0]<0 || p[1]<0 || p[0]>=v->w || p[1]>=v->h)
+			continue;
+		float pc = (p[0]);// + v->rgbiox) / 4;
+		float qc = (p[1]);// + v->rgbioy) / 4;
+		float c[pd];
+		//if (i == 2) tiffo_getpixel_float_bilinear(c,v->tc,0,pc,qc);
+		//else if(i==3)
+		//	tiffo_getpixel_float_bicubic(c,v->tg,0,pc,qc);
+		//else
+		tiffo_getpixel_float_1        (c,v->tg,0,pc,qc);
+		if (!i && !j) for (int l = 0; l < pd; l++)
+			fprintf(stderr, "\tc[%d] = %g\n", l, c[l]);
+		//}
+		for (int l = 0; l < pd; l++)
+			buf[(i+j*v->dw)*pd+l] = c[l];
+	}
+	buf[0] = 0.1;
+	iio_write_image_float_vec(fname_ms, buf, v->dw, v->dh, pd);
+	fprintf(stderr, "dumped raw ms to file \"%s\"\n", fname_ms);
+	raw_view_counter += 1;
+}
+
 static void action_dump_raw_fancy(struct FTR *f)
 {
 	static int raw_view_counter = 0;
@@ -1660,9 +1718,11 @@ static void action_dump_raw_fancy(struct FTR *f)
 		float pc = (p[0] + v->rgbiox) / 4;
 		float qc = (p[1] + v->rgbioy) / 4;
 		float g = i+0.1*j, c[pd];
+		if (!v->general_mode) {
 		if (io == 2)tiffo_getpixel_float_bilinear(&g,v->tg,0,*p,p[1]);
 		else if(io==3)tiffo_getpixel_float_bicubic(&g,v->tg,0,*p,p[1]);
 		else tiffo_getpixel_float_1              (&g,v->tg,0,p[0],p[1]);
+		}
 		if (!v->gray_only) {
 		if (io == 2) tiffo_getpixel_float_bilinear(c,v->tc,0,pc,qc);
 		else if(io==3)tiffo_getpixel_float_bicubic(c,v->tc,0,pc,qc);
@@ -1672,9 +1732,11 @@ static void action_dump_raw_fancy(struct FTR *f)
 		for (int l = 0; l < pd; l++)
 			buf_msi[(i+j*v->dw)*pd+l] = c[l];
 	}
+	if (!v->general_mode)
 	iio_write_image_float_vec(fname_pan, buf_pan, v->dw, v->dh,  1);
 	if (!v->gray_only)
 	iio_write_image_float_vec(fname_msi, buf_msi, v->dw, v->dh, pd);
+	if (!v->general_mode)
 	fprintf(stderr, "dumped raw pan to file \"%s\"\n", fname_pan);
 	if (!v->gray_only)
 	fprintf(stderr, "dumped raw msi (pd=%d) to file \"%s\"\n",pd,fname_msi);
@@ -1807,6 +1869,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == '4') action_dump_raw_fancy(f);
 	if (k == '8') action_dump_raw_collection_fancy(f);
 	if (k == ';') action_dump_raw(f);
+	if (k == '9') action_dump_raw_ms(f);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
