@@ -36,7 +36,7 @@
 //#define I_CAN_KEEP_TMP_FILES
 
 
-#define IIO_SHOW_DEBUG_MESSAGES
+//#define IIO_SHOW_DEBUG_MESSAGES
 #ifdef IIO_SHOW_DEBUG_MESSAGES
 #  define IIO_DEBUG(...) do {\
 	fprintf(stderr,"DEBUG(%s:%d:%s): ",__FILE__,__LINE__,__PRETTY_FUNCTION__);\
