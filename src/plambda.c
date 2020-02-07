@@ -2771,8 +2771,8 @@ Examples:\n\
 \n\
 Report bugs to <enric.meinhardt@ens-paris-saclay.fr>.\
 "
-//" --version\tdisplay version\n\
-//" --man\tdisplay manpage\n\
+//" --version\tdisplay version\n
+//" --man\tdisplay manpage\n
 
 #define HMAN_LONG \
 "\n\
@@ -2923,13 +2923,13 @@ Registers (numbered from 1 to 9):\n\
 \n\
 "
 
-//" interleave\tinterleave\n\
-//" deinterleave\tdeinterleave\n\
-//" nsplit\tnsplit\n\
+//" interleave\tinterleave\n
+//" deinterleave\tdeinterleave\n
+//" nsplit\tnsplit\n
 //
-//" x[2]%i\tminimum value of the blue channel\n\
-//" \n\
-//" x%M\tmedian pixel value\n\
+//" x[2]%i\tminimum value of the blue channel\n
+//" \n
+//" x%M\tmedian pixel value\n
 //
 //"Environment:\n"
 //" SRAND\tseed of the random number generator (default=1)\n"
