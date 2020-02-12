@@ -29,7 +29,7 @@
 #define I_CAN_HAS_LIBPNG
 #define I_CAN_HAS_LIBJPEG
 #define I_CAN_HAS_LIBTIFF
-#define I_CAN_HAS_LIBHDF5
+//#define I_CAN_HAS_LIBHDF5
 //#define I_CAN_HAS_LIBEXR
 #define I_CAN_HAS_WGET
 #define I_CAN_HAS_WHATEVER

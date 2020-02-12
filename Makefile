@@ -1,6 +1,6 @@
 CFLAGS ?= -O3 -march=native
 #CFLAGS ?= -g -Wall -Wextra -Wno-unused
-LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm -lhdf5_serial #-lgdal
+LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm #-lhdf5_serial #-lgdal
 
 OBJ = src/iio.o src/fancy_image.o
 BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
