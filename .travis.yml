@@ -2,6 +2,14 @@
 
 language: c
 
+addons:
+  apt:
+    packages:
+      - libhdf5-dev
+  homebrew:
+    packages:
+      - hdf5
+
 matrix:
   include:
     - os: linux
