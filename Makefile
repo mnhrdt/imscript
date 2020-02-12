@@ -1,5 +1,6 @@
 CFLAGS ?= -O3 -march=native
-LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm #-lgdal
+#CFLAGS ?= -g -Wall -Wextra -Wno-unused
+LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm -lhdf5_serial #-lgdal
 
 OBJ = src/iio.o src/fancy_image.o
 BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
@@ -27,7 +28,7 @@ endif
 test: bin/plambda bin/imprintf
 	echo $(MAKECMDGOALS)
 	bin/plambda zero:512x512 "randg randg randl randg randg 5 njoin" \
-	| bin/plambda - "split rot del hypot" | bin/imprintf "%s%e%r%i%a\n" \
+	| bin/plambda "split rot del hypot" | bin/imprintf "%s%e%r%i%a\n" \
 	| grep -q 3775241.440161.730120.0037888911.8794
 
 

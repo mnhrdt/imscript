@@ -29,7 +29,7 @@
 #define I_CAN_HAS_LIBPNG
 #define I_CAN_HAS_LIBJPEG
 #define I_CAN_HAS_LIBTIFF
-//#define I_CAN_HAS_LIBHDF5
+#define I_CAN_HAS_LIBHDF5
 //#define I_CAN_HAS_LIBEXR
 #define I_CAN_HAS_WGET
 #define I_CAN_HAS_WHATEVER
@@ -1802,38 +1802,121 @@ static int read_beheaded_tiff(struct iio_image *x,
 // libraries should be shot.  In front of their families.
 //
 
-static int read_whole_hdf5(struct iio_image *x, const char *filename)
+static int read_whole_hdf5(struct iio_image *x, const char *filename_raw)
 {
-	IIO_DEBUG("read whole hdf5 filename=\"%s\"\n", filename);
+	// The structure of a HDF5 file is the following:
+	// - each file contains several datasets
+	// - each dataset is accessed through a dataspace
+	// - the dataspace is divided into chunks
+	// - we access the dataspace by defining an hyperslab
+	// - your hyperslab may (partially) overlap several chunks
+	// - actually, chunks seem to be unnecessary, you can forget about them
+	// - to acctually read the hyperslab you map it to a memspace
+	// - the "HD5read" function reads the hyperslab data into an array
+	// - the array members are of a data type (an "abstract" id)
+	// - the data type belongs to a data class (int, float, date, ...)
+	// - the data type is encoded into a certain order (endianness)
+	// - if the data type is integer, it has a sign scheme (X's complement)
+	// Thus it is really straightforward to read HDF5 images as shown below.
 
+	IIO_DEBUG("read whole hdf5 filename_raw=\"%s\"\n", filename_raw);
+
+	// if dataset is given as environement variable, take it
 	char *dataset_id = getenv("IIO_HDF5_DSET");
 	if (!dataset_id)
 		dataset_id = "/dset";
 
+	// if dataset is given by comma-suffix, take it
+	char filename[FILENAME_MAX];
+	snprintf(filename, FILENAME_MAX, "%s", filename_raw);
+	char *comma = strrchr(filename, ',');
+	if (comma) {
+		*comma = '\0';
+		dataset_id = 1 + comma;
+	}
+
+	// otherwise, try a default dataset
+	if (!dataset_id)
+		dataset_id = "/dset";
+
+
+	IIO_DEBUG("read whole hdf5 filename=\"%s\"\n", filename);
 	IIO_DEBUG("read whole hdf5 dataset=\"%s\"\n", dataset_id);
 
+	// open the file, the dataset, and extract basic info
 	hid_t       f;  // file
 	hid_t       d;  // dataset
+	hid_t       s;  // dataspace
 	hid_t       t;  // data type
 	H5T_class_t c;  // data class (yes, you are in a world of pain now)
+	herr_t      e;  // error status code
 
+	// open file
 	f = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
 	IIO_DEBUG("h5 f = %d\n", (int)f);
+
+	// open dataset
 	d = H5Dopen2(f, dataset_id, H5P_DEFAULT);
 	IIO_DEBUG("h5 d = %d\n", (int)d);
 
+	// extract type and class
 	t = H5Dget_type(d);
 	c = H5Tget_class(t);
 	IIO_DEBUG("h5 t = %d\n", (int)t);
 	IIO_DEBUG("h5 c = %d\n", (int)c);
 
+	// bytes per sample
+	size_t bytes_per_sample = H5Tget_size(t);
+	IIO_DEBUG("h5 Bps = %zu\n", bytes_per_sample);
 
-	herr_t e; // error status code
+	// extract dataspace
+	s = H5Dget_space(d);
+
+	// number of dimensions of this dataspace
+	int ndim = H5Sget_simple_extent_ndims(s);
+
+	// sizes along each dimension
+	hsize_t dim[ndim];
+	size_t n = 1;
+	e = H5Sget_simple_extent_dims(s, dim, NULL);
+	IIO_DEBUG("h5 ndim = %d\n", ndim);
+	for (int i = 0; i < ndim; i++)
+	{
+		n *= dim[i];
+		IIO_DEBUG("\tdim[%d] = %d\n", i, (int)dim[i]);
+	}
+	IIO_DEBUG("h5 n = %d\n", (int)n);
+
+	// extract hyperslab from within dataset
+	//e = H5Sselect_hyperslab();
+
+	void *buf = xmalloc(n * bytes_per_sample);
+	e = H5Dread(d, t, H5S_ALL, H5S_ALL, H5P_DEFAULT, buf);
+	IIO_DEBUG("h5 e(read) = %d\n", (int)e);
+
+
+	// close dataset and file, whatever that means
 	e = H5Dclose(d);
 	IIO_DEBUG("h5 e(dclose) = %d\n", (int)e);
 
 	e = H5Fclose(f);
 	IIO_DEBUG("h5 e(fclose) = %d\n", (int)e);
+
+	if (c!=H5T_FLOAT || bytes_per_sample!=4 || ndim!=3)
+		fail("unrecognized HDF5 c=%d Bps=%d ndim=%d\n",
+				(int)c, (int)bytes_per_sample, ndim);
+
+	H5garbage_collect(); // it leaves many, many leaks, but still
+
+	// fill-in image struct
+	x->dimension = 2;
+	x->sizes[0] = dim[2];
+	x->sizes[1] = dim[1];
+	x->pixel_dimension = dim[0];
+	x->type = IIO_TYPE_FLOAT;
+	x->data = buf;
+	x->contiguous_data = false;
+	x->format = x->meta = -42;
 	return 0;
 }
 
@@ -4435,6 +4518,32 @@ static bool comma_named_tiff(const char *filename)
 	return retval;
 }
 
+static bool comma_named_hdf5(const char *filename)
+{
+	char *comma = strrchr(filename, ',');
+	if (!comma) return false;
+
+	//int lnumber = strlen(comma + 1);
+	//int ldigits = strspn(comma + 1, "0123456789");
+	//if (lnumber != ldigits) return false;
+
+	char rfilename[FILENAME_MAX];
+	snprintf(rfilename, FILENAME_MAX, "%s", filename);
+	comma = rfilename + (comma - filename);
+	*comma = '\0';
+
+	bool retval = false;
+	if (seekable_filenameP(rfilename)) {
+		FILE *f = xfopen(rfilename, "r");
+		int bufmax = 0x100, nbuf, format;
+		char buf[0x100] = {0};
+		format = guess_format(f, buf, &nbuf, bufmax);
+		retval = format == IIO_FORMAT_HDF5;
+		xfclose(f);
+	}
+	return retval;
+}
+
 // dispatcher                                                               {{{1
 
 // "centralized dispatcher"
@@ -4601,6 +4710,10 @@ static int read_image(struct iio_image *x, const char *fname)
 	} else if (comma_named_tiff(fname)) {
 		r = read_whole_tiff(x, fname);
 #endif//I_CAN_HAS_LIBTIFF
+#ifdef I_CAN_HAS_LIBHDF5
+	} else if (comma_named_hdf5(fname)) {
+		r = read_whole_hdf5(x, fname);
+#endif//I_CAN_HAS_LIBHDF5
 #ifdef I_USE_LIBRAW
 	} else if (try_reading_file_with_libraw(fname, x)) {
 		r=0;
