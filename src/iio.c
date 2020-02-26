@@ -25,7 +25,11 @@
 //
 // editable configuration
 //
+
+#define IIO_SHOW_DEBUG_MESSAGES
+
 #define IIO_ABORT_ON_ERROR
+
 #define I_CAN_HAS_LIBPNG
 #define I_CAN_HAS_LIBJPEG
 #define I_CAN_HAS_LIBTIFF
@@ -36,7 +40,18 @@
 //#define I_CAN_KEEP_TMP_FILES
 
 
-//#define IIO_SHOW_DEBUG_MESSAGES
+//
+// portability macros to choose OS features
+//
+//
+#define I_CAN_POSIX
+#define I_CAN_LINUX
+
+
+//
+// no need to edit below here
+//
+
 #ifdef IIO_SHOW_DEBUG_MESSAGES
 #  define IIO_DEBUG(...) do {\
 	fprintf(stderr,"DEBUG(%s:%d:%s): ",__FILE__,__LINE__,__PRETTY_FUNCTION__);\
@@ -75,13 +90,6 @@
 #endif
 
 
-
-//
-// portability macros to choose OS features
-//
-//
-#define I_CAN_POSIX
-#define I_CAN_LINUX
 
 
 // internal shit
@@ -1897,26 +1905,43 @@ static int read_whole_hdf5(struct iio_image *x, const char *filename_raw)
 
 	// close dataset and file, whatever that means
 	e = H5Dclose(d);
-	IIO_DEBUG("h5 e(dclose) = %d\n", (int)e);
-
 	e = H5Fclose(f);
+	H5garbage_collect(); // it leaves many, many leaks, but still
+	IIO_DEBUG("h5 e(dclose) = %d\n", (int)e);
 	IIO_DEBUG("h5 e(fclose) = %d\n", (int)e);
 
-	if (c!=H5T_FLOAT || bytes_per_sample!=4 || ndim!=3)
+	// identify corresponding IIO_TYPE
+	int typ = -1;
+	if (c==H5T_FLOAT   && bytes_per_sample==4) typ = IIO_TYPE_FLOAT;
+	if (c==H5T_FLOAT   && bytes_per_sample==8) typ = IIO_TYPE_DOUBLE;
+	if (c==H5T_INTEGER && bytes_per_sample==1) typ = IIO_TYPE_UINT8;
+	if (c==H5T_INTEGER && bytes_per_sample==2) typ = IIO_TYPE_UINT16;
+	if (c==H5T_INTEGER && bytes_per_sample==4) typ = IIO_TYPE_UINT32;
+
+	if (typ < 0 || ndim > 4)
 		fail("unrecognized HDF5 c=%d Bps=%d ndim=%d\n",
 				(int)c, (int)bytes_per_sample, ndim);
 
-	H5garbage_collect(); // it leaves many, many leaks, but still
+	// identify IIO sizes (with some squeezing if necessary)
+	// philosophy: data is not reordered here
+	int w=1, h=1, pd=1, brk=0;
+	if (ndim==2) {w=dim[1]; h=dim[0]; }
+	else if (ndim==3 && dim[0]==1) { w=dim[2]; h=dim[1]; }
+	else if (ndim==3 && dim[2]==1) { w=dim[1]; h=dim[0]; }
+	else if (ndim==4 && dim[0]==1) { w=dim[2]; h=dim[1]; pd=dim[3]; brk=1; }
+
+	IIO_DEBUG("h5 w=%d h=%d pd=%d brk=%d\n", w, h, pd, brk);
 
 	// fill-in image struct
 	x->dimension = 2;
-	x->sizes[0] = dim[2];
-	x->sizes[1] = dim[1];
-	x->pixel_dimension = dim[0];
-	x->type = IIO_TYPE_FLOAT;
+	x->sizes[0] = w;
+	x->sizes[1] = h;
+	x->pixel_dimension = pd;
+	x->type = typ;
 	x->data = buf;
 	x->contiguous_data = false;
 	x->format = x->meta = -42;
+	//if (brk) repair_broken_pixels_inplace(x, w*h, pd, bytes_per_sample);
 	return 0;
 }
 
