@@ -73,11 +73,11 @@ static void fail(const char *fmt, ...)
 	fprintf(stderr, "\n\n");
 	fflush(NULL);
 	print_trace(stderr);
-#ifdef NDEBUG
-	exit(-1);
-#else//NDEBUG
+#ifdef SEGFAULT_ON_FAIL
 	exit(*(volatile int *)0x43);
-#endif//NDEBUG
+#else//SEGFAULT_ON_FAIL
+	exit(-1);
+#endif//SEGFAULT_ON_FAIL
 }
 
 #endif//_FAIL_C
