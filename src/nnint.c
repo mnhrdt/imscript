@@ -130,7 +130,8 @@ static void buildup_things(
 	}
 	for (int i = 0; i < w*h; i++)
 	{
-		if (!isnan(x[i]))
+		//if (!isnan(x[i]))
+		if (isfinite(x[i]))
 		{
 			e->x[i] = 0;
 			e->y[i] = TRIAL;
