@@ -26,7 +26,7 @@
 // editable configuration
 //
 
-#define IIO_SHOW_DEBUG_MESSAGES
+//#define IIO_SHOW_DEBUG_MESSAGES
 
 #define IIO_ABORT_ON_ERROR
 
@@ -1864,8 +1864,14 @@ static int read_whole_hdf5(struct iio_image *x, const char *filename_raw)
 	IIO_DEBUG("h5 f = %d\n", (int)f);
 
 	// open dataset
-	d = H5Dopen2(f, dataset_id, H5P_DEFAULT);
+	//d = H5Dopen2(f, dataset_id, H5P_DEFAULT);
+	// there is not a working "open_dataset" function,
+	// if you want to use it, you have to write it yourself
+	hid_t my_hd5open(hid_t, char *);
+	d = my_hd5open(f, dataset_id);
 	IIO_DEBUG("h5 d = %d\n", (int)d);
+	if (d < 0) fail("could not find dataset \"%s\" on file \"%s\"",
+			dataset_id, filename);
 
 	// extract type and class
 	t = H5Dget_type(d);
@@ -1967,6 +1973,38 @@ static int read_beheaded_hdf5(struct iio_image *x,
 
 	return 0;
 }
+
+struct twostrings { char *a, *b; };
+
+static bool string_suffix(const char *s, const char *suf);
+static herr_t find_suffix(hid_t o, const char *n, const H5O_info_t *i, void *d)
+{
+	struct twostrings *p = d;
+	if (i->type == H5O_TYPE_DATASET && string_suffix(n, p->a))
+		return strncpy(p->b, n, FILENAME_MAX),1;
+	return 0;
+}
+
+// the fact that this function needs to be written is unbearable
+//
+// Note: this function cannot be implemented using the "H5Lexists" function,
+// you have to write the iterator yourself.  The function H5Lexsits only serves
+// to check whether a dataset belongs to a group.  It fails (meaning, the HD5F
+// library spews a lot of errors into the terminal and crashes) if you try to
+// call this function using an absolute or relative path with non-existing
+// intermediate components.
+hid_t my_hd5open(hid_t f, char *suffix)
+{
+	char dset[FILENAME_MAX] = {0};
+
+	H5O_iterate_t u = find_suffix;
+	struct twostrings p = {suffix, dset};
+	p.a = suffix;
+	herr_t e = H5Ovisit(f, H5_INDEX_NAME, H5_ITER_NATIVE, u, &p);
+	if (*dset) IIO_DEBUG("HDF5_DSET = /%s\n", dset);
+	return *dset ? H5Dopen2(f, dset, H5P_DEFAULT) : -1;
+}
+
 #endif//I_CAN_HAS_LIBHDF5
 
 // QNM readers                                                              {{{2
@@ -3711,7 +3749,7 @@ static void iio_write_image_as_tiff(const char *filename, struct iio_image *x)
 	}
 
 	// disable TIFF compression when saving large images
-	if (x->sizes[0] * x->sizes[1] < 2000*2000)
+	if (x->sizes[0] * x->sizes[1] < 2000*2000 && !getenv("IIOTIFF_PLAIN"))
 		TIFFSetField(tif, TIFFTAG_COMPRESSION, COMPRESSION_LZW);
 	else
 		TIFFSetField(tif, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
@@ -4667,6 +4705,8 @@ static int read_image(struct iio_image *x, const char *fname)
 {
 	int r; // the return-value of this function, zero if it succeeded
 
+	IIO_DEBUG("read image \"%s\"\n", fname);
+
 #ifndef IIO_ABORT_ON_ERROR
 	if (setjmp(global_jump_buffer)) {
 		IIO_DEBUG("SOME ERROR HAPPENED AND WAS HANDLED\n");
@@ -4710,6 +4750,7 @@ static int read_image(struct iio_image *x, const char *fname)
 		return 0;
 	}
 
+	IIO_DEBUG("read image(no magic) \"%s\"\n", fname);
 
 #ifdef I_CAN_HAS_WGET
 	// check for URL
@@ -4728,6 +4769,8 @@ static int read_image(struct iio_image *x, const char *fname)
 		delete_temporary_file(tfn);
 	} else
 #endif//I_CAN_HAS_WGET
+
+	IIO_DEBUG("read image(no wget) \"%s\"\n", fname);
 
 	if (false) {
 		;
@@ -4751,6 +4794,7 @@ static int read_image(struct iio_image *x, const char *fname)
 		r = r0 + r1;
 	} else {
 		// call CORE
+		IIO_DEBUG("read image(core) \"%s\"\n", fname);
 		FILE *f = xfopen(fname, "r");
 		r = read_image_f(x, f);
 		xfclose(f);
