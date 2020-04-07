@@ -150,6 +150,22 @@ void fill_bill_split(float *out, float *in, int w, int h, int pd)
 	}
 }
 
+void fill_bill_vec(float *out, float *in, int w, int h, int pd)
+{
+	float *outl = xmalloc(w*h*sizeof*outl);
+	float *inl = xmalloc(w*h*sizeof*outl);
+	for (int l = 0; l < pd; l++)
+	{
+		for (int i = 0; i < w*h; i++)
+			inl[i] = in[i*pd+l];
+		fill_bill_split(outl, inl, w, h, 1);
+		for (int i = 0; i < w*h; i++)
+			out[i*pd+l] = outl[i];
+	}
+	free(outl);
+	free(inl);
+}
+
 
 // ddp the following two lines to enable/disable the "main" function
 #undef MAIN_FILL_BILL

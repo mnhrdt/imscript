@@ -15,7 +15,9 @@ int main(int c, char *v[])
 	char *filepat_out = v[2];
 	int w, h, pd;
 	if (!t && !T) {
+		fprintf(stderr, "getbands standard...\n");
 		float *x = iio_read_image_float_split(filename_in, &w, &h, &pd);
+		fprintf(stderr, "getbands standard w=%d h=%d pd=%d\n",w,h,pd);
 		for (int i = 0; i < pd; i++)
 		{
 			char n[FILENAME_MAX];

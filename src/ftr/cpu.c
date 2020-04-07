@@ -42,7 +42,7 @@ struct pan_state {
 	bool auto_qauto;
 
 	// 4. roi
-	int roi; // 0=nothing 1=dftwindow 2=rawfourier 3=ppsmooth
+	int roi; // 0=nothing 1=dftwindow 2=rawfourier 3=ppsmooth 4=circppsm
 	int roi_x, roi_y, roi_w;
 
 	// 5. user interface
@@ -336,12 +336,13 @@ static void action_qauto2(struct FTR *f)
 static void action_toggle_roi(struct FTR *f, int x, int y, int dir)
 {
 	struct pan_state *e = f->userdata;
-	e->roi = (e->roi + (dir?-1:1)) % 4;
+	e->roi = (e->roi + (dir?-1:1)) % 5;
 	fprintf(stderr, "ROI SWITCH(%d) = %d\n", dir, e->roi);
 	e->roi_x = x - e->roi_w / 2;
 	e->roi_y = y - e->roi_w / 2;
 	f->changed = 1;
 }
+
 
 static void action_toggle_aqauto(struct FTR *f)
 {
@@ -527,8 +528,28 @@ static void transform_roi_buffers_old(float *y, float *x, int n)
 		y[i] += x_s[i];
 }
 
+static void circular_roi(float *y, float *x, int n)
+{
+	for (int j = 0; j < n; j++)
+	for (int i = 0; i < n; i++)
+	for (int l = 0; l < 3; l++)
+	{
+		if (hypot(i-0.5*n+0.5,j-0.5*n+0.5) < 0.5*n-4)
+			y[(j*n+i)*3+l] = NAN;
+		else
+			y[(j*n+i)*3+l] = x[(j*n+i)*3+l];
+	}
+	simplest_inpainting_vec(y, n, n, 3);
+	for (int j = 0; j < n; j++)
+	for (int i = 0; i < n; i++)
+	for (int l = 0; l < 3; l++)
+		if (hypot(i-0.5*n+0.5,j-0.5*n+0.5) < 0.5*n-4)
+			y[(j*n+i)*3+l] = x[(j*n+i)*3+l] - y[(j*n+i)*3+l];// + 127;
+}
+
 static void transform_roi_buffers(float *y, float *x, int n, int roi)
 {
+	if (roi == 4) { circular_roi(y, x, n); return; }
 	float x_p0[3*n*n], *x_p = x_p0;
 	ppsmooth_vec(x_p0, x, n, n, 3);
 	if (roi == 2) x_p = x;
@@ -568,6 +589,7 @@ static void colormap3(unsigned char *rgb, struct pan_state *e, float *frgb)
 	for (int l = 0; l < 3; l++)
 	{
 		if (!isfinite(frgb[l]))
+			//rgb[l] = l==1?0:255; // show NAN as magenta
 			rgb[l] = l==2?127:0; // show NAN as dark blue
 		else {
 			//float g = e->a * c[l] + e->b;
@@ -658,6 +680,11 @@ static void expose_roi(struct FTR *f)
 		pixel_rgbf(c, e, p[0], p[1]);
 	}
 	transform_roi_buffers(buf_out, buf_in, e->roi_w, e->roi);
+	float A = e->a;
+	float BBB[3] = {e->bbb[0], e->bbb[1], e->bbb[2]};
+	if (4 == e->roi) {
+		BBB[0] = BBB[1] = BBB[2] = 127;
+	}
 	for (int j = 0; j < e->roi_w; j++)
 	for (int i = 0; i < e->roi_w; i++)
 	{
@@ -666,10 +693,14 @@ static void expose_roi(struct FTR *f)
 		float *c = buf_out + 3 * (j * e->roi_w + i);
 		if (insideP(f->w, f->h, ii, jj))
 		{
+			if (4 == e->roi &&
+				hypot(i-0.5*e->roi_w+0.5,
+					j-0.5*e->roi_w+0.5) >= 0.5*e->roi_w-4)
+				continue;
 			uint8_t *cc = f->rgb + 3 * (jj * f->w + ii);
 			for (int l = 0; l < 3; l++)
 			{
-				float g = e->a * c[l] + e->bbb[l];
+				float g = A * c[l] + BBB[l];
 				if      (g < 0)   cc[l] = 0  ;
 				else if (g > 255) cc[l] = 255;
 				else              cc[l] = g  ;

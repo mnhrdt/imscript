@@ -282,6 +282,20 @@ void simplest_inpainting(float *x, int w, int h)
 	free(y);
 }
 
+void simplest_inpainting_vec(float *x, int w, int h, int pd)
+{
+	float *tmp = malloc(w*h*sizeof*tmp);
+	for (int l = 0; l < pd; l++)
+	{
+		for (int i = 0; i < w*h; i++)
+			tmp[i] = x[i*pd+l];
+		simplest_inpainting(tmp, w, h);
+		for (int i = 0; i < w*h; i++)
+			x[i*pd+l] = tmp[i];
+	}
+	free(tmp);
+}
+
 // fill-in the periodic component of an image (with split channels)
 void ppsmooth(float *y, float *x, int w, int h)
 {
