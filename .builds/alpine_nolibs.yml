@@ -1,6 +1,7 @@
 # build manifest for builds.sr.ht
 
 image: alpine/edge
+shell: true
 
 tasks:
         - test: make -C imscript test LDLIBS="" CFLAGS="-DIIO_DISABLE_IMGLIBS"
