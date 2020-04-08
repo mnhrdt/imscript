@@ -1,0 +1,7 @@
+# build manifest for builds.sr.ht
+
+image: ubuntu/latest
+shell: true
+
+tasks:
+        - test: make -C imscript test
