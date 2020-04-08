@@ -1,7 +1,6 @@
 # build manifest for builds.sr.ht
 
 image: ubuntu/latest
-shell: true
 
 packages:
         - libpng-dev
