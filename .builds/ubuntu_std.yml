@@ -3,5 +3,10 @@
 image: ubuntu/latest
 shell: true
 
+packages:
+        - libpng-dev
+        - libtiff-dev
+        - libjpeg-dev
+
 tasks:
         - test: make -C imscript test
