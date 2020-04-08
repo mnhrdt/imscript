@@ -1,0 +1,13 @@
+# build manifest for builds.sr.ht
+
+image: ubuntu/latest
+
+packages:
+        - libpng-dev
+        - libtiff-dev
+        - libjpeg-dev
+        - libhdf5-dev
+
+
+tasks:
+        - test: CFLAGS="`pkg-config --cflags hdf5` -DI_CAN_HAS_HDF5" LDLIBS="`pkg-config --libs hdf5`" make -C imscript test
