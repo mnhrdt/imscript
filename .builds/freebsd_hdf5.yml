@@ -10,6 +10,12 @@ packages:
         - hdf5
         - gmake
 
+environment:
+        CPATH: /usr/local/include
+        LIBRARY_PATH: /usr/local/lib
+        CFLAGS: -DI_CAN_HAS_HDF5
+        LDLIBS: -lhdf5
+
 
 tasks:
-        - test: CFLAGS="-DI_CAN_HAS_HDF5" LDLIBS="-lhdf5" gmake -C imscript test
+        - test: gmake -C imscript test
