@@ -3,11 +3,10 @@
 image: fedora/latest
 
 packages:
-        - png
-        - tiff
-        - jpeg
-        - fftw3-float
-        - hdf5
+        - png-devel
+        - tiff-devel
+        - jpeg-devel
+        - hdf5-devel
 
 environment:
         CFLAGS: -DI_CAN_HAS_HDF5
