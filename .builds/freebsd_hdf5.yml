@@ -1,0 +1,15 @@
+# build manifest for builds.sr.ht
+
+image: freebsd/latest
+
+packages:
+        - png
+        - tiff
+        - jpeg
+        - fftw3-float
+        - hdf5
+        - gmake
+
+
+tasks:
+        - test: CFLAGS="-DI_CAN_HAS_HDF5" LDLIBS="-lhdf5" gmake -C imscript test
