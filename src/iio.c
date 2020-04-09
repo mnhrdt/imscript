@@ -26,7 +26,7 @@
 // editable configuration
 //
 
-//#define IIO_SHOW_DEBUG_MESSAGES
+#define IIO_SHOW_DEBUG_MESSAGES
 
 #define IIO_ABORT_ON_ERROR
 
@@ -46,6 +46,7 @@
 //
 #define I_CAN_POSIX
 #define I_CAN_LINUX
+#define I_CAN_GETENV
 
 
 //
@@ -54,8 +55,9 @@
 
 #ifdef IIO_SHOW_DEBUG_MESSAGES
 #  define IIO_DEBUG(...) do {\
+	if (xgetenv("IIO_DEBUG")){\
 	fprintf(stderr,"DEBUG(%s:%d:%s): ",__FILE__,__LINE__,__PRETTY_FUNCTION__);\
-	fprintf(stderr,__VA_ARGS__);} while(0)
+	fprintf(stderr,__VA_ARGS__);}} while(0)
 #else//IIO_SHOW_DEBUG_MESSAGES
 #  define IIO_DEBUG(...) do { do_nop(__VA_ARGS__); } while(0) /* nothing */
 #endif//IIO_SHOW_DEBUG_MESSAGES
@@ -267,6 +269,16 @@ static const char *myname(void)
 static const char *myname(void) { return ""; }
 #endif//I_CAN_LINUX
 
+
+static char *xgetenv(const char *s)
+{
+#ifdef I_CAN_GETENV
+	return getenv(s);
+#else//I_CAN_GETENV
+	return 0;
+#endif// I_CAN_GETENV
+}
+
 static void fail(const char *fmt, ...) __attribute__((noreturn,format(printf,1,2)));
 static void fail(const char *fmt, ...)
 
@@ -289,8 +301,9 @@ static void fail(const char *fmt, ...)
 	longjmp(global_jump_buffer, 1);
 	//iio_single_jmpstuff(true, false);
 #else//IIO_ABORT_ON_ERROR
+	exit(xgetenv("IIO_SEGFAULT_ON_ERROR")?*(int*)0:-1);
 //#  ifdef NDEBUG
-	exit(-1);
+//	exit(-1);
 //#  else//NDEBUG
 	//print_trace(stderr);
 //	exit(*(int *)0x43);
@@ -624,24 +637,24 @@ static const char *iio_strfmt(int format)
 #undef M
 }
 
-#ifdef IIO_SHOW_DEBUG_MESSAGES
-static void iio_print_image_info(FILE *f, struct iio_image *x)
-{
-	fprintf(f, "iio_print_image_info %p\n", (void *)x);
-	fprintf(f, "dimension = %d\n", x->dimension);
-	int *s = x->sizes;
-	switch(x->dimension) {
-	case 1: fprintf(f, "size = %d\n", s[0]); break;
-	case 2: fprintf(f, "sizes = %dx%d\n", s[0],s[1]); break;
-	case 3: fprintf(f, "sizes = %dx%dx%d\n", s[0],s[1],s[2]); break;
-	case 4: fprintf(f, "sizes = %dx%dx%dx%d\n", s[0],s[1],s[2],s[3]); break;
-	default: fail("unsupported dimension %d", x->dimension);
-	}
-	fprintf(f, "pixel_dimension = %d\n", x->pixel_dimension);
-	fprintf(f, "type = %s\n", iio_strtyp(x->type));
-	fprintf(f, "data = %p\n", (void *)x->data);
-}
-#endif//IIO_SHOW_DEBUG_MESSAGES
+//#ifdef IIO_SHOW_DEBUG_MESSAGES
+//static void iio_print_image_info(FILE *f, struct iio_image *x)
+//{
+//	fprintf(f, "iio_print_image_info %p\n", (void *)x);
+//	fprintf(f, "dimension = %d\n", x->dimension);
+//	int *s = x->sizes;
+//	switch(x->dimension) {
+//	case 1: fprintf(f, "size = %d\n", s[0]); break;
+//	case 2: fprintf(f, "sizes = %dx%d\n", s[0],s[1]); break;
+//	case 3: fprintf(f, "sizes = %dx%dx%d\n", s[0],s[1],s[2]); break;
+//	case 4: fprintf(f, "sizes = %dx%dx%dx%d\n", s[0],s[1],s[2],s[3]); break;
+//	default: fail("unsupported dimension %d", x->dimension);
+//	}
+//	fprintf(f, "pixel_dimension = %d\n", x->pixel_dimension);
+//	fprintf(f, "type = %s\n", iio_strtyp(x->type));
+//	fprintf(f, "data = %p\n", (void *)x->data);
+//}
+//#endif//IIO_SHOW_DEBUG_MESSAGES
 
 
 static void iio_image_fill(struct iio_image *x,
@@ -1536,6 +1549,7 @@ static TIFF *tiffopen_fancy(const char *filename, char *mode)
 
 static int read_whole_tiff(struct iio_image *x, const char *filename)
 {
+	IIO_DEBUG("read whole tiff  \"%s\"\n", filename);
 	// tries to read data in the correct format (via scanlines)
 	// if it fails, it tries to read ABGR data
 	TIFFSetWarningHandler(NULL);//suppress warnings
@@ -1648,7 +1662,7 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 		x->pixel_dimension = 4;
 		x->type = IIO_TYPE_UINT8;
 		x->data = xmalloc(w*h*4);
-		r = TIFFReadRGBAImage(tif, w, h, (uint32_t*)x->data, 0);
+		r = TIFFReadRGBAImageOriented(tif, w, h, (uint32_t*)x->data, ORIENTATION_TOPLEFT, 0);
 		IIO_DEBUG("\tr = %d\n", r);
 		if (!r) fail("TIFFReadRGBAImage(\"%s\") failed\n", filename);
 		x->contiguous_data = false;
@@ -1830,7 +1844,7 @@ static int read_whole_hdf5(struct iio_image *x, const char *filename_raw)
 	IIO_DEBUG("read whole hdf5 filename_raw=\"%s\"\n", filename_raw);
 
 	// if dataset is given as environement variable, take it
-	char *dataset_id = getenv("IIO_HDF5_DSET");
+	char *dataset_id = xgetenv("IIO_HDF5_DSET");
 	if (!dataset_id)
 		dataset_id = "/dset";
 
@@ -1876,12 +1890,15 @@ static int read_whole_hdf5(struct iio_image *x, const char *filename_raw)
 	// extract type and class
 	t = H5Dget_type(d);
 	c = H5Tget_class(t);
+	H5T_sign_t sgn = H5Tget_sign(t); // fml
+	H5Tget_sign(t);
 	IIO_DEBUG("h5 t = %d\n", (int)t);
 	IIO_DEBUG("h5 c = %d\n", (int)c);
+	IIO_DEBUG("h5 sgn = %d\n", (int)sgn);
 
 	// bytes per sample
-	size_t bytes_per_sample = H5Tget_size(t);
-	IIO_DEBUG("h5 Bps = %zu\n", bytes_per_sample);
+	size_t Bps = H5Tget_size(t);
+	IIO_DEBUG("h5 Bps = %zu\n", Bps);
 
 	// extract dataspace
 	s = H5Dget_space(d);
@@ -1904,7 +1921,7 @@ static int read_whole_hdf5(struct iio_image *x, const char *filename_raw)
 	// extract hyperslab from within dataset
 	//e = H5Sselect_hyperslab();
 
-	void *buf = xmalloc(n * bytes_per_sample);
+	void *buf = xmalloc(n * Bps);
 	e = H5Dread(d, t, H5S_ALL, H5S_ALL, H5P_DEFAULT, buf);
 	IIO_DEBUG("h5 e(read) = %d\n", (int)e);
 
@@ -1918,15 +1935,18 @@ static int read_whole_hdf5(struct iio_image *x, const char *filename_raw)
 
 	// identify corresponding IIO_TYPE
 	int typ = -1;
-	if (c==H5T_FLOAT   && bytes_per_sample==4) typ = IIO_TYPE_FLOAT;
-	if (c==H5T_FLOAT   && bytes_per_sample==8) typ = IIO_TYPE_DOUBLE;
-	if (c==H5T_INTEGER && bytes_per_sample==1) typ = IIO_TYPE_UINT8;
-	if (c==H5T_INTEGER && bytes_per_sample==2) typ = IIO_TYPE_UINT16;
-	if (c==H5T_INTEGER && bytes_per_sample==4) typ = IIO_TYPE_UINT32;
+	if (c==H5T_FLOAT   && Bps==4) typ = IIO_TYPE_FLOAT;
+	if (c==H5T_FLOAT   && Bps==8) typ = IIO_TYPE_DOUBLE;
+	if (c==H5T_INTEGER && Bps==1 && sgn==0) typ = IIO_TYPE_UINT8;
+	if (c==H5T_INTEGER && Bps==2 && sgn==0) typ = IIO_TYPE_UINT16;
+	if (c==H5T_INTEGER && Bps==4 && sgn==0) typ = IIO_TYPE_UINT32;
+	if (c==H5T_INTEGER && Bps==1 && sgn==1) typ = IIO_TYPE_INT8;
+	if (c==H5T_INTEGER && Bps==2 && sgn==1) typ = IIO_TYPE_INT16;
+	if (c==H5T_INTEGER && Bps==4 && sgn==1) typ = IIO_TYPE_INT32;
 
 	if (typ < 0 || ndim > 4)
 		fail("unrecognized HDF5 c=%d Bps=%d ndim=%d\n",
-				(int)c, (int)bytes_per_sample, ndim);
+				(int)c, (int)Bps, ndim);
 
 	// identify IIO sizes (with some squeezing if necessary)
 	// philosophy: data is not reordered here
@@ -2683,7 +2703,7 @@ static int read_beheaded_pds(struct iio_image *x,
 	//	return 1;
 
 	// get an object name, if different to "^IMAGE"
-	char *object_id = getenv("IIO_PDS_OBJECT");
+	char *object_id = xgetenv("IIO_PDS_OBJECT");
 	if (!object_id)
 		object_id = "^IMAGE";
 
@@ -2972,6 +2992,12 @@ static int read_beheaded_npy(struct iio_image *x,
 		pd = 1;
 	}
 
+	IIO_DEBUG("npy descr = %s\n", descr);
+	IIO_DEBUG("npy order = %s\n", descr);
+	IIO_DEBUG("npy w = %d\n", w);
+	IIO_DEBUG("npy h = %d\n", h);
+	IIO_DEBUG("npy pd = %d\n", pd);
+
 	// parse type string
 	char *desc = descr; // pointer to the bare description
 	if (*descr=='<' || *descr=='>' || *descr=='=' || *descr=='|')
@@ -2999,8 +3025,10 @@ static int read_beheaded_npy(struct iio_image *x,
 	x->sizes[1] = h;
 	x->pixel_dimension = pd;
 	x->contiguous_data = false;
-	int bps = iio_type_size(x->type);
-	x->data = xmalloc(w * h * pd * bps);
+	size_t bps = iio_type_size(x->type);
+	IIO_DEBUG("bps = %d\n", (int)bps);
+	x->data = xmalloc(((bps * w) * h) * pd);
+	IIO_DEBUG("data = %p\n", (void*)x->data);
 	uint64_t r = fread(x->data, bps, w*h*pd, fin);
 	if (r != (uint64_t)w*h*pd)
 		fprintf(stderr,"IIO WARNING: npy file smaller than expected\n");
@@ -3145,7 +3173,7 @@ static int read_beheaded_ccs(struct iio_image *x,
 	return read_beheaded_pds(x, f, header, nheader);
 
 //	// get an object name, if different to "^IMAGE"
-//	char *object_id = getenv("IIO_PDS_OBJECT");
+//	char *object_id = xgetenv("IIO_PDS_OBJECT");
 //	if (!object_id)
 //		object_id = "^IMAGE";
 //
@@ -3505,7 +3533,7 @@ static int read_beheaded_raw(struct iio_image *x,
 	if (!fn)
 		return 1;
 
-	char *rp = getenv("IIO_RAW");
+	char *rp = xgetenv("IIO_RAW");
 	if (!rp)
 		return 2;
 
@@ -3749,7 +3777,7 @@ static void iio_write_image_as_tiff(const char *filename, struct iio_image *x)
 	}
 
 	// disable TIFF compression when saving large images
-	if (x->sizes[0] * x->sizes[1] < 2000*2000 && !getenv("IIOTIFF_PLAIN"))
+	if (x->sizes[0] * x->sizes[1] < 2000*2000 && !xgetenv("IIOTIFF_PLAIN"))
 		TIFFSetField(tif, TIFFTAG_COMPRESSION, COMPRESSION_LZW);
 	else
 		TIFFSetField(tif, TIFFTAG_COMPRESSION, COMPRESSION_NONE);
@@ -4309,7 +4337,7 @@ static void dump_sixels_to_stdout_uint8(uint8_t *x, int w, int h, int pd)
 	if (pd == 3) dump_sixels_to_bytestream_rgb3(s, x, w, h);
 	if (pd == 1) dump_sixels_to_bytestream_gray2(s, x, w, h);
 	struct bytestream *S = s;
-	bool screen = false;//strstr(getenv("TERM"), "screen");
+	bool screen = false;//strstr(xgetenv("TERM"), "screen");
 	struct bytestream z[1];
 	if (screen) bytestream_init(z);
 	if (screen) penetrate_screen(S = z, s);
@@ -4377,7 +4405,7 @@ static int guess_format(FILE *f, char *buf, int *nbuf, int bufmax)
 	// hand-crafted state machine follows
 	//
 
-	if (getenv("IIO_RAW"))
+	if (xgetenv("IIO_RAW"))
 		return IIO_FORMAT_RAW;
 
 	b[0] = add_to_header_buffer(f, b, nbuf, bufmax);
@@ -4546,9 +4574,10 @@ static bool seekable_filenameP(const char *filename)
 	if (filename[0] == '-')
 		return false;
 #ifdef I_CAN_POSIX
-	FILE *f = xfopen(filename, "r");
+	FILE *f = fopen(filename, "r");
+	if (!f) return false;
 	int r = fseek(f, 0, SEEK_CUR);
-	xfclose(f);
+	fclose(f);
 	return r != -1;
 #else
 	return true;
@@ -4756,6 +4785,7 @@ static int read_image(struct iio_image *x, const char *fname)
 	// check for URL
 	if (fname == strstr(fname, "http://")
 			|| fname==strstr(fname, "https://") ) {
+		IIO_DEBUG("read image(wget) \"%s\"\n", fname);
 		// TODO: for security, sanitize the fname
 		int cmd_len = 2*FILENAME_MAX + 20;
 		char tfn[cmd_len], cmd[cmd_len];
@@ -4767,6 +4797,7 @@ static int read_image(struct iio_image *x, const char *fname)
 		r = read_image_f(x, f);
 		xfclose(f);
 		delete_temporary_file(tfn);
+		return 0;
 	} else
 #endif//I_CAN_HAS_WGET
 
@@ -4814,7 +4845,7 @@ static int read_image(struct iio_image *x, const char *fname)
 	IIO_DEBUG("READ IMAGE type = %s\n", iio_strtyp(x->type));
 	IIO_DEBUG("READ IMAGE contiguous_data = %d\n",x->contiguous_data);
 
-	char *trans = getenv("IIO_TRANS");
+	char *trans = xgetenv("IIO_TRANS");
 	if (trans && *trans)
 		r += trans_apply(x, trans);
 
@@ -5298,10 +5329,6 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 		iio_write_image_as_pfm(filename, x);
 		return;
 	}
-	if (string_suffix(filename, ".npy")) {
-		iio_write_image_as_npy(filename, x);
-		return;
-	}
 	if (string_suffix(filename, ".csv") &&
 			(typ==IIO_TYPE_FLOAT || typ==IIO_TYPE_DOUBLE)
 				&& x->pixel_dimension == 1) {
@@ -5336,6 +5363,10 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 		iio_write_image_default(filename, x); // recursive call
 		xfree(x->data);
 		x->data = old_data;
+		return;
+	}
+	if (string_suffix(filename, ".npy")) {
+		iio_write_image_as_npy(filename, x);
 		return;
 	}
 #ifdef I_CAN_HAS_LIBTIFF
@@ -5428,9 +5459,9 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 	}
 #endif//I_CAN_HAS_LIBPNG
 	IIO_DEBUG("SIDEF:\n");
-#ifdef IIO_SHOW_DEBUG_MESSAGES
-	iio_print_image_info(stderr, x);
-#endif
+//#ifdef IIO_SHOW_DEBUG_MESSAGES
+//	iio_print_image_info(stderr, x);
+//#endif
 	//FILE *f = xfopen(filename, "w");
 	//if (x->pixel_dimension == 1 && typ == IIO_TYPE_FLOAT) {
 	//	int m = these_floats_are_actually_bytes(x->data,x->sizes[0]*x->sizes[1]) ? 255 : 65535;
