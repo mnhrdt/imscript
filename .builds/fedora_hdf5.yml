@@ -3,9 +3,9 @@
 image: fedora/latest
 
 packages:
-        - png-devel
-        - tiff-devel
-        - jpeg-devel
+        - libpng-devel
+        - libtiff-devel
+        - libjpeg-devel
         - hdf5-devel
 
 environment:
