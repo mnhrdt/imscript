@@ -8,6 +8,9 @@ packages:
         - libjpeg-dev
         - libhdf5-dev
 
+environement:
+        CFLAGS: "`pkg-config --cflags hdf5` -DI_CAN_HAS_HDF5"
+        LDLIBS: "`pkg-config --libs hdf5`"
 
 tasks:
-        - test: CFLAGS="`pkg-config --cflags hdf5` -DI_CAN_HAS_HDF5" LDLIBS="`pkg-config --libs hdf5`" make -C imscript test
+        - test: make -C imscript test

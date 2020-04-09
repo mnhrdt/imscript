@@ -1,0 +1,18 @@
+# build manifest for builds.sr.ht
+
+image: fedora/latest
+
+packages:
+        - png
+        - tiff
+        - jpeg
+        - fftw3-float
+        - hdf5
+
+environment:
+        CFLAGS: -DI_CAN_HAS_HDF5
+        LDLIBS: -lhdf5
+
+
+tasks:
+        - test: make -C imscript test
