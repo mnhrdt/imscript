@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <tgmath.h>
-#include <math.h>
+//#include <math.h>
 #include "iio.h"
 
 #include "fail.c"

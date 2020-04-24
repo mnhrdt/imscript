@@ -225,6 +225,7 @@ static enum font_data_format packing_unstring(char *s)
 	fail("unrecognized packing \"%s\"", s);
 	casepack(UNKNOWN);
 #undef casepack
+	return UNKNOWN;
 }
 
 //static struct bitmap_font reformat_font(struct bitmap_font *f,

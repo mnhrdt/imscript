@@ -1663,7 +1663,7 @@ static void action_dump_raw_ms(struct FTR *f)
 		//if (!e->image_space) continue;
 		double p[2];
 		win_to_img(p, e, i, j);
-		if (!i && !j) fprintf(stderr, "\tp00 = %d g %g\n", p[0], p[1]);
+		if (!i && !j) fprintf(stderr, "\tp00 = %g %g\n", p[0], p[1]);
 		if (p[0]<0 || p[1]<0 || p[0]>=v->w || p[1]>=v->h)
 			continue;
 		float pc = (p[0]);// + v->rgbiox) / 4;

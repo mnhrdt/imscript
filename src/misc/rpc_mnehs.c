@@ -122,8 +122,8 @@ void rpc_warpabt(float *outa, float *outb, int w, int h, int pd,
 				c[0], c[1], axyh[2], pc[0], pc[1]);
 	}
 
-	assert(pd = ta->i->spp);
-	assert(pd = tb->i->spp);
+	assert(pd == ta->i->spp);
+	assert(pd == tb->i->spp);
 
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
