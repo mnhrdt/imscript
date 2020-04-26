@@ -31,6 +31,14 @@ test: bin/plambda bin/imprintf
 	| bin/plambda "split rot del hypot" | bin/imprintf "%s%e%r%i%a\n" \
 	| grep -q 3775241.440161.730120.0037888911.8794
 
+# build tutorial
+tutorial: default
+	cd doc/tutorial/f && env PATH=../../../bin:$(PATH) $(SHELL) build.sh
+
+# build manpages
+manpages: default
+	cd doc && $(SHELL) rebuild_manpages.sh
+
 
 # exotic targets, not built by default
 # FTR: interactive tools, require X11 or freeglut
@@ -79,7 +87,7 @@ bin/%_term : src/ftr/%.o $(OBJ_FTR_TERM)
 
 # bureaucracy
 clean: ; @$(RM) $(BIN_ALL) bin/im src/*.o src/ftr/*.o src/misc/*.o
-.PHONY: default full ftr misc clean
+.PHONY: default full ftr misc clean tutorial manpages
 .PRECIOUS: %.o
 
 
