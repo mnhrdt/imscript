@@ -37,7 +37,7 @@ tutorial: default
 
 # build manpages
 manpages: default
-	cd doc && $(SHELL) rebuild_manpages.sh
+	cd doc && env PATH=../bin:$(PATH) $(SHELL) rebuild_manpages.sh
 
 
 # exotic targets, not built by default
