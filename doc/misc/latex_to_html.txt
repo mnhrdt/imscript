@@ -1,0 +1,56 @@
+How to convert LaTeX to HTML
+
+
+COMMON TAGGING
+
+\title{x}              <title>x | site</title> <h1>x</h1>
+\section{x}            <h2>x</h2>
+\subsection{x}         <h3>x</h3>
+\emph{x}               <i>x</i>
+\textit{x}             <i>x</i>
+\textbf{x}             <b>x</b>
+{\bf x}                <b>x</b>
+\includegraphics{x}    <img src="x" >
+%paragraph             <p>
+
+
+
+ENVIRONEMENTS
+
+\begin{verbatim}       <pre>
+x                      x
+\end{verbatim}         </pre>
+
+\begin{enumerate}      <ol>
+\item x                <li> x
+\end{enumerate}        </ol>
+
+\begin{itemize}        <ul>
+\item x                <li> x
+\end{itemize}          </ul>
+
+\begin{itemize}        <ul>
+\item[i] x             <li style=":before {content:'i.'}" >x
+\end{itemize}          </ul>
+
+\begin{tabular}{...}   <table>
+x & y & z \\           <tr><td>x <td>y <td>z
+p & q & r \\           <tr><td>p <td>q <td>r
+\end{tabular}          </table>
+
+
+
+THEOREM ENVIRONEMENTS
+
+\begin{definition}     <div class="definition"><b>Definition</b><i>
+x                      x
+\end{definition        </i></div>
+
+\begin{proposition}    <div class="proposition"><b>Proposition</b><i>
+x                      x
+\end{proposition}      </i></div>
+
+
+MATH (it is left as is, and dealt with via mathjax)
+
+a~$b$ c                a&nbsp;$b$ c

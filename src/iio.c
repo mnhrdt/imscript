@@ -33,12 +33,13 @@
 #define I_CAN_HAS_LIBPNG
 #define I_CAN_HAS_LIBJPEG
 #define I_CAN_HAS_LIBTIFF
-//#define I_CAN_HAS_LIBHDF5
+#define I_CAN_HAS_LIBHDF5
 //#define I_CAN_HAS_LIBEXR
 #define I_CAN_HAS_WGET
 #define I_CAN_HAS_WHATEVER
 //#define I_CAN_KEEP_TMP_FILES
 
+#define I_CAN_HAS_INT64
 
 //
 // portability macros to choose OS features
@@ -2020,7 +2021,7 @@ hid_t my_hd5open(hid_t f, char *suffix)
 	H5O_iterate_t u = find_suffix;
 	struct twostrings p = {suffix, dset};
 	p.a = suffix;
-	herr_t e = H5Ovisit(f, H5_INDEX_NAME, H5_ITER_NATIVE, u, &p);
+	herr_t e = H5Ovisit1(f, H5_INDEX_NAME, H5_ITER_NATIVE, u, &p);
 	if (*dset) IIO_DEBUG("HDF5_DSET = /%s\n", dset);
 	return *dset ? H5Dopen2(f, dset, H5P_DEFAULT) : -1;
 }

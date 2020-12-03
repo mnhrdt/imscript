@@ -3,8 +3,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <tgmath.h>
-//#include <math.h>
+#ifdef __ICC
+#  include <math.h> // disable tgmath for icc (broken on linux headers)
+#else
+#  include <tgmath.h>
+#endif//__ICC
 #include "iio.h"
 
 #include "fail.c"

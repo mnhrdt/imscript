@@ -23,6 +23,7 @@ static void lcg_knuth_srand(uint32_t x)
 	lcg_knuth_seed = x;
 }
 
+// linear congruential generator from "seminumerical algorithms"
 static uint32_t lcg_knuth_rand(void)
 {
 	lcg_knuth_seed *= 6364136223846793005;

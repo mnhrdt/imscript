@@ -7,6 +7,7 @@
 // rpctk fitP             < llhij.txt > rpc.xml
 // rpctk fillL nx ny nh   > ijhll.txt
 // rpctk fillP nx ny nh   > llhij.txt
+// rpctk zoom f rpc.xml   > rpc.xml
 
 
 #include <stdio.h>
@@ -258,6 +259,31 @@ int main_rpctk_fitL(int c, char *v[])
 	return 0;
 }
 
+static void rescale_rpc_in_place(struct rpc *r, float z)
+{
+	;
+}
+
+int main_rpctk_zoom(int c, char *v[])
+{
+	if (c != 4)
+		return fprintf(stderr, "usage:\n\t%s zoom f rpc > rpc\n", *v);
+		//                                 0 1    2 3
+	char *filename_rpc = v[3];
+	float zoom_factor = atof(v[2]);
+
+	struct rpc r[1];
+	read_rpc_file_xml(r, filename_rpc);
+
+	rescale_rpc_in_place(r, zoom_factor);
+
+	print_rpc(stdout, r, "");
+
+	return 0;
+}
+
+
+
 #include <string.h>
 int main(int c, char *v[])
 {
@@ -270,6 +296,7 @@ int main(int c, char *v[])
 	//if (0 == strcmp(v[1], "fit"))      return main_rpctk_fit(c-1, v+1);
 	//if (0 == strcmp(v[1], "fitP"))     return main_rpctk_fitP(c-1, v+1);
 	//if (0 == strcmp(v[1], "fillP"))     return main_rpctk_filPL(c-1, v+1);
+	if (0 == strcmp(v[1], "zoom"))    return main_rpctk_zoom(c-1, v+1);
 end:	return fprintf(stderr,
 			"usage:\n\t%s {info|localize|project|fit} ...\n", *v);
 }
