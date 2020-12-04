@@ -122,11 +122,11 @@ static struct ann_pair *srmatch(
 	struct sift_keypoint *hkb = xmalloc(nb*sizeof*hkb);
 	memcpy(hkb, kb, nb*sizeof*hkb);
 	sifthom(hkb, nb, ih0);
-	{
-		FILE *f = xfopen("/tmp/hsifts", "w");
-		write_raw_sifts(f, kb, nb);
-		xfclose(f);
-	}
+	//{
+	//	FILE *f = xfopen("/tmp/hsifts", "w");
+	//	write_raw_sifts(f, kb, nb);
+	//	xfclose(f);
+	//}
 
 	// compute exhaustive SIFT matches to the registered points
 	// (using a tiny search area)
