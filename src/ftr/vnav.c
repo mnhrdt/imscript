@@ -1915,6 +1915,8 @@ int main_noninteractive(int c, char *v[])
 	float param_l = atof(pick_option(&c, &v, "l", "0"));    // nfa l
 	float param_n = atof(pick_option(&c, &v, "n", "10000"));// nrsamples
 
+	fprintf(stderr, "\nparam_h = %g\n", param_h);
+
 	// process input arguments
 	if (c != 3) {
 		fprintf(stderr, "usage:\n\t%s in_ohm.tif out_dips.txt\n", *v);
@@ -1988,7 +1990,7 @@ int main_noninteractive(int c, char *v[])
 	//ftr_set_handler(&f, "expose", pan_exposer);
 	//int r = ftr_loop_run(&f);
 
-	e->offset_x = param_h;       // read from CLI
+	e->offset_y = param_h;       // read from CLI
 	action_compute_hough(&f);
 
 	// write the meaningful sinusoids to the output file
