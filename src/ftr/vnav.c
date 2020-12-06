@@ -247,11 +247,13 @@ static void action_print_value_under_cursor(struct FTR *f, int x, int y)
 	}
 }
 
+#include "smapa.h"
+SMART_PARAMETER(VNAV_DEBUG,0)
 
 #include<stdarg.h>
 static void img_debug(float *x, int w, int h, int pd, const char *fmt, ...)
 {
-	return;
+	if (!VNAV_DEBUG()) return;
 	va_list ap;
 	char fname[FILENAME_MAX];
 	va_start(ap, fmt);
@@ -528,7 +530,8 @@ double sin_nfa_continuous(struct sinusoid s, double *ox, double *oy,
       double c = s.c;
       int dir = s.d;
       int x = i;
-      double yy = 360/M_PI*(a*cos(2*M_PI*x/(X-1)) + b*sin(2*M_PI*x/(X-1))) + c;
+      double width = X;
+      double yy= width/M_PI*(a*cos(2*M_PI*x/(X-1)) + b*sin(2*M_PI*x/(X-1))) + c;
       int y = lrint(yy);
 
       if( x >= 0 && x < X && y >= 0 && y < Y && (ox[x+y*X] * ox[x+y*X]) != 0.0
@@ -581,8 +584,8 @@ double sin_nfa(struct sinusoid s, double *ox, double *oy,
 		int dir = s.d;
 
 		/* compute y coordinate in the sinusoid */
-		// TODO: use the image width instead of 360 here
-		y = lrint(360/M_PI*(a*cos(2*M_PI*x/(X-1))
+		double image_width = X;
+		y = lrint(image_width/M_PI*(a*cos(2*M_PI*x/(X-1))
 					+ b*sin(2*M_PI*x/(X-1))) + c);
 
 		/* valid orientation */
@@ -1001,7 +1004,7 @@ static void action_nfa(struct FTR *f)//{{{2
 	e->show_meaningful_sinusoids = true;
 	// TODO: this loop must only traverse the heights that are inside the
 	// ROI
-	float amplitude = hypot(A, B) * 360 / M_PI;
+	float amplitude = hypot(A, B) * e->strip_w / M_PI;
 	int c_from = 10 + amplitude;
 	int c_to = e->strip_h - amplitude - 10;
 	assert(0 <= c_from);
@@ -1052,7 +1055,7 @@ static void exclude_around_sinusoid(struct pan_state *e, struct sinusoid *s)
 		double a = s->a;
 		double b = s->b;
 		double c = s->c;
-		double yy = 360/M_PI*(a*cos(2*M_PI*x/(X-1))
+		double yy = X/M_PI*(a*cos(2*M_PI*x/(X-1))
 				+ b*sin(2*M_PI*x/(X-1))) + c;
 		int y = lrint(yy);
 		for (int h = -5; h <= 5; h++)
@@ -1351,7 +1354,7 @@ static void dump_inferno(struct FTR *f)
 		float r = hypot(x, y);
 		float t = atan2(y, x);
 		int ir = lrint(e->infernal_a + e->infernal_b / r);
-		int it = lrint(359*(M_PI + t)/(2 * M_PI));
+		int it = lrint((e->strip_w-1)*(M_PI + t)/(2 * M_PI));
 		if (insideP(e->strip_w, e->strip_h, it, ir))
 		{
 			float v = 0;
@@ -1808,7 +1811,6 @@ static void fill_global_dirt(void)
 	}
 }
 
-#include "smapa.h"
 SMART_PARAMETER(INFERNAL_A,-60)
 SMART_PARAMETER(INFERNAL_B,20000)
 
@@ -1896,8 +1898,125 @@ int main_vnav(int c, char *v[])
 	return r;
 }
 
+//#include "pickopt.c"
+int main_noninteractive(int c, char *v[])
+{
+	TIFFSetWarningHandler(NULL);//suppress warnings
+
+	// extract named parameters
+	float param_o = atof(pick_option(&c, &v, "o", "0"));    // octave
+	float param_h = atof(pick_option(&c, &v, "h", "0"));    // depth start
+	float param_H = atof(pick_option(&c, &v, "H", "360"));  // depth delta
+	float param_s = atof(pick_option(&c, &v, "s", "2"));    // σ
+	float param_e = atof(pick_option(&c, &v, "e", "4"));    // η
+	float param_R = atof(pick_option(&c, &v, "R", "1.5"));  // R (hough rad)
+	float param_p = atof(pick_option(&c, &v, "p", "0"));    // nfa p
+	float param_g = atof(pick_option(&c, &v, "g", "1e-9")); // nfa g
+	float param_l = atof(pick_option(&c, &v, "l", "0"));    // nfa l
+	float param_n = atof(pick_option(&c, &v, "n", "10000"));// nrsamples
+
+	// process input arguments
+	if (c != 3) {
+		fprintf(stderr, "usage:\n\t%s in_ohm.tif out_dips.txt\n", *v);
+		//                          0 1          2
+		return 1;
+	}
+	char *in_fname = v[1];
+	char *out_fname = v[2];
+
+	// read input image
+	struct pan_state e[1];
+	int megabytes = 100;
+	tiff_octaves_init(e->t, in_fname, megabytes);
+	int STRIP_WIDTH = e->t->i->w;
+	if (e->t->i->w != STRIP_WIDTH)
+		fail("expected an image of width %d (got %d)\n",
+						STRIP_WIDTH, e->t->i->w);
+
+	// init state
+	e->a = 1;
+	e->b = 0;
+	e->strip_w = STRIP_WIDTH;
+	e->strip_h = param_H;          // read from CLI
+	e->hough_w = HOUGH_SIDE;
+	e->hough_h = HOUGH_SIDE; // (unused)
+	e->strip = xmalloc(e->strip_w * e->strip_h * sizeof*e->strip);
+	e->hough = xmalloc(e->hough_w * e->hough_w * sizeof*e->hough);
+	e->has_hough = false;
+	e->show_dip_bundle = false;
+	e->dip_stride = 30;
+	e->dip_offset = 0;
+	e->contrast_mode = 0;
+	e->head_up_display = true;
+	e->nb_meaningful_sinusoids = 0;
+	e->nb_refined_sinusoids = 0;
+	e->show_meaningful_sinusoids = false;
+	e->nfa_param_th_modgrad = param_g;  // read from CLI
+	e->nfa_param_p = param_p;           // read from CLI
+	e->nfa_param_lepsilon = param_l;    // read from CLI
+	e->validatronics_mode = true;
+	e->acontrario_orientations_x = xmalloc(e->strip_w * e->strip_h * sizeof*e->acontrario_orientations_x);
+	e->acontrario_orientations_y = xmalloc(e->strip_w * e->strip_h * sizeof*e->acontrario_orientations_y);
+	e->exclusion_mask = xmalloc(e->strip_w * e->strip_h);
+
+	e->aradius = param_R;               // read from CLI
+	e->pre_blur_sigma = param_s;        // read from CLI
+	e->pre_blur_type = "gaussian";
+	e->post_blur_sigma = param_e;       // read from CLI
+	e->post_blur_type = "cauchy";
+	e->randomized = param_n;            // read from CLI
+	e->autocontrast = true;
+	//font_fill_from_bdf(&e->font, FONT_BDF_FILE);
+	e->font = *xfont_9x15;
+	e->font = reformat_font(e->font, UNPACKED);
+	e->tensor = 1;
+	e->ntensor = 9;
+	e->inferno = false;
+	//e->infernal_a = INFERNAL_A();
+	//e->infernal_b = INFERNAL_B();
+	e->inpaint_strip = false;
+	fill_global_dirt();
+
+	// open window
+	struct FTR f;// = ftr_new_window(2*e->strip_w + e->hough_w, e->hough_w);
+	f.h = e->strip_h;
+	f.userdata = e;
+	action_reset_zoom_and_position(&f);
+	//ftr_set_handler(&f, "key"   , pan_key_handler);
+	//ftr_set_handler(&f, "button", pan_button_handler);
+	//ftr_set_handler(&f, "motion", pan_motion_handler);
+	//ftr_set_handler(&f, "expose", pan_exposer);
+	//int r = ftr_loop_run(&f);
+
+	e->offset_x = param_h;       // read from CLI
+	action_compute_hough(&f);
+
+	// write the meaningful sinusoids to the output file
+	FILE *fout = xfopen(out_fname, "wa");
+	for (int i = 0; i < e->nb_refined_sinusoids; i++)
+	{
+		double A = e->meaningful_sinusoid[i].a;
+		double B = e->meaningful_sinusoid[i].b;
+		double C = e->meaningful_sinusoid[i].c;
+		int D = e->meaningful_sinusoid[i].d;
+		double Ch = C + param_h;
+		double n = e->meaningful_sinusoid[i].nfa;
+		if (n < e->nfa_param_lepsilon)
+			fprintf(fout, "%g %g %g %d %g\n", A, B, Ch, D, n);
+	}
+	xfclose(fout);
+
+	//// cleanup and exit (optional)
+	//ftr_close(&f);
+	//free(e->font.data);
+	return 0;
+}
+
 int main(int c, char *v[])
 {
-	return main_vnav(c, v);
+	if (c > 1 && 0 == strcmp(v[1], "cli"))
+		return main_noninteractive(c-1, v+1);
+	else
+		return main_vnav(c, v);
 }
 // vim:set foldmethod=marker:
