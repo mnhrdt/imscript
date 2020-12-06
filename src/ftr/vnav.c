@@ -45,6 +45,9 @@
 #include <stdint.h>
 #include "iio.h" // (for debug only)
 
+#include "xmalloc.c"
+#include "parsenumbers.c"
+
 #define TIFFU_OMIT_MAIN
 #include "tiffu.c"
 
@@ -145,6 +148,11 @@ struct pan_state {
 	double nfa_param_lepsilon; // "l" 0 (offset = 1)
 	bool validatronics_mode;
 	char *exclusion_mask;
+
+	// 7. ground truth
+	int nb_true_sinusoids;
+	struct sinusoid *true_sinusoids;
+	bool show_true_sinusoids;
 };
 
 
@@ -532,12 +540,14 @@ double sin_nfa_continuous(struct sinusoid s, double *ox, double *oy,
       int x = i;
       double width = X;
       double yy= width/M_PI*(a*cos(2*M_PI*x/(X-1)) + b*sin(2*M_PI*x/(X-1))) + c;
+      //double yy= X/π*(a*COS(2*π*x/(X-1)) + b*sin(2*π*x/(X-1))) + c;
       int y = lrint(yy);
 
       if( x >= 0 && x < X && y >= 0 && y < Y && (ox[x+y*X] * ox[x+y*X]) != 0.0
 		      && (!mask || mask[x+y*X]) )
         {
-          double deriv = 720/(X-1) * ( -a*sin(2*M_PI*x/(X-1))
+          //double deriv = 720/(X-1) * ( -a*sin(2*M_PI*x/(X-1))
+          double deriv = (2.0*X)/(X-1) * ( -a*sin(2*M_PI*x/(X-1))
                                       + b*cos(2*M_PI*x/(X-1)) );
           double norm_angle = atan2(dir*1.0,-dir*deriv);
           double theta = atan2(oy[x+y*X],ox[x+y*X]);
@@ -593,7 +603,8 @@ double sin_nfa(struct sinusoid s, double *ox, double *oy,
 				&& (!mask || mask[x+y*X]) )
 		{
 			// TODO: use 2*the image width instead of 720 here
-			double deriv = 720/(X-1) * ( -a*sin(2*M_PI*x/(X-1))
+			//double deriv = 720/(X-1) * ( -a*sin(2*M_PI*x/(X-1))
+			double deriv = (2.0*X)/(X-1) * ( -a*sin(2*M_PI*x/(X-1))
 					+ b*cos(2*M_PI*x/(X-1)) );
 			double norm_angle = atan2(dir*1.0,-dir*deriv);
 			double theta = atan2(oy[x+y*X], ox[x+y*X]);
@@ -1565,6 +1576,38 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		}
 	}
 
+	// show the ground-truth sinusoids in magenta
+	if (e->show_true_sinusoids)
+	{
+		for (int i = 0; i < e->nb_true_sinusoids; i++)
+		{
+			fprintf(stderr, "true sinusoid %d/%d a=%g\n", i, e->nb_true_sinusoids, e->true_sinusoids[i].c);
+			for (int i_theta = 0; i_theta < e->strip_w; i_theta++)
+			{
+				double A = e->true_sinusoids[i].a;
+				double B = e->true_sinusoids[i].b;
+				double C = e->true_sinusoids[i].c;
+				int D = e->true_sinusoids[i].d;
+				int n_theta = e->strip_w;
+				int n_z = e->strip_h;
+				float theta = i_theta * 2 * M_PI / n_theta;
+				float z = A * cos(theta) + B * sin(theta);
+				float magic_factor = n_theta / M_PI;
+				int i_z = magic_factor * z;
+				int k = i_z + C;
+				if (insideP(f->w, f->h, i_theta, k) &&
+					insideP(f->w, f->h, i_theta, k+1)&&
+					insideP(f->w, f->h, i_theta, k-1))
+				{
+					int fidx = (k+1) * f->w + i_theta;
+					f->rgb[3*fidx+0] = 255;
+					f->rgb[3*fidx+1] = 0;
+					f->rgb[3*fidx+2] = 255;
+				}
+			}
+		}
+	}
+
 	if (e->show_dip_bundle && !e->inferno && !e->show_meaningful_sinusoids)
 	{
 		for (int i_theta = 0; i_theta < e->strip_w; i_theta++)
@@ -1821,6 +1864,9 @@ int main_vnav(int c, char *v[])
 {
 	TIFFSetWarningHandler(NULL);//suppress warnings
 
+	// optional arguments
+	char *file_gt = pick_option(&c, &v, "t", ""); // optional true dips
+
 	// process input arguments
 	if (c != 2) {
 		fprintf(stderr, "usage:\n\t%s pyrpattern\n", *v);
@@ -1881,6 +1927,30 @@ int main_vnav(int c, char *v[])
 	e->infernal_b = INFERNAL_B();
 	e->inpaint_strip = false;
 	fill_global_dirt();
+
+	e->show_true_sinusoids = false;
+	e->nb_true_sinusoids = 0;
+	e->true_sinusoids = NULL;
+	if (*file_gt)
+	{
+		int ntmp;
+		double *tmp = read_ascii_doubles_fn(file_gt, &ntmp);
+		ntmp /= 3;
+		e->nb_true_sinusoids = ntmp;
+		fprintf(stderr, "\ngot %d sinusoids from file %s\n\n", ntmp, file_gt);
+		e->true_sinusoids = xmalloc(ntmp * sizeof*e->true_sinusoids);
+		for (int i = 0; i < ntmp; i++)
+		{
+			double a = tmp[3*i+1]; // dip azimuth in degrees
+			double d = tmp[3*i+1]; // dip dip in degrees
+			double A = a*M_PI/180;
+			double D = d*M_PI/180;
+			e->true_sinusoids[i].a = 0*A;
+			e->true_sinusoids[i].b = 0*D;
+			e->true_sinusoids[i].c = tmp[3*i+0]; // dip depth (pix)
+		}
+		e->show_true_sinusoids = true;
+	}
 
 	// open window
 	struct FTR f = ftr_new_window(2*e->strip_w + e->hough_w, e->hough_w);
