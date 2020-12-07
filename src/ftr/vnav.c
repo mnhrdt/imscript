@@ -858,7 +858,8 @@ static void action_compute_hough(struct FTR *f)//{{{2
 {
 	struct pan_state *e = f->userdata;
 	if (e->inferno) return;
-	fprintf(stderr, "compute hough\n");
+	fprintf(stderr, "compute hough z=%g ox=%g oy=%g o=%d\n",
+			e->zoom_y, e->offset_x, e->offset_y, e->octave);
 	e->nb_meaningful_sinusoids = 0;
 	e->has_hough = true;
 	f->changed = 1;
@@ -2060,18 +2061,19 @@ int main_noninteractive(int c, char *v[])
 	//ftr_set_handler(&f, "expose", pan_exposer);
 	//int r = ftr_loop_run(&f);
 
-	e->offset_y = param_h;       // read from CLI
 	for (int i = 0; i < param_o; i++) // "param_o" read from CLI
 		action_increase_octave(&f, 0, e->offset_y);
+	e->offset_y = param_h;       // read from CLI
 	action_compute_hough(&f);
+	float octave_factor = 1 << (int)param_o;
 
 	// write the meaningful sinusoids to the output file
 	FILE *fout = xfopen(out_fname, "wa");
 	for (int i = 0; i < e->nb_refined_sinusoids; i++)
 	{
-		double A = e->meaningful_sinusoid[i].a;
-		double B = e->meaningful_sinusoid[i].b;
-		double C = e->meaningful_sinusoid[i].c;
+		double A = e->meaningful_sinusoid[i].a * octave_factor;
+		double B = e->meaningful_sinusoid[i].b * octave_factor;
+		double C = e->meaningful_sinusoid[i].c * octave_factor;
 		int D = e->meaningful_sinusoid[i].d;
 		double Ch = C + param_h;
 		double n = e->meaningful_sinusoid[i].nfa;
