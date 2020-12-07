@@ -2061,6 +2061,8 @@ int main_noninteractive(int c, char *v[])
 	//int r = ftr_loop_run(&f);
 
 	e->offset_y = param_h;       // read from CLI
+	for (int i = 0; i < param_o; i++) // "param_o" read from CLI
+		action_increase_octave(&f, 0, e->offset_y);
 	action_compute_hough(&f);
 
 	// write the meaningful sinusoids to the output file
@@ -2074,7 +2076,8 @@ int main_noninteractive(int c, char *v[])
 		double Ch = C + param_h;
 		double n = e->meaningful_sinusoid[i].nfa;
 		if (n < e->nfa_param_lepsilon)
-			fprintf(fout, "%g %g %g %d %g\n", A, B, Ch, D, n);
+			fprintf(fout, "%g %g %g %d %g %g\n",
+					A, B, Ch, D, n, param_o);
 	}
 	xfclose(fout);
 
