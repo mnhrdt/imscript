@@ -148,6 +148,7 @@ struct pan_state {
 	double nfa_param_lepsilon; // "l" 0 (offset = 1)
 	bool validatronics_mode;
 	char *exclusion_mask;
+	double max_refinement_iterations;
 
 	// 7. ground truth
 	int nb_true_sinusoids;
@@ -670,8 +671,10 @@ int refine_this_sinusoid(struct pan_state *e, struct sinusoid *s)
 	int best_idx;
 	//fprintf(stderr, "before do nfa = %g [%g %g %g]\n", best_nfa,
 	//		abc[0], abc[1], abc[2]);
+	int iteration_number = 1;
 	do {
 		//fprintf(stderr, "iteration (nfa=%g)\n", best_nfa);
+		if (iteration_number >= e->max_refinement_iterations) break;
 		best_idx = -1;
 		for (int i = 0; i < nn; i++)
 		{
@@ -693,6 +696,7 @@ int refine_this_sinusoid(struct pan_state *e, struct sinusoid *s)
 			s->c += step[2] * n[best_idx][2];
 			s->nfa = best_nfa;
 		}
+		iteration_number += 1;
 	} while (best_idx >= 0);
 	//fprintf(stderr, "after while (nfa=%g) %g %g %g\n", best_nfa,
 	//		abc[0], abc[1], abc[2]);
@@ -1906,6 +1910,7 @@ int main_vnav(int c, char *v[])
 	e->nfa_param_th_modgrad = 1e-9;
 	e->nfa_param_p = 0;//.03125;
 	e->nfa_param_lepsilon = 0;
+	e->max_refinement_iterations = 100;
 	e->validatronics_mode = true;
 	e->acontrario_orientations_x = xmalloc(e->strip_w * e->strip_h * sizeof*e->acontrario_orientations_x);
 	e->acontrario_orientations_y = xmalloc(e->strip_w * e->strip_h * sizeof*e->acontrario_orientations_y);
@@ -1985,6 +1990,7 @@ int main_noninteractive(int c, char *v[])
 	float param_g = atof(pick_option(&c, &v, "g", "1e-9")); // nfa g
 	float param_l = atof(pick_option(&c, &v, "l", "0"));    // nfa l
 	float param_n = atof(pick_option(&c, &v, "n", "10000"));// nrsamples
+	float param_m = atof(pick_option(&c, &v, "m", "100"));  // maxref
 
 	fprintf(stderr, "\nparam_h = %g\n", param_h);
 
@@ -2027,6 +2033,7 @@ int main_noninteractive(int c, char *v[])
 	e->nfa_param_th_modgrad = param_g;  // read from CLI
 	e->nfa_param_p = param_p;           // read from CLI
 	e->nfa_param_lepsilon = param_l;    // read from CLI
+	e->max_refinement_iterations = param_m; // read from CLI
 	e->validatronics_mode = true;
 	e->acontrario_orientations_x = xmalloc(e->strip_w * e->strip_h * sizeof*e->acontrario_orientations_x);
 	e->acontrario_orientations_y = xmalloc(e->strip_w * e->strip_h * sizeof*e->acontrario_orientations_y);
@@ -2068,7 +2075,7 @@ int main_noninteractive(int c, char *v[])
 	float octave_factor = 1 << (int)param_o;
 
 	// write the meaningful sinusoids to the output file
-	FILE *fout = xfopen(out_fname, "wa");
+	FILE *fout = xfopen(out_fname, "w");
 	for (int i = 0; i < e->nb_refined_sinusoids; i++)
 	{
 		double A = e->meaningful_sinusoid[i].a * octave_factor;
