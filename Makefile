@@ -3,13 +3,6 @@ CFLAGS ?= -O3 -march=native
 #CFLAGS ?= -g -Wall -Wextra -Wno-unused
 LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm
 
-ifndef DISABLE_HDF5
-# comment the following two lines to disable hdf5 support
-LDLIBS += $(shell pkg-config hdf5 --libs --silence-errors || echo -lhdf5)
-src/iio.o: CPPFLAGS+= -DI_CAN_HAS_LIBHDF5 `pkg-config hdf5 --cflags 2>/dev/null`
-endif
-
-
 
 OBJ = src/iio.o src/fancy_image.o
 BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
@@ -26,6 +19,15 @@ default: $(BIN) bin/cpu_term bin/rpcflip_term
 
 bin/%  : src/%.o $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+
+
+
+ifndef DISABLE_HDF5
+# comment the following two lines to disable hdf5 support
+LDLIBS += $(shell pkg-config hdf5 --libs --silence-errors || echo -lhdf5)
+src/iio.o: CPPFLAGS+= -DI_CAN_HAS_LIBHDF5 `pkg-config hdf5 --cflags 2>/dev/null`
+endif
+
 
 
 

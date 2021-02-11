@@ -1,0 +1,22 @@
+ABOUT LIBRARIES
+===============
+
+Software libraries are diseases.  You want to avoid them as much as possible.
+Making your program depend on a library is like infecting it on purpose with
+a well-known malady; while there may be legitimate reasons for that
+infection, they need to be thoroughly justified.
+
+Not all diseases are equivalent, and the same holds true for software
+libraries.  The worse libraries are like cancer: you start depending on them
+for a minor, non-essential part of your program (what could be the harm?) and
+before you notice they have infected your whole program and there's no way to
+remove them.  Other libraries are like the seasonal flu: you cannot avoid
+"catching" them (for they provide a required feature), but after some time
+you can remove them easily, leaving your program healthier, stronger, and
+having gained resistance to further attempts at injecting dependencies.
+
+Thus, when designing a library for other people to use, the programmer should
+take care that it is very easy to get rid of it.
+
+
+# vim:set tw=77 filetype=text spell spelllang=en:

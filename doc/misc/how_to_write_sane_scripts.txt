@@ -5,13 +5,14 @@ How to write sane scripts
 - preferably, use #!/bin/sh, but then assume sh is not bash
 - otherwise if you need bash, use #!/bin/bash
 - only put a shebang if the file is executable
+- avoid #!/usr/bin/env crap
 - if your script is not executable, it can be run with ". file.sh" without ever
   quitting the parent shell
 - shell variable names are uppercase, except maybe if they are single letters
 - never store filanemes in variables, filenames *are* variable names
 - exception: input arguments $1, $2, ... can be put into variables
 - if you check the existence of files at every line, write a makefile instead
-- use always "test" and short-circuiting, try to avoid "if"
+- use always "test" and short-circuiting, do not use "if"
 - to break a pipeline into several lines, put each command on a separate line
 - assume that your filenames do not contain spaces.  If this is not possible,
   start your script by temporarily renaming the files using saner names.  Do
@@ -31,10 +32,10 @@ How to write sane scripts
                 echo process $i
         done | parallel -j 32
 
-  BEST: write a makefile
+  BEST: write a makefile and run "make -j"
 
 
-- this is the basic skeleton of an executable script
+- this is the basic skeleton of an executable script:
 
 #!/bin/sh
 

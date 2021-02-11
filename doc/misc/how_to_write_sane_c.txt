@@ -20,7 +20,7 @@ NAMING
 
 N0. mixed-case symbols are forbidden
 N1. all local variables are single letters (like in the rest of mathematics)
-    - exception: letters like "alpha", "beta" (gcc does not yet grok UTF8)
+    - exception: greek letters like "alpha", "beta" (gcc does not yet grok UTF8)
     - exception: variations of a single letter like "x_in", "x_out"
 N2. all global variables are self-documenting and have the form "global_*"
 N3. all the symbols exposed by a translation unit share a prefix ending in _
@@ -34,8 +34,8 @@ N8. struct members are lowercase
 
 FORMATTING
 
-F0. indent with 1 tab or with 8 spaces (but not both on the same file)
-F1. the maximum line width is 80 (1 indentation level counts as 8)
+F0. indent with 1 tab or with 8 spaces (but not mix them on the same file)
+F1. the maximum line width is 80 characters (1 indentation level counts as 8)
 F2. functions have at most 20 or 25 lines, unless they have some symmetry
 F3. no declaration without initialization
     - exception: when the initialization is via a reference on the next line
@@ -61,7 +61,7 @@ S1. do not cast: either use implicit conversions or write conversion functions
 S2. local variables are pronouns, comments are the names (see N1 and C1)
 S3. unsigned types are only used for bit fields
 S4. all loops are exactly of the form "for (int i=0; i<n; i++)"
-    - n is a constant or a variable whose value can be estimated at compile-time
+    - n is a constant or a variable whose value can be bounded at compile-time
 S5. strive to make the body of each loop a single statement
 S6. non-tail recursion is only allowed if the depth is O(log(input size))
 S7. use pointers to VLA for simple array arithmetic
@@ -107,7 +107,7 @@ I8. allocate memory only inside main(), then you do not need to free it!
 I9. prefer a single large file than several smaller files
     - exception: an archive of many functions that you want to link separately
 I10. foo.c never includes foo.h
-I11. do not use include guards (this helps to avoid diamonds)
+I11. do not use include guards (this helps to avoid dependency diamonds)
 
 
 

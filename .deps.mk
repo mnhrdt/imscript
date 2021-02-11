@@ -56,7 +56,7 @@ src/fontu.o: src/fontu.c src/xmalloc.c src/fail.c src/xfopen.c src/dataconv.c \
  src/fonts/xfont_10x20.c src/fonts/xfont_canny.c \
  src/fonts/xfont_clR6x12.c src/fonts/xfont_helvR12.c src/iio.h \
  src/pickopt.c
-src/getbands.o: src/getbands.c src/iio.h
+src/getbands.o: src/getbands.c src/iio.h src/pickopt.c
 src/getpixel.o: src/getpixel.c
 src/ghisto.o: src/ghisto.c src/iio.h src/xmalloc.c src/fail.c src/smapa.h \
  src/pickopt.c
@@ -110,9 +110,10 @@ src/palette.o: src/palette.c src/fail.c src/xmalloc.c src/xfopen.c \
  src/fonts/xfont_clR6x12.c src/fonts/xfont_helvR12.c
 src/parsenumbers.o: src/parsenumbers.c src/xmalloc.c src/fail.c
 src/pickopt.o: src/pickopt.c
+src/pixdump.o: src/pixdump.c src/iio.h
 src/plambda.o: src/plambda.c src/smapa.h src/fail.c src/xmalloc.c \
  src/random.c src/parsenumbers.c src/colorcoordsf.c src/getpixel.c \
- src/iio.h
+ src/iio.h src/help_stuff.c
 src/ppsmooth.o: src/ppsmooth.c src/iio.h src/pickopt.c
 src/pview.o: src/pview.c src/iio.h src/fail.c src/xmalloc.c src/xfopen.c \
  src/parsenumbers.c src/drawsegment.c src/pickopt.c src/smapa.h \
@@ -205,6 +206,7 @@ src/ftr/fancy_rpcflip.o: src/ftr/fancy_rpcflip.c src/ftr/rpc2.c src/ftr/xfopen.c
  src/ftr/fail.c src/ftr/smapa.h src/ftr/ftr.h src/ftr/fancy_image.h \
  src/ftr/srtm4o.c src/ftr/tiff_octaves_rw.c src/ftr/iio.h \
  src/ftr/xmalloc.c src/ftr/pickopt.c
+src/ftr/fill_bill.o: src/ftr/fill_bill.c src/ftr/iio.h
 src/ftr/fm.o: src/ftr/fm.c src/ftr/seconds.c src/ftr/ftr.h src/ftr/iio.h
 src/ftr/fontu.o: src/ftr/fontu.c src/ftr/xmalloc.c src/ftr/fail.c \
  src/ftr/xfopen.c src/ftr/dataconv.c src/ftr/fonts/xfonts_all.c \
@@ -264,12 +266,12 @@ src/ftr/tiff_octaves_rw.o: src/ftr/tiff_octaves_rw.c
 src/ftr/tiffu.o: src/ftr/tiffu.c
 src/ftr/tterm.o: src/ftr/tterm.c
 src/ftr/viho.o: src/ftr/viho.c src/ftr/ftr.h src/ftr/marching_interpolation.c \
- src/ftr/iio.h
-src/ftr/vnav.o: src/ftr/vnav.c src/ftr/iio.h src/ftr/tiffu.c src/ftr/ftr.h \
- src/ftr/minisimpois.c src/ftr/blur.c src/ftr/fail.c src/ftr/xmalloc.c \
- src/ftr/smapa.h src/ftr/tdip.c src/ftr/strt.c src/ftr/random.c \
- src/ftr/fontu.c src/ftr/xfopen.c src/ftr/dataconv.c \
- src/ftr/fonts/xfont_9x15.c src/ftr/seconds.c
+ src/ftr/iio.h src/ftr/pickopt.c
+src/ftr/vnav.o: src/ftr/vnav.c src/ftr/iio.h src/ftr/xmalloc.c src/ftr/fail.c \
+ src/ftr/parsenumbers.c src/ftr/tiffu.c src/ftr/ftr.h \
+ src/ftr/minisimpois.c src/ftr/blur.c src/ftr/smapa.h src/ftr/tdip.c \
+ src/ftr/strt.c src/ftr/random.c src/ftr/fontu.c src/ftr/xfopen.c \
+ src/ftr/dataconv.c src/ftr/fonts/xfont_9x15.c src/ftr/seconds.c
 src/ftr/wifpan.o: src/ftr/wifpan.c src/ftr/iio.h src/ftr/ftr.h src/ftr/fontu.c \
  src/ftr/xmalloc.c src/ftr/fail.c src/ftr/xfopen.c src/ftr/dataconv.c \
  src/ftr/fonts/xfonts_all.c src/ftr/fonts/xfont_4x6.c \
