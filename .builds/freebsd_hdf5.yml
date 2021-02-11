@@ -5,7 +5,7 @@ image: freebsd/latest
 packages:
         - png
         - tiff
-        - jpeg
+        - libjpeg-turbo
         - fftw3-float
         - hdf5
         - gmake
@@ -13,9 +13,6 @@ packages:
 environment:
         CPATH: /usr/local/include
         LIBRARY_PATH: /usr/local/lib
-        CFLAGS: -DI_CAN_HAS_HDF5
-        LDLIBS: -lhdf5
-
 
 tasks:
         - test: gmake -C imscript test

@@ -8,4 +8,4 @@ packages:
         - libjpeg-dev
 
 tasks:
-        - test: make -C imscript test
+        - test: make -C imscript test DISABLE_HDF5=1
