@@ -28,12 +28,14 @@
 
 #define IIO_SHOW_DEBUG_MESSAGES
 
+//#define IIO_DISABLE_IMGLIBS
+
 #define IIO_ABORT_ON_ERROR
 
 #define I_CAN_HAS_LIBPNG
 #define I_CAN_HAS_LIBJPEG
 #define I_CAN_HAS_LIBTIFF
-#define I_CAN_HAS_LIBHDF5
+//#define I_CAN_HAS_LIBHDF5
 //#define I_CAN_HAS_LIBEXR
 #define I_CAN_HAS_WGET
 #define I_CAN_HAS_WHATEVER
@@ -242,7 +244,6 @@ jmp_buf global_jump_buffer;
 
 //#include <errno.h> // only for errno
 #include <ctype.h> // for isspace
-#include <math.h> // for floorf
 #include <stdlib.h>
 
 #ifdef I_CAN_LINUX
@@ -788,10 +789,10 @@ static void inplace_trim(struct iio_image *x,
 	char *new_data = xmalloc(nw * nh * ps);
 	if (ss == sizeof(float))
 		for (int i = 0; i < nw*nh*pd; i++)
-			((float*)new_data)[i] = NAN;
+			((float*)new_data)[i] = 0.0f/0.0f;
 	else if (ss == sizeof(double))
 		for (int i = 0; i < nw*nh*pd; i++)
-			((double*)new_data)[i] = NAN;
+			((double*)new_data)[i] = 0.0f/0.0f;
 	else
 		for (int i = 0; i < nw*nh*ps; i++)
 			((char*)new_data)[i] = 0;
@@ -1814,7 +1815,8 @@ static int read_beheaded_tiff(struct iio_image *x,
 
 // HDF5 reader                                                              {{{2
 #ifdef I_CAN_HAS_LIBHDF5
-#include <hdf5/serial/hdf5.h>
+#define H5_USE_110_API
+#include <hdf5.h>
 
 // DISCLAIMER:
 //
@@ -2646,6 +2648,7 @@ static int read_beheaded_asc(struct iio_image *x,
 	x->type = IIO_TYPE_FLOAT;
 	int nsamples = iio_image_number_of_samples(x);
 	float *xdata = xmalloc(nsamples * sizeof*xdata);
+	IIO_DEBUG("asc %d,%d,%d,%d\n", n[0], n[1], n[2], n[3]);
 	read_qnm_numbers(xdata, f, nsamples, 0, true);
 	x->data = xmalloc(nsamples * sizeof*xdata);
 	recover_broken_pixels_float(x->data, xdata, n[0]*n[1]*n[2], n[3]);
@@ -3973,6 +3976,41 @@ static void iio_write_image_as_csv(const char *filename, struct iio_image *x)
 	xfclose(f);
 }
 
+// TXT writer                                                               {{{2
+static void iio_write_image_as_txt(const char *filename, struct iio_image *x)
+{
+	FILE *f = xfopen(filename, "w");
+	int w = x->sizes[0];
+	int h = x->sizes[1];
+	assert(x->pixel_dimension == 1);
+	if (x->type == IIO_TYPE_FLOAT) {
+		float *t = x->data;
+		for (int i = 0; i < w*h; i++)
+			fprintf(f, "%.9g%c", t[i], (i+1)%w?' ':'\n');
+	}
+	if (x->type == IIO_TYPE_DOUBLE) {
+		double *t = x->data;
+		for (int i = 0; i < w*h; i++)
+			fprintf(f, "%.9g%c", t[i], (i+1)%w?' ':'\n');
+	}
+	if (x->type == IIO_TYPE_UINT8) {
+		uint8_t *t = x->data;
+		for (int i = 0; i < w*h; i++)
+			fprintf(f, "%d%c", t[i], (i+1)%w?' ':'\n');
+	}
+	xfclose(f);
+}
+
+// general text&separator writing function
+static void iio_write_image_as_txt_general(
+		const char *filename, struct iio_image *x,
+		char *optional_seplist)
+{
+	char *seplist = optional_seplist;
+	if (!seplist) seplist = " \t\n";
+	int nseps = strlen(seplist);
+}
+
 // NPY writer                                                               {{{2
 static void iio_write_image_as_npy(const char *filename, struct iio_image *x)
 {
@@ -5250,7 +5288,7 @@ uint8_t *iio_read_image_uint8(const char *fname, int *w, int *h)
 
 static bool this_float_is_actually_a_byte(float x)
 {
-	return (x == floor(x)) && (x >= 0) && (x < 256);
+	return (x == (int)(x)) && (x >= 0) && (x < 256);
 }
 
 //static bool this_float_is_actually_a_short(float x)

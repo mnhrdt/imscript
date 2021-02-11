@@ -1,6 +1,13 @@
+#CC=clang
 CFLAGS ?= -O3 -march=native
 #CFLAGS ?= -g -Wall -Wextra -Wno-unused
-LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm #-lhdf5_serial #-lgdal
+LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm
+
+# comment the following two lines to disable hdf5 support
+LDLIBS += $(shell pkg-config hdf5 --libs --silence-errors || echo -lhdf5)
+src/iio.o: CPPFLAGS+= -DI_CAN_HAS_LIBHDF5 `pkg-config hdf5 --cflags 2>/dev/null`
+
+
 
 OBJ = src/iio.o src/fancy_image.o
 BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
@@ -9,7 +16,7 @@ BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
       srmatch tiffu siftu crop lrcat tbcat fftshift bmms registration imflip \
       fft dct dht flambda fancy_crop fancy_downsa autotrim iion mediator     \
       redim colormatch eucdist nonmaxsup gntiply idump warp heatd imhalve    \
-      ppsmooth mdither mdither2 rpctk getbands
+      ppsmooth mdither mdither2 rpctk getbands pixdump
 
 BIN := $(addprefix bin/,$(BIN))
 
@@ -17,6 +24,7 @@ default: $(BIN) bin/cpu_term bin/rpcflip_term
 
 bin/%  : src/%.o $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+
 
 
 # END OF CORE PART, THE REST OF THIS FILE IS NOT ESSENTIAL
@@ -31,13 +39,15 @@ test: bin/plambda bin/imprintf
 	| bin/plambda "split rot del hypot" | bin/imprintf "%s%e%r%i%a\n" \
 	| grep -q 3775241.440161.730120.0037888911.8794
 
+
 # build tutorial
 tutorial: default
 	cd doc/tutorial/f && env PATH=../../../bin:$(PATH) $(SHELL) build.sh
 
 # build manpages
 manpages: default
-	cd doc && env PATH=../bin:$(PATH) $(SHELL) rebuild_manpages.sh
+	cd doc && $(SHELL) rebuild_manpages.sh
+
 
 
 # exotic targets, not built by default
@@ -75,7 +85,7 @@ bin/% : src/misc/%.o $(OBJ)
 
 # single, fat, busybox-like executable
 BINOBJ = $(BIN:bin/%=src/%.o) #$(BIN_FTR:bin/%=src/ftr/%.o)
-L = -lfftw3f -lpng -ltiff -ljpeg -llzma -lz -lm -ljbig
+L = -lfftw3f -lpng -ltiff -ljpeg -llzma -lz -lm -ljbig $(LDLIBS) -lm -lpthread
 bin/im : src/im.o $(BINOBJ) $(OBJ) src/misc/overflow.o
 	$(CC) $(LDFLAGS) -static -Wl,--allow-multiple-definition -o $@ $^ $L
 

@@ -144,6 +144,18 @@ static float nodes_nnice[] = {
 	3,   0, 255,   0, // blue
 };
 
+static float nodes_white[] = {
+	1, 255, 255, 255,
+	2, 255, 255, 255,
+	3, 255, 255, 255,
+};
+
+static float nodes_black[] = {
+	1, 0, 0, 0,
+	2, 0, 0, 0,
+	3, 0, 0, 0,
+};
+
 static float *get_gpl_nodes(char *filename, int *n)
 {
 	int bufsize = 0xff, nnodes = 0;
@@ -216,6 +228,12 @@ static void fill_palette(struct palette *p, char *s, float m, float M)
 	} else if (0 == strcmp(s, "nnice")) {
 		set_node_positions_linearly(nodes_nnice, 3, m, M);
 		fill_palette_with_nodes(p, nodes_nnice, 3);
+	} else if (0 == strcmp(s, "white")) {
+		set_node_positions_linearly(nodes_white, 3, m, M);
+		fill_palette_with_nodes(p, nodes_white, 3);
+	} else if (0 == strcmp(s, "black")) {
+		set_node_positions_linearly(nodes_black, 3, m, M);
+		fill_palette_with_nodes(p, nodes_black, 3);
 	} else if (hassuffix(s, ".gpl")) {
 		int nnodes;
 		float *nodes = get_gpl_nodes(s, &nnodes);
@@ -301,6 +319,7 @@ SMART_PARAMETER_SILENT(PLEGEND_TICKWIDTH,3)
 SMART_PARAMETER_SILENT(PLEGEND_TEXT_XOFFSET,4)
 SMART_PARAMETER_SILENT(PLEGEND_TEXT_YOFFSET,0)
 SMART_PARAMETER_SILENT(PLEGEND_NTICKS,3)
+SMART_PARAMETER_SILENT(PLEGEND_REVERSE,0)
 void save_legend(char *filename_legend, char *palette_id, float m, float M)
 {
 	// palette and font structs
@@ -329,6 +348,10 @@ void save_legend(char *filename_legend, char *palette_id, float m, float M)
 	// transformation "x -> alpha * j + beta" from positions to values
 	float alpha = (M - m) / (p_j - q_j);
 	float beta  = m - alpha * q_j;
+	if (PLEGEND_REVERSE()) {
+		alpha = (m - M) / (p_j - q_j);
+		beta = M - alpha * q_j;
+	}
 
 	// fill legend colors
 	for (int j = p_j; j < q_j; j++)
@@ -368,6 +391,7 @@ void save_legend(char *filename_legend, char *palette_id, float m, float M)
 	{
 		float x = ticks[k][0]; // tick value
 		int   j = ticks[k][1]; // tick position inside the legend
+		if (PLEGEND_REVERSE()) x *= -1;
 
 		// draw tick
 		for (int i = q_i; i < q_i+1+PLEGEND_TICKWIDTH(); i++)

@@ -387,7 +387,7 @@ void tdip_state_compute_rand_acc(struct tdip_state *e)
 				lrint(alf * x[1] + bet)
 			};
 			if (insideP(tside, tside, ix[0], ix[1]))
-				e->transform[tside*ix[1] + ix[0]] += log(gw);//gw;
+				e->transform[tside*ix[1] + ix[0]] += gw;
 		}
 		cx += 1;
 	}
