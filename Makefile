@@ -21,7 +21,7 @@ bin/%  : src/%.o $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 
-
+DISABLE_HDF5 = 1
 ifndef DISABLE_HDF5
 # comment the following two lines to disable hdf5 support
 LDLIBS += $(shell pkg-config hdf5 --libs --silence-errors || echo -lhdf5)
@@ -88,10 +88,16 @@ bin/% : src/misc/%.o $(OBJ)
 
 
 # single, fat, busybox-like executable
-BINOBJ = $(BIN:bin/%=src/%.o) #$(BIN_FTR:bin/%=src/ftr/%.o)
+BINOBJ = $(BIN:bin/%=src/%.o) #$(BIN_FTR:bin/%=src/ftr/%.o) src/ftr/ftr.o
 L = -lfftw3f -lpng -ltiff -ljpeg -llzma -lz -lm -ljbig $(LDLIBS) -lm -lpthread
-bin/im : src/im.o $(BINOBJ) $(OBJ) src/misc/overflow.o
+#L = -lfftw3f -lpng -ltiff -ljpeg -llzma -lz -lm -ljbig -lwebp -lpthread -lzstd -lX11 -lxcb -ldl
+bin/im.static : src/im.o $(BINOBJ) $(OBJ) src/misc/overflow.o
 	$(CC) $(LDFLAGS) -static -Wl,--allow-multiple-definition -o $@ $^ $L
+
+BINOBJ2 = $(BIN:bin/%=src/%.o) $(BIN_FTR:bin/%=src/ftr/%.o) src/ftr/ftr.o
+L2 = $(LDLIBS) $(LDLIBS_FTR)
+bin/im : src/im.o $(BINOBJ2) $(OBJ) src/misc/overflow.o
+	$(CC) $(LDFLAGS) -Wl,--allow-multiple-definition -o $@ $^ $(L2)
 
 
 # some ftr executables, but compiled for the terminal backend

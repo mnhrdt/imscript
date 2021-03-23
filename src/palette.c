@@ -320,8 +320,12 @@ SMART_PARAMETER_SILENT(PLEGEND_TEXT_XOFFSET,4)
 SMART_PARAMETER_SILENT(PLEGEND_TEXT_YOFFSET,0)
 SMART_PARAMETER_SILENT(PLEGEND_NTICKS,3)
 SMART_PARAMETER_SILENT(PLEGEND_REVERSE,0)
+SMART_PARAMETER_SILENT(PLEGEND_FACTOR,1)
 void save_legend(char *filename_legend, char *palette_id, float m, float M)
 {
+	m *= PLEGEND_FACTOR();
+	M *= PLEGEND_FACTOR();
+
 	// palette and font structs
 	struct bitmap_font f[1] = {reformat_font(*xfont_7x14B, UNPACKED)};
 	struct palette     p[1]; fill_palette(p, palette_id, m, M);

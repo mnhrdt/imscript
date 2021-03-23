@@ -1,3 +1,4 @@
+	MAIN(cpu);
 	MAIN(viho);
 	MAIN(fpan);
 	MAIN(fpantiff);
