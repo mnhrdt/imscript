@@ -80,7 +80,6 @@ GUI: utils with an interactive user interface
 	powerkill: paint in black in the frequency domain
 	rpcflip:   visualize satellite images and their RPC
 	viho:      interactive deformation of an image by an homography
-	vnav:      navigate a borehole image and apply the dip picker transform
 	vhough:    explore the hough transform space side-by-side
 	dosdo:     explore the frequency domain side-by-side
 	epiview:   visualize epipolar lines of a fundamental matrix

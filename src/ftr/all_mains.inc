@@ -7,7 +7,6 @@
 	MAIN(powerkill);
 	MAIN(dosdo);
 	MAIN(epiview);
-	MAIN(vnav);
 	MAIN(pleview);
 	MAIN(srt);
 	MAIN(fpanflip);
