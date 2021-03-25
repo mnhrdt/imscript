@@ -321,6 +321,7 @@ SMART_PARAMETER_SILENT(PLEGEND_TEXT_YOFFSET,0)
 SMART_PARAMETER_SILENT(PLEGEND_NTICKS,3)
 SMART_PARAMETER_SILENT(PLEGEND_REVERSE,0)
 SMART_PARAMETER_SILENT(PLEGEND_FACTOR,1)
+SMART_PARAMETER_SILENT(PLEGEND_HIDE,0)
 void save_legend(char *filename_legend, char *palette_id, float m, float M)
 {
 	m *= PLEGEND_FACTOR();
@@ -405,7 +406,12 @@ void save_legend(char *filename_legend, char *palette_id, float m, float M)
 		// draw number associated to this tick
 		char buf[0x100];
 		uint8_t bg[3] = { 255, 255, 255}, fg[3] = {0, 0, 0};
-		snprintf(buf, sizeof buf, "%g", x);
+		int X = PLEGEND_HIDE();
+		if (!X)
+			snprintf(buf, sizeof buf, "%g", x);
+		else {
+			snprintf(buf, sizeof buf, "XX%2.2lf", fmod(x,100));
+		}
 		int pos_i = q_i + PLEGEND_TICKWIDTH() + PLEGEND_TEXT_XOFFSET();
 		int pos_j = j - f->height/2 + PLEGEND_TEXT_YOFFSET();
 		put_string_in_rgb_image(rgb,w,h, pos_i, pos_j, fg,bg,0,f,buf);
