@@ -495,7 +495,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 			uint8_t fg[3] = {0, 255, 0};
 			uint8_t bg[3] = {0, 0, 0};
 			char buf[300];
-			int l;
+			int l = 0;
 			if (e->zoom_factor>100 && (c[0]!=c[1] || c[0]!=c[2]))
 				l=snprintf(buf,300,"%g %g %g",c[0],c[1],c[2]);
 			if (c[0] == c[1] && c[0] == c[2])

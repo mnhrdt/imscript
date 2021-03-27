@@ -2906,7 +2906,7 @@ static int read_beheaded_vrt(struct iio_image *x,
 	int pos[4] = {0,0,0,0}, pos_cx = 0, has_fname = 0;
 
 	// obtain the path where the vrt file is located
-	strncpy(dirvrt, global_variable_containing_the_name_of_the_last_opened_file, n);
+	strncpy(dirvrt, global_variable_containing_the_name_of_the_last_opened_file, n-1);
 	char* dirvrt2 = dirname(dirvrt);
 
 	while (1) {
@@ -3088,10 +3088,10 @@ static int read_beheaded_vic(struct iio_image *x,
 
 		// extract VICAR fields
 		if (0 == strcmp(k, "RECSIZE")) f_recsize = atoi(v);
-		if (0 == strcmp(k, "FORMAT" )) strncpy(f_format, v, 99);
-		if (0 == strcmp(k, "TYPE"   )) strncpy(f_type, v, 99);
-		if (0 == strcmp(k, "ORG"    )) strncpy(f_org, v, 99);
-		if (0 == strcmp(k, "INTFMT" )) strncpy(f_ifmt, v, 99);
+		if (0 == strcmp(k, "FORMAT" )) strncpy(f_format, v, 98);
+		if (0 == strcmp(k, "TYPE"   )) strncpy(f_type, v, 98);
+		if (0 == strcmp(k, "ORG"    )) strncpy(f_org, v, 98);
+		if (0 == strcmp(k, "INTFMT" )) strncpy(f_ifmt, v, 98);
 		if (0 == strcmp(k, "NL"     )) f_nl  = atoi(v);
 		if (0 == strcmp(k, "NS"     )) f_ns  = atoi(v);
 		if (0 == strcmp(k, "NB"     )) f_nb  = atoi(v);
@@ -4006,6 +4006,8 @@ static void iio_write_image_as_txt_general(
 		const char *filename, struct iio_image *x,
 		char *optional_seplist)
 {
+	(void)filename;
+	(void)x;
 	char *seplist = optional_seplist;
 	if (!seplist) seplist = " \t\n";
 	int nseps = strlen(seplist);

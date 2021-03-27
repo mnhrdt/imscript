@@ -1455,7 +1455,7 @@ static void action_select_view(struct FTR *f, int i, int x, int y)
 static void action_select_interpolator(struct FTR *f, int k)
 {
 	struct pan_state *e = f->userdata;
-	if (k >= 0 || k < 3 || k == 4)
+	if (k >= 0 && k <= 4)
 	       	e->interpolation_order = k;
 	request_repaints(f);
 }

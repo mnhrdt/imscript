@@ -1521,7 +1521,7 @@ static void action_select_view(struct FTR *f, int i, int x, int y)
 static void action_select_interpolator(struct FTR *f, int k)
 {
 	struct pan_state *e = f->userdata;
-	if (k >= 0 || k < 3 || k == 4)
+	if (k >= 0 && k <= 4)
 		e->interpolation_order = k;
 	request_repaints(f);
 }
@@ -1942,8 +1942,8 @@ static int pan_non_interactive(struct pan_state *e, char *command_string)
 		if (*tok == 'b') base_h = atoi(tok+1);
 		if (*tok == 'i') interpord = atoi(tok+1);
 		if (*tok == 'z') zoom = atof(tok+1);
-		if (*tok == 'd') strncpy(outdir, tok+1, FILENAME_MAX);
-		if (*tok == 'o') strncpy(outnam, tok+1, FILENAME_MAX);
+		if (*tok == 'd') strncpy(outdir, tok+1, FILENAME_MAX-1);
+		if (*tok == 'o') strncpy(outnam, tok+1, FILENAME_MAX-1);
 		if (*tok == 'c') qauto = atoi(tok+1);
 		if (*tok == 'p') {
 			struct pan_view *v = e->view;
