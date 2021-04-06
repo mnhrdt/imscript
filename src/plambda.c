@@ -241,6 +241,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+//#include <tgmath.h>
 
 
 //#define __STDC_IEC_559_COMPLEX__ 1
@@ -355,6 +356,11 @@ static double logic_or (double a, double b) { return a || b; }
 static double logic_xor (double a, double b) { return !a != !b; }
 static double logic_and (double a, double b) { return a && b; }
 static double logic_not (double a) { return !a; }
+
+static double bitwise_not(double a) { return !lrint(a); }
+static double bitwise_or(double a, double b) { return lrint(a)|lrint(b); }
+static double bitwise_and(double a, double b) { return lrint(a)&lrint(b); }
+static double bitwise_xor(double a, double b) { return lrint(a)^lrint(b); }
 
 static double function_isfinite  (double x) { return isfinite(x); }
 static double function_isinf     (double x) { return isinf(x);    }
@@ -866,6 +872,10 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(logic_or,"or",2),
 	REGISTER_FUNCTIONN(logic_xor,"xor",2),
 	REGISTER_FUNCTIONN(logic_not,"not",1),
+	REGISTER_FUNCTIONN(bitwise_not,"bitnot",1),
+	REGISTER_FUNCTIONN(bitwise_or,"bitor",2),
+	REGISTER_FUNCTIONN(bitwise_xor,"bitxor",2),
+	REGISTER_FUNCTIONN(bitwise_and,"bitand",2),
 	REGISTER_FUNCTIONN(function_isfinite,"isfinite",1),
 	REGISTER_FUNCTIONN(function_isinf,"isinf",1),
 	REGISTER_FUNCTIONN(function_isnan,"isnan",1),
