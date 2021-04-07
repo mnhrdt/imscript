@@ -563,6 +563,17 @@ static int scalar_product(float *ab, float *a, float *b, int na, int nb)
 	return 1;
 }
 
+// instance of "bivector_function"
+static int vector_cosine(float *ab, float *a, float *b, int na, int nb)
+{
+	float x[3];
+	scalar_product(x+0, a, b, na, nb);
+	scalar_product(x+1, a, a, na, na);
+	scalar_product(x+2, b, b, nb, nb);
+	*ab = x[0] / sqrt(x[1]*x[2]);
+	return 1;
+}
+
 // instance of "univector_function"
 static int matrix_determinant(float *r, float *a, int n)
 {
@@ -924,6 +935,7 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(matrix_product,"mprod",-5),
 	REGISTER_FUNCTIONN(vector_product,"vprod",-5),
 	REGISTER_FUNCTIONN(scalar_product,"sprod",-5),
+	REGISTER_FUNCTIONN(vector_cosine,"vcos",-5),
 	REGISTER_FUNCTIONN(matrix_determinant,"mdet",-6),
 	REGISTER_FUNCTIONN(matrix_transpose,"mtrans",-6),
 	REGISTER_FUNCTIONN(matrix_inverse,"minv",-6),
@@ -1492,6 +1504,7 @@ static int token_is_stackop(const char *t)
 	if (0 == strcmp(t, "merge3")) return PLAMBDA_STACKOP_VMERGE3;
 	if (0 == strcmp(t, "join3")) return PLAMBDA_STACKOP_VMERGE3;
 	if (0 == strcmp(t, "rgb")) return PLAMBDA_STACKOP_VMERGE3;
+	if (0 == strcmp(t, "vec")) return PLAMBDA_STACKOP_VMERGE3;
 	if (0 == strcmp(t, "mergeall")) return PLAMBDA_STACKOP_VMERGEALL;
 	if (0 == strcmp(t, "joinall")) return PLAMBDA_STACKOP_VMERGEALL;
 	if (0 == strcmp(t, "ajoin")) return PLAMBDA_STACKOP_VMERGEALL;
