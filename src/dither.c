@@ -84,6 +84,39 @@ void dither_b(float *x, int w, int h)
 	}
 }
 
+// Floyd-Steinberg "adaptive", by github user zvezdochiot
+void dither_a(float *x, int w, int h)
+{
+	getpixel_operator get = getpixel_127;
+	setpixel_operator set = setpixel_insideP;
+	setpixel_operator add = setpixel_tsum_insideP;
+
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		float old = get(x, w, h, i, j);
+		float new = dither_value(old);
+		float err = old - new;
+		float val = get(x, w, h, i-1, j+0);
+		val = (val > new) ? (val - new) : (new - val);
+		float errk1 = 6*val + 1;
+		val = get(x, w, h, i+1, j+1);
+		val = (val > new) ? (val - new) : (new - val);
+		float errk2 = 2*val + 1;
+		val = get(x, w, h, i+0, j+1);
+		val = (val > new) ? (val - new) : (new - val);
+		float errk3 = 4*val + 1;
+		float errk4 = 1;
+		float errks = errk1 + errk2 + errk3 + errk4;
+		add(x, w, h, i-1, j+0, err*errk1/errks);
+		add(x, w, h, i+1, j+1, err*errk2/errks);
+		add(x, w, h, i-0, j+1, err*errk3/errks);
+		add(x, w, h, i-1, j+1, err*errk4/errks);
+		set(x, w, h, i, j, new);
+	}
+}
+
+
 void dither_sep(float *x, int w, int h, int pd, _Bool b)
 {
 	for (int i = 0; i < pd; i++)
@@ -99,12 +132,12 @@ void dither_sep(float *x, int w, int h, int pd, _Bool b)
 #include "pickopt.c"
 int main_dither(int c, char *v[])
 {
+	_Bool option_b = pick_option(&c, &v, "b", 0);
 	if (c != 1 && c != 2 && c != 3) {
 		fprintf(stderr, "usage:\n\t%s [gray [binary]]\n", *v);
 		//                          0  1     2
 		return 1;
 	}
-	_Bool option_b = pick_option(&c, &v, "b", 0);
 	char *filename_in  = c > 1 ? v[1] : "-";
 	char *filename_out = c > 2 ? v[2] : "-";
 
