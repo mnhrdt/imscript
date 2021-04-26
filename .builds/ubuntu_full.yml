@@ -1,0 +1,15 @@
+sources:
+ - https://git.sr.ht/~coco/imscript
+
+image: ubuntu/latest
+
+packages:
+        - libpng-dev
+        - libtiff-dev
+        - libjpeg-dev
+        - libfftw3-dev
+        - libx11-dev
+        - libgsl-dev
+
+tasks:
+        - test: make -C imscript full
