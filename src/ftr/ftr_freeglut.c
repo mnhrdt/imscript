@@ -264,7 +264,11 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	//ftr_loop_run((struct FTR *)f);
 	//f->handle_expose2 = 0;
 
-	return *(struct FTR *)f;
+	//return *(struct FTR *)f;
+	// avoid stupid type-punning warning:
+	struct FTR F[1];
+	memcpy(F, f, sizeof f);
+	return *F;
 }
 
 // ftr_close {{{2

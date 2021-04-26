@@ -184,7 +184,7 @@ int main(int c, char *v[])
 
 	// read input images
 	fprintf(stderr, "reading input images...\n");
-	int w, h, pd = 0;
+	int w=0, h=0, pd = 0;
 	float *x[n], *y[n];
 	for (int i = 0; i < n; i++)
 	{

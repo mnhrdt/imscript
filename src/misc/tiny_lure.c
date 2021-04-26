@@ -117,7 +117,7 @@ int main(int c, char *v[])
 	int n = idx_last - idx_first + 1;
 	if (n < 3 || n > 1000) fail("bad n = %d\n", n);
 
-	int w, h, pd = 0;
+	int w=0, h=0, pd = 0;
 	float *x[n], *y[n];
 	for (int i = 0; i < n; i++)
 	{

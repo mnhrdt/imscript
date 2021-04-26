@@ -54,7 +54,7 @@ int main(int c, char *v[])
 	double *M1 = iio_read_image_double(filename_M1, &wm1, &hm1); //histo_in
 	double *M2 = iio_read_image_double(filename_M2, &wm2, &hm2); //histo_out
 	float *x = iio_read_image_float_vec(filename_x, &wx, &hx, &pd); //11band
-	float *y = iio_read_image_float(filename_y, &wx, &hx); // segmentation
+	float *y = iio_read_image_float(filename_y, &wy, &hy); // segmentation
 	assert(wm1 == 256);
 	assert(wm2 == 256);
 	assert(hm1 == 11);

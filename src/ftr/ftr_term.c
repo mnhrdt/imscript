@@ -118,7 +118,11 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	disable_canonical_and_echo_modes();
 	ftr_term_dump(f);
 
-	return *(struct FTR *)f;
+	//return *(struct FTR *)f;
+	// avoid stupid type-punning warning:
+	struct FTR F[1];
+	memcpy(F, f, sizeof f);
+	return *F;
 }
 
 // ftr_close {{{2

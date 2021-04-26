@@ -50,7 +50,9 @@ void mediatorw(
 	for (int iter = 0; iter < n; iter++)
 	{
 		// compute weighted average
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif//_OPENMP
 		for (int j = 0; j < h; j++)
 		for (int i = 0; i < w; i++)
 		{
@@ -64,7 +66,9 @@ void mediatorw(
 		}
 
 		// update weights
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif//_OPENMP
 		for (int j = 0; j < h; j++)
 		for (int i = 0; i < w; i++)
 		{

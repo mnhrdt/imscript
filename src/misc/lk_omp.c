@@ -309,7 +309,9 @@ static void compute_structure_tensor_field(float *st,
 		float *wv, int (*wo)[2], int kside,
 		float *gx, float *gy, int w, int h)
 {
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif//_OPENMP
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 	{
@@ -325,7 +327,9 @@ static void compute_rhs(float *rhs,
 		float *wv, int (*wo)[2], int kside,
 		float *gx, float *gy, float *gt, int w, int h)
 {
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif//_OPENMP
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 	{
@@ -345,7 +349,9 @@ static void solve_pointwise(float *u, float *v, float *st, float *rhs,
 	float (*x_u)[w] = (void*)u;
 	float (*x_v)[w] = (void*)v;
 
+#ifdef _OPENMP
 #pragma omp parallel
+#endif//_OPENMP
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 	{
