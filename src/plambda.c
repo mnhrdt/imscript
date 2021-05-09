@@ -2506,6 +2506,14 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 				vstack_push_vector(s, v, 2);
 				break;
 			}
+			/*hack*/if ('Y' == t->colonvar) {
+				float v[2] = {
+					(2.0/(imw-1))*ai - 1,
+					(2.0/(imh-1))*aj - 1
+				};
+				vstack_push_vector(s, v, 2);
+				break;
+			}
 			float x = eval_colonvar(imw, imh, ai, aj, t->colonvar);
 			vstack_push_scalar(s, x);
 			break;
@@ -2840,6 +2848,8 @@ Predefined variables (always preceeded by a colon):\n\
  :L\tminus squared centered distance to the center\n\
  :W\twidth of the image divided by 2*pi\n\
  :H\theight of the image divided by 2*pi\n\
+ :X\t(:i,:j) coordinates of the pixel\n\
+ :Y\t(:x,:y) relative position of the pixel (from -1 to 1)\n\
 \n\
 Variable modifiers acting on regular variables:\n\
  x\t\tvalue of pixel (i,j)\n\
