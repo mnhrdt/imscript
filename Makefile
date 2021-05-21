@@ -1,7 +1,10 @@
-#CC=clang
 CFLAGS ?= -O3 -march=native
-#CFLAGS ?= -g -Wall -Wextra -Wno-unused
-LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm
+#CFLAGS ?= -O3 -march=native -fsanitize=undefined
+#WFLAGS = -pedantic -Wall -Wextra -Wno-unused -Wno-overlength-strings -Wno-unused-parameter
+#CFLAGS ?= -O3 -march=native -std=c17 $(WFLAGS)
+#CFLAGS ?= -O3 -march=native #-Mnobuiltin -Wno-unused-variable
+#CFLAGS ?= -O3 -Wall -Wextra -Wno-unused -Wno-unused-parameter
+LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm# -lubsan
 
 
 OBJ = src/iio.o src/fancy_image.o
@@ -11,7 +14,7 @@ BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
       srmatch tiffu siftu crop lrcat tbcat fftshift bmms registration imflip \
       fft dct dht flambda fancy_crop fancy_downsa autotrim iion mediator     \
       redim colormatch eucdist nonmaxsup gntiply idump warp heatd imhalve    \
-      ppsmooth mdither mdither2 rpctk getbands pixdump
+      ppsmooth mdither mdither2 rpctk getbands pixdump geomedian #carve
 
 BIN := $(addprefix bin/,$(BIN))
 

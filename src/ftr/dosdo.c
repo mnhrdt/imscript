@@ -348,6 +348,9 @@ static unsigned char float_to_byte(float x)
 	return x;
 }
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 static void dump_hud(struct FTR *f)
 {

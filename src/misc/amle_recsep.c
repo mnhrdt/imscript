@@ -153,7 +153,7 @@ static float amle_iteration(float *x, int w, int h, int (*mask)[2], int nmask)
 		int i = mask[p][0];
 		int j = mask[p][1];
 		int idx = j*w + i, min, max;
-		float value[0x100], weight[0x100];
+		float value[0x100]={0}, weight[0x100]={0};
 		int nv = get_nvals(value, weight, x, w, h, i, j);
 		get_minmax_idx(&min, &max, value, nv);
 		float a = sqrt(weight[max]);

@@ -153,13 +153,14 @@ static float eval_cost(struct ortho_view *o, int n, int i, int j, int h)
 	}
 	return r;
 }
-		
+
 
 static void random_search(float *cost, float *out_h, float *init_h,
 		struct ortho_view *t, int n)
 {
 	for (int k = 0; k < n; k++)
-		fprintf(stderr, "rs_%d %p %p %d\n", k, t+k, t[k].r, t[k].w);
+		fprintf(stderr, "rs_%d %p %p %d\n",
+				k, (void*)(t+k), (void*)t[k].r, t[k].w);
 
 	float min_off = PM_MIN();
 	float max_off = PM_MAX();
@@ -192,7 +193,8 @@ static void backward_propagation(float *cost, float *height,
 		struct ortho_view *t, int n)
 {
 	for (int k = 0; k < n; k++)
-		fprintf(stderr, "bp_%d %p %p %d\n", k, t+k, t[k].r, t[k].w);
+		fprintf(stderr, "bp_%d %p %p %d\n",
+				k, (void*)(t+k), (void*)t[k].r, t[k].w);
 
 	int neigs[4][2] = { {1,0}, {0,1}, {-1,0}, {0,-1}};
 #ifdef _OPENMP
@@ -222,7 +224,8 @@ static void backward_propagation2(float *cost, float *height,
 		struct ortho_view *t, int n)
 {
 	for (int k = 0; k < n; k++)
-		fprintf(stderr, "bp2_%d %p %p %d\n", k, t+k, t[k].r, t[k].w);
+		fprintf(stderr, "bp2_%d %p %p %d\n",
+				k, (void*)(t+k), (void*)t[k].r, t[k].w);
 
 	int neigs[4][2] = { {1,0}, {0,1}, {-1,0}, {0,-1}};
 #ifdef _OPENMP

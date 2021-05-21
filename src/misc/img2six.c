@@ -47,7 +47,7 @@ void dump_sixels_to_stdout_rgb(uint8_t *x, int w, int h)
 	//fill_palette(p);
 
 	// beginning of sixel block
-	printf("\ePq\n");
+	printf("\033Pq\n");
 	//printf("<ESC>Pq\n");
 
 	// dump palette (RGB 3+3+2 bits palette)
@@ -130,7 +130,7 @@ void dump_sixels_to_stdout_rgb(uint8_t *x, int w, int h)
 	}
 
 	// end of sixel block
-	printf("\e\\");
+	printf("\033\\");
 	//printf("<ESC>\\");
 }
 
@@ -142,7 +142,7 @@ static int pidx(uint8_t *rgb)
 void dump_sixels_to_stdout_rgb2(uint8_t *x, int w, int h)
 {
 	// beginning of sixel block
-	printf("\ePq\n");
+	printf("\033Pq\n");
 
 	// dump palette (RGB 3+3+2 bits palette)
 	for (int i = 0; i < 0x100; i++)
@@ -208,12 +208,12 @@ void dump_sixels_to_stdout_rgb2(uint8_t *x, int w, int h)
 	}
 
 	// end of sixel block
-	printf("\e\\");
+	printf("\033\\");
 }
 
 void dump_sixels_to_stdout_rgb3(uint8_t *x, int w, int h)
 {
-	printf("\ePq\n");
+	printf("\033Pq\n");
 	for (int i = 0; i < 0x100; i++)
 		printf("#%d;2;%d;%d;%d", i,(int)(14.2857*(i/32)),
 				(int)(14.2857*((i/4)%8)), (int)(33.3333*(i%4)));
@@ -256,7 +256,7 @@ void dump_sixels_to_stdout_rgb3(uint8_t *x, int w, int h)
 			printf(c ? "$\n" : "-\n");
 		}
 	}
-	printf("\e\\");
+	printf("\033\\");
 }
 
 static int sdx(uint8_t *rgb)
@@ -266,7 +266,7 @@ static int sdx(uint8_t *rgb)
 
 void dump_sixels_to_stdout_rgb4(uint8_t *x, int w, int h)
 {
-	printf("\ePq\n");
+	printf("\033Pq\n");
 	for (int i = 0; i < 0x100; i++)
 		printf("#%d;2;%d;%d;%d", i,(int)(14.2857*(i/32)),
 				(int)(14.2857*((i/4)%8)), (int)(33.3333*(i%4)));
@@ -299,7 +299,7 @@ void dump_sixels_to_stdout_rgb4(uint8_t *x, int w, int h)
 			printf(c ? "$\n" : "-\n");
 		}
 	}
-	printf("\e\\");
+	printf("\033\\");
 }
 
 static int pal_gidx(uint8_t *g)
@@ -317,7 +317,7 @@ static int pal_gidx(uint8_t *g)
 void dump_sixels_to_stdout_gray(uint8_t *x, int w, int h)
 {
 	// beginning of sixel block
-	printf("\ePq\n");
+	printf("\033Pq\n");
 
 	int Q = (1<<2); // quantization over [0..255]
 
@@ -396,13 +396,13 @@ void dump_sixels_to_stdout_gray(uint8_t *x, int w, int h)
 	}
 
 	// end of sixel block
-	printf("\e\\");
+	printf("\033\\");
 }
 
 void dump_sixels_to_stdout_gray2(uint8_t *x, int w, int h)
 {
 	int Q = (1<<2); // quantization over [0..255]
-	printf("\ePq\n");
+	printf("\033Pq\n");
 	for (int i = 0; i < 0x100/Q; i++)
 		printf("#%d;2;%d;%d;%d",
 			i, (int)(Q*.39*i), (int)(Q*.39*i), (int)(Q*.39*i));
@@ -438,7 +438,7 @@ void dump_sixels_to_stdout_gray2(uint8_t *x, int w, int h)
 			printf(c ? "$\n" : "-\n");
 		}
 	}
-	printf("\e\\");
+	printf("\033\\");
 }
 
 int main(int c, char *v[])
