@@ -3768,7 +3768,7 @@ static void iio_write_image_as_tiff(const char *filename, struct iio_image *x)
 	TIFFSetField(tif, TIFFTAG_PLANARCONFIG, PLANARCONFIG_CONTIG);
 	TIFFSetField(tif, TIFFTAG_SAMPLESPERPIXEL, x->pixel_dimension);
 	TIFFSetField(tif, TIFFTAG_BITSPERSAMPLE, ss * 8);
-	uint16 caca[1] = {EXTRASAMPLE_UNASSALPHA};
+	uint16_t caca[1] = {EXTRASAMPLE_UNASSALPHA};
 	switch (x->pixel_dimension) {
 	case 1:
 		TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_MINISBLACK);

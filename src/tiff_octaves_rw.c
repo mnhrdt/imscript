@@ -327,7 +327,7 @@ static void read_scanlines(struct tiff_tile *tout, TIFF *tif)
 }
 
 static tsize_t my_readtile(TIFF *tif, tdata_t buf,
-		uint32 x, uint32 y, uint32 z, tsample_t sample)
+		uint32_t x, uint32_t y, uint32_t z, tsample_t sample)
 {
 	tsize_t r = TIFFReadTile(tif, buf, x, y, z, sample);
 	if (r == -1) memset(buf, 0, r = TIFFTileSize(tif));
