@@ -18,7 +18,7 @@
 
 // TODO: fix this shit
 #define DONT_USE_TEST_MAIN
-#include "ftr/rpc2.c"
+#include "rpc2.c"
 
 int main_rpctk_info(int c, char *v[])
 {
