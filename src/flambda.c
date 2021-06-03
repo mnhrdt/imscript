@@ -230,8 +230,7 @@
 #include <math.h>
 
 
-//#define __STDC_IEC_559_COMPLEX__ 1
-#ifdef __STDC_IEC_559_COMPLEX__
+#ifndef __STDC_NO_COMPLEX__
 #include <complex.h>
 #endif
 
@@ -387,7 +386,7 @@ static void complex_product(float *xy, float *x, float *y)
 
 static void complex_exp(float *y, float *x)
 {
-#ifdef __STDC_IEC_559_COMPLEX__
+#ifndef __STDC_NO_COMPLEX__
 	*(complex float *)y = cexp(*(complex float *)x);
 #else
 	y[0] = exp(x[0]) * cos(x[1]);
@@ -395,7 +394,7 @@ static void complex_exp(float *y, float *x)
 #endif
 }
 
-#ifdef __STDC_IEC_559_COMPLEX__
+#ifndef __STDC_NO_COMPLEX__
 #define REGISTERC(f) static void complex_ ## f(float *y, float *x) {\
 	*(complex float *)y = f(*(complex float *)y); }
 REGISTERC(cacos)
@@ -787,7 +786,7 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(from_cartesian_to_polar,"topolar", -2),
 	REGISTER_FUNCTIONN(from_polar_to_cartesian,"frompolar", -2),
 	REGISTER_FUNCTIONN(complex_exp,"cexp", -2),
-#ifdef __STDC_IEC_559_COMPLEX__
+#ifndef __STDC_NO_COMPLEX__
 	REGISTER_FUNCTIONN(complex_cacos , "cacos", -2),
 	REGISTER_FUNCTIONN(complex_cacosh, "cacosh", -2),
 	REGISTER_FUNCTIONN(complex_casin , "casin", -2),

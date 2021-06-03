@@ -244,8 +244,7 @@
 //#include <tgmath.h>
 
 
-//#define __STDC_IEC_559_COMPLEX__ 1
-#ifdef __STDC_IEC_559_COMPLEX__
+#ifndef __STDC_NO_COMPLEX__
 #include <complex.h>
 #endif
 
@@ -449,7 +448,7 @@ static double psubst(double x, double y, double z)
 
 static void complex_exp(float *y, float *x)
 {
-#ifdef __STDC_IEC_559_COMPLEX__
+#ifndef __STDC_NO_COMPLEX__
 	*(complex float *)y = cexp(*(complex float *)x);
 #else
 	assert(false); // this is a wrong implementation!
@@ -458,14 +457,14 @@ static void complex_exp(float *y, float *x)
 #endif
 }
 
-#ifdef __STDC_IEC_559_COMPLEX__
+#ifndef __STDC_NO_COMPLEX__
 static void complex_cpow(float *z, float *x, float *y)
 {
 	*(complex float *)z = cpow(*(complex float *)y, *(complex float *)x);
 }
 #endif
 
-#ifdef __STDC_IEC_559_COMPLEX__
+#ifndef __STDC_NO_COMPLEX__
 #define REGISTERC(f) static void complex_ ## f(float *y, float *x) {\
 	*(complex float *)y = f(*(complex float *)x); }
 REGISTERC(cacos)
@@ -907,7 +906,7 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(from_cartesian_to_polar,"topolar", -2),
 	REGISTER_FUNCTIONN(from_polar_to_cartesian,"frompolar", -2),
 	REGISTER_FUNCTIONN(complex_exp,"cexp", -2),
-#ifdef __STDC_IEC_559_COMPLEX__
+#ifndef __STDC_NO_COMPLEX__
 	REGISTER_FUNCTIONN(complex_cacos , "cacos", -2),
 	REGISTER_FUNCTIONN(complex_cacosh, "cacosh", -2),
 	REGISTER_FUNCTIONN(complex_casin , "casin", -2),
@@ -927,7 +926,6 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(complex_ctanh , "ctanh", -2),
 	REGISTER_FUNCTIONN(complex_cpow  , "cpow", -3),
 #endif
-	REGISTER_FUNCTIONN(complex_exp   , "cexp", -2),
 	REGISTER_FUNCTIONN(complex_creal , "creal", -6),
 	REGISTER_FUNCTIONN(complex_cimag , "cimag", -6),
 	REGISTER_FUNCTIONN(complex_product,"cprod", -3),
