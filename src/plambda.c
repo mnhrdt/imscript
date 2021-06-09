@@ -304,6 +304,7 @@
 #define IMAGEOP_GRAD 1002
 #define IMAGEOP_DIV 1003
 #define IMAGEOP_SHADOW 1004
+#define IMAGEOP_SHADOWL 1005
 #define IMAGEOP_M_ERO 2000 //E
 #define IMAGEOP_M_DIL 2001 //D
 #define IMAGEOP_M_OPE 2002 //O
@@ -1629,6 +1630,7 @@ static void parse_imageop(const char *s, int *op, int *scheme)
 	else if (hasprefix(s, "g")) *op = IMAGEOP_GRAD;
 	else if (hasprefix(s, "d")) *op = IMAGEOP_DIV;
 	else if (hasprefix(s, "S")) *op = IMAGEOP_SHADOW;
+	else if (hasprefix(s, "Z")) *op = IMAGEOP_SHADOWL;
 	else if (hasprefix(s, "E")) *op = IMAGEOP_M_ERO;
 	else if (hasprefix(s, "D")) *op = IMAGEOP_M_DIL;
 //	else if (hasprefix(s, "O")) *op = IMAGEOP_M_OPE;
@@ -2455,6 +2457,19 @@ static int imageop_vector(float *out, float *img, int w, int h, int pd,
 		float sun[3] = {-SHADOWX(), -SHADOWY(), SHADOWZ()}, nor[3];
 		vector_product(nor, vdx, vdy, 3, 3);
 		return scalar_product(out, nor, sun, 3, 3);
+		}
+	case IMAGEOP_SHADOWL: {
+		if (pd != 1) fail("can not yet compute shadow of a vector");
+		float vdx[3]={1,0,apply_3x3_stencil(img, w,h,pd, ai,aj,0, sx)};
+		float vdy[3]={0,1,apply_3x3_stencil(img, w,h,pd, ai,aj,0, sy)};
+		//float sun[3] = {-1, -1, 1}, nor[3];
+		float sun[3] = {-SHADOWX(), -SHADOWY(), SHADOWZ()};
+		float sur[3] = {1, vdx[2], vdy[2]};
+		float nsun = hypot(sun[0], hypot(sun[1], sun[2]));
+		float nsur = hypot(sur[0], hypot(sur[1], sur[2]));
+		sun[0]/=nsun; sun[1]/=nsun; sun[2]/=nsun;
+		sur[0]/=nsur; sur[1]/=nsur; sur[2]/=nsur;
+		return scalar_product(out, sun, sur, 3, 3);
 		}
 	default: fail("unrecognized imageop %d\n", t->imageop_operator);
 	}
