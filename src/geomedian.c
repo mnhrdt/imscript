@@ -52,6 +52,7 @@ static float medscore(float *xx, int idx, int d, int n)
 }
 
 // y[] = x[i][] which is closest to the euclidean median
+// runs in quadratic time
 static void float_med(float *y, float *xx, int d, int n)
 {
 	float (*x)[d] = (void*)xx;
@@ -346,6 +347,96 @@ int main_clmps(int c, char *v[])
 	return 0;
 }
 
+//static float objective_function(int d, int n, float a[n][d], float *x)
+//{
+//	double r = 0;
+//	for (int i = 0; i < n; i++)
+//		r += euclidean_distance(a[i], x, d);
+//	return r;
+//}
+
+static void gradient(float *g, int d, int n, float a[n][d], float *x)
+{
+	for (int k = 0; k < d; k++)
+		g[k] = 0;
+	for (int i = 0; i < n; i++)
+	{
+		double r = 0;
+		for (int j = 0; j < d; j++)
+			r = hypot(r, x[j] - a[i][j]);
+		for (int k = 0; k < d; k++)
+			g[k] += (x[k] - a[i][k]) / r;
+	}
+}
+
+//static void hessian(float *h, int d, int n, float a[n][d], float *x)
+//{
+//	float (*H)[d] = (void*)h;
+//
+//	// initialize to the identity
+//	for (int k = 0; k < d; k++)
+//	for (int l = 0; l < d; l++)
+//		H[k][l] = k == l;
+//
+//	// accumulate perturbations
+//	double R = 0; // sum of all inverse norms x-ai
+//	for (int i = 0; i < n; i++)
+//	{
+//		double r = 0; // norm of x-ai
+//		for (int j = 0; j < d; j++)
+//			r = hypot(r, x[j] - a[i][j]);
+//		R += 1/r;
+//	}
+//	for (int k = 0; k < d; k++)
+//		H[k][k] *= R;
+//
+//	for (int i = 0; i < n; i++)
+//	{
+//		double r = 0; // norm of x-ai (TODO: do not recompute)
+//		for (int j = 0; j < d; j++)
+//			r = hypot(r, x[j] - a[i][j]);
+//
+//		x[j] - a[i][j]
+//	}
+//
+//
+//}
+
+#include "iio.h"
+
+// fancier weiszfeld variands based on gradient descent
+// (by default, plain weiszfeld)
+//
+// Variants:
+// 	stepsize-constant: use a constant stepsize (relative to the gradient)
+// 	stepsize-absolute: use a constant-length stepsize (non-convergent!)
+// 	stepsize-factor: multiply the Weiszfeld lambda by this factor
+// 	search-armijo: linear armijo search with parameters = 1/2
+// 	stochastic-computations: 
+//
+int main_weisz(int c, char *v[])
+{
+	if (c != 1)
+		return fprintf(stderr, "usage:\n\t%s [params] <in\n", *v);
+
+	int n, d;
+	void *aa = iio_read_image_float("-", &d, &n);
+	float (*a)[d] = aa;
+
+	float x[d]; // initialization
+	for (int i = 0; i < d; i++)
+		x[i] = 0;
+
+	float E = objective_function(d, n, a, x);
+
+	fprintf(stderr, "got %d points in dimension %d\n", n, d);
+	fprintf(stderr, "initial energy = %g\n", E);
+
+
+	return 0;
+}
+
 #ifndef HIDE_ALL_MAINS
-int main(int c, char **v) { return main_clmps(c, v); }
+//int main(int c, char **v) { return main_clmps(c, v); }
+int main(int c, char **v) { return main_weisz(c, v); }
 #endif
