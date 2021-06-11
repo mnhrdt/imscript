@@ -369,40 +369,47 @@ static void gradient(float *g, int d, int n, float a[n][d], float *x)
 	}
 }
 
-//static void hessian(float *h, int d, int n, float a[n][d], float *x)
-//{
-//	float (*H)[d] = (void*)h;
-//
-//	// initialize to the identity
-//	for (int k = 0; k < d; k++)
-//	for (int l = 0; l < d; l++)
-//		H[k][l] = k == l;
-//
-//	// accumulate perturbations
-//	double R = 0; // sum of all inverse norms x-ai
-//	for (int i = 0; i < n; i++)
-//	{
-//		double r = 0; // norm of x-ai
-//		for (int j = 0; j < d; j++)
-//			r = hypot(r, x[j] - a[i][j]);
-//		R += 1/r;
-//	}
-//	for (int k = 0; k < d; k++)
-//		H[k][k] *= R;
-//
-//	for (int i = 0; i < n; i++)
-//	{
-//		double r = 0; // norm of x-ai (TODO: do not recompute)
-//		for (int j = 0; j < d; j++)
-//			r = hypot(r, x[j] - a[i][j]);
-//
-//		x[j] - a[i][j]
-//	}
-//
-//
-//}
+static void hessian(float *h, int d, int n, float a[n][d], float *x)
+{
+	float (*H)[d] = (void*)h;
+
+	// initialize to the identity
+	for (int k = 0; k < d; k++)
+	for (int l = 0; l < d; l++)
+		H[k][l] = k == l;
+
+	// accumulate perturbations
+	double R = 0; // sum of all inverse norms x-ai
+	for (int i = 0; i < n; i++)
+	{
+		double r = 0; // norm of x-ai
+		for (int j = 0; j < d; j++)
+			r = hypot(r, x[j] - a[i][j]);
+		R += 1/r;
+	}
+	for (int k = 0; k < d; k++)
+		H[k][k] *= R;
+
+	for (int i = 0; i < n; i++)
+	{
+		double r = 0; // norm of x-ai (TODO: do not recompute)
+		for (int j = 0; j < d; j++)
+			r = hypot(r, x[j] - a[i][j]);
+
+		for (int k = 0; k < d; k++)
+		for (int l = 0; l < d; l++)
+			H[k][l] -= (x[k]-a[i][k])*(x[l]-a[i][l]) / (r*r*r);
+	}
+}
 
 #include "iio.h"
+
+#include "smapa.h"
+SMART_PARAMETER_SILENT(XMIN,-2)
+SMART_PARAMETER_SILENT(XMAX,12)
+SMART_PARAMETER_SILENT(YMIN,-2)
+SMART_PARAMETER_SILENT(YMAX,12)
+SMART_PARAMETER_SILENT(NUMIT,20)
 
 // fancier weiszfeld variands based on gradient descent
 // (by default, plain weiszfeld)
@@ -416,12 +423,32 @@ static void gradient(float *g, int d, int n, float a[n][d], float *x)
 //
 int main_weisz(int c, char *v[])
 {
+	char *out_sampling = pick_option(&c, &v, "o", "");
+
 	if (c != 1)
 		return fprintf(stderr, "usage:\n\t%s [params] <in\n", *v);
 
 	int n, d;
 	void *aa = iio_read_image_float("-", &d, &n);
 	float (*a)[d] = aa;
+
+	if (d == 2 && *out_sampling)
+	{
+		int w = 1000;
+		int h = 1000;
+		float *o = malloc(w*h*sizeof*o);
+		for (int i = 0; i < h; i++)
+		for (int j = 0; j < w; j++)
+		{
+			float x[2] = {
+				XMIN() + i*(XMAX()-XMIN())/w,
+				YMIN() + j*(YMAX()-YMIN())/h,
+			};
+			o[j*w+i] = objective_function(d, n, a, x);
+		}
+		iio_write_image_float(out_sampling, o, w, h);
+		free(o);
+	}
 
 	float x[d]; // initialization
 	for (int i = 0; i < d; i++)
@@ -430,8 +457,37 @@ int main_weisz(int c, char *v[])
 	float E = objective_function(d, n, a, x);
 
 	fprintf(stderr, "got %d points in dimension %d\n", n, d);
-	fprintf(stderr, "initial energy = %g\n", E);
+	fprintf(stderr, "energy at zero = %g\n", E);
 
+
+	if (n < 10)
+		for (int i = 0; i < n; i++)
+			fprintf(stderr, "E(x[%d]) = %g\n",
+					i, objective_function(d, n, a, a[i]));
+
+	float avg[d];
+	linear_average(avg, d, n, a);
+	E = objective_function(d, n, a, avg);
+	fprintf(stderr, "avg = %lf %lf (%lf)\n", avg[0], avg[1], E);
+
+	for (int j = 0; j < d; j++)
+		x[j] = avg[j];
+	fprintf(stderr, "starting energy = %g\n", E);
+
+	int numit = NUMIT();
+	for (int i = 0; i < numit; i++)
+	{
+		float g[d];
+		gradient(g, d, n, a, x);
+		if (d == 2)
+			fprintf(stderr, "g[%d] = %g %g\t", i, g[0], g[1]);
+		float λ = 0.5; // use weiszfeld weight here
+		for (int j = 0; j < d; j++)
+			x[j] -= λ * g[j];
+
+		E = objective_function(d, n, a, x);
+		fprintf(stderr, "f(%g %g) = %g\n", x[0], x[1], E);
+	}
 
 	return 0;
 }
