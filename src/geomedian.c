@@ -4,6 +4,8 @@
 #include <assert.h>
 #include <math.h>
 
+#include "linalg.c" // cholesky, solve_spd
+
 
 static void linear_average(float *o, int d, int n, float a[n][d])
 {
@@ -369,6 +371,19 @@ static void gradient(float *g, int d, int n, float a[n][d], float *x)
 	}
 }
 
+static float weiszfeld_weight(int d, int n, float a[n][d], float *x)
+{
+	double R = 0; // sum of all inverse norms x-ai
+	for (int i = 0; i < n; i++)
+	{
+		double r = 0; // norm of x-ai
+		for (int j = 0; j < d; j++)
+			r = hypot(r, x[j] - a[i][j]);
+		R += 1/r;
+	}
+	return R;
+}
+
 static void hessian(float *h, int d, int n, float a[n][d], float *x)
 {
 	float (*H)[d] = (void*)h;
@@ -378,7 +393,7 @@ static void hessian(float *h, int d, int n, float a[n][d], float *x)
 	for (int l = 0; l < d; l++)
 		H[k][l] = k == l;
 
-	// accumulate perturbations
+	// first term: a scalar multiple of the identity
 	double R = 0; // sum of all inverse norms x-ai
 	for (int i = 0; i < n; i++)
 	{
@@ -390,6 +405,10 @@ static void hessian(float *h, int d, int n, float a[n][d], float *x)
 	for (int k = 0; k < d; k++)
 		H[k][k] *= R;
 
+	if (d == 2)
+		fprintf(stderr, "\t\tH=%g %g %g %g\n", h[0],h[1],h[2],h[3]);
+
+	// second-term: accumulate singular perturbations
 	for (int i = 0; i < n; i++)
 	{
 		double r = 0; // norm of x-ai (TODO: do not recompute)
@@ -400,6 +419,9 @@ static void hessian(float *h, int d, int n, float a[n][d], float *x)
 		for (int l = 0; l < d; l++)
 			H[k][l] -= (x[k]-a[i][k])*(x[l]-a[i][l]) / (r*r*r);
 	}
+
+	if (d == 2)
+		fprintf(stderr, "\t\tH=%g %g %g %g\n", h[0],h[1],h[2],h[3]);
 }
 
 #include "iio.h"
@@ -492,7 +514,118 @@ int main_weisz(int c, char *v[])
 	return 0;
 }
 
+// fancier weiszfeld variands based on gradient descent
+// (by default, plain weiszfeld)
+//
+// Variants:
+// 	stepsize-constant: use a constant stepsize (relative to the gradient)
+// 	stepsize-absolute: use a constant-length stepsize (non-convergent!)
+// 	stepsize-factor: multiply the Weiszfeld lambda by this factor
+// 	search-armijo: linear armijo search with parameters = 1/2
+// 	stochastic-computations: 
+//
+int main_hess(int c, char *v[])
+{
+	char *out_sampling = pick_option(&c, &v, "o", "");
+
+	if (c != 1)
+		return fprintf(stderr, "usage:\n\t%s [params] <in\n", *v);
+
+	int n, d;
+	void *aa = iio_read_image_float("-", &d, &n);
+	float (*a)[d] = aa;
+
+	if (d == 2 && *out_sampling)
+	{
+		int w = 1000;
+		int h = 1000;
+		float *o = malloc(w*h*sizeof*o);
+		for (int i = 0; i < h; i++)
+		for (int j = 0; j < w; j++)
+		{
+			float x[2] = {
+				XMIN() + i*(XMAX()-XMIN())/w,
+				YMIN() + j*(YMAX()-YMIN())/h,
+			};
+			o[j*w+i] = objective_function(d, n, a, x);
+		}
+		iio_write_image_float(out_sampling, o, w, h);
+		free(o);
+	}
+
+	float x[d]; // initialization
+	for (int i = 0; i < d; i++)
+		x[i] = 0;
+
+	float E = objective_function(d, n, a, x);
+
+	fprintf(stderr, "got %d points in dimension %d\n", n, d);
+	fprintf(stderr, "energy at zero = %g\n", E);
+
+
+	if (n < 10)
+		for (int i = 0; i < n; i++)
+			fprintf(stderr, "E(x[%d]) = %g\n",
+					i, objective_function(d, n, a, a[i]));
+
+	float avg[d];
+	linear_average(avg, d, n, a);
+	if (d == 2) {
+		avg[0] = 9.99;
+		avg[1] = 9.99;
+	}
+	E = objective_function(d, n, a, avg);
+	fprintf(stderr, "avg = %lf %lf (%lf)\n", avg[0], avg[1], E);
+
+	for (int j = 0; j < d; j++)
+		x[j] = avg[j];
+	fprintf(stderr, "starting energy = %g\n", E);
+
+	int numit = NUMIT();
+	for (int i = 0; i < numit; i++)
+	{
+		float g[d];
+		gradient(g, d, n, a, x);
+		if (d == 2)
+			fprintf(stderr, "g[%d] = %g %g\n", i, g[0], g[1]);
+
+		float H[d*d];
+		hessian(H, d, n, a, x);
+		if (d == 2) {
+		fprintf(stderr, "\th=%g %g %g\n", H[0], H[1], H[3]);
+		fprintf(stderr, "\tT=%g D=%g\n",H[0]+H[2], H[0]*H[3]-H[1]*H[2]);
+		}
+
+		float p[d];
+		solve_spdf(p, H, g, d);
+		if (d == 2) {
+			fprintf(stderr, "\tp = %g %g\n", p[0], p[1]);
+			float y[2] = {
+				g[0] - H[0]*p[0] - H[1]*p[1],
+				g[1] - H[2]*p[0] - H[3]*p[1],
+			};
+			fprintf(stderr, "\ty = %g %g\n", y[0], y[1]);
+		}
+
+		float W = weiszfeld_weight(d, n, a, x);
+		fprintf(stderr, "\tW=%g, 1/W=%g\n", W, 1/W);
+
+
+		float λ = 1; // use weiszfeld weight here
+		for (int j = 0; j < d; j++)
+			//x[j] -= λ * g[j];
+			x[j] -= p[j];
+
+		E = objective_function(d, n, a, x);
+		fprintf(stderr, "\tf(%lf %lf) = %lf\n", x[0], x[1], E);
+
+	}
+
+	return 0;
+}
+
 #ifndef HIDE_ALL_MAINS
 //int main(int c, char **v) { return main_clmps(c, v); }
-int main(int c, char **v) { return main_weisz(c, v); }
+//int main(int c, char **v) { return main_weisz(c, v); }
+int main(int c, char **v) { return main_hess(c, v); }
 #endif
