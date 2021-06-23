@@ -28,6 +28,9 @@ static void print_points(float *x, int n, int d)
 		printf("%g%c", x[i*d+j], (j==d-1)?'\n':' ');
 }
 
+#include "smapa.h"
+SMART_PARAMETER_SILENT(SRAND,0)
+
 int main_random(int c, char *v[])
 {
 	float s = atof(pick_option(&c, &v, "s", "1"));
@@ -49,6 +52,8 @@ int main_random(int c, char *v[])
 		offset[i] = 0;
 	if (*offset_string)
 		read_n_doubles_from_string(offset, offset_string, d);
+
+	xsrand(100+SRAND());
 
 	switch (v[2][0]) {
 	case 'g':

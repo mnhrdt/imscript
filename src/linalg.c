@@ -91,3 +91,16 @@ static void solve_spdf(float *xf, float *Af, float *bf, int n)
 	for (int i = 0; i < n; i++)
 		xf[i] = x[i];
 }
+
+// solve a symmetric, positive definite system
+static void solve_spd(double *xf, double *Af, double *bf, int n)
+{
+	long double x[n], A[n*n], b[n];
+	for (int i = 0; i < n; i++)
+		b[i] = bf[i];
+	for (int i = 0; i < n*n; i++)
+		A[i] = Af[i];
+	solve_spdl(x, A, b, n);
+	for (int i = 0; i < n; i++)
+		xf[i] = x[i];
+}

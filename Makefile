@@ -121,9 +121,9 @@ clean: ; @$(RM) $(BIN_ALL) bin/im src/*.o src/ftr/*.o src/misc/*.o
 # compiler does not define __STDC_VERSION__.  The idea is that many older
 # compilers are able to compile standard C when given that option.
 # This hack seems to work for all versions of gcc, clang and icc.
-ifeq (,$(shell $(CC) $(CFLAGS) -dM -E -< /dev/null | grep __STDC_VERSION_))
-CFLAGS := $(CFLAGS) -std=gnu99
-endif
+#ifeq (,$(shell $(CC) $(CFLAGS) -dM -E -< /dev/null | grep __STDC_VERSION_))
+#CFLAGS := $(CFLAGS) -std=gnu99
+#endif
 
 
 
