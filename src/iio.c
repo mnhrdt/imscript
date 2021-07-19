@@ -169,6 +169,7 @@
 #define IIO_FORMAT_FIT 34
 #define IIO_FORMAT_HDF5 35
 #define IIO_FORMAT_TXT 36
+#define IIO_FORMAT_RAT 37
 #define IIO_FORMAT_UNRECOGNIZED (-1)
 
 //
@@ -639,7 +640,7 @@ static const char *iio_strfmt(int format)
 	M(TIFF); M(RIM); M(BMP); M(EXR); M(JP2);
 	M(VTK); M(CIMG); M(PAU); M(DICOM); M(PFM); M(NIFTI);
 	M(PCX); M(GIF); M(XPM); M(RAFA); M(FLO); M(LUM); M(JUV);
-	M(PCM); M(ASC); M(RAW); M(RWA); M(PDS); M(CSV); M(VRT);
+	M(PCM); M(ASC); M(RAW); M(RWA); M(PDS); M(CSV); M(VRT); M(RAT);
 	M(FFD); M(DLM); M(NPY); M(VIC); M(CCS); M(FIT); M(HDF5);
 	M(TXT);
 	M(UNRECOGNIZED);
@@ -3052,6 +3053,42 @@ static int read_beheaded_ffd(struct iio_image *x,
 	return 0;
 }
 
+// RAT reader                                                               {{{2
+static int read_beheaded_rat(struct iio_image *x,
+		FILE *fin, char *header, int nheader)
+{
+	(void)header; (void)nheader;
+	assert(nheader == 4);
+	int fullb = 30; // includes size of dummy RAT header fields
+	char s[4+4*fullb]; // whole header (mostly unused)
+	for (int i = 4; i < 4 + 4*fullb; i++)
+		s[i] = pick_char_for_sure(fin);
+	int32_t d = *(int32_t*)(s + 4*2);
+	int32_t w = *(int32_t*)(s + 4*3);
+	int32_t h = *(int32_t*)(s + 4*4);
+	int32_t var = *(int32_t*)(s + 4*5);
+
+	IIO_DEBUG("RAT d = %d\n", d);
+	IIO_DEBUG("RAT w = %d\n", w);
+	IIO_DEBUG("RAT h = %d\n", h);
+	IIO_DEBUG("RAT var = %d\n", var);
+
+	if (var != 6)
+		fail("RAR option var=%d not implemented; ask enric", var);
+
+	x->dimension = 2;
+	x->sizes[0] = w;
+	x->sizes[1] = h;
+	x->pixel_dimension = 2*d*d;
+	x->type = IIO_TYPE_FLOAT;
+	x->contiguous_data = false;
+	long total = w * h * d * d * 2;
+	x->data = xmalloc(total * sizeof(float));
+	long r = fread(x->data, sizeof(float), total, fin);
+	if (r != total) fail("total=%ld r=%ld\n", total, r);//return 1;
+	return 0;
+}
+
 // NUMPY reader                                                             {{{2
 static int read_beheaded_npy(struct iio_image *x,
 		FILE *fin, char *header, int nheader)
@@ -4597,6 +4634,9 @@ static int guess_format(FILE *f, char *buf, int *nbuf, int bufmax)
 		// && b[4]=='P' &&b [5]=='Y')
 		return IIO_FORMAT_NPY; // Numpy
 
+	if (b[0]==4 && b[1]==0 && b[2]==0 && b[3]==0)
+		return IIO_FORMAT_RAT; // Random Access Texture (just for radar)
+
 #ifdef I_CAN_HAS_LIBHDF5
 	if (b[0]==0x89 && b[1]=='H' && b[2]=='D' && b[3]=='F')
 		return IIO_FORMAT_HDF5;
@@ -4821,6 +4861,8 @@ int read_beheaded_image(struct iio_image *x, FILE *f, char *h, int hn, int fmt)
 {
 	IIO_DEBUG("rbi fmt = %d\n", fmt);
 	// these functions can be defined in separate, independent files
+	// TODO: turn this function into an array of pointers to functions,
+	// indexed by a format enum
 	switch(fmt) {
 	case IIO_FORMAT_QNM:   return read_beheaded_qnm (x, f, h, hn);
 	case IIO_FORMAT_RIM:   return read_beheaded_rim (x, f, h, hn);
@@ -4839,6 +4881,7 @@ int read_beheaded_image(struct iio_image *x, FILE *f, char *h, int hn, int fmt)
 	case IIO_FORMAT_FFD:   return read_beheaded_ffd (x, f, h, hn);
 	case IIO_FORMAT_DLM:   return read_beheaded_dlm (x, f, h, hn);
 	case IIO_FORMAT_NPY:   return read_beheaded_npy (x, f, h, hn);
+	case IIO_FORMAT_RAT:   return read_beheaded_rat (x, f, h, hn);
 	case IIO_FORMAT_VIC:   return read_beheaded_vic (x, f, h, hn);
 	case IIO_FORMAT_FIT:   return read_beheaded_fit (x, f, h, hn);
 	case IIO_FORMAT_CCS:   return read_beheaded_ccs (x, f, h, hn);
