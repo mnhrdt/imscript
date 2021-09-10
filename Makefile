@@ -4,7 +4,7 @@ CFLAGS ?= -O3 -march=native
 #CFLAGS ?= -O3 -march=native -std=c17 $(WFLAGS)
 #CFLAGS ?= -O3 -march=native #-Mnobuiltin -Wno-unused-variable
 #CFLAGS ?= -O3 -Wall -Wextra -Wno-unused -Wno-unused-parameter
-LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm# -lubsan
+LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lwebp -lm# -lubsan
 
 
 OBJ = src/iio.o src/fancy_image.o
@@ -14,7 +14,7 @@ BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
       srmatch tiffu siftu crop lrcat tbcat fftshift bmms registration imflip \
       fft dct dht flambda fancy_crop fancy_downsa autotrim iion mediator     \
       redim colormatch eucdist nonmaxsup gntiply idump warp heatd imhalve    \
-      ppsmooth mdither mdither2 rpctk getbands pixdump #carve
+      ppsmooth mdither mdither2 rpctk getbands pixdump #geomedian points #carve
 
 
 BIN := $(addprefix bin/,$(BIN))

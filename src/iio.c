@@ -35,6 +35,7 @@
 #define I_CAN_HAS_LIBPNG
 #define I_CAN_HAS_LIBJPEG
 #define I_CAN_HAS_LIBTIFF
+#define I_CAN_HAS_LIBWEBP
 //#define I_CAN_HAS_LIBHDF5
 //#define I_CAN_HAS_LIBEXR
 #define I_CAN_HAS_WGET
@@ -93,12 +94,17 @@
 #undef I_CAN_HAS_LIBHDF5
 #endif
 
+#ifdef IIO_DISABLE_LIBWEBP
+#undef I_CAN_HAS_LIBWEBP
+#endif
+
 #ifdef IIO_DISABLE_IMGLIBS
 #undef I_CAN_HAS_LIBPNG
 #undef I_CAN_HAS_LIBJPEG
 #undef I_CAN_HAS_LIBTIFF
 #undef I_CAN_HAS_LIBEXR
 #undef I_CAN_HAS_LIBHDF5
+#undef I_CAN_HAS_LIBWEBP
 #endif
 
 
@@ -170,6 +176,7 @@
 #define IIO_FORMAT_HDF5 35
 #define IIO_FORMAT_TXT 36
 #define IIO_FORMAT_RAT 37
+#define IIO_FORMAT_WEBP 38
 #define IIO_FORMAT_UNRECOGNIZED (-1)
 
 //
@@ -642,7 +649,7 @@ static const char *iio_strfmt(int format)
 	M(PCX); M(GIF); M(XPM); M(RAFA); M(FLO); M(LUM); M(JUV);
 	M(PCM); M(ASC); M(RAW); M(RWA); M(PDS); M(CSV); M(VRT); M(RAT);
 	M(FFD); M(DLM); M(NPY); M(VIC); M(CCS); M(FIT); M(HDF5);
-	M(TXT);
+	M(TXT); M(WEBP);
 	M(UNRECOGNIZED);
 	default: fail("caca de la grossa (%d)", format);
 	}
@@ -1971,6 +1978,10 @@ static int read_whole_hdf5(struct iio_image *x, const char *filename_raw)
 
 	IIO_DEBUG("h5 w=%d h=%d pd=%d brk=%d\n", w, h, pd, brk);
 
+	// squeeze
+	if (h == 1 && pd > 1) {h = w; w = pd; pd = 1; }
+	//if (w == 1 && pd > 1) {w = pd; pd = 1; }
+
 	// fill-in image struct
 	x->dimension = 2;
 	x->sizes[0] = w;
@@ -2039,6 +2050,39 @@ hid_t my_hd5open(hid_t f, char *suffix)
 }
 
 #endif//I_CAN_HAS_LIBHDF5
+
+
+// WEBP reader                                                              {{{2
+#ifdef I_CAN_HAS_LIBWEBP
+#include <webp/decode.h>
+static int read_beheaded_webp(struct iio_image *x,
+		FILE *f, char *header, int nheader)
+{
+	long filesize;
+	void *filedata = load_rest_of_file(&filesize, f, header, nheader);
+	if (!filedata) return 1;
+
+	int w, h;
+	int rv = WebPGetInfo(filedata, filesize, &w, &h);
+	if (!rv) return 2;
+
+	uint8_t *data = xmalloc(4 * w * h);
+	uint8_t *r = WebPDecodeRGBAInto(filedata, filesize, data, 4*w*h, 4*w);
+	if (!r) return 3;
+
+	xfree(filedata); // XXX: leak upon load failure
+
+	x->dimension = 2;
+	x->sizes[0] = w;
+	x->sizes[1] = h;
+	x->pixel_dimension = 4;
+	x->type = IIO_TYPE_UINT8;
+	x->contiguous_data = false;
+	x->data = data;
+	return 0;
+}
+#endif//I_CAN_HAS_LIBWEBP
+
 
 // QNM readers                                                              {{{2
 
@@ -4589,7 +4633,7 @@ static int guess_format(FILE *f, char *buf, int *nbuf, int bufmax)
 #endif//I_CAN_HAS_LIBTIFF
 
 	if (b[0]=='I' && b[1]=='R') return IIO_FORMAT_RIM;
-	if (b[0]=='R' && b[1]=='I') return IIO_FORMAT_RIM;
+	//if (b[0]=='R' && b[1]=='I') return IIO_FORMAT_RIM; //webp conflict
 	if (b[0]=='M' && b[1]=='I') return IIO_FORMAT_RIM;
 	if (b[0]=='I' && b[1]=='M') return IIO_FORMAT_RIM;
 	if (b[0]=='W' && b[1]=='E') return IIO_FORMAT_RIM;
@@ -4604,6 +4648,12 @@ static int guess_format(FILE *f, char *buf, int *nbuf, int bufmax)
 
 	b[2] = add_to_header_buffer(f, b, nbuf, bufmax);
 	b[3] = add_to_header_buffer(f, b, nbuf, bufmax);
+
+#ifdef I_CAN_HAS_LIBWEBP
+	if (b[0]=='R' && b[1]=='I' && b[2]=='F' && b[3]=='F')
+		return IIO_FORMAT_WEBP;
+#endif//I_CAN_HAS_LIBWEBP
+	if (b[0]=='R' && b[1]=='I') return IIO_FORMAT_RIM; // (very rare)
 
 #ifdef I_CAN_HAS_LIBPNG
 	if (b[1]=='P' && b[2]=='N' && b[3]=='G')
@@ -4829,6 +4879,8 @@ static bool comma_named_tiff(const char *filename)
 
 static bool comma_named_hdf5(const char *filename)
 {
+	IIO_DEBUG("hdf5 try \"%s\"\n", filename);
+
 	char *comma = strrchr(filename, ',');
 	if (!comma) return false;
 
@@ -4841,13 +4893,19 @@ static bool comma_named_hdf5(const char *filename)
 	comma = rfilename + (comma - filename);
 	*comma = '\0';
 
+	IIO_DEBUG("hdf5 still trying\n\trfilename=\"%s\"\n\tcomma=\"%s\"\n",
+			rfilename, comma+1);
+
 	bool retval = false;
-	if (seekable_filenameP(rfilename)) {
+	bool skbl = seekable_filenameP(rfilename);
+	IIO_DEBUG("skbl = %d\n", skbl);
+	if (skbl) {
 		FILE *f = xfopen(rfilename, "r");
 		int bufmax = 0x100, nbuf, format;
 		char buf[0x100] = {0};
 		format = guess_format(f, buf, &nbuf, bufmax);
 		retval = format == IIO_FORMAT_HDF5;
+		IIO_DEBUG("retval = %d\n", retval);
 		xfclose(f);
 	}
 	return retval;
@@ -4886,10 +4944,6 @@ int read_beheaded_image(struct iio_image *x, FILE *f, char *h, int hn, int fmt)
 	case IIO_FORMAT_FIT:   return read_beheaded_fit (x, f, h, hn);
 	case IIO_FORMAT_CCS:   return read_beheaded_ccs (x, f, h, hn);
 
-#ifdef I_CAN_HAS_LIBHDF5
-	case IIO_FORMAT_HDF5:   return read_beheaded_hdf5 (x, f, h, hn);
-#endif
-
 #ifdef I_CAN_HAS_LIBPNG
 	case IIO_FORMAT_PNG:   return read_beheaded_png (x, f, h, hn);
 #endif
@@ -4905,6 +4959,15 @@ int read_beheaded_image(struct iio_image *x, FILE *f, char *h, int hn, int fmt)
 #ifdef I_CAN_HAS_LIBEXR
 	case IIO_FORMAT_EXR:   return read_beheaded_exr (x, f, h, hn);
 #endif
+
+#ifdef I_CAN_HAS_LIBHDF5
+	case IIO_FORMAT_HDF5:   return read_beheaded_hdf5 (x, f, h, hn);
+#endif
+
+#ifdef I_CAN_HAS_LIBWEBP
+	case IIO_FORMAT_WEBP:   return read_beheaded_webp (x, f, h, hn);
+#endif
+
 
 	/*
 	case IIO_FORMAT_JP2:   return read_beheaded_jp2 (x, f, h, hn);
@@ -5032,6 +5095,7 @@ static int read_image(struct iio_image *x, const char *fname)
 #endif//I_CAN_HAS_LIBTIFF
 #ifdef I_CAN_HAS_LIBHDF5
 	} else if (comma_named_hdf5(fname)) {
+		IIO_DEBUG("hdf5 OK\n");
 		r = read_whole_hdf5(x, fname);
 #endif//I_CAN_HAS_LIBHDF5
 #ifdef I_USE_LIBRAW
