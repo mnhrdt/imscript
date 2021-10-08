@@ -7,6 +7,7 @@ int main(int c, char *v[])
 {
 	_Bool t = pick_option(&c, &v, "t", 0);
 	_Bool T = pick_option(&c, &v, "T", 0);
+	int k = atoi(pick_option(&c, &v, "n", "-1"));
 	if (c != 3)
 		return fprintf(stderr,
 				"usage:\n\t%s [-t] in.tif out_%%d.tif\n", *v);
@@ -20,6 +21,7 @@ int main(int c, char *v[])
 		fprintf(stderr, "getbands standard w=%d h=%d pd=%d\n",w,h,pd);
 		for (int i = 0; i < pd; i++)
 		{
+			if (k>=0 && k!=i) continue;
 			char n[FILENAME_MAX];
 			snprintf(n, FILENAME_MAX, filepat_out, i);
 			iio_write_image_float(n, x + w*h*i, w, h);
@@ -28,6 +30,7 @@ int main(int c, char *v[])
 		float *x = iio_read_image_float_vec(filename_in, &w, &h, &pd);
 		for (int i = 0; i < h; i++)
 		{
+			if (k>=0 && k!=i) continue;
 			char n[FILENAME_MAX];
 			snprintf(n, FILENAME_MAX, filepat_out, i);
 			iio_write_image_float(n, x + w*pd*i, pd, w);
@@ -40,6 +43,7 @@ int main(int c, char *v[])
 		fprintf(stderr, "getbands T option w=%d h=%d pd=%d\n",w,h,pd);
 		for (int i = 0; i < w; i++)
 		{
+			if (k>=0 && k!=i) continue;
 			for (int j = 0; j < h; j++)
 			for (int l = 0; l <pd; l++)
 				y[j*pd+l] = x[(j*w+i)*pd+l];
