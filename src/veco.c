@@ -474,11 +474,12 @@ int main_veco(int c, char *v[])
 	bool use_numbers =   pick_option(&c, &v, "x", 0);
 	bool by_columns  =   pick_option(&c, &v, "c", 0);
 	bool by_channels =   pick_option(&c, &v, "k", 0);
+	bool by_slices   =   pick_option(&c, &v, "s", 0);
 	bool by_full_img =   pick_option(&c, &v, "f", 0);
 	bool indep_chans =   pick_option(&c, &v, "i", 0);
 	char *goodness   =   pick_option(&c, &v, "g", "numeric");
 	char *filename_out = pick_option(&c, &v, "o", "-");
-	if (c < 3 && !by_channels) {
+	if (c < 3 && !by_channels && !by_slices) {
 		fprintf(stderr,
 		"usage:\n\t%s {sum|min|max|avg|mul|med} [v1 ...] > out\n", *v);
 		//          0  1                          2  3
@@ -591,6 +592,21 @@ int main_veco(int c, char *v[])
 			y[i] = f(tmp, ngood);
 		}
 		iio_write_image_float(filename_out, y, w, h);
+	} else if (n < 2 && by_slices) {
+		int w, h, pd;
+		float *x = iio_read_image_float_vec(c>2?v[2]:"-", &w, &h, &pd);
+		float *y = xmalloc(w * pd * sizeof*y);
+		for (int i = 0; i < w ; i++)
+		for (int k = 0; k < pd; k++)
+		{
+			float tmp[h];
+			int ngood = 0;
+			for (int j = 0; j < h; j++)
+				if (isgood(x[(j*w+i)*pd+k]))
+					tmp[ngood++] = x[(j*w+i)*pd+k];
+			y[k*w+i] = f(tmp, ngood);
+		}
+		iio_write_image_float(filename_out, y, w, pd);
 	} else if (n < 2 && by_full_img) {
 		int w, h, pd;
 		float *x = iio_read_image_float_vec(c>2?v[2]:"-", &w, &h, &pd);
