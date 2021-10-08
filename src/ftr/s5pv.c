@@ -157,9 +157,9 @@ static void svv_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
 		float gg = xx[e->h/2][j][i];
 		uint8_t g = float_to_uint8(e->a * gg + e->b);
 		uint8_t (*rgb)[f->w][3] = (void*)f->rgb;
-		rgb[20+j][20+i][0] = g;
-		rgb[20+j][20+i][1] = g;
-		rgb[20+j][20+i][2] = g;
+		rgb[20+i][20+j][0] = g;
+		rgb[20+i][20+j][1] = g;
+		rgb[20+i][20+j][2] = g;
 	}
 }
 
@@ -168,6 +168,7 @@ static void svv_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
 static void svv_button_handler(struct FTR *f, int b, int m, int x, int y)
 {
 	fprintf(stderr, "BUT b=%d m=%d x=%d y=%d\n", b, m, x, y);
+
 	//if (b == FTR_BUTTON_UP && m & FTR_MASK_CONTROL) {
 	//	action_cycle_view(f, +1, x, y); return; }
 	//if (b == FTR_BUTTON_DOWN && m & FTR_MASK_CONTROL) {
@@ -201,6 +202,8 @@ static void svv_motion_handler(struct FTR *f, int unused_b, int m, int x, int y)
 // CALLBACK: pan_key_handler {{{1
 void svv_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
+	fprintf(stderr, "KEY k=%d ('%c') m=%d x=%d y=%d\n", k, k, m, x, y);
+
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
 		ftr_notify_the_desire_to_stop_this_loop(f, 1);
@@ -236,8 +239,8 @@ int main_s5pv(int c, char *v[])
 	struct FTR f = ftr_new_window(1000, 1000);
 	f.userdata = e;
 	f.changed = 1;
-	//ftr_set_handler(&f, "key"   , pan_key_handler);
-	//ftr_set_handler(&f, "button", pan_button_handler);
+	ftr_set_handler(&f, "key"   , svv_key_handler);
+	ftr_set_handler(&f, "button", svv_button_handler);
 	//ftr_set_handler(&f, "motion", pan_motion_handler);
 	ftr_set_handler(&f, "expose", svv_exposer);
 	//ftr_set_handler(&f, "resize", pan_resize);
