@@ -6,6 +6,18 @@
 //
 //
 // Let us start small: just load an image and show three slices`
+//
+// TODO:
+// 1. allow mouse interaction besides keyboard
+// 2. add options for better local-adapted linear contrast changes
+// 3. use palettes, logscale, etc
+// 4. show textual info on the window, not on xterm (for easier screensharing)
+// 5. load irradiance and normalize by it (toggle)
+// 6. get smile-corrected slices (toggle)
+// 7. project on a geographic grid (mode without slices)
+// 8. flip between several bands
+// 9. flip between dates
+// 10. false color by combination of bands (e.g., methane-optimized ratios)
 
 // #includes {{{1
 #include <assert.h>
