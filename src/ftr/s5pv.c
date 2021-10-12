@@ -326,6 +326,59 @@ static void action_offset_center(struct FTR *f, int d[3])
 	f->changed = 1;
 }
 
+static void action_qauto(struct FTR *f)
+{
+	struct svv_state *e = f->userdata;
+
+	float m = INFINITY, M = -m;
+	//m = 0;
+	//M = 255;
+	for (int i = 0; i < e->w * e->window[1][1]; i++)
+	{
+		float g = e->fbuf[1][i];
+		m = fmin(m, g);
+		M = fmax(M, g);
+	}
+
+	e->a = 255 / ( M - m );
+	e->b = 255 * m / ( m - M );
+
+	fprintf(stderr, "m=%g M=%g a=%g b=%g\n", m, M, e->a, e->b);
+
+	f->changed = 1;
+}
+
+static void action_hit_move_center(struct FTR *f, int x, int y)
+{
+	struct svv_state *e = f->userdata;
+
+	int w = window_hit(e, x, y);
+	if (w < 0 || w > 3)
+		return;
+
+	int i = x - e->window[w][0];
+	int j = y - e->window[w][1];
+
+	switch (w) {
+	case 0:
+		e->c[0] = i;
+		e->c[2] = j;
+		f->changed = 1;
+		break;
+	case 1:
+		e->c[0] = i;
+		e->c[1] = e->h - j - e->view_offset_y;
+		f->changed = 1;
+		break;
+	case 2:
+		e->c[1] = e->h - j - e->view_offset_y;
+		e->c[2] = i;
+		f->changed = 1;
+		break;
+	default:
+		break;
+	}
+}
 
 
 
@@ -481,24 +534,19 @@ static void svv_button_handler(struct FTR *f, int b, int m, int x, int y)
 
 
 // CALLBACK: svv_motion_handler {{{1
-
-// update offset variables by dragging
-static void svv_motion_handler(struct FTR *f, int unused_b, int m, int x, int y)
+static void svv_motion_handler(struct FTR *f, int b, int m, int x, int y)
 {
-	//(void)unused_b;
-	//struct pan_state *e = f->userdata;
-	//static double ox = 0, oy = 0;
-	//if (m & FTR_BUTTON_LEFT) action_offset_viewport(f, x - ox, y - oy);
-	//ox = x;
-	//oy = y;
+	static int ox = 0, oy = 0;
 
-	//if (e->show_vertdir)
-	//{
-	//	e->vdx = x;
-	//	e->vdy = y;
-	//	f->changed = 1;
-	//}
+	fprintf(stderr, "MOT b=%d m=%d (%d %d) {%d %d}\n", b, m, x, y,
+			x-ox, y-oy);
+
+	if (m & FTR_MASK_SHIFT)    action_hit_move_center(f, x, y);
+
+	ox = x;
+	oy = y;
 }
+
 
 // CALLBACK: svv_key_handler {{{1
 void svv_key_handler(struct FTR *f, int k, int m, int x, int y)
@@ -545,6 +593,8 @@ void svv_key_handler(struct FTR *f, int k, int m, int x, int y)
 		action_offset_center(f, d);
 	}
 
+	if (k=='c') action_qauto(f);
+
 }
 
 // CALLBACK: svv_resize {{{1
@@ -576,9 +626,9 @@ int main_s5pv(int c, char *v[])
 	f.changed = 1;
 	ftr_set_handler(&f, "key"   , svv_key_handler);
 	ftr_set_handler(&f, "button", svv_button_handler);
-	//ftr_set_handler(&f, "motion", pan_motion_handler);
+	ftr_set_handler(&f, "motion", svv_motion_handler);
 	ftr_set_handler(&f, "expose", svv_exposer);
-	//ftr_set_handler(&f, "resize", pan_resize);
+	//ftr_set_handler(&f, "resize", svv_resize);
 	int r = ftr_loop_run(&f);
 
 	// cleanup and exit (optional)
