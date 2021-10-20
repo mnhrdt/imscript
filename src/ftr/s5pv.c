@@ -8,8 +8,8 @@
 // Let us start small: just load an image and show three slices`
 //
 // TODO:
-// 1. allow mouse interaction besides keyboard
-// 2. add options for better local-adapted linear contrast changes
+// 1. (DONE) allow mouse interaction besides keyboard
+// 2. (DONE-qauto) add options for better local-adapted linear contrast changes
 // 3. use palettes, logscale, etc
 // 4. show textual info on the window, not on xterm (for easier screensharing)
 // 5. load irradiance and normalize by it (toggle)
@@ -18,6 +18,7 @@
 // 8. flip between several bands
 // 9. flip between dates
 // 10. false color by combination of bands (e.g., methane-optimized ratios)
+// 11. refactor all window offsets, rotations, etc. on a single function
 
 // #includes {{{1
 #include <assert.h>
@@ -45,7 +46,7 @@
 
 // svv_state {{{1
 
-// this goes inside the "userdata" field of the 
+// this goes inside the "userdata" field of the FTR struct
 struct svv_state {
 	// 0. image data (so far, radiance-only)
 	int w, h, pd;
@@ -64,7 +65,14 @@ struct svv_state {
 	int workspace_h;
 	int nwindows;
 	int window[MAX_WINDOWS][4]; // x0, y0, w, h
+	int slice_direction[MAX_WINDOWS]; // 0,1,2 = h,pd,w
 	float *fbuf[MAX_WINDOWS]; // temporary buffers for slices and shit
+
+	// per-window viewport shit
+	int slice_affinity[MAX_WINDOWS][6];
+	int slice_unsmiled[MAX_WINDOWS];
+	int slice_localized[MAX_WINDOWS];
+
 };
 
 
@@ -472,7 +480,7 @@ static void svv_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
 		int h = e->window[1][3];
 		uint8_t (*rgb)[f->w][3] = (void*)f->rgb;
 		int ii = e->c[0];
-		if (ii >= 0 && ii < w);
+		if (ii >= 0 && ii < w)
 			for (int j = 0; j < h; j++)
 				rgb[y+j][x+ii][0] = 200;
 		int jj = e->h - (e->c[1]+e->view_offset_y);
@@ -489,7 +497,7 @@ static void svv_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
 		int h = e->window[0][3];
 		uint8_t (*rgb)[f->w][3] = (void*)f->rgb;
 		int ii = e->c[0];
-		if (ii >= 0 && ii < w);
+		if (ii >= 0 && ii < w)
 			for (int j = 0; j < h; j++)
 				rgb[y+j][x+ii][0] = 200;
 		int jj = e->c[2];
@@ -506,7 +514,7 @@ static void svv_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
 		int h = e->window[2][3];
 		uint8_t (*rgb)[f->w][3] = (void*)f->rgb;
 		int ii = e->c[2];
-		if (ii >= 0 && ii < w);
+		if (ii >= 0 && ii < w)
 			for (int j = 0; j < h; j++)
 				rgb[y+j][x+ii][0] = 200;
 		int jj = e->h - (e->c[1]+e->view_offset_y);
