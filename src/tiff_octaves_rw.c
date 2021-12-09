@@ -533,10 +533,10 @@ static int load_one_octave_file(struct tiff_octaves *t, int o)
 
 	// set up data for old tile deletion
 	if (t->megabytes) {
-		for (int o = 0; o < t->noctaves; o++)
+		for (int u = 0; u < t->noctaves; u++)
 		{
-			fprintf(stderr, "ti[%d].ntiles = %d\n", o, t->i[o].ntiles);
-			t->a[o] = xmalloc(t->i[o].ntiles * sizeof*t->a[o]);
+			fprintf(stderr, "ti[%d].ntiles = %d\n", u, t->i[u].ntiles);
+			t->a[u] = xmalloc(t->i[u].ntiles * sizeof*t->a[u]);
 		}
 		t->ax = 0;
 		int tilesize = t->i->tw * t->i->th * (t->i->bps/8) * t->i->spp;

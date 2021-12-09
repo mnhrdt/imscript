@@ -163,10 +163,10 @@ static void zoom_out_by_factor_two(float *out, int ow, int oh,
 		a[2] = getsample_zero(in, iw, ih, pd, 2*i  , 2*j+1, l);
 		a[3] = getsample_zero(in, iw, ih, pd, 2*i+1, 2*j+1, l);
 		int n = 0;
-		for (int i = 0; i < 4; i++)
-			if (!isnan(a[i]))
+		for (int k = 0; k < 4; k++)
+			if (!isnan(a[k]))
 			{
-				A += a[i];
+				A += a[k];
 				n += 1;
 			}
 		out[pd*(ow*j + i)+l] = n ? A/n : NAN;

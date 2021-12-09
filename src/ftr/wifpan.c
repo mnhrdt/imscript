@@ -657,9 +657,9 @@ static void zoom_out_by_factor_two_avg(float *out, int ow, int oh,
 		a[2] = getsample_0(in, iw, ih, 2*i  , 2*j+1, l);
 		a[3] = getsample_0(in, iw, ih, 2*i+1, 2*j+1, l);
 		int cx = 0;
-		for (int i = 0; i < 4; i++)
-			if (!isnan(a[i])) {
-				ax += a[i];
+		for (int k = 0; k < 4; k++)
+			if (!isnan(a[k])) {
+				ax += a[k];
 				cx += 1;
 			}
 		out[3*(ow*j + i)+l] = cx ? ax/cx : NAN;//(a[0] + a[1] + a[2] + a[3])/4;

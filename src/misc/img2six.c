@@ -121,7 +121,7 @@ void dump_sixels_to_stdout_rgb(uint8_t *x, int w, int h)
 			//	printf("%c", buf[i]);
 			for (int i = 0; i <= idx; i++)
 				if (rep[idx] < 3)
-					for (int k = 0; k < rep[i]; k++)
+					for (int K = 0; K < rep[i]; K++)
 						printf("%c", rle[i]);
 				else
 					printf("!%d%c", rep[i], rle[i]);
@@ -199,7 +199,7 @@ void dump_sixels_to_stdout_rgb2(uint8_t *x, int w, int h)
 			printf("#%d", k); // select color k
 			for (int i = 0; i <= idx; i++)
 				if (rep[idx] < 3)
-					for (int k = 0; k < rep[i]; k++)
+					for (int l = 0; l < rep[i]; l++)
 						printf("%c", rle[i]);
 				else
 					printf("!%d%c", rep[i], rle[i]);
@@ -249,7 +249,7 @@ void dump_sixels_to_stdout_rgb3(uint8_t *x, int w, int h)
 			printf("#%d", k);
 			for (int i = 0; i <= n; i++)
 				if (R[n] < 3)
-					for (int k = 0; k < R[i]; k++)
+					for (int l = 0; l < R[i]; l++)
 						printf("%c", r[i]);
 				else
 					printf("!%d%c", R[i], r[i]);
@@ -293,7 +293,7 @@ void dump_sixels_to_stdout_rgb4(uint8_t *x, int w, int h)
 				else r[++n] = b[i];
 			printf("#%d", k);
 			for (int i = 0; i <= n; i++)
-				if (R[n] < 3) for (int k = 0; k < R[i]; k++)
+				if (R[n] < 3) for (int l = 0; l < R[i]; l++)
 						printf("%c", r[i]);
 				else printf("!%d%c", R[i], r[i]);
 			printf(c ? "$\n" : "-\n");
@@ -387,7 +387,7 @@ void dump_sixels_to_stdout_gray(uint8_t *x, int w, int h)
 			//	printf("%c", buf[i]);
 			for (int i = 0; i <= idx; i++)
 				if (rep[idx] < 3)
-					for (int k = 0; k < rep[i]; k++)
+					for (int l = 0; l < rep[i]; l++)
 						printf("%c", rle[i]);
 				else
 					printf("!%d%c", rep[i], rle[i]);
@@ -431,7 +431,7 @@ void dump_sixels_to_stdout_gray2(uint8_t *x, int w, int h)
 			printf("#%d", k);
 			for (int i = 0; i <= idx; i++)
 				if (R[idx] < 3)
-					for (int k = 0; k < R[i]; k++)
+					for (int l = 0; l < R[i]; l++)
 						printf("%c", r[i]);
 				else
 					printf("!%d%c", R[i], r[i]);

@@ -92,12 +92,12 @@ int main(int c, char *v[])
 		for (int j = 0; j < out_size[i]; j++)
 		{
 			int pidx = out_all[out_first[i]+j];
-			float *v = x + nbands * pidx;
+			float *V = x + nbands * pidx;
 			for (int l = 0; l < nbands; l++)
 			{
-				float vl = v[l];
-				if (!isfinite(vl)) continue;
-				int bin = floor(vl);
+				float Vl = V[l];
+				if (!isfinite(Vl)) continue;
+				int bin = floor(Vl);
 				if (bin < 0) bin = 0;
 				if (bin >= nbins) bin = nbins - 1;
 				H[l*nbins+bin] += 1;
