@@ -6,17 +6,18 @@
 #include <string.h>
 
 #include "iio.h"
-
+#include "pickopt.c"
 int main(int c, char *v[])
 {
 	// process input arguments
 	if (c != 3) {
-		fprintf(stderr, "usage:\n\t%s colors heights > ply\n", *v);
-		//                          0 1      2
+		fprintf(stderr, "usage:\n\t%s [-i] colors heights > ply\n", *v);
+		//                          0      1      2
 		return 1;
 	}
 	char *fname_colors = v[1];
 	char *fname_heights = v[2];
+	_Bool option_i = pick_option(&c, &v, "i", NULL);
 
 	// read input images
 	int w, h, pd, ww, hh;
@@ -86,6 +87,7 @@ int main(int c, char *v[])
 		for (int k = 0; k < pd; k++) rgb[k] = color[j][i][k];
 		for (int k = pd; k < 3; k++) rgb[k] = rgb[k-1];
 		double xyz[3] = {i, j, height[j][i]};
+		if (option_i) j *= -1;
 		printf("%.16lf %.16lf %.16lf %d %d %d\n",
 				xyz[0], xyz[1], xyz[2], rgb[0], rgb[1], rgb[2]);
 		cx += 1;
