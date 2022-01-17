@@ -549,8 +549,8 @@ int main_viewcircs(int c, char *v[])
 		o[j][i] = 0;
 	for (int i = 0; i < n; i++)
 	{
-		int c[3] = { lrint(p[i][0]), lrint(p[i][1]), lrint(p[i][2]) };
-		overlay_circle_gray(*o, w, h, c[0], c[1], c[2]);
+		int C[3] = { lrint(p[i][0]), lrint(p[i][1]), lrint(p[i][2]) };
+		overlay_circle_gray(*o, w, h, C[0], C[1], C[2]);
 	}
 
 	iio_write_image_uint8_vec("-", (uint8_t*)o, w, h, 1);
@@ -584,8 +584,8 @@ int main_gviewcircs(int c, char *v[])
 		o[i] = 0;
 	for (int i = 0; i < n; i++)
 	{
-		int c[3] = { lrint(p[i][0]), lrint(p[i][1]), lrint(p[i][2]) };
-		overlay_circle_rvec(o, w, h, c[0], c[1], c[2]);
+		int C[3] = { lrint(p[i][0]), lrint(p[i][1]), lrint(p[i][2]) };
+		overlay_circle_rvec(o, w, h, C[0], C[1], C[2]);
 	}
 
 	iio_write_image_float_vec("-", o, w, h, 2);

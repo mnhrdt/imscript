@@ -1753,12 +1753,12 @@ static void action_dump_raw_collection_fancy(struct FTR *f)
 	char *fmt_pan = "/tmp/rpcflip_cfraw_pan_%d_%d_%d.tiff";
 	char *fmt_msi = "/tmp/rpcflip_cfraw_msi_%d_%d_%d.tiff";
 
-	for (int i = 0; i < e->nviews; i++)
+	for (int k = 0; k < e->nviews; k++)
 	{
-		action_select_view(f, i, f->w/2, f->h/2);
+		action_select_view(f, k, f->w/2, f->h/2);
 		pan_repaint(e, f->w, f->h);
-		snprintf(fname_pan, F, fmt_pan, pid, raw_collection_counter, i);
-		snprintf(fname_msi, F, fmt_msi, pid, raw_collection_counter, i);
+		snprintf(fname_pan, F, fmt_pan, pid, raw_collection_counter, k);
+		snprintf(fname_msi, F, fmt_msi, pid, raw_collection_counter, k);
 		struct pan_view  *v = obtain_view(e);
 
 		int pd = v->tc->pd;

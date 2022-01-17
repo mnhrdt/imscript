@@ -25,9 +25,9 @@ int main(int c, char *v[])
 	for (int l = 0; l < pd; l++)
 	for (int i = 0; i < w*h; i++)
 	{
-		float v = x[w*h*l + i];
-		if (!isfinite(v)) continue;
-		int idx = floor(v);
+		float V = x[w*h*l + i];
+		if (!isfinite(V)) continue;
+		int idx = floor(V);
 		if (idx < 0) idx = 0;
 		if (idx >= nbins) idx = nbins - 1;
 		H[l*nbins+idx] += 1;

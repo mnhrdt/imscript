@@ -1723,8 +1723,8 @@ static int load_one_octave_file(struct tiff_octaves *t, int o)
 
 	// set up data for old tile deletion
 	if (t->megabytes) {
-		for (int o = 0; o < t->noctaves; o++)
-			t->a[o] = malloc(t->i[o].ntiles * sizeof*t->a[o]);
+		for (int u = 0; u < t->noctaves; u++)
+			t->a[u] = malloc(t->i[u].ntiles * sizeof*t->a[u]);
 		t->ax = 0;
 		int tilesize = t->i->tw * t->i->th * (t->i->bps/8) * t->i->spp;
 		double mbts = tilesize / (1024.0 * 1024);
