@@ -566,7 +566,9 @@ int iio_type_id(size_t sample_size, bool ieeefp_sample, bool signed_sample)
 		switch(sample_size) {
 		case sizeof(float):       return IIO_TYPE_FLOAT;
 		case sizeof(double):      return IIO_TYPE_DOUBLE;
+#ifdef I_CAN_HAS_LONGDOUBLE
 		case sizeof(long double): return IIO_TYPE_LONGDOUBLE;
+#endif//I_CAN_HAS_LONGDOUBLE
 		case sizeof(float)/2:     return IIO_TYPE_HALF;
 		default: fail("bad float size %zu", sample_size);
 		}
