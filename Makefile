@@ -1,10 +1,13 @@
 CFLAGS ?= -O3 -march=native
+#CFLAGS ?= -g -O1
 #CFLAGS ?= -O3 -march=native -fsanitize=undefined
 #WFLAGS = -pedantic -Wall -Wextra -Wno-unused -Wno-overlength-strings -Wno-unused-parameter
 #CFLAGS ?= -O3 -march=native -std=c17 $(WFLAGS)
 #CFLAGS ?= -O3 -march=native #-Mnobuiltin -Wno-unused-variable
 #CFLAGS ?= -O3 -Wall -Wextra -Wno-unused -Wno-unused-parameter
-LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lwebp -lm# -lubsan
+
+#LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lwebp -lm
+LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm# -lubsan
 
 
 OBJ = src/iio.o src/fancy_image.o
@@ -19,7 +22,7 @@ BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
 
 BIN := $(addprefix bin/,$(BIN))
 
-default: $(BIN) bin/cpu_term bin/rpcflip_term
+default: $(BIN) bin/cpu_term bin/rpcflip_term #bin/s5pv
 
 bin/%  : src/%.o $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
