@@ -53,17 +53,12 @@ int main_tbcat_two(int c, char *v[])
 
 int main_tbcat(int c, char *v[])
 {
-	char *filename_out = pick_option(&c, &v, "o", "");
-	if (!*filename_out && c != 3 && c != 4) {
-		fprintf(stderr, "usage:\n\t%s a b [ab]\n", *v);
-		//                          0 1 2  3
-		return 1;
-	}
-	int n = *filename_out ? c - 1 : 2;
+	char *filename_out = pick_option(&c, &v, "o", "-");
+	int n = c - 1;
 	char *filename[n+1];
-	filename[n] = *filename_out ? filename_out : "-";
 	for (int i = 0; i < n; i++)
 		filename[i] = v[i+1];
+	filename[n] = filename_out;
 
 	int w[n+1], h[n+1], pd[n+1];
 	float *x[n+1];
