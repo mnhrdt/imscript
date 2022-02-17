@@ -35,7 +35,8 @@
 #define I_CAN_HAS_LIBPNG
 #define I_CAN_HAS_LIBJPEG
 #define I_CAN_HAS_LIBTIFF
-//#define I_CAN_HAS_LIBWEBP
+#define I_CAN_HAS_LIBWEBP
+//#define I_CAN_HAS_LIBHEIF
 //#define I_CAN_HAS_LIBHDF5
 //#define I_CAN_HAS_LIBEXR
 #define I_CAN_HAS_WGET
@@ -98,6 +99,10 @@
 #undef I_CAN_HAS_LIBWEBP
 #endif
 
+#ifdef IIO_DISABLE_LIBHEIF
+#undef I_CAN_HAS_LIBHEIF
+#endif
+
 #ifdef IIO_DISABLE_IMGLIBS
 #undef I_CAN_HAS_LIBPNG
 #undef I_CAN_HAS_LIBJPEG
@@ -105,6 +110,7 @@
 #undef I_CAN_HAS_LIBEXR
 #undef I_CAN_HAS_LIBHDF5
 #undef I_CAN_HAS_LIBWEBP
+#undef I_CAN_HAS_LIBHEIF
 #endif
 
 
@@ -177,6 +183,7 @@
 #define IIO_FORMAT_TXT 36
 #define IIO_FORMAT_RAT 37
 #define IIO_FORMAT_WEBP 38
+#define IIO_FORMAT_HEIF 39
 #define IIO_FORMAT_UNRECOGNIZED (-1)
 
 //
@@ -2084,6 +2091,51 @@ static int read_beheaded_webp(struct iio_image *x,
 	return 0;
 }
 #endif//I_CAN_HAS_LIBWEBP
+
+// HEIF reader                                                              {{{2
+#ifdef I_CAN_HAS_LIBHEIF
+#include <libheif/heif.h>
+static int read_beheaded_heif(struct iio_image *x,
+		FILE *f, char *header, int nheader)
+{
+	long filesize;
+	void *filedata = load_rest_of_file(&filesize, f, header, nheader);
+	if (!filedata) return 1;
+
+	heif_context *ctx = heif_context_alloc();
+	heif_context_read_from_memory_without_copy(ctx, filedata, filesize, );
+
+	heif_image_handle* handle;
+	heif_context_get_primary_image_handle(ctx, &handle);
+
+	heif_image *img;
+	heif_decode_image(handle, &img,
+			heif_colorspace_RGB, heif_chroma_interleaved_RGB, 0);
+
+	int stride;
+	const uint8_t *data = heif_image_get_plane_readonly(img,
+			heif_channel_interleaved, &stride);
+
+	int w, h;
+	int rv = WebPGetInfo(filedata, filesize, &w, &h);
+	if (!rv) return 2;
+
+	uint8_t *data = xmalloc(4 * w * h);
+	uint8_t *r = WebPDecodeRGBAInto(filedata, filesize, data, 4*w*h, 4*w);
+	if (!r) return 3;
+
+	xfree(filedata); // XXX: leak upon load failure
+
+	x->dimension = 2;
+	x->sizes[0] = w;
+	x->sizes[1] = h;
+	x->pixel_dimension = 4;
+	x->type = IIO_TYPE_UINT8;
+	x->contiguous_data = false;
+	x->data = data;
+	return 0;
+}
+#endif//I_CAN_HAS_LIBHEIF
 
 
 // QNM readers                                                              {{{2
@@ -4712,7 +4764,12 @@ static int guess_format(FILE *f, char *buf, int *nbuf, int bufmax)
 		if (b[3]==0xdb) // Raw JPEG
 			return IIO_FORMAT_JPEG;
 	}
-#endif//I_CAN_HAS_LIBPNG
+#endif//I_CAN_HAS_LIBJPEG
+
+#ifdef I_CAN_HAS_LIBHEIF
+	if (b[4]=='f' && b[5]=='t' && b[6]=='y' && b[7]=='p')
+		return IIO_FORMAT_HEIF;
+#endif//I_CAN_HAS_LIBHEIF
 
 	if (b[0]=='L' && b[1]=='B' && b[2]=='L' && b[3]=='S' &&
 			b[4]=='I' && b[5]=='Z' && b[6]=='E' && b[7]=='=')
@@ -4968,6 +5025,10 @@ int read_beheaded_image(struct iio_image *x, FILE *f, char *h, int hn, int fmt)
 
 #ifdef I_CAN_HAS_LIBWEBP
 	case IIO_FORMAT_WEBP:   return read_beheaded_webp (x, f, h, hn);
+#endif
+
+#ifdef I_CAN_HAS_LIBHEIF
+	case IIO_FORMAT_HEIF:   return read_beheaded_heif (x, f, h, hn);
 #endif
 
 
