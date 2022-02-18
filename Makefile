@@ -1,14 +1,5 @@
 CFLAGS ?= -O3 -march=native
-#CFLAGS ?= -g -O1
-#CFLAGS ?= -O3 -march=native -fsanitize=undefined
-#WFLAGS = -pedantic -Wall -Wextra -Wno-unused -Wno-overlength-strings -Wno-unused-parameter
-#CFLAGS ?= -O3 -march=native -std=c17 $(WFLAGS)
-#CFLAGS ?= -O3 -march=native #-Mnobuiltin -Wno-unused-variable
-#CFLAGS ?= -O3 -Wall -Wextra -Wno-unused -Wno-unused-parameter
-
-#LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lwebp -lm
-LDLIBS += -ljpeg -ltiff -lpng -lz -lfftw3f -lm# -lubsan
-
+LDLIBS += -lm -lfftw3f
 
 OBJ = src/iio.o src/fancy_image.o
 BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
@@ -17,28 +8,34 @@ BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
       srmatch tiffu siftu crop lrcat tbcat fftshift bmms registration imflip \
       fft dct dht flambda fancy_crop fancy_downsa autotrim iion mediator     \
       redim colormatch eucdist nonmaxsup gntiply idump warp heatd imhalve    \
-      ppsmooth mdither mdither2 rpctk getbands pixdump #geomedian points #carve
-
+      ppsmooth mdither mdither2 rpctk getbands pixdump geomedian points #carve
 
 BIN := $(addprefix bin/,$(BIN))
 
-default: $(BIN) bin/cpu_term bin/rpcflip_term #bin/s5pv
+default: $(BIN) bin/cpu_term bin/rpcflip_term bin/s5pv
 
 bin/%  : src/%.o $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 
+# CONFIGURABLE DEPENDENCIES
+# XXX: comment (or not) the following lines to enable (disable) image formats
+
+#DISABLE_PNG = 1
+#DISABLE_TIFF = 1
+#DISABLE_JPEG = 1
+DISABLE_WEBP = 1
+DISABLE_HEIF = 1
 DISABLE_HDF5 = 1
-ifndef DISABLE_HDF5
-# comment the following two lines to disable hdf5 support
-LDLIBS += $(shell pkg-config hdf5 --libs --silence-errors || echo -lhdf5)
-src/iio.o: CPPFLAGS+= -DI_CAN_HAS_LIBHDF5 `pkg-config hdf5 --cflags 2>/dev/null`
-endif
 
 
 
 
+
+#
 # END OF CORE PART, THE REST OF THIS FILE IS NOT ESSENTIAL
+#
+
 
 # unit test (end-to-end)
 ifeq ($(MAKECMDGOALS),test)
@@ -92,6 +89,8 @@ bin/% : src/misc/%.o $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS_MSC)
 
 
+# this is the end of the "regular" targets.  What follows are fancy build
+# targets, or bizarre graphics/terminal interfaces.
 
 
 # single, fat, busybox-like executable
@@ -112,6 +111,12 @@ OBJ_FTR_TERM = src/ftr/ftr_term.o $(filter-out src/ftr/ftr.o,$(OBJ_FTR))
 bin/%_term : src/ftr/%.o $(OBJ_FTR_TERM)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
+
+
+
+
+
+
 # bureaucracy
 clean: ; @$(RM) $(BIN_ALL) bin/im src/*.o src/ftr/*.o src/misc/*.o
 .PHONY: default full ftr misc clean tutorial manpages
@@ -130,9 +135,51 @@ clean: ; @$(RM) $(BIN_ALL) bin/im src/*.o src/ftr/*.o src/misc/*.o
 
 
 
+#
+# setup variables for configurable dependencies (nothing interesting here)
+#
 
-# non-standard file dependences
+ifndef DISABLE_PNG
+LDLIBS += -lpng
+src/iio.o: CPPFLAGS += -DI_CAN_HAS_LIBPNG
+endif
+
+ifndef DISABLE_JPEG
+LDLIBS += -ljpeg
+src/iio.o: CPPFLAGS += -DI_CAN_HAS_LIBJPEG
+endif
+
+ifndef DISABLE_WEBP
+LDLIBS += -lwebp
+src/iio.o: CPPFLAGS += -DI_CAN_HAS_LIBWEBP
+endif
+
+ifndef DISABLE_HEIF
+LDLIBS += -lheif
+src/iio.o: CPPFLAGS += -DI_CAN_HAS_LIBHEIF
+endif
+
+ifndef DISABLE_TIFF
+LDLIBS += -ltiff
+src/iio.o: CPPFLAGS += -DI_CAN_HAS_LIBTIFF
+else
+src/fancy_image.o: CPPFLAGS += -DFANCY_IMAGE_DISABLE_TIFF
+# note that disabling tiff kills the whole fancy_image stuff
+endif
+
+ifndef DISABLE_HDF5
+LDLIBS += $(shell pkg-config hdf5 --libs --silence-errors || echo -lhdf5)
+src/iio.o: CPPFLAGS+= -DI_CAN_HAS_LIBHDF5 `pkg-config hdf5 --cflags 2>/dev/null`
+# yes, the hdf5 compile-time configuration is a bit fucked up, but this goes
+# well with the rest of that library.
+endif
+
+
+
+
+# create and include non-standard file dependences
 # (this is needed because some .c files include other .c files directly)
+# it's not a big deal, you can comment this lines if they fail
 DIRS = src src/ftr src/misc
 .deps.mk:;for i in $(DIRS);do $(CC) -MM $$i/*.c|sed "\:^[^ ]:s:^:$$i/:g";done>$@
 -include .deps.mk
