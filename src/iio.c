@@ -662,7 +662,7 @@ static const char *iio_strfmt(int format)
 	M(PCX); M(GIF); M(XPM); M(RAFA); M(FLO); M(LUM); M(JUV);
 	M(PCM); M(ASC); M(RAW); M(RWA); M(PDS); M(CSV); M(VRT); M(RAT);
 	M(FFD); M(DLM); M(NPY); M(VIC); M(CCS); M(FIT); M(HDF5);
-	M(TXT); M(WEBP);
+	M(TXT); M(WEBP); M(HEIF);
 	M(UNRECOGNIZED);
 	default: fail("caca de la grossa (%d)", format);
 	}
