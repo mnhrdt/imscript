@@ -19,14 +19,15 @@ bin/%  : src/%.o $(OBJ)
 
 
 # CONFIGURABLE DEPENDENCIES
-# XXX: comment (or not) the following lines to enable (disable) image formats
+# XXX: comment (or not) the following lines to disable (enable) image formats
+# Note: just comment the lines, do NOT change the ones to zeros!
 
-#DISABLE_PNG = 1
-#DISABLE_TIFF = 1
-#DISABLE_JPEG = 1
-DISABLE_WEBP = 1
-DISABLE_HEIF = 1
-DISABLE_HDF5 = 1
+ENABLE_PNG  = 1
+ENABLE_TIFF = 1
+ENABLE_JPEG = 1
+#ENABLE_WEBP = 1
+#ENABLE_HEIF = 1
+#ENABLE_HDF5 = 1
 
 
 
@@ -139,27 +140,27 @@ clean: ; @$(RM) $(BIN_ALL) bin/im src/*.o src/ftr/*.o src/misc/*.o
 # setup variables for configurable dependencies (nothing interesting here)
 #
 
-ifndef DISABLE_PNG
+ifdef ENABLE_PNG
 LDLIBS += -lpng
 src/iio.o: CPPFLAGS += -DI_CAN_HAS_LIBPNG
 endif
 
-ifndef DISABLE_JPEG
+ifdef ENABLE_JPEG
 LDLIBS += -ljpeg
 src/iio.o: CPPFLAGS += -DI_CAN_HAS_LIBJPEG
 endif
 
-ifndef DISABLE_WEBP
+ifdef ENABLE_WEBP
 LDLIBS += -lwebp
 src/iio.o: CPPFLAGS += -DI_CAN_HAS_LIBWEBP
 endif
 
-ifndef DISABLE_HEIF
+ifdef ENABLE_HEIF
 LDLIBS += -lheif
 src/iio.o: CPPFLAGS += -DI_CAN_HAS_LIBHEIF
 endif
 
-ifndef DISABLE_TIFF
+ifdef ENABLE_TIFF
 LDLIBS += -ltiff
 src/iio.o: CPPFLAGS += -DI_CAN_HAS_LIBTIFF
 else
@@ -167,7 +168,7 @@ src/fancy_image.o: CPPFLAGS += -DFANCY_IMAGE_DISABLE_TIFF
 # note that disabling tiff kills the whole fancy_image stuff
 endif
 
-ifndef DISABLE_HDF5
+ifdef ENABLE_HDF5
 LDLIBS += $(shell pkg-config hdf5 --libs --silence-errors || echo -lhdf5)
 src/iio.o: CPPFLAGS+= -DI_CAN_HAS_LIBHDF5 `pkg-config hdf5 --cflags 2>/dev/null`
 # yes, the hdf5 compile-time configuration is a bit fucked up, but this goes
