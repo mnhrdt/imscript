@@ -32,13 +32,17 @@
 
 #define IIO_ABORT_ON_ERROR
 
-#define I_CAN_HAS_LIBPNG
-#define I_CAN_HAS_LIBJPEG
-#define I_CAN_HAS_LIBTIFF
-#define I_CAN_HAS_LIBWEBP
+// Note: on imscript's iio, all formats that require libraries are disabled by
+// default.  They are enabled by the configurable makefile.
+
+//#define I_CAN_HAS_LIBPNG
+//#define I_CAN_HAS_LIBJPEG
+//#define I_CAN_HAS_LIBTIFF
+//#define I_CAN_HAS_LIBWEBP
 //#define I_CAN_HAS_LIBHEIF
 //#define I_CAN_HAS_LIBHDF5
 //#define I_CAN_HAS_LIBEXR
+
 #define I_CAN_HAS_WGET
 #define I_CAN_HAS_WHATEVER
 //#define I_CAN_KEEP_TMP_FILES
@@ -2102,37 +2106,38 @@ static int read_beheaded_heif(struct iio_image *x,
 	void *filedata = load_rest_of_file(&filesize, f, header, nheader);
 	if (!filedata) return 1;
 
-	heif_context *ctx = heif_context_alloc();
-	heif_context_read_from_memory_without_copy(ctx, filedata, filesize, );
+	struct heif_context *ctx = heif_context_alloc();
+	heif_context_read_from_memory_without_copy(ctx, filedata, filesize, 0);
 
-	heif_image_handle* handle;
+	struct heif_image_handle* handle;
 	heif_context_get_primary_image_handle(ctx, &handle);
 
-	heif_image *img;
+	struct heif_image *img;
 	heif_decode_image(handle, &img,
 			heif_colorspace_RGB, heif_chroma_interleaved_RGB, 0);
 
 	int stride;
 	const uint8_t *data = heif_image_get_plane_readonly(img,
-			heif_channel_interleaved, &stride);
+			heif_channel_interleaved, &stride);  // no alloc here
 
-	int w, h;
-	int rv = WebPGetInfo(filedata, filesize, &w, &h);
-	if (!rv) return 2;
-
-	uint8_t *data = xmalloc(4 * w * h);
-	uint8_t *r = WebPDecodeRGBAInto(filedata, filesize, data, 4*w*h, 4*w);
-	if (!r) return 3;
-
-	xfree(filedata); // XXX: leak upon load failure
+	int w = heif_image_handle_get_width(handle);
+	int h = heif_image_handle_get_height(handle);
 
 	x->dimension = 2;
 	x->sizes[0] = w;
 	x->sizes[1] = h;
-	x->pixel_dimension = 4;
+	x->pixel_dimension = 3;
 	x->type = IIO_TYPE_UINT8;
 	x->contiguous_data = false;
-	x->data = data;
+	x->data = xmalloc(w*h*3);
+	for (int j = 0; j < h; j+=1)
+	for (int i = 0; i < w*3; i+=1)
+		((uint8_t *)x->data)[j*w*3+i] = data[j*stride+i];
+
+	free(filedata);
+	heif_context_free(ctx);
+	heif_image_handle_release(handle);
+	heif_image_release(img);
 	return 0;
 }
 #endif//I_CAN_HAS_LIBHEIF
