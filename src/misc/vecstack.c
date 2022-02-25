@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "iio.h"
@@ -14,14 +15,21 @@ int main(int c, char *v[])
 	int w[c-1], h[c-1];
 	for (int i = 0; i < c-1; i++)
 		chan[i] = iio_read_image_float(v[i+1], w + i, h + i);
-	float (*out)[c-1] = xmalloc(*w * *h * (c-1) * sizeof*out);
+	float (*out) = xmalloc(*w * *h * (c-1) * sizeof*out);
 	for (int i = 0; i < c-1; i++) {
-		if (w[i] != *w || h[i] != *w)
-			fprintf(stderr,"warning: %dth image size mismatch\n",i);
+		if (!chan[i])
+			fprintf(stderr, "warning: not \"%s\"\n", v[i+1]);
+		else if (w[i] != *w || h[i] != *h)
+			fprintf(stderr,"warning: %dth image size mismatch"
+					"%dx%d != %dx%d\n",i,
+					w[i], *w, h[i], *h);
 		else
 			for (int j = 0; j < *w * *h; j++)
-				out[j][i] = chan[i][j];
+			{
+				assert(chan[i]);
+				out[j*(c-1)+i] = chan[i][j];
+			}
 	}
-	iio_write_image_float_vec("-", out[0], *w, *h, c-1);
+	iio_write_image_float_vec("-", out, *w, *h, c-1);
 	return EXIT_SUCCESS;
 }
