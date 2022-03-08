@@ -256,6 +256,11 @@
 #include "parsenumbers.c"
 #include "colorcoordsf.c"
 
+//#define PLAMBDA_WITH_GSL
+#ifdef PLAMBDA_WITH_GSL
+#include <gsl/gsl_sf.h>
+#endif
+
 
 // #defines {{{1
 
@@ -303,8 +308,9 @@
 #define IMAGEOP_HESS 1001
 #define IMAGEOP_GRAD 1002
 #define IMAGEOP_DIV 1003
-#define IMAGEOP_SHADOW 1004
-#define IMAGEOP_SHADOWL 1005
+#define IMAGEOP_CURL 1004
+#define IMAGEOP_SHADOW 1005
+#define IMAGEOP_SHADOWL 1006
 #define IMAGEOP_M_ERO 2000 //E
 #define IMAGEOP_M_DIL 2001 //D
 #define IMAGEOP_M_OPE 2002 //O
@@ -428,6 +434,40 @@ static void from_polar_to_cartesian(float *y, float *x)
 	y[1] = x[0] * sin(x[1]);
 }
 
+SMART_PARAMETER(ELLIPTICAL_C,0.6)
+
+// X[3] = { r, t }   // c^2 = a^2 - b^2
+// Y[2] = { x, y }
+static void from_elliptic_to_cartesian(float *Y, float *X)
+{
+	double r = X[0];
+	double t = X[1];
+	double c = ELLIPTICAL_C();
+	double x = c * cosh(r) * cos(t);
+	double y = c * sinh(r) * sin(t);
+	Y[0] = x;
+	Y[1] = y;
+}
+
+// X[3] = { x, y }   // c^2 = a^2 - b^2
+// Y[2] = { r, t }
+static void from_cartesian_to_elliptic(float *Y, float *X)
+{
+	double x = X[0];
+	double y = X[1];
+	double c = ELLIPTICAL_C();
+	double B = x*x + y*y - c*c;
+	double p = (-B + sqrt(B*B+4*c*c*y*y))/(2*c*c);
+	double q = (-B - sqrt(B*B+4*c*c*y*y))/(2*c*c);
+	double t = asin(sqrt(p));
+	if (x <  0 && y >= 0) t = M_PI - t;
+	if (x <= 0 && y <  0) t = M_PI + t;
+	if (x >  0 && y <  0) t = 2*M_PI - t;
+	double r = 0.5 * log(1 - 2*q + 2 * sqrt(q*q - q));
+	Y[0] = r;
+	Y[1] = t;
+}
+
 static void complex_product(float *xy, float *x, float *y)
 {
 	xy[0] = x[0]*y[0] - x[1]*y[1];
@@ -486,6 +526,44 @@ REGISTERC(csqrt)
 REGISTERC(ctan)
 REGISTERC(ctanh)
 #endif
+
+
+#ifdef PLAMBDA_WITH_GSL
+static double mathieu_a(double n, double q) { return gsl_sf_mathieu_a(n, q); }
+static double mathieu_b(double n, double q) { return gsl_sf_mathieu_b(n, q); }
+static double mathieu_ce(double n, double q, double z)
+{
+	if (!isfinite(n) || !isfinite(q) || !isfinite(z)) return NAN;
+	//	fprintf(stderr, "mathieu_ce n=%g q=%g z=%g\n", n, q, z);
+	return gsl_sf_mathieu_ce(n, q, z);
+}
+static double mathieu_se(double n, double q, double z)
+{
+	if (!isfinite(n) || !isfinite(q) || !isfinite(z)) return NAN;
+	//fprintf(stderr, "mathieu_se n=%g q=%g z=%g\n", n, q, z);
+	return gsl_sf_mathieu_se(n, q, z);
+}
+static double mathieu_Mc1(double n, double q, double z)
+{
+	if (!isfinite(n) || !isfinite(q) || !isfinite(z)) return NAN;
+	return gsl_sf_mathieu_Mc(1, n, q, z);
+}
+static double mathieu_Mc2(double n, double q, double z)
+{
+	if (!isfinite(n) || !isfinite(q) || !isfinite(z)) return NAN;
+	return gsl_sf_mathieu_Mc(2, n, q, z);
+}
+static double mathieu_Ms1(double n, double q, double z)
+{
+	if (!isfinite(n) || !isfinite(q) || !isfinite(z)) return NAN;
+	return gsl_sf_mathieu_Ms(1, n, q, z);
+}
+static double mathieu_Ms2(double n, double q, double z)
+{
+	if (!isfinite(n) || !isfinite(q) || !isfinite(z)) return NAN;
+	return gsl_sf_mathieu_Ms(2, n, q, z);
+}
+#endif//PLAMBDA_WITH_GSL
 
 
 static void matrix_product_clean(
@@ -906,6 +984,8 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(random_stable,"rands",2),
 	REGISTER_FUNCTIONN(from_cartesian_to_polar,"topolar", -2),
 	REGISTER_FUNCTIONN(from_polar_to_cartesian,"frompolar", -2),
+	REGISTER_FUNCTIONN(from_cartesian_to_elliptic,"toell", -2),
+	REGISTER_FUNCTIONN(from_elliptic_to_cartesian,"fromell", -2),
 	REGISTER_FUNCTIONN(complex_exp,"cexp", -2),
 #ifndef __STDC_NO_COMPLEX__
 	REGISTER_FUNCTIONN(complex_cacos , "cacos", -2),
@@ -931,6 +1011,16 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(complex_cimag , "cimag", -6),
 	REGISTER_FUNCTIONN(complex_product,"cprod", -3),
 	REGISTER_FUNCTIONN(complex_division,"cdiv", -3),
+#ifdef PLAMBDA_WITH_GSL
+	REGISTER_FUNCTIONN(mathieu_a  , "mathieu-a",  2),
+	REGISTER_FUNCTIONN(mathieu_b  , "mathieu-b",  2),
+	REGISTER_FUNCTIONN(mathieu_ce , "mathieu-ce", 3),
+	REGISTER_FUNCTIONN(mathieu_se , "mathieu-se", 3),
+	REGISTER_FUNCTIONN(mathieu_Mc1, "mathieu-Mc1",3),
+	REGISTER_FUNCTIONN(mathieu_Mc2, "mathieu-Mc2",3),
+	REGISTER_FUNCTIONN(mathieu_Ms1, "mathieu-Ms1",3),
+	REGISTER_FUNCTIONN(mathieu_Ms2, "mathieu-Ms2",3),
+#endif
 	REGISTER_FUNCTIONN(matrix_product,"mprod",-5),
 	REGISTER_FUNCTIONN(vector_product,"vprod",-5),
 	REGISTER_FUNCTIONN(scalar_product,"sprod",-5),
@@ -984,6 +1074,8 @@ static float apply_function(struct predefined_function *f, float *v)
 	case 1: return ((double(*)(double))(f->f))(v[0]);
 	case 2: return ((double(*)(double,double))f->f)(v[1], v[0]);
 	case 3: return ((double(*)(double,double,double))f->f)(v[2],v[1],v[0]);
+	case 4: return ((double(*)(double,double,double,double))f->f)
+		(v[3],v[2],v[1],v[0]);
 	case -1: return ((double(*)(void))(f->f))();
 	default: fail("bizarre{%d}", f->nargs);
 	}
@@ -1617,6 +1709,7 @@ static bool hassuffix(const char *s, const char *suf)
 
 static void parse_imageop(const char *s, int *op, int *scheme)
 {
+	//fprintf(stderr, "parse_imageop \"%s\"\n", s);
 	*op = IMAGEOP_IDENTITY;
 	if (false) ;
 	else if (hasprefix(s, "xx")) *op = IMAGEOP_XX;
@@ -1629,6 +1722,8 @@ static void parse_imageop(const char *s, int *op, int *scheme)
 	else if (hasprefix(s, "n")) *op = IMAGEOP_NGRAD;
 	else if (hasprefix(s, "g")) *op = IMAGEOP_GRAD;
 	else if (hasprefix(s, "d")) *op = IMAGEOP_DIV;
+	else if (hasprefix(s, "r")) *op = IMAGEOP_CURL;
+	else if (hasprefix(s, "H")) *op = IMAGEOP_HESS;
 	else if (hasprefix(s, "S")) *op = IMAGEOP_SHADOW;
 	else if (hasprefix(s, "Z")) *op = IMAGEOP_SHADOWL;
 	else if (hasprefix(s, "E")) *op = IMAGEOP_M_ERO;
@@ -2449,6 +2544,25 @@ static int imageop_vector(float *out, float *img, int w, int h, int pd,
 			out[l] = ax + by;
 		}
 		return pd/2;
+	case IMAGEOP_CURL:
+		//if (pd!=2)fail("can not compute divergence of a %d-vector",pd);
+		//float ax = apply_3x3_stencil(img, w,h,pd, ai,aj,0, sx);
+		//float by = apply_3x3_stencil(img, w,h,pd, ai,aj,1, sy);
+		//out[0] = ax + by;
+		//return 1;
+		if (pd%2)fail("can not compute divergence of a %d-vector",pd);
+		for (int l = 0; l < pd/2; l++) {
+			float ax=apply_3x3_stencil(img,w,h,pd,ai,aj,2*l+0,sx);
+			float by=apply_3x3_stencil(img,w,h,pd,ai,aj,2*l+1,sy);
+			out[l] = ax + by;
+		}
+		return pd/2;
+	case IMAGEOP_HESS: {
+		for (int l = 0; l < pd; l++) {
+			out[2*l+0] = apply_3x3_stencil(img,w,h,pd,ai,aj,l, sx);
+			out[2*l+1] = apply_3x3_stencil(img,w,h,pd,ai,aj,l, sy);
+		}
+		}
 	case IMAGEOP_SHADOW: {
 		if (pd != 1) fail("can not yet compute shadow of a vector");
 		float vdx[3]={1,0,apply_3x3_stencil(img, w,h,pd, ai,aj,0, sx)};
@@ -2762,7 +2876,7 @@ static int main_images(int c, char **v)
 
 	xsrand(100+SRAND());
 
-	//print_compiled_program(p);
+	////print_compiled_program(p);
 	int pdreal = eval_dim(p, x, pd);
 
 	float *out = xmalloc(*w * *h * pdreal * sizeof*out);

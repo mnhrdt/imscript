@@ -29,6 +29,7 @@ ENABLE_JPEG = 1
 #ENABLE_WEBP = 1
 #ENABLE_HEIF = 1
 #ENABLE_HDF5 = 1
+#ENABLE_PGSL = 1
 
 
 
@@ -174,6 +175,11 @@ LDLIBS += $(shell pkg-config hdf5 --libs --silence-errors || echo -lhdf5)
 src/iio.o: CPPFLAGS+= -DI_CAN_HAS_LIBHDF5 `pkg-config hdf5 --cflags 2>/dev/null`
 # yes, the hdf5 compile-time configuration is a bit fucked up, but this goes
 # well with the rest of that library.
+endif
+
+ifdef ENABLE_PGSL
+bin/plambda: LDLIBS += -lgsl
+src/plambda.o: CPPFLAGS += -DPLAMBDA_WITH_GSL
 endif
 
 
