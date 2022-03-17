@@ -3224,8 +3224,15 @@ static int read_beheaded_npy(struct iio_image *x,
 		pd = 1;
 	}
 
+	if (order[0] == 'T') // fortran_order == True
+	{
+		int t = h;
+		h = w;
+		w = t;
+	}
+
 	IIO_DEBUG("npy descr = %s\n", descr);
-	IIO_DEBUG("npy order = %s\n", descr);
+	IIO_DEBUG("npy order = %s\n", order);
 	IIO_DEBUG("npy w = %d\n", w);
 	IIO_DEBUG("npy h = %d\n", h);
 	IIO_DEBUG("npy pd = %d\n", pd);
@@ -3247,6 +3254,8 @@ static int read_beheaded_npy(struct iio_image *x,
 	else if (0 == strcmp(desc, "i8")) x->type = IIO_TYPE_INT64;
 	else if (0 == strcmp(desc, "c8")) x->type = IIO_TYPE_FLOAT;
 	else if (0 == strcmp(desc, "c16")) x->type = IIO_TYPE_DOUBLE;
+	else if (0 == strcmp(desc, "b1")) x->type = IIO_TYPE_INT8;
+	else if (0 == strcmp(desc, "B1")) x->type = IIO_TYPE_UINT8;
 	else return fprintf(stderr,
 			"IIO ERROR: unrecognized npy type \"%s\"\n", desc); 
 	if (*desc == 'c') pd *= 2; // 1 complex = 2 reals
@@ -3264,6 +3273,7 @@ static int read_beheaded_npy(struct iio_image *x,
 	uint64_t r = fread(x->data, bps, w*h*pd, fin);
 	if (r != (uint64_t)w*h*pd)
 		fprintf(stderr,"IIO WARNING: npy file smaller than expected\n");
+	if (order[0] == 'T') inplace_transpose(x);
 	return 0;
 }
 
