@@ -527,8 +527,38 @@ REGISTERC(ctan)
 REGISTERC(ctanh)
 #endif
 
+//static double bessel_jn(double n, double x) { return jn(n, x); }
+//static double bessel_yn(double n, double x) { return yn(n, x); }
 
 #ifdef PLAMBDA_WITH_GSL
+static double bessel_Jn(double n, double x)
+{
+	if (!(n>=0) || !isfinite(n) || !isfinite(x)) return NAN;
+	int N = n;
+	if (N == 0) return gsl_sf_bessel_J0(x);
+	if (N == 1) return gsl_sf_bessel_J1(x);
+	return gsl_sf_bessel_Jn(N, x);
+}
+static double bessel_zero_Jn(double n, double s)
+{
+	if (!(n>=0) || !isfinite(n)) return NAN;
+	if (!(s>=0) || !isfinite(s)) return NAN;
+	int N = n;
+	int S = s;
+	if (N == 0) return gsl_sf_bessel_zero_J0(S);
+	if (N == 1) return gsl_sf_bessel_zero_J1(S);
+	return gsl_sf_bessel_zero_Jnu(N, S);
+}
+static double disk_dirichlet(double r, double t, double n, double k, double i)
+{
+	double a = bessel_zero_Jn(n, k);
+	double j = bessel_Jn(n, a * r);
+	double s = 0;
+	if (i == 1) s = cos(n * t);
+	if (i == 2) s = sin(n * t);
+	return j * s;
+}
+
 static double mathieu_a(double n, double q) { return gsl_sf_mathieu_a(n, q); }
 static double mathieu_b(double n, double q) { return gsl_sf_mathieu_b(n, q); }
 static double mathieu_ce(double n, double q, double z)
@@ -1011,6 +1041,13 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(complex_cimag , "cimag", -6),
 	REGISTER_FUNCTIONN(complex_product,"cprod", -3),
 	REGISTER_FUNCTIONN(complex_division,"cdiv", -3),
+// Note: we use GSL for bessel functions because math.h lacks the bessel roots
+//	REGISTER_FUNCTIONN(j0  , "bessel-j0", 1),
+//	REGISTER_FUNCTIONN(j1  , "bessel-j1", 1),
+//	REGISTER_FUNCTIONN(bessel_jn  , "bessel-jn", 2),
+//	REGISTER_FUNCTIONN(y0  , "bessel-y0", 1),
+//	REGISTER_FUNCTIONN(y1  , "bessel-y1", 1),
+//	REGISTER_FUNCTIONN(bessel_yn  , "bessel-yn", 2),
 #ifdef PLAMBDA_WITH_GSL
 	REGISTER_FUNCTIONN(mathieu_a  , "mathieu-a",  2),
 	REGISTER_FUNCTIONN(mathieu_b  , "mathieu-b",  2),
@@ -1020,6 +1057,11 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(mathieu_Mc2, "mathieu-Mc2",3),
 	REGISTER_FUNCTIONN(mathieu_Ms1, "mathieu-Ms1",3),
 	REGISTER_FUNCTIONN(mathieu_Ms2, "mathieu-Ms2",3),
+//	REGISTER_FUNCTIONN(bessel_zero_J0, "bessel-zJ0", 1),
+//	REGISTER_FUNCTIONN(bessel_zero_J1, "bessel-zJ1", 1),
+	REGISTER_FUNCTIONN(bessel_zero_Jn, "bessel-zJn", 2),
+	REGISTER_FUNCTIONN(bessel_Jn, "bessel-Jn", 2),
+	REGISTER_FUNCTIONN(disk_dirichlet, "disk-dirichlet", 5),
 #endif
 	REGISTER_FUNCTIONN(matrix_product,"mprod",-5),
 	REGISTER_FUNCTIONN(vector_product,"vprod",-5),
@@ -1076,6 +1118,8 @@ static float apply_function(struct predefined_function *f, float *v)
 	case 3: return ((double(*)(double,double,double))f->f)(v[2],v[1],v[0]);
 	case 4: return ((double(*)(double,double,double,double))f->f)
 		(v[3],v[2],v[1],v[0]);
+	case 5: return ((double(*)(double,double,double,double,double))f->f)
+		(v[4],v[3],v[2],v[1],v[0]);
 	case -1: return ((double(*)(void))(f->f))();
 	default: fail("bizarre{%d}", f->nargs);
 	}
