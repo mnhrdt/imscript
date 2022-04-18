@@ -2823,7 +2823,7 @@ static int read_beheaded_asc(struct iio_image *x,
 {
 	long filesize;
 	char *filedata = load_rest_of_file(&filesize, f, header, nheader);
-	int n[4], r = sscanf(header, "%d %d %d %d\n", n, n+1, n+2, n+3);
+	int n[5], r = sscanf(filedata, "%d %d %d %d\n%n", n, n+1, n+2, n+3,n+4);
 	if (r != 4) return 1;
 	x->dimension = 2;
 	x->sizes[0] = n[0];
@@ -2839,7 +2839,7 @@ static int read_beheaded_asc(struct iio_image *x,
 
 	// read data
 	float *numbers = xdata;
-	char *delim = " \n", *tok = strtok(filedata, delim);
+	char *delim = " \n", *tok = strtok(filedata + n[4], delim);
 	while (tok && numbers < (float*)(xdata)+nsamples)
 	{
 		*numbers++ = atof(tok);
