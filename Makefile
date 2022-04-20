@@ -1,3 +1,4 @@
+CC=clang
 CFLAGS ?= -O3 -march=native
 LDLIBS += -lm -lfftw3f
 
@@ -13,7 +14,7 @@ BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
 
 BIN := $(addprefix bin/,$(BIN))
 
-default: $(BIN) bin/cpu_term bin/rpcflip_term bin/s5pv
+default: $(BIN) bin/cpu_term bin/rpcflip_term
 
 bin/%  : src/%.o $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
@@ -26,10 +27,10 @@ bin/%  : src/%.o $(OBJ)
 ENABLE_PNG  = 1
 ENABLE_TIFF = 1
 ENABLE_JPEG = 1
-#ENABLE_WEBP = 1
-#ENABLE_HEIF = 1
-#ENABLE_HDF5 = 1
-#ENABLE_PGSL = 1
+ENABLE_WEBP = 1
+ENABLE_HEIF = 1
+ENABLE_HDF5 = 1
+ENABLE_PGSL = 1
 
 
 
