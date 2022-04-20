@@ -1,4 +1,3 @@
-CC=clang
 CFLAGS ?= -O3 -march=native
 LDLIBS += -lm -lfftw3f
 
@@ -27,10 +26,10 @@ bin/%  : src/%.o $(OBJ)
 ENABLE_PNG  = 1
 ENABLE_TIFF = 1
 ENABLE_JPEG = 1
-ENABLE_WEBP = 1
-ENABLE_HEIF = 1
-ENABLE_HDF5 = 1
-ENABLE_PGSL = 1
+#ENABLE_WEBP = 1
+#ENABLE_HEIF = 1
+#ENABLE_HDF5 = 1
+#ENABLE_PGSL = 1
 
 
 
