@@ -282,13 +282,99 @@ static void get_min_max(float *min, float *max, float *x, int n)
 	if (max) *max = M+PALMAXEPS();
 }
 
-void apply_palette(uint8_t *y, float *x, int n, char *s, float *m, float *M)
+static int compare_floats(const void *a, const void *b)
 {
-	if (!isfinite(*m)) get_min_max(m, 0, x, n);
-	if (!isfinite(*M)) get_min_max(0, M, x, n);
+	const float *da = (const float *) a;
+	const float *db = (const float *) b;
+	return (*da > *db) - (*da < *db);
+}
 
+static int get_two_quantiles(float *m, float *M, float *x, int n,
+		float qm, float qM)
+{
+	float *tx = xmalloc(n*sizeof*tx);
+	int N = 0;
+	for (int i = 0; i < n; i++)
+		if (!isnan(x[i]))
+			tx[N++] = x[i];
+	if (N < 1) {
+		fprintf(stderr, "too many NANs %d/%d", N, n);
+		abort();
+	}
+	qsort(tx, N, sizeof*tx, compare_floats);
+	int im = round(qm*N);
+	int iM = round(qM*N);
+	if (im < 0) im = 0;
+	if (im >= N) im = N-1;
+	if (iM < 0) iM = 0;
+	if (iM >= N) iM = N-1;
+	*m = tx[im];
+	*M = tx[iM];
+	free(tx);
+	return N;
+}
+static int get_signed_quantile(float *t, float *x, int n, float p)
+{
+	float *tx = xmalloc(n*sizeof*tx);
+	int N = 0;
+	for (int i = 0; i < n; i++)
+		if (!isnan(x[i]))
+			tx[N++] = fabs(x[i]);
+	if (N < 1) {
+		fprintf(stderr, "too many NANs %d/%d", N, n);
+		abort();
+	}
+	qsort(tx, N, sizeof*tx, compare_floats);
+	int i = round(p*N);
+	if (i < 0) i = 0;
+	if (i >= N) i = N-1;
+	*t = tx[i];
+	free(tx);
+	return N;
+}
+
+void parse_from_to(float *out_from, float *out_to, float *x, int n,
+		char *from_id, char *to_id)
+{
+	char *mp, *Mp;
+	float m = strtof(from_id, &mp);
+	float M = strtof(to_id,   &Mp);
+	fprintf(stderr, "parse m,M = %g %g\n", m, M);
+	if (*mp != '%' && *Mp != '%')  // regular case, no percentiles
+	{
+		if (!isfinite(m)) get_min_max(&m, 0, x, n);
+		if (!isfinite(M)) get_min_max(0, &M, x, n);
+		*out_from = m;
+		*out_to = M;
+		return;
+	}
+	if (*mp == '%' && *Mp == '%') // two-sided percentile
+	{
+		get_two_quantiles(out_from, out_to, x, n, m/100, M/100);
+		return;
+	}
+	if (m == 0 && *Mp == '%') // one-sided percentile: force signed palette
+	{
+		float t;
+		get_signed_quantile(&t, x, n, M/100);
+		*out_from = -t;
+		*out_to = t;
+		return;
+	}
+	if (M == 0 && *mp == '%') // one-sided percentile: force signed palette
+	{
+		float t;
+		get_signed_quantile(&t, x, n, 1-m/100);
+		*out_from = -t;
+		*out_to = t;
+		return;
+	}
+}
+
+void apply_palette(uint8_t *y, float *x, int n, char *s, float m, float M)
+{
 	struct palette p[1];
-	fill_palette(p, s, *m, *M);
+	fill_palette(p, s, m, M);
 
 	//fprint_palette(stderr, p);
 
@@ -421,7 +507,36 @@ void save_legend(char *filename_legend, char *palette_id, float m, float M)
 	iio_write_image_uint8_vec(filename_legend, rgb, w, h, 3);
 	free(rgb);
 }
-int main_palette(int c, char *v[])
+//int main_palette(int c, char *v[])
+//{
+//	char *filename_legend = pick_option(&c, &v, "l", "");
+//	if (c != 4 && c != 5 && c != 6 ) {
+//		fprintf(stderr, "usage:\n\t%s from to pal [in [out]]\n", *v);
+//		//                         0  1    2   3    4   5
+//		return 1;
+//	}
+//	float from = atof(v[1]);
+//	float to = atof(v[2]);
+//	char *palette_id = v[3];
+//	char *filename_in = c > 4 ? v[4] : "-";
+//	char *filename_out = c > 5 ? v[5] : "-";
+//
+//	int w, h;
+//	float *x = iio_read_image_float(filename_in, &w, &h);
+//	uint8_t *y = xmalloc(3*w*h);
+//
+//	apply_palette(y, x, w*h, palette_id, &from, &to);
+//
+//	iio_write_image_uint8_vec(filename_out, y, w, h, 3);
+//
+//	if (*filename_legend)
+//		save_legend(filename_legend, palette_id, from, to);
+//
+//	free(x);
+//	free(y);
+//	return 0;
+//}
+int main_palette2(int c, char *v[])
 {
 	char *filename_legend = pick_option(&c, &v, "l", "");
 	if (c != 4 && c != 5 && c != 6 ) {
@@ -429,8 +544,8 @@ int main_palette(int c, char *v[])
 		//                         0  1    2   3    4   5
 		return 1;
 	}
-	float from = atof(v[1]);
-	float to = atof(v[2]);
+	char* from_id = v[1];
+	char* to_id = v[2];
 	char *palette_id = v[3];
 	char *filename_in = c > 4 ? v[4] : "-";
 	char *filename_out = c > 5 ? v[5] : "-";
@@ -439,7 +554,10 @@ int main_palette(int c, char *v[])
 	float *x = iio_read_image_float(filename_in, &w, &h);
 	uint8_t *y = xmalloc(3*w*h);
 
-	apply_palette(y, x, w*h, palette_id, &from, &to);
+	float from, to;
+	parse_from_to(&from, &to, x, w*h, from_id, to_id);
+	fprintf(stderr, "from=%g to=%g\n", from, to);
+	apply_palette(y, x, w*h, palette_id, from, to);
 
 	iio_write_image_uint8_vec(filename_out, y, w, h, 3);
 
@@ -452,6 +570,6 @@ int main_palette(int c, char *v[])
 }
 
 #ifndef HIDE_ALL_MAINS
-int main(int c, char **v) { return main_palette(c, v); }
+int main(int c, char **v) { return main_palette2(c, v); }
 #endif
 #endif//PALETTE_MAIN
