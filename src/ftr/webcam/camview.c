@@ -1,42 +1,56 @@
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 #include <ctype.h>
 #include "ftr.h"
 #include "cam.h"
 
+#include "seconds.c"
+
 struct kam_state {
-	int dummy;
-	struct camera_t *c;
+	struct camera *c;
+	uint8_t *prev;
 };
 
 static void kam_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
 {
+	static double tic = 0;
+	double tac = seconds();
+	fprintf(stderr, "tictac = %g ms (%g fps)\n",1000*(tac-tic),1/(tac-tic));
+	tic = tac;
+
 	(void)unused_x; (void)unused_y;
-	//fprintf(stderr, "\n\nexpose %d %d\n", b, m);
 	struct kam_state *e = f->userdata;
-	//fprintf(stderr, "expose event fwh=%d,%d, cwh=%d,%d\n", f->w, f->h, e->c->w, e->c->h);
 
 	// workspace: dark blue background
 	for (int i = 0; i < 3 * f->w * f->h; i++)
 		f->rgb[i] = 100 * (2 == i%3);
 
-	struct camera_t *c = e->c;
-	camera_capture(c);
+	struct camera *c = e->c;
+	camera_grab_rgb(c);
 
-	uint8_t *rgb = yuyv2rgb(c->head.start, c->w, c->h);
-	//fillrgb(f->rgb
-
+	// leave a symmetric margin
 	int ox = (f->w - c->w) / 2;
 	int oy = (f->h - c->h) / 2;
 	assert(ox >= 0);
 	assert(oy >= 0);
-	for (int j = 0; j < (int)c->h; j++)
-	for (int i = 0; i < (int)c->w; i++)
-	for (int k = 0; k < 3; k++)
-		f->rgb[3*(f->w*(j+oy)+(i+ox))+k] = rgb[3*(j*c->w+i)+k];
-		//f->rgb[3*(f->w*(j+oy)+(i+ox))+k] = rgb[3*(j*c->w+(c->w -i-1))+k];
-	free(rgb);
-	f->changed = 1;
+
+	//for (int j = 0; j < c->h; j++)
+	//	memcpy(f->rgb+ 3*(f->w*(j+oy)+ox), c->rgb+ 3*(c->w*j), 3*c->w);
+
+	for (int j = 0; j < c->h; j++)
+	for (int i = 0; i < c->w; i++)
+	for (int k = 0; k < 3   ; k++)
+	{
+		float v1 = c->rgb [3*(j*c->w+i)+k];
+		float v2 = e->prev[3*(j*c->w+i)+k];
+		float v = 3*(v2 - v1) + 127;
+		if (v > 255) v = 255;
+		if (v < 0) v = 0;
+		f->rgb[3*(f->w*(j+oy)+i+ox)+k] = v;
+	}
+
+	memcpy(e->prev, c->rgb, 3 * c->w * c->h);
 }
 
 void kam_key_handler(struct FTR *f, int k, int m, int x, int y)
@@ -44,12 +58,8 @@ void kam_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (m & FTR_MASK_SHIFT && islower(k)) k = toupper(k);
 	fprintf(stderr, "KEY k=%d ('%c') m=%d x=%d y=%d\n", k, k, m, x, y);
 
-	// if ESC or q, exit
-	if  (k == '\033' || k == 'q')
+	if  (k == '\033' || k == 'q') // ESC or q
 		ftr_notify_the_desire_to_stop_this_loop(f, 1);
-
-	if (k == 'e')
-		f->changed = 1;
 }
 
 int main()
@@ -58,16 +68,14 @@ int main()
 	struct kam_state e[1];
 
 	// camera stuff
-	int w = 800;
-	int h = 600;
-	e->c = camera_open("/dev/video0", w, h); // XXX: depends on cam!
-	//e->c = camera_open("/dev/video0", 800, 448); // XXX: depends on cam!
-	camera_init(e->c);
-	camera_start(e->c);
+	int w = 640;//800;
+	int h = 360;//600;
+	e->c = camera_begin("/dev/video2", w, h); // XXX: depends on cam!
 
+	e->prev = malloc(2*3 * w * h);
 
 	// window stuff
-	struct FTR f = ftr_new_window(w+100,h+100);
+	struct FTR f = ftr_new_window(w + 100, h + 100);
 	f.userdata = e;
 	f.changed = 1;
 	ftr_set_handler(&f, "key"   , kam_key_handler);
@@ -75,9 +83,9 @@ int main()
 	int r = ftr_loop_run(&f);
 	ftr_close(&f);
 
-	camera_stop(e->c);
-	camera_finish(e->c);
-	camera_close(e->c);
+	free(e->prev);
+	camera_end(e->c);
+
 
 	return 0;
 }

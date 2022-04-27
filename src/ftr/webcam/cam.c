@@ -10,7 +10,7 @@
 // build: cc cam.c -o cam -DCAPTURE_MAIN
 
 #include <stdbool.h> // true, false
-#include <stdint.h> // uint8_t, uint32_t
+#include <stdint.h> // uint8_t
 #include <stdlib.h> // exit, malloc, calloc, free
 #include <stdio.h> // FILE, fprintf, stderr
 #include <string.h> // strerror, memset, memcpy
@@ -24,29 +24,9 @@
 #include <linux/videodev2.h> // v4l2_*, V4L2_*, VIDIOC_*
 
 
-#define THE_NUMBER_OF_THE_BUFFERS_SHALL_BE_FOUR 4
+#define THE_NUMBER_OF_THE_BUFFERS_SHALL_BE_FOUR 1
 
-// API
-// used only inside the camera struct
-struct camera_buffer_t {
-	uint8_t* start;
-	size_t length;
-};
-
-// API
-// internal struct, just for this program
-struct camera_t {
-	// intended for external use
-	uint32_t w;
-	uint32_t h;
-	uint8_t *rgb;
-
-	// implementation details
-	int fd;
-	size_t buffer_count;
-	struct camera_buffer_t *buffers;
-	struct camera_buffer_t head;
-};
+#include "cam.h"
 
 static void quit(const char *msg)
 {
@@ -74,15 +54,15 @@ static int xioctl(int fd, unsigned long request, void *arg)
 // API
 // open the device file and fill-in struct fields
 // returns an allocated struct that needs to be freed afterwards
-struct camera_t* camera_open(
+struct camera *camera_open(
 		const char *device,
-	       	uint32_t w,
-		uint32_t h
+		int w,
+		int h
 		)
 {
 	int fd = open(device, O_RDWR | O_NONBLOCK, 0);
 	if (fd == -1) quit("open");
-	struct camera_t *c = malloc(sizeof*c);
+	struct camera *c = malloc(sizeof*c);
 	c->fd = fd;
 	c->w = w;
 	c->h = h;
@@ -96,7 +76,7 @@ struct camera_t* camera_open(
 // API
 // check and setup capabilities via ioctls, memmap buffers
 // (the actual webcam is still off)
-void camera_init(struct camera_t* c)
+void camera_init(struct camera *c)
 {
 	//// query capabilities (we need "video capture" and "streaming")
 	//struct v4l2_capability cap;
@@ -142,7 +122,7 @@ void camera_init(struct camera_t* c)
 	if (xioctl(c->fd, VIDIOC_REQBUFS, &req) == -1)
 		quit("VIDIOC_REQBUFS");
 	c->buffer_count = req.count;
-	c->buffers = calloc(req.count, sizeof (struct camera_buffer_t));
+	c->buffers = calloc(req.count, sizeof (struct camera_buffer));
 
 	// mmap each buffer, and malloc the head one (externally visible)
 	size_t buf_max = 0;
@@ -168,7 +148,7 @@ void camera_init(struct camera_t* c)
 
 // API
 // switch on the camera and start recording frames into the buffers
-void camera_start(struct camera_t* c)
+void camera_start(struct camera *c)
 {
 	// assign each buffer to a query
 	for (size_t i = 0; i < c->buffer_count; i++) {
@@ -189,7 +169,7 @@ void camera_start(struct camera_t* c)
 
 // API
 // switch off the camera
-void camera_stop(struct camera_t* c)
+void camera_stop(struct camera *c)
 {
 	enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	if (xioctl(c->fd, VIDIOC_STREAMOFF, &type) == -1)
@@ -198,7 +178,7 @@ void camera_stop(struct camera_t* c)
 
 // API
 // free buffers and stuff
-void camera_finish(struct camera_t* c)
+void camera_finish(struct camera *c)
 {
 	for (size_t i = 0; i < c->buffer_count; i++) {
 		munmap(c->buffers[i].start, c->buffers[i].length);
@@ -213,7 +193,7 @@ void camera_finish(struct camera_t* c)
 
 // API
 // close device and free struct memory
-void camera_close(struct camera_t* c)
+void camera_close(struct camera *c)
 {
 	if (close(c->fd) == -1)
 		quit("close");
@@ -222,7 +202,7 @@ void camera_close(struct camera_t* c)
 
 // API
 // copy one frame from the buffer ring to the head, at any time
-int camera_capture(struct camera_t* c)
+int camera_capture(struct camera *c)
 {
 	struct v4l2_buffer buf;
 	memset(&buf, 0, sizeof buf);
@@ -240,7 +220,7 @@ int camera_capture(struct camera_t* c)
 
 // API
 // wait at most "timeout" and capture the next frame
-int camera_frame(struct camera_t* c, struct timeval timeout)
+int camera_frame(struct camera *c, struct timeval timeout)
 {
 	fd_set fds;
 	FD_ZERO(&fds);
@@ -258,53 +238,71 @@ static int bclamp(int v)
 	return v;
 }
 
-uint8_t* yuyv2rgb(uint8_t* yuyv, uint32_t w, uint32_t h)
+void fill_rgb888_from_yuyv422(
+		uint8_t *out_rgb, // rgb  888
+		uint8_t *in_yuyv, // yuyv 422
+		int w, int h,     // width, height
+		int s             // output line stride (including first line)
+	    )
+{
+	for (size_t j = 0; j < h; j += 1)
+	for (size_t i = 0; i < w; i += 2)
+	{
+		size_t ij  = j * w + i;
+		size_t ijs = j * w + i + s;
+		int y0 = in_yuyv[2*ij + 0] << 8;
+		int u  = in_yuyv[2*ij + 1] - 128;
+		int y1 = in_yuyv[2*ij + 2] << 8;
+		int v  = in_yuyv[2*ij + 3] - 128;
+		out_rgb[3*ijs + 0 + 0] = bclamp((y0 + 359*v) >> 8);
+		out_rgb[3*ijs + 0 + 3] = bclamp((y1 + 359*v) >> 8);
+		out_rgb[3*ijs + 1 + 0] = bclamp((y0 + 88*u - 183*v) >> 8);
+		out_rgb[3*ijs + 1 + 3] = bclamp((y1 + 88*u - 183*v) >> 8);
+		out_rgb[3*ijs + 2 + 0] = bclamp((y0 + 454*u) >> 8);
+		out_rgb[3*ijs + 2 + 3] = bclamp((y1 + 454*u) >> 8);
+	}
+}
+
+uint8_t *yuyv2rgb(uint8_t *yuyv, int w, int h)
 {
 	//fprintf(stderr, "YUYV2RGB w,h = %d %d\n", w, h);
-	uint8_t* rgb = calloc(w * h * 3, sizeof (uint8_t));
-	for (size_t i = 0; i < h; i++)
-	for (size_t j = 0; j < w; j += 2)
-	{
-		size_t ij = i * w + j;
-		int y0 = yuyv[ij * 2 + 0] << 8;
-		int u  = yuyv[ij * 2 + 1] - 128;
-		int y1 = yuyv[ij * 2 + 2] << 8;
-		int v  = yuyv[ij * 2 + 3] - 128;
-		rgb[3*ij + 0 + 0] = bclamp((y0 + 359*v) >> 8);
-		rgb[3*ij + 0 + 3] = bclamp((y1 + 359*v) >> 8);
-		rgb[3*ij + 1 + 0] = bclamp((y0 + 88*u - 183*v) >> 8);
-		rgb[3*ij + 1 + 3] = bclamp((y1 + 88*u - 183*v) >> 8);
-		rgb[3*ij + 2 + 0] = bclamp((y0 + 454*u) >> 8);
-		rgb[3*ij + 2 + 3] = bclamp((y1 + 454*u) >> 8);
-	}
+	uint8_t *rgb = calloc(w * h * 3, sizeof (uint8_t));
+	fill_rgb888_from_yuyv422(rgb, yuyv, w, h, 0);
 	return rgb;
 }
 
-//void fill_rgb888_from_yuyv422(
-//		uint8_t *out_rgb, // rgb  888
-//		uint8_t *in_yuyv, // yuyv 422
-//		int w, int h      // width, height
-//		int s,            // output line stride (including first line)
-//	    )
-//{
-//	for (size_t j = 0; j < h; j += 1)
-//	for (size_t i = 0; i < w; i += 2)
-//	{
-//		size_t ij  = j * w + i;
-//		size_t ijs = j * w + i + s;
-//		int y0 = in_yuyv[2*ij + 0] << 8;
-//		int u  = in_yuyv[2*ij + 1] - 128;
-//		int y1 = in_yuyv[2*ij + 2] << 8;
-//		int v  = in_yuyv[2*ij + 3] - 128;
-//		out_rgb[3*ijs + 0 + 0] = bclamp((y0 + 359*v) >> 8);
-//		out_rgb[3*ijs + 0 + 3] = bclamp((y1 + 359*v) >> 8);
-//		out_rgb[3*ijs + 1 + 0] = bclamp((y0 + 88*u - 183*v) >> 8);
-//		out_rgb[3*ijs + 1 + 3] = bclamp((y1 + 88*u - 183*v) >> 8);
-//		out_rgb[3*ijs + 2 + 0] = bclamp((y0 + 454*u) >> 8);
-//		out_rgb[3*ijs + 2 + 3] = bclamp((y1 + 454*u) >> 8);
-//	}
-//}
 
+// high-level API
+struct camera *camera_begin(const char *device, int w, int h)
+{
+	struct camera *c = camera_open(device, w, h);
+	camera_init(c);
+	camera_start(c);
+	c->rgb = malloc(3 * c->w * c->h);
+	return c;
+}
+
+void camera_end(struct camera *c)
+{
+	free(c->rgb);
+	camera_stop(c);
+	camera_finish(c);
+	camera_close(c);
+}
+
+void camera_grab_rgb(struct camera *c)
+{
+	if (0)
+	{
+		camera_capture(c);
+	} else {
+		struct timeval t;
+		t.tv_sec = 1;
+		t.tv_usec = 0;
+		camera_frame(c, t);
+	}
+	fill_rgb888_from_yuyv422(c->rgb, c->head.start, c->w, c->h, 0);
+}
 
 //#ifndef WEBCAM_HIDE_MAIN
 //#define CAPTURE_MAIN
@@ -312,7 +310,7 @@ uint8_t* yuyv2rgb(uint8_t* yuyv, uint32_t w, uint32_t h)
 
 #ifdef CAPTURE_MAIN
 // save an image into a file
-static void ppm(FILE* dest, uint8_t* rgb, uint32_t w, uint32_t h)
+static void ppm(FILE *dest, uint8_t *rgb, int w, int h)
 {
 	fprintf(dest, "P6\n%d %d 255\n", w, h);
 	fwrite(rgb, 3, w*h, dest);
@@ -320,7 +318,7 @@ static void ppm(FILE* dest, uint8_t* rgb, uint32_t w, uint32_t h)
 
 int main()
 {
-	struct camera_t* c = camera_open("/dev/video0", 800, 600);
+	struct camera *c = camera_open("/dev/video0", 800, 600);
 	camera_init(c);
 	camera_start(c);
 
@@ -334,7 +332,7 @@ int main()
 		uint8_t *rgb = yuyv2rgb(c->head.start, c->w, c->h);
 		char filename[FILENAME_MAX];
 		sprintf(filename, "result_%03d.ppm", i);
-		FILE* out = fopen(filename, "w");
+		FILE *out = fopen(filename, "w");
 		ppm(out, rgb, c->w, c->h);
 		fclose(out);
 		free(rgb);
