@@ -7,10 +7,11 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-static int insideP(int w, int h, int i, int j)
-{
-	return i>=0 && j>=0 && i<w && j<h;
-}
+//static int insideP(int w, int h, int i, int j)
+//{
+//	return i>=0 && j>=0 && i<w && j<h;
+//}
+#define INSIDEP(w,h,i,j) (i>=0 && j>=0 && i<w && j<h)
 
 static void canonical_bresenham_parkour(int *o, int w, int h, float p, float q)
 {
@@ -34,7 +35,7 @@ static void canonical_bresenham_parkour(int *o, int w, int h, float p, float q)
 	{
 		o[c++] = -1; // marks the beginning of a path
 		for (int j = 0; j < h; j++)
-			if (insideP(w, h, i+t[j], j))
+			if (INSIDEP(w, h, i+t[j], j))
 				o[c++] = j*w + i+t[j];
 	}
 
@@ -144,9 +145,10 @@ void cast_vertical_shadows(float *xx, int w, int h, float alpha)
 		}
 }
 
-
+#ifndef OMIT_MAIN_SHADOWCAST
 //#define MAIN_VERTSHADOW
 #define MAIN_THREEDSHADOW
+#endif
 
 #ifdef MAIN_VERTSHADOW
 #include <stdio.h>
