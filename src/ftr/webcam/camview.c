@@ -10,6 +10,9 @@
 struct kam_state {
 	struct camera *c;
 	uint8_t *prev;
+
+	int diff_mode;
+	int simplest_color_balance;
 };
 
 static void kam_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
@@ -35,28 +38,40 @@ static void kam_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
 	assert(ox >= 0);
 	assert(oy >= 0);
 
-	//for (int j = 0; j < c->h; j++)
-	//	memcpy(f->rgb+ 3*(f->w*(j+oy)+ox), c->rgb+ 3*(c->w*j), 3*c->w);
-
-	for (int j = 0; j < c->h; j++)
-	for (int i = 0; i < c->w; i++)
-	for (int k = 0; k < 3   ; k++)
+	if (!e->diff_mode)
 	{
-		float v1 = c->rgb [3*(j*c->w+i)+k];
-		float v2 = e->prev[3*(j*c->w+i)+k];
-		float v = 3*(v2 - v1) + 127;
-		if (v > 255) v = 255;
-		if (v < 0) v = 0;
-		f->rgb[3*(f->w*(j+oy)+i+ox)+k] = v;
+		for (int j = 0; j < c->h; j++)
+			memcpy(
+					f->rgb+ 3*(f->w*(j+oy)+ox),
+					c->rgb+ 3*(c->w*j),
+					3*c->w
+			      );
+	} else {
+		for (int j = 0; j < c->h; j++)
+		for (int i = 0; i < c->w; i++)
+		for (int k = 0; k < 3   ; k++)
+		{
+			float v1 = c->rgb [3*(j*c->w+i)+k];
+			float v2 = e->prev[3*(j*c->w+i)+k];
+			float v = 3*(v2 - v1) + 127;
+			if (v > 255) v = 255;
+			if (v < 0) v = 0;
+			f->rgb[3*(f->w*(j+oy)+i+ox)+k] = v;
+		}
+		memcpy(e->prev, c->rgb, 3 * c->w * c->h);
 	}
 
-	memcpy(e->prev, c->rgb, 3 * c->w * c->h);
 }
 
 void kam_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
 	if (m & FTR_MASK_SHIFT && islower(k)) k = toupper(k);
 	fprintf(stderr, "KEY k=%d ('%c') m=%d x=%d y=%d\n", k, k, m, x, y);
+
+	struct kam_state *e = f->userdata;
+
+	if (k == 'd') e->diff_mode = !e->diff_mode;
+	if (k == 'b') e->simplest_color_balance = !e->simplest_color_balance;
 
 	if  (k == '\033' || k == 'q') // ESC or q
 		ftr_notify_the_desire_to_stop_this_loop(f, 1);
@@ -70,9 +85,10 @@ int main()
 	// camera stuff
 	int w = 640;//800;
 	int h = 360;//600;
-	e->c = camera_begin("/dev/video2", w, h); // XXX: depends on cam!
+	e->c = camera_begin("/dev/video0", w, h); // XXX: depends on cam!
 
 	e->prev = malloc(2*3 * w * h);
+	e->diff_mode = 0;
 
 	// window stuff
 	struct FTR f = ftr_new_window(w + 100, h + 100);

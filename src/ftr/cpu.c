@@ -47,6 +47,13 @@ struct pan_state {
 
 	// 5. user interface
 	struct bitmap_font font[5];
+
+	// 6. topographic mode
+	int topographic_mode; // 0=no, 1=shadow, 2=linear, 3=lambert, 4=specular
+	float topographic_sun[3];
+	float topographic_scale;
+	float topographic_spread;
+
 };
 
 // change of coordinates: from window "int" pixels to image "double" point
@@ -159,6 +166,11 @@ static void action_reset_zoom_and_position(struct FTR *f)
 	e->roi_x = f->w / 2;
 	e->roi_y = f->h / 2;
 	e->roi_w = 73; // must be odd
+
+	e->topographic_mode = 0;
+	e->topographic_sun[0] = 1/sqrt(3);
+	e->topographic_sun[1] = 1/sqrt(3);
+	e->topographic_sun[2] = 1/sqrt(3);
 
 	f->changed = 1;
 }
@@ -343,6 +355,13 @@ static void action_toggle_roi(struct FTR *f, int x, int y, int dir)
 	f->changed = 1;
 }
 
+static void action_toggle_topography(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->topographic_mode = !e->topographic_mode;
+	f->changed = 1;
+}
+
 
 static void action_toggle_aqauto(struct FTR *f)
 {
@@ -384,6 +403,21 @@ static void action_move_roi(struct FTR *f, int x, int y)
 		e->roi_y = y - e->roi_w / 2;
 		f->changed = 1;
 	}
+}
+
+static void action_move_sun(struct FTR *f, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+	float R = fmin(f->w, f->h)/2;
+	float p = -(x - f->w/2) / R;
+	float q = -(y - f->h/2) / R;
+	float r = sqrt(1-p*p-q*q);
+	float n = hypot(p, hypot(q, r));
+	e->topographic_sun[0] = p/n;
+	e->topographic_sun[1] = q/n;
+	e->topographic_sun[2] = -r/n;
+	fprintf(stderr, "SUN = %g %g %g\n", p/n, q/n, -r/n);
+	f->changed = 1;
 }
 
 static void action_center_contrast_at_point(struct FTR *f, int x, int y)
@@ -710,10 +744,51 @@ static void expose_roi(struct FTR *f)
 	}
 }
 
+static unsigned char bclamp(float x)
+{
+	if (x < 0) return 0;
+	if (x > 255) return 255;
+	return x;
+}
+
+static void expose_topography(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+
+	if (e->zoom_factor != 1 || e->i->pd != 1) return;
+
+	for (int j = 0; j < f->h; j++)
+	for (int i = 0; i < f->w; i++)
+	{
+		int p = e->offset_x + i;
+		int q = e->offset_y + j;
+		float h = fancy_image_getsample(e->i, p, q, 0);
+		float h10 = fancy_image_getsample(e->i, p+1, q, 0);
+		float h01 = fancy_image_getsample(e->i, p, q+1, 0);
+		float hx = 1*(h10 - h);
+		float hy = 1*(h01 - h);
+
+		//float c = hypot(hx, hy);
+		float *n = e->topographic_sun;
+		float c = hx * n[0] + hy * n[1] + n[2];
+		//float e = exp(-(1-c)*(1-c)*2);
+		unsigned char *cc = f->rgb + 3 * (j * f->w + i);
+		cc[0] = cc[1] = cc[2] = bclamp(127 + 30 * c);
+		//cc[0] = cc[1] = cc[2] = bclamp(255 * e);
+	}
+}
+
 // dump the image acording to the state of the viewport
 static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
 	struct pan_state *e = f->userdata;
+
+	if (e->topographic_mode)
+	{
+		expose_topography(f);
+		f->changed = 1;
+		return;
+	}
 
 	// expose the whole image
 	for (int j = 0; j < f->h; j++)
@@ -743,12 +818,14 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 {
 	//fprintf(stderr, "motion b=%d m=%d (%d %d)\n", b, m, x, y);
+	struct pan_state *e = f->userdata;
 
 	static double ox = 0, oy = 0;
 
 	if (m & FTR_BUTTON_LEFT)   action_offset_viewport(f, x - ox, y - oy);
 	if (m & FTR_BUTTON_MIDDLE) action_print_value_under_cursor(f, x, y);
 	if (m & FTR_MASK_SHIFT)    action_center_contrast_at_point(f, x, y);
+	if (e->topographic_mode) action_move_sun(f, x, y);
 
 	action_move_roi(f, x, y);
 
@@ -803,6 +880,7 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'n') action_qauto2(f);
 	if (k == 'N') action_toggle_aqauto(f);
 	if (k == 'r') action_toggle_roi(f, x, y, m&FTR_MASK_SHIFT);
+	if (k == 't') action_toggle_topography(f);
 	if (k == 'c') action_toggle_p(f);
 
 	// if ESC or q, exit
