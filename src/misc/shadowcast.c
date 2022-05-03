@@ -201,14 +201,14 @@ int main(int c, char *v[])
 int main(int c, char *v[])
 {
 	// process input arguments
-	_Bool m = pick_option(&c, &v, "m", NULL);
-	_Bool M = pick_option(&c, &v, "M", NULL);
+	_Bool m = pick_option(&c, &v, "m", NULL);  // shadow mask
+	_Bool M = pick_option(&c, &v, "M", NULL);  // negative shadow mask
 	if (c < 4 || c > 6) {
 		fprintf(stderr, "usage:\n\t%s p q r [dem_in [dem_out]]\n", *v);
 		//                          0 1 2 3  4       5
 		return 1;
 	}
-	float param_p = atof(v[1]);
+	float param_p = atof(v[1]); // p,q,r = direction of the sun
 	float param_q = atof(v[2]);
 	float param_r = atof(v[3]);
 	char *filename_in  = c > 4 ? v[4] : "-";
