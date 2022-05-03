@@ -780,6 +780,28 @@ static void expose_topography(struct FTR *f)
 
 	if (e->zoom_factor != 1 || e->i->pd != 1) return;
 
+	if (e->topographic_mode == 1) // shadows
+	{
+		float *x = xmalloc(f->w * f->h * sizeof*x);
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < f->w; i++)
+			x[j*f->w+i] = fancy_image_getsample(
+					e->i,
+					i + e->offset_x,
+					j + e->offset_y,
+					0) / e->topographic_scale;
+		cast_shadows(x, f->w, f->h,
+				-e->topographic_sun[0],
+				-e->topographic_sun[1],
+				e->topographic_sun[2]);
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < f->w; i++)
+		for (int k = 0; k < 3; k++)
+			f->rgb[(j*f->w+i)*3+k] = 255*isfinite(x[f->w*j+i]);
+		free(x);
+		return;
+	}
+
 	for (int j = 0; j < f->h; j++)
 	for (int i = 0; i < f->w; i++)
 	{
@@ -796,7 +818,7 @@ static void expose_topography(struct FTR *f)
 		float c = 0;
 		unsigned char *rgb = f->rgb + 3 * (j * f->w + i);
 		switch(e->topographic_mode) {
-		case 1: // shadows
+		//case 1: // shadows
 			//break;
 		case 2: // linearized lambertian
 			c = - hx * S[0] - hy * S[1];
@@ -820,7 +842,8 @@ static void expose_topography(struct FTR *f)
 					e->topographic_P);
 			rgb[0] = rgb[1] = rgb[2] = bclamp(255 * k);
 			break; }
-		default: fail("impossible topographic condition %d");
+		default: fail("impossible topographic condition %d",
+					 e->topographic_mode);
 		}
 	}
 }

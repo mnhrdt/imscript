@@ -1,6 +1,10 @@
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdbool.h>
+
+// tmp dbg
+#include "iio.h"      // library for image input/output
 
 
 #ifndef M_PI
@@ -12,6 +16,45 @@
 //	return i>=0 && j>=0 && i<w && j<h;
 //}
 #define INSIDEP(w,h,i,j) (i>=0 && j>=0 && i<w && j<h)
+
+//static void fill_canonical_bresenham_seeds(
+//		float opq[2]              // (output) traversal step
+//		int *oxy,                 // (output) coordinates of the seeds
+//		int w, int h,             // width, height of the image domain
+//		float p, float q          // normalized direction
+//		)
+//{
+//	assert(q > 0);
+//	assert(q >= fabs(p));
+//
+//	opq[0] = p/q;  // x-step (common for all paths)
+//	opq[1] = 1;    // y-step (common for all paths)
+//
+//	// fill bresenham offsets
+//	int t[h];
+//	for (int i = 0; i < h; i++)
+//		t[i] = lrint(i * p / q);
+//
+//	// compute range of valid abscissae
+//	int i_min = 0;
+//	int i_max = w;
+//	if (p < 0) i_max += -t[h-1];
+//	if (p > 0) i_min -= t[h-1];
+//
+//	// fill-in the beginning of each path
+//	int c = 0; // pixel counter
+//	for (int i = i_min; i < i_max; i++)
+//	{
+//		for (int j = 0; j < h; j++)
+//			if (INSIDEP(w, h, i+t[j], j))
+//			{
+//				o[c++] = j*w + i+t[j];
+//			}
+//	}
+//
+//	assert(c < w + h);
+//}
+// sorry, I can't do this right now
 
 static void canonical_bresenham_parkour(int *o, int w, int h, float p, float q)
 {
@@ -40,6 +83,88 @@ static void canonical_bresenham_parkour(int *o, int w, int h, float p, float q)
 	}
 
 	assert(c < w*h + 2*(w+h));
+}
+
+static void canonical_bresenham_parkour_hack(
+		int *o,            // output pixel indices
+		float *oxy,        // output actual coordinates
+		int w, int h,      // image domain
+		float p, float q   // direction
+		)
+{
+	assert(q > 0);
+	assert(q >= fabs(p));
+
+	// fill bresenham offsets
+	int t[h];
+	for (int i = 0; i < h; i++)
+		t[i] = lrint(i * p / q);
+
+	// compute range of valid abscissae
+	int i_min = 0;
+	int i_max = w;
+	if (p < 0) i_max += -t[h-1];
+	if (p > 0) i_min -= t[h-1];
+
+	// fill-in the paths
+	int c = 0; // pixel counter
+	for (int i = i_min; i < i_max; i++)
+	{
+		o[c++] = -1; // marks the beginning of a path
+		for (int j = 0; j < h; j++)
+			if (INSIDEP(w, h, i+t[j], j))
+			{
+				o[c++] = j*w + i+t[j];
+				oxy[2*c+0] = j;
+				oxy[2*c+1] = i + j*p/q;
+			}
+	}
+
+	assert(c < w*h + 2*(w+h));
+}
+
+static void compute_the_bresenham_parkour_hack(
+		int *o,    // output array of size w*h+2*(w+h), to be filled-in
+		float *oxy,        // output actual coordinates
+		int w,     // width of the image domain
+		int h,     // height of the image domain
+		float p,   // cosine of direction
+		float q    // sine of direction
+		)
+{
+	int N = w*h + 2*(w+h);
+	for (int i = 0; i < N; i++)
+		o[i] = -1;
+
+	if (fabs(p) <= q) // canonical case
+		canonical_bresenham_parkour_hack(o, oxy, w, h, p, q);
+	else if (fabs(p) <= -q) { // swap the sign of q
+		canonical_bresenham_parkour_hack(o, oxy, w, h, p, -q);
+		for (int i = 0; i < N; i++)
+			if (o[i] >= 0) {
+				o[i] = (h - 1 - o[i]/w)*w + o[i]%w;
+				oxy[2*i+0] = h - 1 - oxy[2*i+0];
+			}
+	} else if (fabs(q) < p) { // swap q and p
+		canonical_bresenham_parkour_hack(o, oxy, h, w, q, p);
+		for (int i = 0; i < N; i++)
+			if (o[i] >= 0) {
+				o[i] = (o[i]%h)*w + o[i]/h;
+				float t = oxy[2*i+0];
+				oxy[2*i+0] = oxy[2*i+1];
+				oxy[2*i+1] = t;
+			}
+	} else if (fabs(q) < -p) { // swap q and -p
+		//fprintf(stderr, "here pq = %g %g!", p, q);
+		canonical_bresenham_parkour_hack(o, oxy, h, w, q, -p);
+		for (int i = 0; i < N; i++)
+			if (o[i] >= 0) {
+				o[i] = (o[i]%h)*w + w - 1 - o[i]/h;
+				float t = oxy[2*i+0];
+				oxy[2*i+0] = oxy[2*i+1];
+				oxy[2*i+1] = w - 1 - t;
+			}
+	}
 }
 
 static void compute_the_bresenham_parkour(
@@ -72,6 +197,36 @@ static void compute_the_bresenham_parkour(
 	}
 }
 
+//static void compute_the_bresenham_seeds(
+//		int *o,    // output array of size w+h-1, to be filled-in
+//		int w,     // width of the image domain
+//		int h,     // height of the image domain
+//		float p,   // cosine of direction
+//		float q    // sine of direction
+//		)
+//{
+//	int N = w*h + 2*(w+h);
+//	for (int i = 0; i < N; i++)
+//		o[i] = -1;
+//
+//	if (fabs(p) <= q) // canonical case
+//		canonical_bresenham_parkour(o, w, h, p, q);
+//	else if (fabs(p) <= -q) { // swap the sign of q
+//		canonical_bresenham_parkour(o, w, h, p, -q);
+//		for (int i = 0; i < N; i++) if (o[i] >= 0)
+//			o[i] = (h - 1 - o[i]/w)*w + o[i]%w;
+//	} else if (fabs(q) < p) { // swap q and p
+//		canonical_bresenham_parkour(o, h, w, q, p);
+//		for (int i = 0; i < N; i++) if (o[i] >= 0)
+//			o[i] = (o[i]%h)*w + o[i]/h;
+//	} else if (fabs(q) < -p) { // swap q and -p
+//		//fprintf(stderr, "here pq = %g %g!", p, q);
+//		canonical_bresenham_parkour(o, h, w, q, -p);
+//		for (int i = 0; i < N; i++) if (o[i] >= 0)
+//			o[i] = (o[i]%h)*w + w - 1 - o[i]/h;
+//	}
+//}
+
 #include "xmalloc.c"
 
 static void cast_shadows(
@@ -86,18 +241,31 @@ static void cast_shadows(
 	fprintf(stderr, "cast shadows pqa = %g %g %g\n", p, q, a);
 	int N = w*h + 2*(w+h);  // maximum possible length of parkour
 	int *i = xmalloc(N*sizeof*i); // indices of Bresenham parkour
-	compute_the_bresenham_parkour(i, w, h, p, q);
+	float *oxy = xmalloc(2*N*sizeof*oxy);
+	compute_the_bresenham_parkour_hack(i, oxy, w, h, p, q);
 	int l = -1; // index of the first point on the current line
+	bool debbie = false;
+	float *dbuf = xmalloc(2*w*h*sizeof*dbuf);
+	float xy0[2];
+	for (int i = 0; i < w*h; i++) dbuf[i] = 0;
 	for (int j = 0; j < N; j++)
 	{
 		if (i[j] < 0 && j+1<N && i[j+1] ) // mark the beginning of a line
+		{
 			l = i[j+1];
+			if (l > 0)
+				debbie =  l%w==0 && l/w==380;
+			xy0[0] = l % w;
+			xy0[1] = l / w;
+		}
 		if (i[j] < 0 || l < 0) continue;
 		assert(0 <= i[j]);
 		assert(i[j] < w*h);
 		if (l < 0) fprintf(stderr, "SHIT l=%d\n", l);
 		assert(0 <= l);
 		assert(l < w*h);
+		dbuf[2*((i[j]/w)*w+(i[j]%w))+0] = oxy[2*j+0];
+		dbuf[2*((i[j]/w)*w+(i[j]%w))+1] = oxy[2*j+1];
 		float X = l % w;  // X of last occluding point
 		float Y = l / w;  // Y of last occluding point
 		float Z = D[l];   // Z of last occluding point
@@ -108,8 +276,14 @@ static void cast_shadows(
 			D[i[j]] = NAN;
 		else // new occluding point
 			l = i[j];
+		if (debbie) fprintf(stderr,
+				"xy0 = %g %G  xyz = %g %g %g  ZYX = %g %g %g\n",
+				xy0[0], xy0[1], x, y, z, X, Y, Z);
 	}
 	free(i);
+	free(oxy);
+	iio_write_image_float_vec("/tmp/dbuf.npy", dbuf, w, h, 2);
+	free(dbuf);
 }
 
 void cast_vertical_shadows(float *xx, int w, int h, float alpha)
@@ -153,7 +327,7 @@ void cast_vertical_shadows(float *xx, int w, int h, float alpha)
 #ifdef MAIN_VERTSHADOW
 #include <stdio.h>
 #include <stdlib.h>
-#include "iio.h"      // library for image input/output
+//#include "iio.h"      // library for image input/output
 #include "pickopt.c"  // function "pick_option" for processing args
 int main(int c, char *v[])
 {
@@ -198,7 +372,7 @@ int main(int c, char *v[])
 #ifdef MAIN_THREEDSHADOW
 #include <stdio.h>
 #include <stdlib.h>
-#include "iio.h"      // library for image input/output
+//#include "iio.h"      // library for image input/output
 #include "pickopt.c"  // function "pick_option" for processing args
 int main(int c, char *v[])
 {
