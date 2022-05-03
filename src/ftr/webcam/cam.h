@@ -25,6 +25,13 @@ void camera_end(struct camera *c);
 void camera_grab_rgb(struct camera *c); // fill-in the c->rgb field
 
 
+// API for setting-up the camera parameters
+void camera_autofocus_toggle(struct camera *c);
+void camera_focus_set(struct camera *c, int f);
+
+
+// lower-level API follows
+
 // open the device file and fill-in struct fields
 // returns an allocated struct that needs to be freed afterwards
 struct camera *camera_open(const char *device, int w, int h);

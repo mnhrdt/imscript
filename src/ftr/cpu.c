@@ -19,6 +19,9 @@
 #include "fontu.c" // todo: cherry-pick the required fontu functions
 #include "fonts/xfonts_all.c"
 
+#define OMIT_MAIN_SHADOWCAST
+#include "shadowcast.c"
+
 #include "xmalloc.c"
 
 #define WHEEL_FACTOR 2
@@ -47,6 +50,14 @@ struct pan_state {
 
 	// 5. user interface
 	struct bitmap_font font[5];
+
+	// 6. topographic mode
+	int topographic_mode; // 0=no, 1=shadow, 2=linear, 3=lambert, 4=specular
+	float topographic_sun[3];
+	float topographic_scale;
+	float topographic_P;
+	float topographic_spread;
+
 };
 
 // change of coordinates: from window "int" pixels to image "double" point
@@ -159,6 +170,13 @@ static void action_reset_zoom_and_position(struct FTR *f)
 	e->roi_x = f->w / 2;
 	e->roi_y = f->h / 2;
 	e->roi_w = 73; // must be odd
+
+	e->topographic_mode = 0;
+	e->topographic_sun[0] = 1/sqrt(3);
+	e->topographic_sun[1] = 1/sqrt(3);
+	e->topographic_sun[2] = 1/sqrt(3);
+	e->topographic_scale = 1;
+	e->topographic_P = 1;
 
 	f->changed = 1;
 }
@@ -343,6 +361,29 @@ static void action_toggle_roi(struct FTR *f, int x, int y, int dir)
 	f->changed = 1;
 }
 
+static void action_toggle_topography(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->topographic_mode = (1 + e->topographic_mode) % 5;
+	f->changed = 1;
+}
+
+static void action_topography_span(struct FTR *f, float factor)
+{
+	struct pan_state *e = f->userdata;
+	e->topographic_scale *= factor;
+	fprintf(stderr, "TOPOGRAPHIC SCALE = %g\n", e->topographic_scale);
+	f->changed = 1;
+}
+
+static void action_topography_Pspan(struct FTR *f, float factor)
+{
+	struct pan_state *e = f->userdata;
+	e->topographic_P *= factor;
+	fprintf(stderr, "TOPOGRAPHIC P = %g\n", e->topographic_P);
+	f->changed = 1;
+}
+
 
 static void action_toggle_aqauto(struct FTR *f)
 {
@@ -384,6 +425,22 @@ static void action_move_roi(struct FTR *f, int x, int y)
 		e->roi_y = y - e->roi_w / 2;
 		f->changed = 1;
 	}
+}
+
+static void action_move_sun(struct FTR *f, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+	float R = fmin(f->w, f->h)/2;
+	float p = (x - f->w/2) / R;
+	float q = (y - f->h/2) / R;
+	float r = sqrt(1-p*p-q*q);
+	if (!isfinite(r)) r = 0;
+	float n = hypot(p, hypot(q, r));
+	e->topographic_sun[0] = p/n;
+	e->topographic_sun[1] = q/n;
+	e->topographic_sun[2] = r/n;
+	fprintf(stderr, "SUN = %g %g %g\n", p/n, q/n, r/n);
+	f->changed = 1;
 }
 
 static void action_center_contrast_at_point(struct FTR *f, int x, int y)
@@ -710,10 +767,98 @@ static void expose_roi(struct FTR *f)
 	}
 }
 
+static unsigned char bclamp(float x)
+{
+	if (x < 0) return 0;
+	if (x > 255) return 255;
+	return x;
+}
+
+static void expose_topography(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+
+	if (e->zoom_factor != 1 || e->i->pd != 1) return;
+
+	if (e->topographic_mode == 1) // shadows
+	{
+		float *x = xmalloc(f->w * f->h * sizeof*x);
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < f->w; i++)
+			x[j*f->w+i] = fancy_image_getsample(
+					e->i,
+					i + e->offset_x,
+					j + e->offset_y,
+					0) / e->topographic_scale;
+		cast_shadows(x, f->w, f->h,
+				-e->topographic_sun[0],
+				-e->topographic_sun[1],
+				e->topographic_sun[2]);
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < f->w; i++)
+		for (int k = 0; k < 3; k++)
+			f->rgb[(j*f->w+i)*3+k] = 255*isfinite(x[f->w*j+i]);
+		free(x);
+		return;
+	}
+
+	for (int j = 0; j < f->h; j++)
+	for (int i = 0; i < f->w; i++)
+	{
+		int p = e->offset_x + i;
+		int q = e->offset_y + j;
+		float s = e->topographic_scale;
+		float h = fancy_image_getsample(e->i, p, q, 0) / s;
+		float h10 = fancy_image_getsample(e->i, p+1, q, 0) / s;
+		float h01 = fancy_image_getsample(e->i, p, q+1, 0) / s;
+		float hx = (h10 - h);
+		float hy = (h01 - h);
+		float *S = e->topographic_sun;
+
+		float c = 0;
+		unsigned char *rgb = f->rgb + 3 * (j * f->w + i);
+		switch(e->topographic_mode) {
+		//case 1: // shadows
+			//break;
+		case 2: // linearized lambertian
+			c = - hx * S[0] - hy * S[1];
+			rgb[0] = rgb[1] = rgb[2] = bclamp(127 + 40 * c);
+			break;
+		case 3: // lambertian (Gouraud)
+			c = S[2] - hx * S[0] - hy * S[1];
+			c /= sqrt(1 + hx*hx + hy*hy);
+			rgb[0] = rgb[1] = rgb[2] = bclamp(e->topographic_P
+					* fmax(0, c));
+			break;
+		case 4: { // specular (Blinn-Phong)
+			float N[3] = {-hx, -hy, 1};
+			float n = hypot(N[2], hypot(N[1], N[0]));
+			N[0]/=n; N[1]/=n; N[2]/=n; // N = unit normal
+			float H[3] = {S[0], S[1], S[2]+1};
+			n = hypot(H[2], hypot(H[1], H[0]));
+			H[0]/=n; H[1]/=n; H[2]/=n; // H = half-angle direction
+			float k = pow(
+					fmax(0, H[0]*N[0]+H[1]*N[1]+H[2]*N[2]),
+					e->topographic_P);
+			rgb[0] = rgb[1] = rgb[2] = bclamp(255 * k);
+			break; }
+		default: fail("impossible topographic condition %d",
+					 e->topographic_mode);
+		}
+	}
+}
+
 // dump the image acording to the state of the viewport
 static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
 	struct pan_state *e = f->userdata;
+
+	if (e->topographic_mode)
+	{
+		expose_topography(f);
+		f->changed = 1;
+		return;
+	}
 
 	// expose the whole image
 	for (int j = 0; j < f->h; j++)
@@ -743,12 +888,14 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 {
 	//fprintf(stderr, "motion b=%d m=%d (%d %d)\n", b, m, x, y);
+	struct pan_state *e = f->userdata;
 
 	static double ox = 0, oy = 0;
 
 	if (m & FTR_BUTTON_LEFT)   action_offset_viewport(f, x - ox, y - oy);
 	if (m & FTR_BUTTON_MIDDLE) action_print_value_under_cursor(f, x, y);
 	if (m & FTR_MASK_SHIFT)    action_center_contrast_at_point(f, x, y);
+	if (m & FTR_MASK_SHIFT && e->topographic_mode) action_move_sun(f, x, y);
 
 	action_move_roi(f, x, y);
 
@@ -803,7 +950,12 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'n') action_qauto2(f);
 	if (k == 'N') action_toggle_aqauto(f);
 	if (k == 'r') action_toggle_roi(f, x, y, m&FTR_MASK_SHIFT);
+	if (k == 't') action_toggle_topography(f);
 	if (k == 'c') action_toggle_p(f);
+	if (k == 's') action_topography_span(f, 1/1.3);
+	if (k == 'S') action_topography_span(f, 1.3);
+	if (k == 'd') action_topography_Pspan(f, 1/1.3);
+	if (k == 'D') action_topography_Pspan(f, 1.3);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
