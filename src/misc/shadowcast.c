@@ -97,8 +97,9 @@ static void canonical_bresenham_parkour_hack(
 
 	// fill bresenham offsets
 	int t[h];
-	for (int i = 0; i < h; i++)
-		t[i] = lrint(i * p / q);
+	for (int j = 0; j < h; j++)
+		t[j] = lrint(j * p / q);
+		//t[j] = floor(j * p / q);
 
 	// compute range of valid abscissae
 	int i_min = 0;
@@ -114,9 +115,10 @@ static void canonical_bresenham_parkour_hack(
 		for (int j = 0; j < h; j++)
 			if (INSIDEP(w, h, i+t[j], j))
 			{
-				o[c++] = j*w + i+t[j];
-				oxy[2*c+0] = j;
-				oxy[2*c+1] = i + j*p/q;
+				oxy[2*c+0] = i + j*p/q;
+				oxy[2*c+1] = j;
+				o[c] = j*w + i+t[j];
+				c += 1;
 			}
 	}
 
@@ -137,9 +139,13 @@ static void compute_the_bresenham_parkour_hack(
 		o[i] = -1;
 
 	if (fabs(p) <= q) // canonical case
+	{
 		canonical_bresenham_parkour_hack(o, oxy, w, h, p, q);
+		fprintf(stderr, "SWAP nothing\n");
+	}
 	else if (fabs(p) <= -q) { // swap the sign of q
 		canonical_bresenham_parkour_hack(o, oxy, w, h, p, -q);
+		fprintf(stderr, "SWAP the sign of q\n");
 		for (int i = 0; i < N; i++)
 			if (o[i] >= 0) {
 				o[i] = (h - 1 - o[i]/w)*w + o[i]%w;
@@ -147,6 +153,7 @@ static void compute_the_bresenham_parkour_hack(
 			}
 	} else if (fabs(q) < p) { // swap q and p
 		canonical_bresenham_parkour_hack(o, oxy, h, w, q, p);
+		fprintf(stderr, "SWAP q and p\n");
 		for (int i = 0; i < N; i++)
 			if (o[i] >= 0) {
 				o[i] = (o[i]%h)*w + o[i]/h;
@@ -157,6 +164,7 @@ static void compute_the_bresenham_parkour_hack(
 	} else if (fabs(q) < -p) { // swap q and -p
 		//fprintf(stderr, "here pq = %g %g!", p, q);
 		canonical_bresenham_parkour_hack(o, oxy, h, w, q, -p);
+		fprintf(stderr, "SWAP q and -p\n");
 		for (int i = 0; i < N; i++)
 			if (o[i] >= 0) {
 				o[i] = (o[i]%h)*w + w - 1 - o[i]/h;
@@ -247,7 +255,7 @@ static void cast_shadows(
 	bool debbie = false;
 	float *dbuf = xmalloc(2*w*h*sizeof*dbuf);
 	float xy0[2];
-	for (int i = 0; i < w*h; i++) dbuf[i] = 0;
+	for (int i = 0; i < 2*w*h; i++) dbuf[i] = 0;
 	for (int j = 0; j < N; j++)
 	{
 		if (i[j] < 0 && j+1<N && i[j+1] ) // mark the beginning of a line
@@ -259,26 +267,48 @@ static void cast_shadows(
 			xy0[1] = l / w;
 		}
 		if (i[j] < 0 || l < 0) continue;
+		assert(i[l] < w*h);
 		assert(0 <= i[j]);
 		assert(i[j] < w*h);
 		if (l < 0) fprintf(stderr, "SHIT l=%d\n", l);
 		assert(0 <= l);
 		assert(l < w*h);
-		dbuf[2*((i[j]/w)*w+(i[j]%w))+0] = oxy[2*j+0];
-		dbuf[2*((i[j]/w)*w+(i[j]%w))+1] = oxy[2*j+1];
-		float X = l % w;  // X of last occluding point
-		float Y = l / w;  // Y of last occluding point
+		//dbuf[2*((i[j]/w)*w+(i[j]%w))+0] = oxy[2*j+0];
+		//dbuf[2*((i[j]/w)*w+(i[j]%w))+1] = oxy[2*j+1];
+		dbuf[2*i[j]+0] = oxy[2*i[j]+0];
+		dbuf[2*i[j]+1] = oxy[2*i[j]+1];
+		 int iX = l % w;  // X of last occluding point
+		 int iY = l / w;  // Y of last occluding point
+		 assert(0 <= iX && iX < w);
+		 assert(0 <= iY && iY < h);
+		float X = oxy[2*i[l]+0];
+		float Y = oxy[2*i[l]+1];
+		// if (fabs(X-iX)>0.6) fprintf(stderr, "iX=%d X=%g\n", iX, X);
+		// assert(fabs(X-iX) < 0.6);
+		// assert(fabs(Y-iY) < 0.6);
 		float Z = D[l];   // Z of last occluding point
-		float x = i[j] % w;  // x of current point
-		float y = i[j] / w;  // y of current point
+		 int ix = i[j] % w;  // x of current point
+		 int iy = i[j] / w;  // y of current point
+		 assert(0 <= ix && ix < w);
+		 assert(0 <= iy && iy < h);
+		float x = oxy[2*i[j]+0];
+		float y = oxy[2*i[j]+1];
+		float xx = oxy[2*(iy*w+ix)+0];
+		float yy = oxy[2*(iy*w+ix)+1];
+		// assert(fabs(x-ix) < 0.6);
+		// assert(fabs(y-iy) < 0.6);
 		float z = D[i[j]];   // z of current point
 		if (Z - z > a * hypot(x-X, y-Y)) // occluded point
 			D[i[j]] = NAN;
 		else // new occluding point
 			l = i[j];
-		if (debbie) fprintf(stderr,
-				"xy0 = %g %G  xyz = %g %g %g  ZYX = %g %g %g\n",
-				xy0[0], xy0[1], x, y, z, X, Y, Z);
+		if (debbie)
+			fprintf(stderr,
+				"xy0 = %g %G  iXY=%d %d, XYZ=%g %g %g, "
+				"ixy=%d %d, xyz = %g %g %g xxyy=%g %g, "
+				"j=%d, i[j]=%d\n",
+				xy0[0], xy0[1], iX, iY, X, Y, Z,
+				ix, iy, x, y, z, xx, yy, j, i[j]);
 	}
 	free(i);
 	free(oxy);
