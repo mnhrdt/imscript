@@ -536,7 +536,7 @@ void save_legend(char *filename_legend, char *palette_id, float m, float M)
 //	free(y);
 //	return 0;
 //}
-int main_palette2(int c, char *v[])
+int main_palette(int c, char *v[])
 {
 	char *filename_legend = pick_option(&c, &v, "l", "");
 	if (c != 4 && c != 5 && c != 6 ) {
@@ -570,6 +570,6 @@ int main_palette2(int c, char *v[])
 }
 
 #ifndef HIDE_ALL_MAINS
-int main(int c, char **v) { return main_palette2(c, v); }
+int main(int c, char **v) { return main_palette(c, v); }
 #endif
 #endif//PALETTE_MAIN
