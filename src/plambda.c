@@ -468,6 +468,22 @@ static void from_cartesian_to_elliptic(float *Y, float *X)
 	Y[1] = t;
 }
 
+// same computation, but without conditionals (they are inside atan2).
+static void from_cartesian_to_elliptic2(float *Y, float *X)
+{
+	double x = X[0];
+	double y = X[1];
+	double c = ELLIPTICAL_C();
+	double b = x*x + y*y + c*c;
+	double k2 = (b + sqrt(b*b - 4*c*c*x*x))/(2*c*c);
+	double k = sqrt(k2);
+	double e = k + sqrt(k2 - 1);
+	double r = log(e);
+	double t = atan2((e*e+1)*y, (e*e-1)*x); // atan2(y, tanh(r)*x)
+	Y[0] = r;
+	Y[1] = t;
+}
+
 static void complex_product(float *xy, float *x, float *y)
 {
 	xy[0] = x[0]*y[0] - x[1]*y[1];
@@ -592,6 +608,16 @@ static double mathieu_Ms2(double n, double q, double z)
 {
 	if (!isfinite(n) || !isfinite(q) || !isfinite(z)) return NAN;
 	return gsl_sf_mathieu_Ms(2, n, q, z);
+}
+static double ellipse_dirichlet(double r, double t,
+						double n, double k, double i)
+{
+	double u = NAN;
+	double R = 1; // TODO: get it from somewhere else
+	if (i == 1) {
+		double q = mathieu_a(n, k);
+	}
+	return u;
 }
 #endif//PLAMBDA_WITH_GSL
 
@@ -1014,7 +1040,7 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(random_stable,"rands",2),
 	REGISTER_FUNCTIONN(from_cartesian_to_polar,"topolar", -2),
 	REGISTER_FUNCTIONN(from_polar_to_cartesian,"frompolar", -2),
-	REGISTER_FUNCTIONN(from_cartesian_to_elliptic,"toell", -2),
+	REGISTER_FUNCTIONN(from_cartesian_to_elliptic2,"toell", -2),
 	REGISTER_FUNCTIONN(from_elliptic_to_cartesian,"fromell", -2),
 	REGISTER_FUNCTIONN(complex_exp,"cexp", -2),
 #ifndef __STDC_NO_COMPLEX__
@@ -1625,6 +1651,8 @@ static int token_is_vardef(const char *t)
 #define PLAMBDA_STACKOP_HALVE 13
 #define PLAMBDA_STACKOP_NSPLIT 14
 #define PLAMBDA_STACKOP_NSTACK 15
+#define PLAMBDA_STACKOP_ROT3 16
+#define PLAMBDA_STACKOP_ROX3 17
 
 // if token is a stack operation, return its id
 // otherwise, return zero
@@ -1633,6 +1661,8 @@ static int token_is_stackop(const char *t)
 	if (0 == strcmp(t, "del")) return PLAMBDA_STACKOP_DEL;
 	if (0 == strcmp(t, "dup")) return PLAMBDA_STACKOP_DUP;
 	if (0 == strcmp(t, "rot")) return PLAMBDA_STACKOP_ROT;
+	if (0 == strcmp(t, "rot3")) return PLAMBDA_STACKOP_ROT3;
+	if (0 == strcmp(t, "rox3")) return PLAMBDA_STACKOP_ROX3;
 	if (0 == strcmp(t, "split")) return PLAMBDA_STACKOP_VSPLIT;
 	if (0 == strcmp(t, "merge")) return PLAMBDA_STACKOP_VMERGE;
 	if (0 == strcmp(t, "join")) return PLAMBDA_STACKOP_VMERGE;
@@ -2295,6 +2325,30 @@ static void vstack_process_op(struct value_vstack *s, int opid)
 		int m = vstack_pop_vector(y, s);
 		vstack_push_vector(s, x, n);
 		vstack_push_vector(s, y, m);
+		break;
+				  }
+	case PLAMBDA_STACKOP_ROT3: {
+		float x[PLAMBDA_MAX_PIXELDIM];
+		float y[PLAMBDA_MAX_PIXELDIM];
+		float z[PLAMBDA_MAX_PIXELDIM];
+		int nx = vstack_pop_vector(x, s);
+		int ny = vstack_pop_vector(y, s);
+		int nz = vstack_pop_vector(z, s);
+		vstack_push_vector(s, x, nx);
+		vstack_push_vector(s, y, ny);
+		vstack_push_vector(s, z, nz);
+		break;
+				   }
+	case PLAMBDA_STACKOP_ROX3: {
+		float x[PLAMBDA_MAX_PIXELDIM];
+		float y[PLAMBDA_MAX_PIXELDIM];
+		float z[PLAMBDA_MAX_PIXELDIM];
+		int nx = vstack_pop_vector(x, s);
+		int ny = vstack_pop_vector(y, s);
+		int nz = vstack_pop_vector(z, s);
+		vstack_push_vector(s, y, ny);
+		vstack_push_vector(s, x, nx);
+		vstack_push_vector(s, z, nz);
 		break;
 				  }
 	case PLAMBDA_STACKOP_VMERGEALL:
