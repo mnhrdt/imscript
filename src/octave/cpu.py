@@ -6,3 +6,6 @@ def cpu(x):
 
 	iio.write(f, x)
 	os.system(c)
+
+import sys
+sys.modules[__name__] = cpu
