@@ -22,6 +22,9 @@
 #define OMIT_MAIN_SHADOWCAST
 #include "shadowcast.c"
 
+#define OMIT_MAIN_SARSIM
+#include "sarsim.c"
+
 #include "xmalloc.c"
 
 #define WHEEL_FACTOR 2
@@ -176,7 +179,7 @@ static void action_reset_zoom_and_position(struct FTR *f)
 	e->topographic_sun[1] = 1/sqrt(3);
 	e->topographic_sun[2] = 1/sqrt(3);
 	e->topographic_scale = 1;
-	e->topographic_P = 1;
+	e->topographic_P = 30;
 
 	f->changed = 1;
 }
@@ -364,7 +367,7 @@ static void action_toggle_roi(struct FTR *f, int x, int y, int dir)
 static void action_toggle_topography(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
-	e->topographic_mode = (1 + e->topographic_mode) % 5;
+	e->topographic_mode = (1 + e->topographic_mode) % 6;
 	f->changed = 1;
 }
 
@@ -802,6 +805,41 @@ static void expose_topography(struct FTR *f)
 		return;
 	}
 
+	if (e->topographic_mode == 5) // radar
+	{
+		float *x = xmalloc(f->w * f->h * sizeof*x);
+		float *y = xmalloc(f->w * f->h * sizeof*x);
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < f->w; i++)
+			x[j*f->w+i] = fancy_image_getsample(
+					e->i,
+					i + e->offset_x,
+					j + e->offset_y,
+					0) / e->topographic_scale;
+		float a = -acos(e->topographic_sun[0]);
+		if (e->topographic_sun[0] < 0)
+			a += M_PI;
+		radar_sim_horizontal(y, x, f->w, f->h, a);
+		//fprintf(stderr, "y[0,200] = %g\n", y[(f->w*200)+0]);
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < f->w; i++)
+		for (int k = 0; k < 3; k++)
+			//f->rgb[(j*f->w+i)*3+k] = e->topographic_P*y[f->w*j+i];
+			f->rgb[(j*f->w+i)*3+k] = bclamp(e->topographic_P*y[f->w*j+i]);
+		//{
+		//	f->rgb[(j*f->w+i)*3+0] = e->topographic_P*y[f->w*j+i];
+		//	f->rgb[(j*f->w+i)*3+1] = e->topographic_P*y[f->w*j+i];
+		//	f->rgb[(j*f->w+i)*3+2] = e->topographic_P*y[f->w*j+i];
+		//}
+		//fprintf(stderr, "frgb[0,200] = %d %d %d\n",
+		//		f->rgb[(f->w*200)*3+0],
+		//		f->rgb[(f->w*200)*3+1],
+		//		f->rgb[(f->w*200)*3+2]);
+		free(x);
+		free(y);
+		return;
+	}
+
 	for (int j = 0; j < f->h; j++)
 	for (int i = 0; i < f->w; i++)
 	{
@@ -842,6 +880,8 @@ static void expose_topography(struct FTR *f)
 					e->topographic_P);
 			rgb[0] = rgb[1] = rgb[2] = bclamp(255 * k);
 			break; }
+		//case 5: // radar
+			//break;
 		default: fail("impossible topographic condition %d",
 					 e->topographic_mode);
 		}
