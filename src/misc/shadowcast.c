@@ -252,6 +252,38 @@ static void compute_the_bresenham_parkour(
 
 #include "xmalloc.c"
 
+static float getpix1(float *x, int w, int h, int i, int j)
+{
+	if (i < 0) i = 0;
+	if (j < 0) j = 0;
+	if (i >= w) i = w-1;
+	if (j >= h) j = h-1;
+	return x[i+j*w];
+}
+
+static float bilinear_cell(float a, float b, float c, float d,
+							float x, float y)
+{
+	float r = 0;
+	r += a * (1-x) * (1-y);
+	r += b * ( x ) * (1-y);
+	r += c * (1-x) * ( y );
+	r += d * ( x ) * ( y );
+	return r;
+}
+
+static float getpixel_bilinear(float *x, int w, int h, float p, float q)
+{
+	int ip = p;
+	int iq = q;
+	float a = getpix1(x, w, h, ip  , iq  );
+	float b = getpix1(x, w, h, ip+1, iq  );
+	float c = getpix1(x, w, h, ip  , iq+1);
+	float d = getpix1(x, w, h, ip+1, iq+1);
+	float r = bilinear_cell(a, b, c, d, p-ip, q-iq);
+	return r;
+}
+
 static void cast_shadows(
 		float *D,      // DEM raster data, to be filled-in with NAN
 		int w,         // width of the raster
@@ -261,6 +293,8 @@ static void cast_shadows(
 		float a        // slope of the sun direction
 		)
 {
+	char *M = xmalloc(w*h*sizeof*M);
+	for (int i = 0; i < w*h; i++) M[i] = 1;
 	if (!p && !q) return;
 	fprintf(stderr, "cast shadows pqa = %g %g %g\n", p, q, a);
 	int N = w*h + 2*(w+h);  // maximum possible length of parkour
@@ -297,7 +331,8 @@ static void cast_shadows(
 		 if (fabs(X-iX)>0.6) fprintf(stderr, "iX=%d X=%g\n", iX, X);
 		 assert(fabs(X-iX) < 0.6);
 		 assert(fabs(Y-iY) < 0.6);
-		float Z = D[i[l]];   // Z of last occluding point
+		//float Z = D[i[l]];   // Z of last occluding point
+		float Z = getpixel_bilinear(D, w, h, X, Y);
 		 int ix = i[j] % w;  // x of current point
 		 int iy = i[j] / w;  // y of current point
 		 assert(0 <= ix && ix < w);
@@ -306,7 +341,8 @@ static void cast_shadows(
 		float y = oxy[2*j+1];
 		 assert(fabs(x-ix) < 0.6);
 		 assert(fabs(y-iy) < 0.6);
-		float z = D[i[j]];   // z of current point
+		//float z = D[i[j]];   // z of current point
+		float z = getpixel_bilinear(D, w, h, x, y);
 		if (debbie)
 			fprintf(stderr,
 				"xy0 = %g %G  iXY=%d %d, XYZ=%g %g %g, "
@@ -316,66 +352,20 @@ static void cast_shadows(
 				ix, iy, x, y, z, //xx, yy,
 				j, i[j]);
 		if (Z - z > a * hypot(x-X, y-Y)) // occluded point
-			D[i[j]] = NAN;
+		//if (Z - z > a * hypot(ix-iX, iy-iY)) // occluded point
+			//D[i[j]] = NAN;
+			M[i[j]] = 0;
 		else // new occluding point
 			l = j;
-
-		// LET US START OVER
-		//if (i[j] < 0 && j+1<N && i[j+1] ) // mark the beginning of a line
-		//{
-		//	l = i[j+1];
-		//	if (l > 0)
-		//		debbie =  l%w==0 && l/w==380;
-		//	xy0[0] = l % w;
-		//	xy0[1] = l / w;
-		//}
-		//if (i[j] < 0 || l < 0) continue;
-		//assert(0 <= i[j]);
-		//assert(i[j] < w*h);
-		//if (l < 0) fprintf(stderr, "SHIT l=%d\n", l);
-		//assert(0 <= l);
-		//assert(l < w*h);
-		////dbuf[2*((i[j]/w)*w+(i[j]%w))+0] = oxy[2*j+0];
-		////dbuf[2*((i[j]/w)*w+(i[j]%w))+1] = oxy[2*j+1];
-		//dbuf[2*i[j]+0] = oxy[2*i[j]+0];
-		//dbuf[2*i[j]+1] = oxy[2*i[j]+1];
-		// int iX = l % w;  // X of last occluding point
-		// int iY = l / w;  // Y of last occluding point
-		// assert(0 <= iX && iX < w);
-		// assert(0 <= iY && iY < h);
-		//float X = oxy[2*i[l]+0];
-		//float Y = oxy[2*i[l]+1];
-		//// if (fabs(X-iX)>0.6) fprintf(stderr, "iX=%d X=%g\n", iX, X);
-		//// assert(fabs(X-iX) < 0.6);
-		//// assert(fabs(Y-iY) < 0.6);
-		//float Z = D[l];   // Z of last occluding point
-		// int ix = i[j] % w;  // x of current point
-		// int iy = i[j] / w;  // y of current point
-		// assert(0 <= ix && ix < w);
-		// assert(0 <= iy && iy < h);
-		//float x = oxy[2*i[j]+0];
-		//float y = oxy[2*i[j]+1];
-		//float xx = oxy[2*(iy*w+ix)+0];
-		//float yy = oxy[2*(iy*w+ix)+1];
-		//// assert(fabs(x-ix) < 0.6);
-		//// assert(fabs(y-iy) < 0.6);
-		//float z = D[i[j]];   // z of current point
-		//if (debbie)
-		//	fprintf(stderr,
-		//		"xy0 = %g %G  iXY=%d %d, XYZ=%g %g %g, "
-		//		"ixy=%d %d, xyz = %g %g %g xxyy=%g %g, "
-		//		"j=%d, i[j]=%d\n",
-		//		xy0[0], xy0[1], iX, iY, X, Y, Z,
-		//		ix, iy, x, y, z, xx, yy, j, i[j]);
-		//if (Z - z > a * hypot(x-X, y-Y)) // occluded point
-		//	D[i[j]] = NAN;
-		//else // new occluding point
-		//	l = i[j];
 	}
 	free(i);
 	free(oxy);
 	iio_write_image_float_vec("/tmp/dbuf.npy", dbuf, w, h, 2);
 	free(dbuf);
+	for (int i = 0; i < w*h; i++)
+		if (!M[i])
+			D[i] = NAN;
+	free(M);
 }
 
 void cast_vertical_shadows(float *xx, int w, int h, float alpha)
