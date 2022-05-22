@@ -3,6 +3,7 @@ src/amle.o: src/amle.c src/iio.h src/fail.c src/xmalloc.c src/smapa.h
 src/autotrim.o: src/autotrim.c src/iio.h
 src/backflow.o: src/backflow.c src/iio.h src/fail.c src/xmalloc.c \
  src/getpixel.c src/bicubic.c src/smapa.h
+src/bandslice.o: src/bandslice.c src/iio.h
 src/bdint.o: src/bdint.c src/abstract_dsf.c src/iio.h src/pickopt.c
 src/bicubic.o: src/bicubic.c src/getpixel.c
 src/bicubic_gray.o: src/bicubic_gray.c
@@ -20,7 +21,6 @@ src/colormatch.o: src/colormatch.c src/smapa.h src/iio.h
 src/contihist.o: src/contihist.c src/xfopen.c src/fail.c src/xmalloc.c \
  src/iio.h src/pickopt.c
 src/crop.o: src/crop.c src/fail.c src/xmalloc.c src/iio.h
-src/d5.o: src/d5.c
 src/dataconv.o: src/dataconv.c src/xmalloc.c src/fail.c
 src/dct.o: src/dct.c src/iio.h
 src/dht.o: src/dht.c src/iio.h src/xmalloc.c src/fail.c
@@ -59,7 +59,7 @@ src/fontu.o: src/fontu.c src/xmalloc.c src/fail.c src/xfopen.c src/dataconv.c \
  src/fonts/xfont_clR6x12.c src/fonts/xfont_helvR12.c src/iio.h \
  src/pickopt.c
 src/geomedian.o: src/geomedian.c src/linalg.c src/random.c src/smapa.h \
- src/pickopt.c src/iio.h
+ src/pickopt.c src/iio.h src/help_stuff.c
 src/getbands.o: src/getbands.c src/iio.h src/pickopt.c
 src/getpixel.o: src/getpixel.c
 src/ghisto.o: src/ghisto.c src/iio.h src/xmalloc.c src/fail.c src/smapa.h \
@@ -77,7 +77,6 @@ src/homwarp.o: src/homwarp.c src/extrapolators.c src/bilinear_interpolation.c \
 src/idump.o: src/idump.c src/iio.h
 src/iio.o: src/iio.c
 src/iion.o: src/iion.c src/iio.h
-src/iion_int.o: src/iion_int.c src/iio.h
 src/iion_u16.o: src/iion_u16.c src/iio.h
 src/im.o: src/im.c src/all_mains.inc src/ftr/all_mains.inc
 src/imflip.o: src/imflip.c src/help_stuff.c src/iio.h
@@ -90,8 +89,6 @@ src/marching_interpolation.o: src/marching_interpolation.c
 src/marching_squares.o: src/marching_squares.c
 src/mdither.o: src/mdither.c src/xfopen.c src/fail.c src/iio.h
 src/mdither2.o: src/mdither2.c src/xfopen.c src/fail.c src/iio.h
-src/mdither3.o: src/mdither3.c src/iio.h
-src/means.o: src/means.c
 src/mediator.o: src/mediator.c src/iio.h
 src/minicg.o: src/minicg.c
 src/modes_detector.o: src/modes_detector.c src/smapa.h
@@ -101,7 +98,6 @@ src/nnint.o: src/nnint.c src/abstract_heap.h src/xmalloc.c src/fail.c \
  src/iio.h src/pickopt.c
 src/nonmaxsup.o: src/nonmaxsup.c src/smapa.h src/iio.h
 src/ntiply.o: src/ntiply.c src/iio.h
-src/numbersio.o: src/numbersio.c
 src/ok_list.o: src/ok_list.c src/fail.c src/xmalloc.c
 src/palette.o: src/palette.c src/fail.c src/xmalloc.c src/xfopen.c \
  src/smapa.h src/iio.h src/pickopt.c src/fontu.c src/dataconv.c \
@@ -121,14 +117,12 @@ src/plambda.o: src/plambda.c src/smapa.h src/fail.c src/xmalloc.c \
  src/random.c src/parsenumbers.c src/colorcoordsf.c src/getpixel.c \
  src/iio.h src/help_stuff.c
 src/points.o: src/points.c src/iio.h src/fail.c src/xmalloc.c src/xfopen.c \
- src/parsenumbers.c src/drawsegment.c src/pickopt.c src/random.c
+ src/parsenumbers.c src/drawsegment.c src/pickopt.c src/random.c \
+ src/smapa.h
 src/ppsmooth.o: src/ppsmooth.c src/iio.h src/pickopt.c
 src/pview.o: src/pview.c src/iio.h src/fail.c src/xmalloc.c src/xfopen.c \
  src/parsenumbers.c src/drawsegment.c src/pickopt.c src/smapa.h \
  src/random.c
-src/pλ.o: src/pλ.c src/smapa.h src/fail.c src/xmalloc.c src/random.c \
- src/parsenumbers.c src/colorcoordsf.c src/getpixel.c src/iio.h \
- src/help_stuff.c
 src/qauto.o: src/qauto.c src/iio.h src/help_stuff.c src/pickopt.c
 src/qeasy.o: src/qeasy.c src/iio.h src/help_stuff.c
 src/random.o: src/random.c
@@ -175,7 +169,6 @@ src/vecoh.o: src/vecoh.c src/iio.h src/fail.c src/xmalloc.c src/random.c \
  src/modes_detector.c src/smapa.h src/help_stuff.c src/pickopt.c
 src/vecov.o: src/vecov.c src/iio.h src/fail.c src/xmalloc.c src/random.c \
  src/smapa.h src/help_stuff.c src/pickopt.c
-src/vector.o: src/vector.c
 src/viewflow.o: src/viewflow.c src/iio.h src/smapa.h src/fail.c \
  src/drawsegment.c src/colorcoordsf.c src/marching_squares.c
 src/warp.o: src/warp.c src/iio.h src/fail.c src/xmalloc.c src/getpixel.c \
@@ -199,7 +192,8 @@ src/ftr/cpu.o: src/ftr/cpu.c src/ftr/fancy_image.h src/ftr/ftr.h src/ftr/fontu.c
  src/ftr/fonts/xfont_9x15B.c src/ftr/fonts/xfont_9x18.c \
  src/ftr/fonts/xfont_9x18B.c src/ftr/fonts/xfont_10x20.c \
  src/ftr/fonts/xfont_canny.c src/ftr/fonts/xfont_clR6x12.c \
- src/ftr/fonts/xfont_helvR12.c src/ftr/smapa.h src/ftr/blur.c \
+ src/ftr/fonts/xfont_helvR12.c src/ftr/shadowcast.c src/ftr/iio.h \
+ src/ftr/sarsim.c src/ftr/random.c src/ftr/smapa.h src/ftr/blur.c \
  src/ftr/ppsmooth.c src/ftr/pickopt.c src/ftr/help_stuff.c
 src/ftr/dataconv.o: src/ftr/dataconv.c src/ftr/xmalloc.c src/ftr/fail.c
 src/ftr/dosdo.o: src/ftr/dosdo.c src/ftr/iio.h src/ftr/ftr.h src/ftr/fontu.c \
@@ -264,7 +258,13 @@ src/ftr/rpc2.o: src/ftr/rpc2.c src/ftr/xfopen.c src/ftr/fail.c src/ftr/smapa.h
 src/ftr/rpcflip.o: src/ftr/rpcflip.c src/ftr/tiff_octaves_rw.c src/ftr/srtm4o.c \
  src/ftr/rpc2.c src/ftr/xfopen.c src/ftr/fail.c src/ftr/smapa.h \
  src/ftr/ftr.h src/ftr/iio.h src/ftr/xmalloc.c src/ftr/pickopt.c
+src/ftr/s5pv.o: src/ftr/s5pv.c src/ftr/ftr.h src/ftr/iio.h src/ftr/xmalloc.c \
+ src/ftr/fail.c
+src/ftr/sarsim.o: src/ftr/sarsim.c src/ftr/random.c src/ftr/xmalloc.c \
+ src/ftr/fail.c src/ftr/iio.h
 src/ftr/seconds.o: src/ftr/seconds.c
+src/ftr/shadowcast.o: src/ftr/shadowcast.c src/ftr/iio.h src/ftr/xmalloc.c \
+ src/ftr/fail.c src/ftr/pickopt.c
 src/ftr/srt.o: src/ftr/srt.c src/ftr/ftr.h src/ftr/fontu.c src/ftr/xmalloc.c \
  src/ftr/fail.c src/ftr/xfopen.c src/ftr/dataconv.c \
  src/ftr/fonts/xfont_10x20.c
@@ -453,7 +453,7 @@ src/misc/gblur_core.o: src/misc/gblur_core.c src/misc/iio.h
 src/misc/genk.o: src/misc/genk.c src/misc/fail.c src/misc/xmalloc.c \
  src/misc/random.c src/misc/smapa.h src/misc/iio.h
 src/misc/geomedian.o: src/misc/geomedian.c src/misc/linalg.c src/misc/random.c \
- src/misc/smapa.h src/misc/pickopt.c src/misc/iio.h
+ src/misc/smapa.h src/misc/pickopt.c src/misc/iio.h src/misc/help_stuff.c
 src/misc/getopt_with_pickopt.o: src/misc/getopt_with_pickopt.c
 src/misc/getpixel.o: src/misc/getpixel.c
 src/misc/gharrows.o: src/misc/gharrows.c src/misc/iio.h src/misc/smapa.h
@@ -482,7 +482,7 @@ src/misc/hview.o: src/misc/hview.c src/misc/xmalloc.c src/misc/fail.c \
  src/misc/iio.h
 src/misc/ihough2.o: src/misc/ihough2.c src/misc/iio.h src/misc/pickopt.c
 src/misc/iio.o: src/misc/iio.c
-src/misc/ijmesh.o: src/misc/ijmesh.c src/misc/iio.h
+src/misc/ijmesh.o: src/misc/ijmesh.c src/misc/iio.h src/misc/pickopt.c
 src/misc/imdim.o: src/misc/imdim.c src/misc/iio.h
 src/misc/img2six.o: src/misc/img2six.c src/misc/iio.h
 src/misc/imgerr.o: src/misc/imgerr.c src/misc/fail.c src/misc/iio.h \
@@ -586,7 +586,8 @@ src/misc/pmba2.o: src/misc/pmba2.c src/misc/xfopen.c src/misc/fail.c \
  src/misc/parsenumbers.c src/misc/xmalloc.c src/misc/pickopt.c
 src/misc/points.o: src/misc/points.c src/misc/iio.h src/misc/fail.c \
  src/misc/xmalloc.c src/misc/xfopen.c src/misc/parsenumbers.c \
- src/misc/drawsegment.c src/misc/pickopt.c src/misc/random.c
+ src/misc/drawsegment.c src/misc/pickopt.c src/misc/random.c \
+ src/misc/smapa.h
 src/misc/poisson_rec.o: src/misc/poisson_rec.c src/misc/iio.h
 src/misc/polygonify.o: src/misc/polygonify.c src/misc/ccproc.c \
  src/misc/abstract_dsf.c src/misc/xmalloc.c src/misc/fail.c \
@@ -660,6 +661,8 @@ src/misc/rpchfilt.o: src/misc/rpchfilt.c src/misc/parsenumbers.c \
 src/misc/rpcparcheck.o: src/misc/rpcparcheck.c src/misc/xmalloc.c src/misc/fail.c \
  src/misc/parsenumbers.c src/misc/rpc.c src/misc/xfopen.c \
  src/misc/smapa.h
+src/misc/sarsim.o: src/misc/sarsim.c src/misc/random.c src/misc/xmalloc.c \
+ src/misc/fail.c src/misc/iio.h
 src/misc/satproj.o: src/misc/satproj.c src/misc/fail.c src/misc/getpixel.c \
  src/misc/iio.h src/misc/xmalloc.c src/misc/parsenumbers.c \
  src/misc/pickopt.c
@@ -672,8 +675,8 @@ src/misc/segfilter.o: src/misc/segfilter.c src/misc/parsenumbers.c \
 src/misc/setdim.o: src/misc/setdim.c src/misc/iio.h
 src/misc/sfblur.o: src/misc/sfblur.c src/misc/xmalloc.c src/misc/fail.c \
  src/misc/iio.h
-src/misc/shadowcast.o: src/misc/shadowcast.c src/misc/xmalloc.c src/misc/fail.c \
- src/misc/iio.h src/misc/pickopt.c
+src/misc/shadowcast.o: src/misc/shadowcast.c src/misc/iio.h src/misc/xmalloc.c \
+ src/misc/fail.c src/misc/pickopt.c
 src/misc/sheartilter.o: src/misc/sheartilter.c
 src/misc/shuntingyard.o: src/misc/shuntingyard.c src/misc/fail.c \
  src/misc/xmalloc.c
