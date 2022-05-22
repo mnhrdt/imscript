@@ -126,12 +126,12 @@ static void canonical_bresenham_parkour_hack(
 }
 
 static void compute_the_bresenham_parkour_hack(
-		int *o,    // output array of size w*h+2*(w+h), to be filled-in
-		float *oxy,        // output actual coordinates
-		int w,     // width of the image domain
-		int h,     // height of the image domain
-		float p,   // cosine of direction
-		float q    // sine of direction
+		int *o,     // output array of size w*h+2*(w+h), to be filled-in
+		float *oxy, // output actual coordinates
+		int w,      // width of the image domain
+		int h,      // height of the image domain
+		float p,    // cosine of direction
+		float q     // sine of direction
 		)
 {
 	int N = w*h + 2*(w+h);
@@ -149,7 +149,7 @@ static void compute_the_bresenham_parkour_hack(
 		for (int i = 0; i < N; i++)
 			if (o[i] >= 0) {
 				o[i] = (h - 1 - o[i]/w)*w + o[i]%w;
-				oxy[2*i+0] = h - 1 - oxy[2*i+0];
+				oxy[2*i+1] = h - 1 - oxy[2*i+1];
 			}
 	} else if (fabs(q) < p) { // swap q and p
 		canonical_bresenham_parkour_hack(o, oxy, h, w, q, p);
@@ -168,11 +168,26 @@ static void compute_the_bresenham_parkour_hack(
 		for (int i = 0; i < N; i++)
 			if (o[i] >= 0) {
 				o[i] = (o[i]%h)*w + w - 1 - o[i]/h;
-				float t = oxy[2*i+0];
-				oxy[2*i+0] = oxy[2*i+1];
-				oxy[2*i+1] = w - 1 - t;
+				float t = oxy[2*i+1];
+				oxy[2*i+1] = oxy[2*i+0];
+				oxy[2*i+0] = w - 1 - t;
 			}
 	}
+
+	// sanity check
+	for (int i = 0; i < N; i++)
+		if (o[i] >= 0)
+		{
+			int ix = o[i] % w;
+			int iy = o[i] / w;
+			assert(0 <= ix && ix < w);
+			assert(0 <= iy && iy < h);
+			float x = oxy[2*i+0];
+			float y = oxy[2*i+1];
+			if (fabs(x - ix) > 0.5 || fabs(y-iy) > 0.5) fprintf(stderr, "i=%d, o[i]=%d, ixy=%d %d xy=%g %g\n", i, o[i], ix, iy, x, y);
+			assert(fabs(x - ix) < 0.6);
+			assert(fabs(y - iy) < 0.6);
+		}
 }
 
 static void compute_the_bresenham_parkour(
@@ -246,69 +261,116 @@ static void cast_shadows(
 		float a        // slope of the sun direction
 		)
 {
+	if (!p && !q) return;
 	fprintf(stderr, "cast shadows pqa = %g %g %g\n", p, q, a);
 	int N = w*h + 2*(w+h);  // maximum possible length of parkour
 	int *i = xmalloc(N*sizeof*i); // indices of Bresenham parkour
 	float *oxy = xmalloc(2*N*sizeof*oxy);
 	compute_the_bresenham_parkour_hack(i, oxy, w, h, p, q);
 	int l = -1; // index of the first point on the current line
+	            // note: l is an index for the "i" and "oxy" arrays
 	bool debbie = false;
 	float *dbuf = xmalloc(2*w*h*sizeof*dbuf);
+	for (int i = 0; i < 2*w*h; i++) dbuf[i] = 42;
 	float xy0[2];
-	for (int i = 0; i < 2*w*h; i++) dbuf[i] = 0;
 	for (int j = 0; j < N; j++)
 	{
-		if (i[j] < 0 && j+1<N && i[j+1] ) // mark the beginning of a line
+		if (i[j] < 0 && j+1<N && i[j+1]) // beginning of a line
 		{
-			l = i[j+1];
-			if (l > 0)
-				debbie =  l%w==0 && l/w==380;
-			xy0[0] = l % w;
-			xy0[1] = l / w;
+			l = j + 1;
+			//if (i[l] > 0) debbie = i[l]%w==0 && i[l]/w==380;
+			xy0[0] = i[l] % w;
+			xy0[1] = i[l] / w;
 		}
-		if (i[j] < 0 || l < 0) continue;
-		assert(i[l] < w*h);
-		assert(0 <= i[j]);
+		if (i[j] < 0 || i[l] < 0) continue;
+		assert(i[j] >= 0);
 		assert(i[j] < w*h);
-		if (l < 0) fprintf(stderr, "SHIT l=%d\n", l);
-		assert(0 <= l);
-		assert(l < w*h);
-		//dbuf[2*((i[j]/w)*w+(i[j]%w))+0] = oxy[2*j+0];
-		//dbuf[2*((i[j]/w)*w+(i[j]%w))+1] = oxy[2*j+1];
-		dbuf[2*i[j]+0] = oxy[2*i[j]+0];
-		dbuf[2*i[j]+1] = oxy[2*i[j]+1];
-		 int iX = l % w;  // X of last occluding point
-		 int iY = l / w;  // Y of last occluding point
+		if (i[l] < 0) fprintf(stderr, "SHIT l=%d i[l]=%d\n", l, i[l]);
+		dbuf[2*i[j]+0] = oxy[2*j+0];
+		dbuf[2*i[j]+1] = oxy[2*j+1];
+		 int iX = i[l] % w;  // X of last occluding point
+		 int iY = i[l] / w;  // Y of last occluding point
 		 assert(0 <= iX && iX < w);
 		 assert(0 <= iY && iY < h);
-		float X = oxy[2*i[l]+0];
-		float Y = oxy[2*i[l]+1];
-		// if (fabs(X-iX)>0.6) fprintf(stderr, "iX=%d X=%g\n", iX, X);
-		// assert(fabs(X-iX) < 0.6);
-		// assert(fabs(Y-iY) < 0.6);
-		float Z = D[l];   // Z of last occluding point
+		float X = oxy[2*l+0];
+		float Y = oxy[2*l+1];
+		 if (fabs(X-iX)>0.6) fprintf(stderr, "iX=%d X=%g\n", iX, X);
+		 assert(fabs(X-iX) < 0.6);
+		 assert(fabs(Y-iY) < 0.6);
+		float Z = D[i[l]];   // Z of last occluding point
 		 int ix = i[j] % w;  // x of current point
 		 int iy = i[j] / w;  // y of current point
 		 assert(0 <= ix && ix < w);
 		 assert(0 <= iy && iy < h);
-		float x = oxy[2*i[j]+0];
-		float y = oxy[2*i[j]+1];
-		float xx = oxy[2*(iy*w+ix)+0];
-		float yy = oxy[2*(iy*w+ix)+1];
-		// assert(fabs(x-ix) < 0.6);
-		// assert(fabs(y-iy) < 0.6);
+		float x = oxy[2*j+0];
+		float y = oxy[2*j+1];
+		 assert(fabs(x-ix) < 0.6);
+		 assert(fabs(y-iy) < 0.6);
 		float z = D[i[j]];   // z of current point
-		if (Z - z > a * hypot(x-X, y-Y)) // occluded point
-			D[i[j]] = NAN;
-		else // new occluding point
-			l = i[j];
 		if (debbie)
 			fprintf(stderr,
 				"xy0 = %g %G  iXY=%d %d, XYZ=%g %g %g, "
-				"ixy=%d %d, xyz = %g %g %g xxyy=%g %g, "
+				"ixy=%d %d, xyz = %g %g %g, " //xxyy=%g %g, "
 				"j=%d, i[j]=%d\n",
 				xy0[0], xy0[1], iX, iY, X, Y, Z,
-				ix, iy, x, y, z, xx, yy, j, i[j]);
+				ix, iy, x, y, z, //xx, yy,
+				j, i[j]);
+		if (Z - z > a * hypot(x-X, y-Y)) // occluded point
+			D[i[j]] = NAN;
+		else // new occluding point
+			l = j;
+
+		// LET US START OVER
+		//if (i[j] < 0 && j+1<N && i[j+1] ) // mark the beginning of a line
+		//{
+		//	l = i[j+1];
+		//	if (l > 0)
+		//		debbie =  l%w==0 && l/w==380;
+		//	xy0[0] = l % w;
+		//	xy0[1] = l / w;
+		//}
+		//if (i[j] < 0 || l < 0) continue;
+		//assert(0 <= i[j]);
+		//assert(i[j] < w*h);
+		//if (l < 0) fprintf(stderr, "SHIT l=%d\n", l);
+		//assert(0 <= l);
+		//assert(l < w*h);
+		////dbuf[2*((i[j]/w)*w+(i[j]%w))+0] = oxy[2*j+0];
+		////dbuf[2*((i[j]/w)*w+(i[j]%w))+1] = oxy[2*j+1];
+		//dbuf[2*i[j]+0] = oxy[2*i[j]+0];
+		//dbuf[2*i[j]+1] = oxy[2*i[j]+1];
+		// int iX = l % w;  // X of last occluding point
+		// int iY = l / w;  // Y of last occluding point
+		// assert(0 <= iX && iX < w);
+		// assert(0 <= iY && iY < h);
+		//float X = oxy[2*i[l]+0];
+		//float Y = oxy[2*i[l]+1];
+		//// if (fabs(X-iX)>0.6) fprintf(stderr, "iX=%d X=%g\n", iX, X);
+		//// assert(fabs(X-iX) < 0.6);
+		//// assert(fabs(Y-iY) < 0.6);
+		//float Z = D[l];   // Z of last occluding point
+		// int ix = i[j] % w;  // x of current point
+		// int iy = i[j] / w;  // y of current point
+		// assert(0 <= ix && ix < w);
+		// assert(0 <= iy && iy < h);
+		//float x = oxy[2*i[j]+0];
+		//float y = oxy[2*i[j]+1];
+		//float xx = oxy[2*(iy*w+ix)+0];
+		//float yy = oxy[2*(iy*w+ix)+1];
+		//// assert(fabs(x-ix) < 0.6);
+		//// assert(fabs(y-iy) < 0.6);
+		//float z = D[i[j]];   // z of current point
+		//if (debbie)
+		//	fprintf(stderr,
+		//		"xy0 = %g %G  iXY=%d %d, XYZ=%g %g %g, "
+		//		"ixy=%d %d, xyz = %g %g %g xxyy=%g %g, "
+		//		"j=%d, i[j]=%d\n",
+		//		xy0[0], xy0[1], iX, iY, X, Y, Z,
+		//		ix, iy, x, y, z, xx, yy, j, i[j]);
+		//if (Z - z > a * hypot(x-X, y-Y)) // occluded point
+		//	D[i[j]] = NAN;
+		//else // new occluding point
+		//	l = i[j];
 	}
 	free(i);
 	free(oxy);
