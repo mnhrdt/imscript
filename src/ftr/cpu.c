@@ -796,7 +796,7 @@ static void expose_topography(struct FTR *f)
 		cast_shadows(x, f->w, f->h,
 				-e->topographic_sun[0],
 				-e->topographic_sun[1],
-				e->topographic_sun[2]);
+				tan(asin(e->topographic_sun[2])));
 		for (int j = 0; j < f->h; j++)
 		for (int i = 0; i < f->w; i++)
 		for (int k = 0; k < 3; k++)
