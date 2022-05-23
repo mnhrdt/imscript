@@ -156,6 +156,11 @@ static float nodes_black[] = {
 	3, 0, 0, 0,
 };
 
+static float nodes_botw[] = {
+	1, 65, 49, 5,
+	2, 200, 200, 180,
+};
+
 static float *get_gpl_nodes(char *filename, int *n)
 {
 	int bufsize = 0xff, nnodes = 0;
@@ -234,6 +239,9 @@ static void fill_palette(struct palette *p, char *s, float m, float M)
 	} else if (0 == strcmp(s, "black")) {
 		set_node_positions_linearly(nodes_black, 3, m, M);
 		fill_palette_with_nodes(p, nodes_black, 3);
+	} else if (0 == strcmp(s, "botw")) {
+		set_node_positions_linearly(nodes_botw, 2, m, M);
+		fill_palette_with_nodes(p, nodes_botw, 2);
 	} else if (hassuffix(s, ".gpl")) {
 		int nnodes;
 		float *nodes = get_gpl_nodes(s, &nnodes);
