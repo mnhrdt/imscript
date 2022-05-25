@@ -175,7 +175,7 @@ int main(int c, char *v[])
 {
 	// process input arguments
 	if (c < 2 || c > 4) {
-		fprintf(stderr, "usage:\n\t%s a [dem_in [dem_out]]\n", *v);
+		fprintf(stderr, "usage:\n\t%s a [dem_in [sar_out]]\n", *v);
 		//                          0 1  2       3
 		return 1;
 	}
