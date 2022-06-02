@@ -361,7 +361,7 @@ static void cast_shadows(
 	free(i);
 	free(oxy);
 	////iio_write_image_float_vec("/tmp/dbuf.npy", dbuf, w, h, 2);
-	free(dbuf);
+	////free(dbuf);
 	for (int i = 0; i < w*h; i++)
 		if (!M[i])
 			D[i] = NAN;
