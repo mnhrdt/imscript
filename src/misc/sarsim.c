@@ -41,8 +41,9 @@ static void cast_horizontal_shadows(float *xx, int w, int h, float alpha)
 static float random_speckle(void)
 {
 	//return 1;
+	return pow(random_uniform(),.5);
 	//return random_uniform();
-	return pow(random_uniform(),2);
+	//return pow(random_uniform(),2);
 	//return pow(random_normal(),2);
 	//return fabs(random_normal());
 	//return random_uniform()*random_uniform();
