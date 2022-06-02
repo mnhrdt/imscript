@@ -304,8 +304,8 @@ static void cast_shadows(
 	int l = -1; // index of the first point on the current line
 	            // note: l is an index for the "i" and "oxy" arrays
 	bool debbie = false;
-	float *dbuf = xmalloc(2*w*h*sizeof*dbuf);
-	for (int i = 0; i < 2*w*h; i++) dbuf[i] = 42;
+	////float *dbuf = xmalloc(2*w*h*sizeof*dbuf);
+	////for (int i = 0; i < 2*w*h; i++) dbuf[i] = 42;
 	float xy0[2];
 	for (int j = 0; j < N; j++)
 	{
@@ -320,8 +320,8 @@ static void cast_shadows(
 		assert(i[j] >= 0);
 		assert(i[j] < w*h);
 		if (i[l] < 0) fprintf(stderr, "SHIT l=%d i[l]=%d\n", l, i[l]);
-		dbuf[2*i[j]+0] = oxy[2*j+0];
-		dbuf[2*i[j]+1] = oxy[2*j+1];
+		////dbuf[2*i[j]+0] = oxy[2*j+0];
+		////dbuf[2*i[j]+1] = oxy[2*j+1];
 		 int iX = i[l] % w;  // X of last occluding point
 		 int iY = i[l] / w;  // Y of last occluding point
 		 assert(0 <= iX && iX < w);
@@ -360,7 +360,7 @@ static void cast_shadows(
 	}
 	free(i);
 	free(oxy);
-	iio_write_image_float_vec("/tmp/dbuf.npy", dbuf, w, h, 2);
+	////iio_write_image_float_vec("/tmp/dbuf.npy", dbuf, w, h, 2);
 	free(dbuf);
 	for (int i = 0; i < w*h; i++)
 		if (!M[i])
