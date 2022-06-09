@@ -1,0 +1,1 @@
+v4l2-ctl -d /dev/video2 --list-formats-ext

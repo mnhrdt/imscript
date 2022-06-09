@@ -103,12 +103,19 @@ int *iio_read_image_int_split(const char *fname, int *w, int *h, int *pd);
 // end of this file.  More interesting are the two following general
 // functions:
 
+// TODO: call this number from python
 void *iio_read_image_numbers_as_they_are_stored(char *fname, int *w, int *h,
 		int *samples_per_pixel, int *sample_size,
 		bool *ieeefp_samples, bool *signed_samples);
 
 void *iio_read_image_numbers_in_requested_format(char *fname, int *w, int *h,
 		int *samples_per_pixel, int requested_sample_size,
+		bool requested_ieeefp, bool requested_sign);
+
+// TODO: implement this function
+void *iio_write_image_numbers_in_requested_format(char *fname, void *data,
+		int w, int h, int pixel_dimension,
+		int requested_sample_size,
 		bool requested_ieeefp, bool requested_sign);
 
 // These two general functions have the usual versions for nD images and

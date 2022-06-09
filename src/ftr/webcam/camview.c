@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include "iio.h" // for saving the screenshot
 #include "ftr.h"
 #include "cam.h"
 
@@ -63,6 +64,16 @@ static void kam_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
 
 }
 
+static void action_take_jpeg_screenshot(struct kam_state *e)
+{
+	static int c = 0;
+	char n[FILENAME_MAX];
+	snprintf(n, FILENAME_MAX, "webcam_%d.jpg", c);
+	iio_write_image_uint8_vec(n, e->c->rgb, e->c->w, e->c->h, 3);
+	fprintf(stderr, "wrote sreenshot on file \"%s\"\n", n);
+	c += 1;
+}
+
 void kam_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
 	if (m & FTR_MASK_SHIFT && islower(k)) k = toupper(k);
@@ -72,6 +83,7 @@ void kam_key_handler(struct FTR *f, int k, int m, int x, int y)
 
 	if (k == 'd') e->diff_mode = !e->diff_mode;
 	if (k == 'b') e->simplest_color_balance = !e->simplest_color_balance;
+	if (k == 'j') action_take_jpeg_screenshot(e);
 
 	if  (k == '\033' || k == 'q') // ESC or q
 		ftr_notify_the_desire_to_stop_this_loop(f, 1);
@@ -83,9 +95,9 @@ int main()
 	struct kam_state e[1];
 
 	// camera stuff
-	int w = 640;//800;
-	int h = 360;//600;
-	e->c = camera_begin("/dev/video0", w, h); // XXX: depends on cam!
+	int w = 960;//800;
+	int h = 720;//600;
+	e->c = camera_begin("/dev/video2", w, h); // XXX: depends on cam!
 
 	e->prev = malloc(2*3 * w * h);
 	e->diff_mode = 0;
