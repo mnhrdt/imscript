@@ -1,4 +1,4 @@
-CFLAGS ?= -O3 -march=native
+CFLAGS ?= -O3
 LDLIBS += -lm -lfftw3f
 
 OBJ = src/iio.o src/fancy_image.o
@@ -97,14 +97,14 @@ bin/% : src/misc/%.o $(OBJ)
 
 
 # single, fat, busybox-like executable
-BINOBJ = $(BIN:bin/%=src/%.o) #$(BIN_FTR:bin/%=src/ftr/%.o) src/ftr/ftr.o
-L = -lfftw3f -lpng -ltiff -ljpeg -llzma -lz -lm -ljbig $(LDLIBS) -lm -lpthread
-#L = -lfftw3f -lpng -ltiff -ljpeg -llzma -lz -lm -ljbig -lwebp -lpthread -lzstd -lX11 -lxcb -ldl
+BINOBJ = $(BIN:bin/%=src/%.o) $(BIN_FTR:bin/%=src/ftr/%.o) src/ftr/ftr.o
+#L = -lfftw3f -lpng -ltiff -ljpeg -llzma -lz -lm -ljbig $(LDLIBS) -lm -lpthread -lgsl -lgslcblas -lzstd
+L = -lfftw3f -lpng -ltiff -ljpeg -llzma -lz -lm -ljbig -lwebp -lpthread -lzstd -lX11 -lxcb -ldl -lgsl -lgslcblas -lhdf5_serial -ldl -lm -lXau -lpthread -lXdmcp -lzstd -lz -lsz -laec
 bin/im.static : src/im.o $(BINOBJ) $(OBJ) src/misc/overflow.o
 	$(CC) $(LDFLAGS) -static -Wl,--allow-multiple-definition -o $@ $^ $L
 
 BINOBJ2 = $(BIN:bin/%=src/%.o) $(BIN_FTR:bin/%=src/ftr/%.o) src/ftr/ftr.o
-L2 = $(LDLIBS) $(LDLIBS_FTR)
+L2 = $(LDLIBS) $(LDLIBS_FTR) -lgsl
 bin/im : src/im.o $(BINOBJ2) $(OBJ) src/misc/overflow.o
 	$(CC) $(LDFLAGS) -Wl,--allow-multiple-definition -o $@ $^ $(L2)
 
