@@ -309,10 +309,12 @@ void generic_create(struct FI *f, char *filename)
 #include "smapa.h"
 SMART_PARAMETER_SILENT(FORCE_GDAL,0)
 
+#ifdef FANCY_GDAL
 static bool has_prefix(const char *s, const char *p)
 {
 	return s == strstr(s, p);
 }
+#endif
 
 void generic_read(struct FI *f, char *filename)
 {

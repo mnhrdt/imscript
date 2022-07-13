@@ -343,12 +343,14 @@ static void fail(const char *fmt, ...)
 #endif//IIO_ABORT_ON_ERROR
 }
 
+#ifndef IIO_SHOW_DEBUG_MESSAGES
 static void do_nop(void *p, ...)
 {
 	va_list argp;
 	va_start(argp, p);
 	va_end(argp);
 }
+#endif
 
 static void *xmalloc(size_t size)
 {
@@ -2116,6 +2118,7 @@ struct twostrings { char *a, *b; };
 static bool string_suffix(const char *s, const char *suf);
 static herr_t find_suffix(hid_t o, const char *n, const H5O_info_t *i, void *d)
 {
+	(void)o;
 	struct twostrings *p = d;
 	if (i->type == H5O_TYPE_DATASET && string_suffix(n, p->a))
 		return strncpy(p->b, n, FILENAME_MAX),1;
@@ -2138,6 +2141,7 @@ hid_t my_hd5open(hid_t f, char *suffix)
 	struct twostrings p = {suffix, dset};
 	p.a = suffix;
 	herr_t e = H5Ovisit1(f, H5_INDEX_NAME, H5_ITER_NATIVE, u, &p);
+	IIO_DEBUG("H50visit1 e = %d\n", (int)e);
 	if (*dset) IIO_DEBUG("HDF5_DSET = /%s\n", dset);
 	return *dset ? H5Dopen2(f, dset, H5P_DEFAULT) : -1;
 }
@@ -3015,6 +3019,7 @@ static int read_beheaded_pds(struct iio_image *x,
 	if (n != 1) { free(x->data); return 3; }
 
 	// if necessary, transpose and trim data
+	if (flip_v) inplace_flip_vertical(x);
 	if (flip_h) inplace_flip_horizontal(x);
 		inplace_trim(x, crop_left, 0, crop_right, 0);
 
@@ -3389,9 +3394,9 @@ static int read_beheaded_vic(struct iio_image *x,
 	int f_nl = -1;      // number of lines
 	int f_ns = -1;      // number of samples (per line)
 	int f_nb = -1;      // numbef of bands (pixel dimension)
-	int f_n1 = -1;      // 1st dimension
-	int f_n2 = -1;      // 2nd dimension
-	int f_n3 = -1;      // 3rd dimension
+	//int f_n1 = -1;      // 1st dimension
+	//int f_n2 = -1;      // 2nd dimension
+	//int f_n3 = -1;      // 3rd dimension
 	int f_nbb = 0;      // trim bytes at left of each line line
 	int f_nlb = 0;      // trim records at the beginning
 
@@ -3414,9 +3419,9 @@ static int read_beheaded_vic(struct iio_image *x,
 		if (0 == strcmp(k, "NL"     )) f_nl  = atoi(v);
 		if (0 == strcmp(k, "NS"     )) f_ns  = atoi(v);
 		if (0 == strcmp(k, "NB"     )) f_nb  = atoi(v);
-		if (0 == strcmp(k, "N1"     )) f_n1  = atoi(v);
-		if (0 == strcmp(k, "N2"     )) f_n2  = atoi(v);
-		if (0 == strcmp(k, "N3"     )) f_n3  = atoi(v);
+		//if (0 == strcmp(k, "N1"     )) f_n1  = atoi(v);
+		//if (0 == strcmp(k, "N2"     )) f_n2  = atoi(v);
+		//if (0 == strcmp(k, "N3"     )) f_n3  = atoi(v);
 		if (0 == strcmp(k, "NBB"    )) f_nbb = atoi(v);
 		if (0 == strcmp(k, "NLB"    )) f_nlb = atoi(v);
 	cont:	 tok = strtok(0, " ");
@@ -3478,12 +3483,12 @@ static int read_beheaded_vic(struct iio_image *x,
 // CCSD3ZF reader                                                           {{{2
 
 // clean a short-padded string
-static void sanitize_label(char *s)
-{
-	int n = strlen(s);
-	if (n>1 && 0 == n%2 && !isalnum(s[n-1]))
-		s[n-1] = '\0';
-}
+//static void sanitize_label(char *s)
+//{
+//	int n = strlen(s);
+//	if (n>1 && 0 == n%2 && !isalnum(s[n-1]))
+//		s[n-1] = '\0';
+//}
 
 static int read_beheaded_ccs(struct iio_image *x,
 		FILE *f, char *header, int nheader)
@@ -4329,16 +4334,16 @@ static void iio_write_image_as_txt(const char *filename, struct iio_image *x)
 }
 
 // general text&separator writing function
-static void iio_write_image_as_txt_general(
-		const char *filename, struct iio_image *x,
-		char *optional_seplist)
-{
-	(void)filename;
-	(void)x;
-	char *seplist = optional_seplist;
-	if (!seplist) seplist = " \t\n";
-	int nseps = strlen(seplist);
-}
+//static void iio_write_image_as_txt_general(
+//		const char *filename, struct iio_image *x,
+//		char *optional_seplist)
+//{
+//	(void)filename;
+//	(void)x;
+//	char *seplist = optional_seplist;
+//	if (!seplist) seplist = " \t\n";
+//	int nseps = strlen(seplist);
+//}
 
 // RAW writer                                                               {{{2
 static void iio_write_image_as_raw(const char *filename, struct iio_image *x)
@@ -4762,38 +4767,42 @@ static void dump_sixels_to_stdout(struct iio_image *x)
 static void iio_write_image_as_jpeg(const char *filename, struct iio_image *x)
 {
 	// allocate and initialize a JPEG compression object
-	struct jpeg_compress_struct cinfo[1];
-	struct jpeg_error_mgr jerr[1];
-	cinfo->err = jpeg_std_error(jerr);
-	jerr[0].error_exit = on_jpeg_error;
-	jpeg_create_compress(cinfo);
+	struct jpeg_compress_struct c[1];
+	struct jpeg_error_mgr e[1];
+	c->err = jpeg_std_error(e);
+	e[0].error_exit = on_jpeg_error;
+	jpeg_create_compress(c);
 
 	// specify the destination of the compressed data
 	FILE *f = xfopen(filename, "w");
-	jpeg_stdio_dest(cinfo, f);
+	jpeg_stdio_dest(c, f);
 
 	// set parameters for compression
-	cinfo->image_width      = x->sizes[0];
-	cinfo->image_height     = x->sizes[1];
-	cinfo->input_components = x->pixel_dimension;
-	cinfo->in_color_space   = JCS_UNKNOWN;
-	if (x->pixel_dimension == 1) cinfo->in_color_space = JCS_GRAYSCALE;
-	if (x->pixel_dimension == 3) cinfo->in_color_space = JCS_RGB;
-	jpeg_set_defaults(cinfo);
+	c->image_width      = x->sizes[0];
+	c->image_height     = x->sizes[1];
+	c->input_components = x->pixel_dimension;
+	c->in_color_space   = JCS_UNKNOWN;
+	if (x->pixel_dimension == 1) c->in_color_space = JCS_GRAYSCALE;
+	if (x->pixel_dimension == 3) c->in_color_space = JCS_RGB;
+	jpeg_set_defaults(c);
+
+	// optionally, set compression quality
+	char *q = xgetenv("IIO_JPEG_QUALITY");
+	if (q) jpeg_set_quality(c, atoi(q), 1);
 
 	// compress
-	jpeg_start_compress(cinfo, true);
+	jpeg_start_compress(c, true);
 	int stride = x->sizes[0] * iio_image_pixel_size(x);
 	JSAMPROW r[1];
 	for (int j = 0; j < x->sizes[1]; j++)
 	{
 		r[0] = j*stride + (unsigned char*)x->data;
-		jpeg_write_scanlines(cinfo, r, 1);
+		jpeg_write_scanlines(c, r, 1);
 	}
 
 	// cleanup and exit
-	jpeg_finish_compress(cinfo);
-	jpeg_destroy_compress(cinfo);
+	jpeg_finish_compress(c);
+	jpeg_destroy_compress(c);
 	xfclose(f);
 }
 
@@ -5102,6 +5111,8 @@ static bool comma_named_tiff(const char *filename)
 	return retval;
 }
 
+
+#ifdef I_CAN_HAS_LIBHDF5
 static bool comma_named_hdf5(const char *filename)
 {
 	IIO_DEBUG("hdf5 try \"%s\"\n", filename);
@@ -5135,6 +5146,7 @@ static bool comma_named_hdf5(const char *filename)
 	}
 	return retval;
 }
+#endif//I_CAN_HAS_LIBHDF5
 
 // dispatcher                                                               {{{1
 

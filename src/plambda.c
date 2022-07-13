@@ -2661,6 +2661,7 @@ static int imageop_vector(float *out, float *img, int w, int h, int pd,
 			out[2*l+1] = apply_3x3_stencil(img,w,h,pd,ai,aj,l, sy);
 		}
 		}
+		return 0; // TODO: finish this code
 	case IMAGEOP_SHADOW: {
 		if (pd != 1) fail("can not yet compute shadow of a vector");
 		float vdx[3]={1,0,apply_3x3_stencil(img, w,h,pd, ai,aj,0, sx)};

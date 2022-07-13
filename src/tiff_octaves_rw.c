@@ -614,6 +614,7 @@ static void tiff_octaves_init0(struct tiff_octaves *t, char *filepattern,
 	}
 }
 
+inline
 static
 void tiff_octaves_init(struct tiff_octaves *t, char *filepattern,
 		double megabytes)
@@ -624,6 +625,7 @@ void tiff_octaves_init(struct tiff_octaves *t, char *filepattern,
 // the "implicit" version of "tiff_octaves_init" does not do preliminary checks
 // it is much faster, but it delays failures for non-existing files
 // during runtime
+inline
 static
 void tiff_octaves_init_implicit(struct tiff_octaves *t, char *fpat, int mbytes)
 {
@@ -849,7 +851,9 @@ void tiff_octaves_setpixel_float(struct tiff_octaves *t, int i, int j, float *p)
 	tiff_octaves_setpixel(t, i, j, pix);
 }
 
-static double from_sample_to_double(void *x, int fmt, int bps)
+inline
+static
+double from_sample_to_double(void *x, int fmt, int bps)
 {
 	if (!x) return -1;
 	switch(fmt) {
@@ -871,7 +875,9 @@ static double from_sample_to_double(void *x, int fmt, int bps)
 	return -1;
 }
 
-static void convert_pixel_to_float(float *out, struct tiff_info *t, void *in)
+inline
+static
+void convert_pixel_to_float(float *out, struct tiff_info *t, void *in)
 {
 	for (int i = 0; i < t->spp; i++)
 	{
