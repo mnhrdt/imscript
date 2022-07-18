@@ -3933,6 +3933,14 @@ static void iio_write_image_as_png(const char *filename, struct iio_image *x)
 	}
 	assert(color_type != PNG_COLOR_TYPE_PALETTE);
 
+	if (x->rem) { // add png comment
+		png_text pt;
+		pt.key = "Comment";
+		pt.text = x->rem;
+		pt.compression = PNG_TEXT_COMPRESSION_NONE;
+		png_set_text(pp, pi, &pt, 1);
+	}
+
 	FILE *f = xfopen(filename, "w");
 	png_init_io(pp, f);
 
@@ -5713,6 +5721,7 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 {
 	IIO_DEBUG("going to write into filename \"%s\"\n", filename);
 	int typ = normalize_type(x->type);
+	char rem_text[FILENAME_MAX];
 	if (x->dimension != 2) fail("de moment només escrivim 2D");
 	if (!strcmp(filename,"-") && isatty(1))
 	{
@@ -5726,7 +5735,18 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 					iio_strtyp(x->type));
 		return;
 	}
-	//if (tg
+	if (rem_prefix(filename)) {
+		char *colon = rem_prefix(filename);
+		int remlen = colon - (filename+4) - 1;
+		for (int i = 0; i < remlen; i++)
+			rem_text[i] = filename[4+i];
+		rem_text[remlen] = 0;
+		filename = 1 + colon;
+		x->rem = rem_text; // disappears when out of scope
+		IIO_DEBUG("rem filename = %s\n", filename);
+		IIO_DEBUG("rem text = %s\n", rem_text);
+		IIO_DEBUG("rem len = %d\n", remlen);
+	}
 	if (string_suffix(filename, ".uv") && typ == IIO_TYPE_FLOAT
 				&& x->pixel_dimension == 2) {
 		iio_write_image_as_juv(filename, x);
