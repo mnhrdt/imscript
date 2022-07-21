@@ -4022,16 +4022,19 @@ static void iio_write_image_as_tiff(const char *filename, struct iio_image *x)
 	}
 	TIFFSetField(tif, TIFFTAG_SAMPLEFORMAT, tsf);
 
-    // define TIFFTAG_ROWSPERSTRIP to satisfy some readers (e.g. gdal)
-    uint32_t rows_per_strip = x->sizes[1];
-    rows_per_strip = TIFFDefaultStripSize(tif, rows_per_strip);
-    TIFFSetField(tif, TIFFTAG_ROWSPERSTRIP, rows_per_strip);
+	// define TIFFTAG_ROWSPERSTRIP to satisfy some readers (e.g. gdal)
+	uint32_t rows_per_strip = x->sizes[1];
+	rows_per_strip = TIFFDefaultStripSize(tif, rows_per_strip);
+	TIFFSetField(tif, TIFFTAG_ROWSPERSTRIP, rows_per_strip);
 
 	FORI(x->sizes[1]) {
 		void *line = i*sls + (char *)x->data;
 		int r = TIFFWriteScanline(tif, line, i, 0);
 		if (r < 0) fail("error writing %dth TIFF scanline", i);
 	}
+
+	if (x->rem) // optional comment
+		TIFFSetField(tif, TIFFTAG_IMAGEDESCRIPTION, x->rem);
 
 	TIFFClose(tif);
 }
@@ -4131,7 +4134,9 @@ static void iio_write_image_as_ppm(const char *filename, struct iio_image *x)
 	int pd = x->pixel_dimension;
 	float *t = (float*) x->data;
 	float scale = 255;
-	fprintf(f, "P%c\n%d %d\n%g\n", dimchar, w, h, scale);
+	fprintf(f, "P%c\n", dimchar);
+	if (x->rem) fprintf(f, "# %s\n", x->rem);
+	fprintf(f, "%d %d\n%g\n", w, h, scale);
 	for (int i = 0; i < w*h*pd; i++)
 		fprintf(f, "%d\n", (int) t[i]);
 	xfclose(f);
@@ -4684,13 +4689,17 @@ static void iio_write_image_as_jpeg(const char *filename, struct iio_image *x)
 	char *q = xgetenv("IIO_JPEG_QUALITY");
 	if (q) jpeg_set_quality(c, atoi(q), 1);
 
-	// compress
+	// start compression, with optional comment field
 	jpeg_start_compress(c, true);
-	int stride = x->sizes[0] * iio_image_pixel_size(x);
+	if (x->rem)
+		jpeg_write_marker(c, JPEG_COM, (JOCTET*)x->rem, strlen(x->rem));
+
+	// compress scanlines
+	int s = x->sizes[0] * iio_image_pixel_size(x);
 	JSAMPROW r[1];
 	for (int j = 0; j < x->sizes[1]; j++)
 	{
-		r[0] = j*stride + (unsigned char*)x->data;
+		r[0] = j*s + (unsigned char*)x->data;
 		jpeg_write_scanlines(c, r, 1);
 	}
 
@@ -5735,6 +5744,7 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 					iio_strtyp(x->type));
 		return;
 	}
+	x->rem = xgetenv("IIO_REM");
 	if (rem_prefix(filename)) {
 		char *colon = rem_prefix(filename);
 		int remlen = colon - (filename+4) - 1;
