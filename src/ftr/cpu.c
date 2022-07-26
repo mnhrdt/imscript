@@ -530,6 +530,16 @@ static void action_reload_image(struct FTR *f)
 	f->changed = 1;
 }
 
+static void action_screenshot(struct FTR *f)
+{
+	static int c = 0;
+	char n[FILENAME_MAX];
+	snprintf(n, FILENAME_MAX, "screenshot_cpu_%d.png", c);
+	void iio_write_image_uint8_vec(char*,uint8_t*,int,int,int);
+	iio_write_image_uint8_vec(n, f->rgb, f->w, f->h, 3);
+	fprintf(stderr, "wrote sreenshot on file \"%s\"\n", n);
+	c += 1;
+}
 
 static bool insideP(int w, int h, int i, int j)
 {
@@ -996,6 +1006,7 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'S') action_topography_span(f, 1.3);
 	if (k == 'd') action_topography_Pspan(f, 1/1.3);
 	if (k == 'D') action_topography_Pspan(f, 1.3);
+	if (k == ',') action_screenshot(f);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
