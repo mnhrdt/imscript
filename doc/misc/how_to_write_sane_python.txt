@@ -34,7 +34,7 @@ F6. ... except when they are dictionary keys, which are quoted 'thusly'
 
 COMMENTS
 
-C1. write a single-line comment for each variable explaining its meaning
+C1. write a single-line comment for each variable, explaining its meaning
 C2. write a few lines of comment to document each function
 C3. docstrings are used only for functions intended to be used in another file
 C4. the docstring does not replace the comment associated to the function.  It
@@ -51,10 +51,19 @@ IMPORTING
 
 I1. strive to minimize the number of imports
 I2. imports should be as local as possible (e.g., inside a function)
-I3. Comparison of importing styles:
+I3. unless your script has code at level 0, global imports are prohibited
+I4. Comparison of importing styles:
     BAD: import package as pk         # your code becomes un-copypasteable
     GOOD: import package              # code is clear (but may be too verbose)
     BEST: from package import fu bar  # useful for short and function-heavy code
+
+
+EXPORTING
+
+E1. do not export visibility of dependencies
+E2. do not export visubility of unnecessary functions
+E3. each exported function must have a comprehensive docstring
+E4. use sys.modules[__name__] = foo to avoid foo.foo stupidity
 
 
 USAGE
