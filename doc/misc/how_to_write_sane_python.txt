@@ -74,3 +74,14 @@ U3. in numpy, never use .dot, use always @
 U4. use matplotlib for plots, but do not EVER use it for displaying an image
 U5. tkinter is there, and is useful, and is simple; do not be afraid of it
 U6. represent graphs as sparse matrices, not as dictionaries^2
+
+
+SHELL ENVIRONEMENT
+
+S1. rm -rf ~/.local ; touch ~/.local ; chmod 000 ~/.local # once and for all
+S2. mkdir -p ~/local/{bin,share/python,dotlocal}
+S3. export PATH=~/local/bin:~/local/share/python/bin:$PATH
+S4. export PYTHONDONTWRITEBYTECODE=1
+S5. export PYTHONUSERBASE=~/local/share/python
+S6. export XDG_DATA_HOME=~/local/share/dotlocal
+S7. pip install shit  # only affects your local user
