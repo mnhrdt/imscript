@@ -1,0 +1,26 @@
+For Release 1:
+
+- fix a set of "core" tools, move others to misc
+- add --help/manpage to each of the core tools
+- add a tutorial line for each core tool, tutorial build becomes test suite
+
+
+Release 2:
+
+- refactor the linking to build a single-executable entry point (a la git)
+
+
+Release 3:
+
+- build single executable as an αpε
+
+
+Release 4:
+
+- arrange core/misc divide: move and remove stuff
+
+
+Release 5:
+
+- ftr: add some neat terminal-based backends (tip, sixel, ...)
+- arrange ftr tools
