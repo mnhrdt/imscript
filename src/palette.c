@@ -227,10 +227,10 @@ static void fill_palette(struct palette *p, char *s, float m, float M)
 	} else if (0 == strcmp(s, "dem")) {
 		set_node_positions_linearly(nodes_dem, 8, m, M);
 		fill_palette_with_nodes(p, nodes_dem, 8);
-	} else if (0 == strcmp(s, "nice")) {
+	} else if (0 == strcmp(s, "nice") || 0 == strcmp(s, "signed")) {
 		set_node_positions_linearly(nodes_nice, 3, m, M);
 		fill_palette_with_nodes(p, nodes_nice, 3);
-	} else if (0 == strcmp(s, "nnice")) {
+	} else if (0 == strcmp(s, "nnice") || 0 == strcmp(s, "nsigned")) {
 		set_node_positions_linearly(nodes_nnice, 3, m, M);
 		fill_palette_with_nodes(p, nodes_nnice, 3);
 	} else if (0 == strcmp(s, "white")) {
@@ -544,8 +544,47 @@ void save_legend(char *filename_legend, char *palette_id, float m, float M)
 //	free(y);
 //	return 0;
 //}
+
+static char *help_string_name     = "palette";
+static char *help_string_version  = "palette 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "colorize a grayscale image using a palette";
+static char *help_string_usage    = "usage:\n\t"
+"palette from to pal [in [out]] [-l legend.png]";
+static char *help_string_long     =
+"Palette colorizes a grayscale image using a color scheme\n"
+"\n"
+"Gray values between FROM and TO are linearly mapped to the colors\n"
+"of the palette PAL.\n"
+"\n"
+"Usage: palette FROM TO PAL in.tiff out.png\n"
+"   or: palette FROM TO PAL in.tiff > out.pnm\n"
+"   or: cat in.tiff | palette FROM TO PAL > out.pnm\n"
+"\n"
+"Palettes:\n"
+" signed     blue-white-red\n"
+" nsigned    red-white-blue\n"
+" dem        from blue to white through \"topographical\" colors\n"
+" botw       brownish colors like in the zelda game\n"
+" pal.gpl    read palette from gimp palette file\n"
+" pal.gpf    read palette from gnuplot color gradient file\n"
+"\n"
+"Options:\n"
+" -l legend.png\tsave a legend of colors\n"
+" -h\t\tdisplay short help message\n"
+" --help\t\tdisplay longer help message\n"
+"\n"
+"Examples:\n"
+" palette -1 1 signed in.tiff out.png   Visualize a signed image.\n"
+" palette 0 2000 dem in.tiff out.png    Visualize a topographic map\n"
+"\n"
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
+;
+#include "help_stuff.c" // functions that print the strings named above
 int main_palette(int c, char *v[])
 {
+	if (c == 2)
+		if_help_is_requested_print_it_and_exit_the_program(v[1]);
+
 	char *filename_legend = pick_option(&c, &v, "l", "");
 	if (c != 4 && c != 5 && c != 6 ) {
 		fprintf(stderr, "usage:\n\t%s from to pal [in [out]]\n", *v);

@@ -1,3 +1,4 @@
+export SOURCE_DATE_EPOCH=1666666666
 help2man --help >/dev/null &&\
 for i in `ls ../src/*.c ../src/ftr/*.c|grep -v help_stuff`; do
 	X=`basename $i .c`
