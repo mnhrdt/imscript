@@ -8,7 +8,7 @@
 #include "xmalloc.c"
 #include "smapa.h"
 
-SMART_PARAMETER_SILENT(HISMOTTH,0)
+SMART_PARAMETER_SILENT(HISMOOTH,0)
 SMART_PARAMETER_SILENT(SHOWSTATS,0)
 
 static void smooth_histogram_rw(long double (*h)[2], int n, int w)
@@ -50,8 +50,8 @@ static int fill_histogram(long double (*h)[2], float *in_x, int n)
 	r += 1;
 
 	free(x);
-	if (HISMOTTH() > 0)
-		smooth_histogram_rw(h, r, HISMOTTH());
+	if (HISMOOTH() > 0)
+		smooth_histogram_rw(h, r, HISMOOTH());
 	return r;
 }
 
@@ -70,7 +70,7 @@ static void dump_histogram(long double (*h)[2], int n)
 	accumulate_histogram(a, n);
 	printf("set xrange [%Lg:%Lg]\n", h[0][0], h[n-1][0]);
 	printf("set yrange [0:]\n");
-	printf("set format y \"\"\n");
+	//printf("set format y \"\"\n");
 	if (SHOWSTATS() > 0) {
 		printf("set samples 1000\nset key left\n");
 		printf("N(m,s,x)=exp(-(x-m)**2/(2*s*s))/(s*sqrt(2*pi))\n");
@@ -104,9 +104,43 @@ static void dump_histogram(long double (*h)[2], int n)
 	free(a);
 }
 
+static char *help_string_name     = "ghisto";
+static char *help_string_version  = "ghisto 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "compute the histogram of an image, in gnuplot format";
+static char *help_string_usage    = "usage:\n\t"
+"ghisto [-p] [img.png] > histo.g";
+static char *help_string_long     =
+"Ghisto computes the histogram of an image.\n"
+"\n"
+"The histogram is printed in a format that can be piped directly to gnuplot.\n"
+"Notice that no quantization is made by this program, if the input image\n"
+"is floating point, it is likely that all pixel values will be different\n"
+"and the histogram will look flat.\n"
+"\n"
+"Usage: ghisto img.png > histo.g\n"
+"   or: cat img.png | ghisto > histo.g\n"
+"\n"
+"Options:\n"
+" -p\t\twrite a png-producing gnuplot program\n"
+" -h\t\tdisplay short help message\n"
+" --help\t\tdisplay longer help message\n"
+"\n"
+"Environment:\n"
+" HISMOOTH    filter the histogram by a rectangular kernel of this width\n"
+" SHOWSTATS   show various statistics (curves, etc)\n"
+"\n"
+"Examples:\n"
+" ghisto img.png | gnuplot                View histogram in a gnuplot window.\n"
+" ghisto -p img.png | gnuplot > hist.png  Create png image of the histogram\n"
+"\n"
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
+;
+#include "help_stuff.c" // functions that print the strings named above
 #include "pickopt.c"
 int main_ghisto(int c, char *v[])
 {
+	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
+
 	bool term_png = pick_option(&c, &v, "p", NULL);
 	if (c != 2 && c != 1) {
 		fprintf(stderr, "usage:\n\t%s [in]\n", *v);

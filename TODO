@@ -19,6 +19,7 @@ Release 3:
 Release 4:
 
 - arrange core/misc divide: move and remove stuff
+- refactor interface to remove some envvars in favor of options
 
 
 Release 5:
