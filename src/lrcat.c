@@ -51,8 +51,39 @@ int main_lrcat_two(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
+static char *help_string_name     = "lrcat";
+static char *help_string_version  = "lrcat 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "concatenate images horizontally";
+static char *help_string_usage    = "usage:\n\t"
+"lrcat in1 in2 ... {> out|-o out}";
+static char *help_string_long     =
+"Concatenate several images horizontally (from left to right).\n"
+"\n"
+"Lrcat creates a \"wide\" image by joining several images horizontally.\n"
+"If the images have different heights, the background is filled with the\n"
+"value of the environement variable $BACKGROUND.\n"
+"\n"
+"Usage: lrcat in1 in2 in3 ... > out\n"
+"   or: lrcat in1 in2 in3 ... -o out\n"
+"\n"
+"Options:\n"
+" -h\t\tdisplay short help message\n"
+" --help\t\tdisplay longer help message\n"
+"\n"
+"Environment:\n"
+" BACKGROUND\tvalue to fill the background when images have different height\n"
+"\n"
+"Examples:\n"
+" lrcat lena.png lena.png -o twolenas.png            duplicate an image\n"
+" BACKGROUND=255 lrcat a.png b.png c.png -o abc.png  mosaic with white background\n"
+"\n"
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
+;
+#include "help_stuff.c" // functions that print the strings named above
 int main_lrcat(int c, char *v[])
 {
+	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
+
 	char *filename_out = pick_option(&c, &v, "o", "-");
 	int n = c - 1;
 	char *filename[n+1];

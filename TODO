@@ -7,7 +7,8 @@ For Release 1:
 
 Release 2:
 
-- refactor the linking to build a single-executable entry point (a la git)
+- refactor the compilation to produce a single-executable (a la git/busybox)
+- open question: include all .c into a single tu, or link the .o together?
 
 
 Release 3:

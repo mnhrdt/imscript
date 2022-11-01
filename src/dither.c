@@ -130,8 +130,40 @@ void dither_sep(float *x, int w, int h, int pd, _Bool b)
 #include <stdlib.h>
 #include "iio.h"
 #include "pickopt.c"
+
+static char *help_string_name     = "dither";
+static char *help_string_version  = "dither 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "binarize a grayscale image by dithering";
+static char *help_string_usage    = "usage:\n\t"
+"dither [-b] [in [out]]";
+static char *help_string_long     =
+"Filter that binarizes a grayscale image by the Floyd-Steinberg algorithm.\n"
+"\n"
+"The input image is assumed to take values between 0=black and 255=white.\n"
+"The output image is binary on the same range.  For color images,\n"
+"the algorithm is applied independently to each color channel.\n"
+"\n"
+"Usage: dither in.png out.png\n"
+"   or: dither in.png > out.npy\n"
+"   or: cat in.png | dither > out.npy\n"
+"\n"
+"Options:\n"
+" -b\t\tboustrophedonic traversal order\n"
+" -h\t\tdisplay short help message\n"
+" --help\t\tdisplay longer help message\n"
+"\n"
+"Examples:\n"
+" dither lena.png lena.pbm             Floyd-Steinberg dithering\n"
+" blur C 1 lena.png | qauto | dither   contrast-enhanced dithering\n"
+"\n"
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
+;
+#include "help_stuff.c" // functions that print the strings named above
 int main_dither(int c, char *v[])
 {
+	if (c == 2)
+		if_help_is_requested_print_it_and_exit_the_program(v[1]);
+
 	_Bool option_b = pick_option(&c, &v, "b", 0);
 	if (c != 1 && c != 2 && c != 3) {
 		fprintf(stderr, "usage:\n\t%s [gray [binary]]\n", *v);

@@ -30,7 +30,7 @@ philosophy.
 3. IMPLEMENTATION
 
 The graph of dependencies between files is as disconnected as possible.
-Most programs use the functions from "iio.c" for opening and saving images.
+Most programs use the functions from "iio.c" for reading and writing images.
 The interactive tools use the functions from "ftr.c" for the gui.
 Some files may be directly included into others (e.g., "random.c").
 
@@ -71,16 +71,16 @@ desired executables into your PATH (or add imscript/bin into the path).
 	- iion: copy named input to named output (useful to change file format)
 
 * Accumulators: combine several images into one
-	- plambda: apply an arbitrary pixel-wise expression, given explicitly
-	- veco: generic pixel-wise expressions for gray images, gray output
-	- vecov: generic pixel-wise expressions for color images, color output
-	- vecoh: generic pixel-wise operations for gray images, color output
-	- tbcat: concatenate two image (top-bottom)
-	- lrcat: concatenate two image (left-right)
+	- plambda: apply an arbitrary pixel-wise expression
+	- veco: generic pixel-wise accumulators for gray images, gray output
+	- vecov: generic pixel-wise accumulators for color images, color output
+	- vecoh: generic pixel-wise accumulators for gray images, color output
+	- tbcat: concatenate images vertically (top-bottom)
+	- lrcat: concatenate images horizontally (left-right)
 
 * Queries: extract data from one image
 	- imprintf: print a formatted string of image data
-	- ghisto: common histogram
+	- ghisto: common histogram, in gnuplot format
 	- contihist: continuous histogram
 	- viewflow:  represent a vector field using a color code
 	- flowarrows: represent a vector field using arrows
@@ -113,8 +113,8 @@ desired executables into your PATH (or add imscript/bin into the path).
 	- ijmesh: build 3D mesh from non-calibrated 2.5D representation
 
 * Multi-program suites:
-	- siftu: operations for sift keypoints
-	- tiffu: operations for tiff files
+	- siftu: operations for sift keypoints (transform, match, etc)
+	- tiffu: operations for tiff files (access tiles, sub-images, etc)
 	- fontu: operations for bitmapped fonts
 
 * Miscellaneous:

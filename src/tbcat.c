@@ -2,13 +2,13 @@
 #include <stdlib.h>
 #include "iio.h"
 
-#include "smapa.h"
 #include "xmalloc.c"
 #include "getpixel.c"
 #include "pickopt.c"
 
 #define BAD_MAX(a,b) (a)<(b)?(b):(a);
 
+#include "smapa.h"
 SMART_PARAMETER_SILENT(BACKGROUND,0)
 
 int main_tbcat_two(int c, char *v[])
@@ -51,8 +51,39 @@ int main_tbcat_two(int c, char *v[])
 	return EXIT_SUCCESS;
 }
 
+static char *help_string_name     = "tbcat";
+static char *help_string_version  = "tbcat 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "concatenate images vertically";
+static char *help_string_usage    = "usage:\n\t"
+"tbcat in1 in2 ... {> out|-o out}";
+static char *help_string_long     =
+"Concatenate several images vertically (from top to bottom).\n"
+"\n"
+"Tbcat creates a \"tall\" image by joining several images vertically.\n"
+"If the images have different widths, the background is filled with the\n"
+"value of the environement variable $BACKGROUND.\n"
+"\n"
+"Usage: tbcat in1 in2 in3 ... > out\n"
+"   or: tbcat in1 in2 in3 ... -o out\n"
+"\n"
+"Options:\n"
+" -h\t\tdisplay short help message\n"
+" --help\t\tdisplay longer help message\n"
+"\n"
+"Environment:\n"
+" BACKGROUND\tvalue to fill the background when images have different width\n"
+"\n"
+"Examples:\n"
+" tbcat lena.png lena.png -o twolenas.png            duplicate an image\n"
+" BACKGROUND=255 tbcat a.png b.png c.png -o abc.png  mosaic with white background\n"
+"\n"
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
+;
+#include "help_stuff.c" // functions that print the strings named above
 int main_tbcat(int c, char *v[])
 {
+	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
+
 	char *filename_out = pick_option(&c, &v, "o", "-");
 	int n = c - 1;
 	char *filename[n+1];
