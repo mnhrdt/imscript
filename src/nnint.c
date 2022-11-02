@@ -261,11 +261,42 @@ void nnint_split(float *x, int w, int h, int pd)
 #endif
 
 #ifdef USE_NNINT_MAIN
+static char *help_string_name     = "nnint";
+static char *help_string_version  = "nnint 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "nearest neighbor interpolation";
+static char *help_string_usage    = "usage:\n\t"
+"nnint [-m mask.png] [in.npy [out.npy]]";
+static char *help_string_long     =
+"Nnint fills-in the missing pixels of an image by nearest-neighbor.\n"
+"\n"
+"The missing pixels are those whose value is NAN.  (Alternatively,\n"
+"a binary mask image can be given.)  For a color image, each pixel\n"
+"dimension is treated independently.\n"
+"\n"
+"Usage: nnint in.npy out.npy\n"
+"   or: nnint in.npy > out.npy\n"
+"   or: cat in.npy | nnint > out.npy\n"
+"\n"
+"Options:\n"
+" -m mask.png\tuse a separate binary mask instead of inline NANs\n"
+" -h\t\tdisplay short help message\n"
+" --help\t\tdisplay longer help message\n"
+"\n"
+"Examples:\n"
+" nnint in.tiff out.tiff            Remove the NANs by nearest-neighbor\n"
+" nnint -m mask.png in.png out.png  Fill-in the holes determined by the mask\n"
+"\n"
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
+;
+#include "help_stuff.c" // functions that print the strings named above
+
 #include <stdio.h>
 #include "iio.h"
 #include "pickopt.c"
 int main_nnint(int c, char *v[])
 {
+	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
+
 	char *filename_mask = pick_option(&c, &v, "m", "");
 	_Bool help_argument = pick_option(&c, &v, "h", 0);
 	if (help_argument || (c != 1 && c != 2 && c != 3)) {

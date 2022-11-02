@@ -37,8 +37,8 @@ Some files may be directly included into others (e.g., "random.c").
 
 4. COMPILATION
 
-make full -j   # build all the tools (including the interctive ones)
-make -j        # build only the basic tools
+make -j        # build only the core tools
+make full -j   # build all tools (including miscellaneous and interctive ones)
 
 
 5. PREREQUISITES

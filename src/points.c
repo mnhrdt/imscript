@@ -35,7 +35,7 @@ int main_random(int c, char *v[])
 {
 	float s = atof(pick_option(&c, &v, "s", "1"));
 	char *offset_string = pick_option(&c, &v, "o", "");
-	fprintf(stderr, "c=%d\n", c);
+	//fprintf(stderr, "c=%d\n", c);
 	if (c != 4) {
 		fprintf(stderr, "usage:\n\t%s dimension distribution npoints"
 		//                          0 1         2            3
