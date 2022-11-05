@@ -304,10 +304,55 @@ void poisson_solver_separable(float *out, float *in, float *dat,
 
 #define MAIN_IPOL_POISSON
 #ifdef MAIN_IPOL_POISSON
+static char *help_string_name     = "simpois";
+static char *help_string_version  = "simpois 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "a simple Poisson solver for images";
+static char *help_string_usage    = "usage:\n\t"
+"simpois [options] [-m mask.png] [-f data.npy] [-i in.npy] [-o out.npy]";
+static char *help_string_long     =
+"Simpois is a simple Poisson solver for image processing.\n"
+"\n"
+"This program can solve Poisson, Laplace and Biharmonic equations\n"
+"over an arbitrary part of the image domain, with arbitrary data terms\n"
+"and boundary conditions.  Fast approximations to the solution can be\n"
+"obtained by setting the parameters.  Solving over the whole image domain\n"
+"is discouraged, as it is always better to use fft-based methods.\n"
+"\n"
+"Usage: simpois [options] -i in.npy -o out.npy\n"
+"   or: simpois [options] -i in.npy > out.npy\n"
+"   or: cat in.npy | simpois [options] -o out.npy\n"
+"   or: cat in.npy | simpois [options] > out.npy\n"
+"\n"
+"Options:\n"
+" -i IMG\tInput image with boundary data (default=stdin)\n"
+" -f IMG\tPoisson data term (default=zeros)\n"
+" -m IMG\tMask for the region of interest (default=zeros)\n"
+" -o IMG\tOutput image (default=stdout)\n"
+" -t 0.25\tTime step for Gauss-Seidel iterations (negative=biharmonic)\n"
+" -n 10\tNumber of Gauss-Seidel iterations\n"
+" -s 99\tMaximum number of multi-scale octaves\n"
+" -c 0\tNumber of Conjugate Gradient iterations\n"
+" -h\tdisplay short help message\n"
+" --help\tdisplay longer help message\n"
+"\n"
+"Examples:\n"
+" cat in.npy | simpois > out.npy           Fill NANs by Laplace equation\n"
+" cat in.npy | simpois -n 1 > out.npy      Fill NANs, fast (one iteration)\n"
+" cat in.npy | simpois -t -0.08 > out.npy  Fill NANs, smooth (Biharmonic)\n"
+" simpois -i in.npy -o out.npy             Laplace, with explicit data\n"
+" simpois -m mask.png ...                  Use mask instead of NANs\n"
+" simpois -f lap.npy ...                   Poisson editor\n"
+"\n"
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
+;
+#include "help_stuff.c" // functions that print the strings named above
 #include "iio.h"      // library for image input/output
 #include "pickopt.c"  // function for extracting named command line arguments
 int main_simpois(int argc, char *argv[])
 {
+	if (argc==2)
+		if_help_is_requested_print_it_and_exit_the_program(argv[1]);
+
 	// extract named arguments
 	float tstep = atof(pick_option(&argc, &argv, "t", "0.25"));
 	float niter = atof(pick_option(&argc, &argv, "n", "10"));

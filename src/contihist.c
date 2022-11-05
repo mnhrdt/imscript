@@ -472,12 +472,44 @@ static void update_min_max_if_not_finite(float *m, float *M, float *x, int n)
 #include <stdlib.h>
 #include "iio.h"
 #include "pickopt.c"
+
+static char *help_string_name     = "contihist";
+static char *help_string_version  = "contihist 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "compute the \"continuous\" histogram of an image";
+static char *help_string_usage    = "usage:\n\t"
+"contihist NSAMPLES MIN MAX [-p] [img.png] > histo.g";
+static char *help_string_long     =
+"Contihist computes the continuous histogram of an image.\n"
+"\n"
+"The continuous histogram is defined as the limit histogram of the image\n"
+"zoomed-in linearly by an infinite factor.  Thus, the continuous histogram\n"
+"is a function R->R that is sampled at NSAMPLES positions between MIN and MAX\n"
+"to produce the output of this program.\n"
+"The histogram is printed in a format that can be piped directly to gnuplot.\n"
+"\n"
+"Usage: contihist NSAMPLES MIN MAX img.png > histo.g\n"
+"   or: cat img.png | contihist NSAMPLES MIN MAX > histo.g\n"
+"\n"
+"Options:\n"
+" -p\t\twrite a png-producing gnuplot program\n"
+" -h\t\tdisplay short help message\n"
+" --help\t\tdisplay longer help message\n"
+"\n"
+"Examples:\n"
+" contihist a.png 1000 0 255 | gnuplot              View in gnuplot window\n"
+" contihist -p 1000 0 255 a.png | gnuplot > h.png   Histogram as a png image\n"
+"\n"
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
+;
+#include "help_stuff.c" // functions that print the strings named above
 int main_contihist(int c, char *v[])
 {
+	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
+
 	// process input arguments
 	bool term_png = pick_option(&c, &v, "p", NULL);
 	if (c != 5) {
-		fprintf(stderr, "usage:\n\t%s nbins min max img.png\n", *v);
+		fprintf(stderr, "usage:\n\t%s nsamples min max img.png\n", *v);
 		//                          0 1     2   3   4
 		return 1;
 	}

@@ -296,8 +296,45 @@ void amle_old(float *y, float *x, int w, int h)
 #endif
 
 
+static char *help_string_name     = "amle";
+static char *help_string_version  = "amle 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "Absolutely Minimizing Lipschitz Extension";
+static char *help_string_usage    = "usage:\n\t"
+"simpois [in [mask [out]]]";
+static char *help_string_long     =
+"Interpolate by AMLE (Absolutely Minimizing Lipschitz Extension).\n"
+"\n"
+"The pixels to fill-in are specified by NAN values in the input image\n"
+"or by a separate user-provided mask.  The interpolated is defined\n"
+"as that whose maximal slope is the lowest possible, recursively in all\n"
+"subsets on the region of interest.\n"
+"\n"
+"Usage: amle in.npy mask.png out.npy\n"
+"   or: amle in.npy mask.png > out.npy\n"
+"   or: amle in.npy > out.npy\n"
+"   or: cat in.npy | amle > out.npy\n"
+"\n"
+"Options:\n"
+" -h\tdisplay short help message\n"
+" --help\tdisplay longer help message\n"
+"\n"
+"Environement:\n"
+" AMLE_NN\tNeigborhood size (4, 6, 8, 16, 26 or 32, default=4)\n"
+" AMLE_TAU\tTimestep for the iterations (default=0.25)\n"
+" AMLE_NITER\tNumber of iterations at each scale (default=100)\n"
+" AMLE_INIT\tInitial image for the iterations (default=zeros)\n"
+"\n"
+"Examples:\n"
+" amle in.npy > out.npy               Fill-in the holes in a DSM\n"
+" AMLE_NN=32 amle in.npy > out.npy    More precise, slower solver\n"
+"\n"
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
+;
+#include "help_stuff.c" // functions that print the strings named above
 int main_amle(int c, char *v[])
 {
+	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
+
 	if (c > 4 || (v[1] && v[1][0]=='-' && v[1][1]=='h')) {
 		fprintf(stderr, "usage:\n\t%s [in [mask [out]]]\n", *v);
 		//                          0  1   2     3
