@@ -45,7 +45,7 @@ static void error(const char *fmt, ...)
 	exit(-1);
 #else//NDEBUG
 	//print_trace(stderr);
-	exit(*(int *)0x43);
+	exit(*(volatile int *)0);
 #endif//NDEBUG
 }
 

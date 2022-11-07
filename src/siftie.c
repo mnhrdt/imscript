@@ -1330,7 +1330,7 @@ struct ann_trip *siftlike_get_tripletsrad(
 	struct ann_trip *p = xmalloc(na * sizeof * p);
 	int np = 0;
 	FORI(na) {
-		float db, dc;
+		float db = INFINITY, dc = INFINITY;
 		int jb = fancynearestt_rad(ka + i, kb, nb, &db, t, rx, ry);
 		int jc = fancynearestt_rad(ka + i, kc, nc, &dc, t, rx, ry);
 		if (jb >= 0 && jc >= 0) {
@@ -1568,7 +1568,7 @@ static void homographic_mapf(float y[2], float H[9], float x[2])
 }
 
 static
-void siftaff(struct sift_keypoint *t, int n, float A[9])
+void siftaff(struct sift_keypoint *t, int n, float A[6])
 {
 	float det = A[0]*A[4] - A[1]*A[3];
 	//fprintf(stderr, "det = %g\n", det);

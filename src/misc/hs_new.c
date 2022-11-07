@@ -20,7 +20,7 @@ static void abort_with_message(const char *fmt, ...)
 #ifdef NDEBUG
 	exit(-1);
 #else//NDEBUG
-	exit(*(int *)0x43);
+	exit(*(volatile int *)0);
 #endif//NDEBUG
 }
 

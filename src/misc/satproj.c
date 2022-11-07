@@ -160,8 +160,8 @@ double objective_height_side(double h, void *ee)
 static void raytrace(double out[3],
 		double L[8], float *heights, int w, int h, double ij[2])
 {
-	double base[3] = {ij[0], ij[1], 0};
-	apply_projection(base, L, ij);
+	double base[3], ij0[3] = {ij[0], ij[1], 0};
+	apply_projection(base, L, ij0);
 	double bh = bicubic_interpolation(heights, w, h, base[0], base[1]);
 
 	struct bisection_state e[1];

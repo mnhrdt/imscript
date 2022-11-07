@@ -449,6 +449,9 @@ int moistiv_epipolar(float *m1, float *m2, int *k, float *z,
   float **c  = matrix(1,9,1,9);
   float *w  = vector(1,9);
   float **v  = matrix(1,9,1,9);
+  //float c[9][9];
+  //float w[9];
+  //float v[9][9];
   float a[4];
 
   /* build 9xn matrix from point matches */

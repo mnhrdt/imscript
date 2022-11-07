@@ -393,7 +393,8 @@ static int obtain_octave(struct pan_state *e)
 
 
 // affine approximation of the projection function {{{1
-static void window_to_image_exh(double*,struct pan_state*,double,double,double);
+static void window_to_image_exh(double[2],struct pan_state*,
+		double,double,double);
 
 static void raster_to_image_exh(double out[2], struct pan_state *e,
 		double x, double y, double h);

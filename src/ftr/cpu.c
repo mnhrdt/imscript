@@ -136,6 +136,7 @@ static void pixel(float *out, struct pan_state *e, double p, double q)
 static void pixel_rgbf(float out[3], struct pan_state *e, double p, double q)
 {
 	float v[e->i->pd];
+	v[e->i->pd-1] = 0; // remove an idiotic gcc warning
 	pixel(v, e, p, q);
 	get_rgb_from_vec(out, e, v);
 }

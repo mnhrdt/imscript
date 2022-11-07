@@ -84,7 +84,7 @@ static void fail(const char *fmt, ...)
 #  ifdef NDEBUG
 	exit(-1);
 #  else//NDEBUG
-	exit(*(int *)0x43);
+	exit(*(volatile int *)0);
 #  endif//NDEBUG
 }
 #endif//_FAIL_C
@@ -244,6 +244,7 @@ static void get_tiff_info_filename(struct tiff_info *t, char *fname)
 	TIFF *tif = tiffopen_fancy(fname, "r");
 	if (!tif)
 		fail("could not open TIFF file \"%s\" for reading", fname);
+	t->ntiles = 0;
 	get_tiff_info(t, tif);
 	TIFFClose(tif);
 }

@@ -122,7 +122,7 @@ void error(const char *fmt, ...)
 	exit(-1);
 #else
 	//print_trace(stderr);
-	exit(*(int *)0x43);
+	exit(*(volatile int *)0);
 #endif
 }
 

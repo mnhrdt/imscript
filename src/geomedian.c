@@ -282,8 +282,8 @@ static double fdiste(double *x, double *y, int n, double e)
 	return n ? hypot(*x - *y, fdiste(x + 1, y + 1, n - 1, e)) : e;
 }
 
-#include "smapa.h"
-SMART_PARAMETER_SILENT(WEISZ_NITER,10)
+//#include "smapa.h"
+//SMART_PARAMETER_SILENT(WEISZ_NITER,10)
 
 // y[k] = euclidean median of the vectors x[i][k]
 static void double_weisz(double *y, double *x, int d, int n, int N, double ε)
@@ -506,12 +506,12 @@ static void hessian_diag(double *h, int d, int n, double a[n][d], double *x)
 
 #include "iio.h"
 
-#include "smapa.h"
-SMART_PARAMETER_SILENT(XMIN,-2)
-SMART_PARAMETER_SILENT(XMAX,12)
-SMART_PARAMETER_SILENT(YMIN,-2)
-SMART_PARAMETER_SILENT(YMAX,12)
-SMART_PARAMETER_SILENT(NUMIT,20)
+//#include "smapa.h"
+//SMART_PARAMETER_SILENT(XMIN,-2)
+//SMART_PARAMETER_SILENT(XMAX,12)
+//SMART_PARAMETER_SILENT(YMIN,-2)
+//SMART_PARAMETER_SILENT(YMAX,12)
+//SMART_PARAMETER_SILENT(NUMIT,20)
 
 // fancier weiszfeld variands based on gradient descent
 // (by default, plain weiszfeld)
@@ -787,6 +787,7 @@ struct descent_options {
 static void print_descent_options(FILE *f, struct descent_options *o)
 {
 	char const*const s_i[] = {
+		[ZERO] = "ZERO",
 		[GIVEN] = "GIVEN",
 		[AVERAGE] = "AVERAGE",
 		[GORNER_KANZOW] = "GORNER_KANZOW",
@@ -1165,6 +1166,8 @@ int main_descent(int c, char *v[])
 	fprintf(stderr, "energy at first point = %g\n", E);
 	fprintf(stderr, "numit = %d\n", numit);
 
+	if (d == 2)
+		fprintf(stderr, "P\t%lf\t%lf\t%lf\n", x[0], x[1], E);
 
 	//if (n < 10)
 	//	for (int i = 0; i < n; i++)
@@ -1182,7 +1185,8 @@ int main_descent(int c, char *v[])
 			x[k] = x[k]  -  λ * p[k];
 
 		E = objective_function(d, n, a, x);
-		fprintf(stderr, "%lf\t%lf\t%lf\n", x[0], x[1], E);
+		if (d == 2)
+			fprintf(stderr, "P\t%lf\t%lf\t%lf\n", x[0], x[1], E);
 
 		//if (*out_log && d > 1)
 		//{
@@ -1209,6 +1213,39 @@ int main_descent(int c, char *v[])
 	//	fclose(f);
 	//}
 
+	return 0;
+}
+
+int main_descent_raw(int c, char *v[])
+{
+	struct descent_options o[1];
+	grab_options(o, &c, &v);
+	int numit = atoi(pick_option(&c, &v, "n", "100"));
+	if (c != 1) return fprintf(stderr, "usage:\n\t%s [params] <in\n", *v);
+
+	// read input point cloud
+	int d; // dimension of the space
+	int n; // total number of input points
+	void *aa = iio_read_image_double("-", &d, &n);
+	double (*a)[d] = aa; // point cloud
+
+	double x[d]; // current position
+	find_initial_point(d, n, a, x, o);
+
+	double E = objective_function(d, n, a, x);
+
+	for (int i = 0; i < numit; i++)
+	{
+		double p[d];
+		find_descent_direction(d, n, p, a, x, o);
+
+		double λ = find_descent_step(d, n, p, a, x, o);
+
+		for (int k = 0; k < d; k++)
+			x[k] = x[k]  -  λ * p[k];
+
+	//	E = objective_function(d, n, a, x);
+	}
 	return 0;
 }
 

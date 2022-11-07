@@ -34,7 +34,7 @@ void bad_fail(const char *fmt, ...)
 	fprintf(stderr, "\n\n");
 	fflush(NULL);
 	print_trace(stderr);
-	exit(*(int *)0x43);
+	exit(*(volatile int *)0);
 }
 
 

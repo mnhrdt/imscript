@@ -122,7 +122,7 @@ static bool cut_line_with_segment(double out[2], double line[3],
 }
 
 static bool cut_line_with_rectangle(double out_a[2], double out_b[2],
-		double line[3], double rec_from[2], double rec_to[4])
+		double line[3], double rec_from[2], double rec_to[2])
 {
 	// four vertices of the rectangle
 	double v[4][2] = {

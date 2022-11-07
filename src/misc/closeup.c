@@ -29,7 +29,7 @@ static void error(const char *fmt, ...)
 #ifdef NDEBUG
 	exit(-1);
 #else
-	exit(*(int *)0x43);
+	exit(*(volatile int *)0);
 #endif//NDEBUG
 }
 
