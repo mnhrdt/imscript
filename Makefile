@@ -28,8 +28,31 @@ ENABLE_TIFF = 1
 ENABLE_JPEG = 1
 #ENABLE_WEBP = 1
 #ENABLE_HEIF = 1
-#ENABLE_HDF5 = 1
 #ENABLE_PGSL = 1
+
+# NOTE **WARNING**
+#
+# You can uncomment the line below to enable support for HDF5 files.
+# However, notice that libHDF5 is an extremely user-hostile library and
+# linking to it has major drawbacks in exchange of being able to open the
+# stupid hdf5 files.  The real nightmare starts after version 1.10.3 of that
+# library, which is based on the "fabric" framework.  Thus, linking against
+# hdf5 turns each program into an "hdf5 application" that will perform
+# several "checks" each time the program is run.  These checks are triggered
+# by the mere dynamic loading of the library and cannot be disabled (even if
+# the program does not use the library at all!).  On my laptop, this takes
+# TWO HUNDRED FUCKING MILLISECONDS for each run of each program.  This is
+# easily way longer than most actual image-processing computations, slowing
+# all imscript-based pipelines to a crawl.
+#
+# My disappointment is immeasurable, and my day is ruined.
+#
+# On future versions of imscript, HDF5 support will be enabled by means of a
+# middleman library that dynamically links libhdf5 upon demand.  Thus, only
+# the first reading of an actual hdf5 image will be slowed-down.  But this is
+# is a lot of work and it will have to wait.
+
+#ENABLE_HDF5 = 1
 
 
 
