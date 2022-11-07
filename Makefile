@@ -43,15 +43,17 @@ ENABLE_JPEG = 1
 # the program does not use the library at all!).  On my laptop, this takes
 # TWO HUNDRED FUCKING MILLISECONDS for each run of each program.  This is
 # easily way longer than most actual image-processing computations, slowing
-# all imscript-based pipelines to a crawl.
+# all imscript-based pipelines to a crawl.  It's not that these checks do
+# anything useful, either : if you strace the runtime linking of hdf5, you'll
+# see that most of this time is spent in 961 calls to clock_nanosleep(2).
 #
 # My disappointment is immeasurable, and my day is ruined.
 #
 # On future versions of imscript, HDF5 support will be enabled by means of a
 # middleman library that dynamically links libhdf5 upon demand.  Thus, only
-# the first reading of an actual hdf5 image will be slowed-down.  But this is
+# the first reading of an actual hdf5 image will be slowed-down.  But this
 # is a lot of work and it will have to wait.
-
+#
 #ENABLE_HDF5 = 1
 
 
