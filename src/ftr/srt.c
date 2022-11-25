@@ -22,6 +22,9 @@
 // dependences like libfreetype and obnoxious concepts such as pty.
 //
 
+#include <stdio.h> // fprintf, popen
+#include <ctype.h> // isprint
+
 #include "ftr.h"
 #define OMIT_MAIN_FONTU
 #include "fontu.c" // todo: cherry-pick the required fontu functions
@@ -42,6 +45,9 @@ struct terminal {
 
 	// output of the program running inside the terminal at this moment
 	FILE *stream;
+
+	// program management
+	int program;
 };
 
 // Overall structure:
@@ -174,6 +180,29 @@ void term_bitmap(uint8_t *rgb, int w, int h, struct terminal *t)
 	}
 }
 
+static void term_action_run_dummy(struct terminal *t)
+{
+	if (t->program) return;
+	t->program = 1;
+	fprintf(stderr, "TERM ACTION RUN DUMMY\n");
+
+	//t->stream  = popen("/bin/yes", "r");
+	t->stream  = popen("./dummy2 write", "r");
+}
+
+static void term_action_getchar(struct terminal *t)
+{
+	if (!t->program) return;
+
+	int c = fgetc(t->stream);
+	fprintf(stderr, "stream gave me c=%d '%c'\n", c, isprint(c)?c:' ');
+
+	char s[2];
+	s[0] = c;
+	s[1] = 0;
+	term_puts(t, s);
+}
+
 static char *global_table_of_keycodes_to_consolecodes[0x2000] = {
 	[FTR_KEY_UP]    = "A",
 	[FTR_KEY_DOWN]  = "B",
@@ -186,8 +215,13 @@ static void term_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
 	fprintf(stderr, "TERM_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
 			k, isalpha(k)?k:' ', m, x, y);
-	if  (k == '\033')
+	if (k == '\033')
 		ftr_notify_the_desire_to_stop_this_loop(f, 1);
+	if (k == 'x')
+		term_action_run_dummy(f->userdata);
+	if (k == ' ')
+		term_action_getchar(f->userdata);
+
 
 	if (k >= 0x2000) {
 		fprintf(stderr, "WARNING: rejected key %d\n", k);
@@ -240,6 +274,8 @@ int main_srt()
 	t->cursorx = t->cursory = 0;
 	int w = (t->w + t->kerning) * t->font->width;
 	int h = (t->h + t->spacing) * t->font->height;
+
+	t->program = 0;
 
 	term_puts(t, "abc");
 
