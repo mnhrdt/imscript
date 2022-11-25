@@ -3,8 +3,9 @@
 
 int main()
 {
-	struct termios m;
+	struct termios m, o;
 	tcgetattr(0, &m);
+	o = m;
 	m.c_lflag &= !(ECHO | ICANON);
 	tcsetattr(0, TCSANOW, &m);
 
@@ -16,5 +17,6 @@ int main()
 			break;
 	}
 
-	return 0;
+	tcsetattr(0, TCSANOW, &o);
+	return 42;
 }
