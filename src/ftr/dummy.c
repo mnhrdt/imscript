@@ -1,8 +1,10 @@
-#include <stdio.h>
-#include <termios.h>
+#include <ctype.h>    // isprint
+#include <stdio.h>    // getchar, printf
+#include <termios.h>  // tcgetattr, tcsetattr
 
 int main()
 {
+	// canonicalize terminal
 	struct termios m, o;
 	tcgetattr(0, &m);
 	o = m;
@@ -11,12 +13,18 @@ int main()
 
 	while (1)
 	{
+		fprintf(stderr, " (going to wait for a char)\n");
 		int c = getchar();
-		printf("got c = %d\n", c);
+		fprintf(stderr, " (got c=%d)\n", c);
+		printf("got c = %d", c);
+		if (isprint(c))
+			printf(" '%c'", c);
+		printf("\n");
 		if (c == 27)
 			break;
 	}
 
+	// un-canonicalize back
 	tcsetattr(0, TCSANOW, &o);
 	return 42;
 }

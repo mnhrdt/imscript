@@ -23,7 +23,7 @@
 //
 
 #include <stdio.h> // fprintf, popen
-#include <ctype.h> // isprint
+#include <ctype.h> // isalpha, isprint
 
 #include "ftr.h"
 #define OMIT_MAIN_FONTU
@@ -45,6 +45,7 @@ struct terminal {
 
 	// output of the program running inside the terminal at this moment
 	FILE *stream;
+	FILE *streams[2];
 
 	// program management
 	int program;
@@ -96,6 +97,7 @@ void term_action_advance_cursor(struct terminal *t)
 // functions of the form "term_action_*".)
 void term_puts(struct terminal *t, char *s)
 {
+	fprintf(stderr, "term puts s=\"%s\"\n", s);
 	while (1)
 	{
 		int c = *s++;
@@ -180,6 +182,65 @@ void term_bitmap(uint8_t *rgb, int w, int h, struct terminal *t)
 	}
 }
 
+
+//static int bidirectional_pipe(FILE *outin[2], const char *program)
+//{
+//}
+//
+//static FILE *unidirectional_read_pipe(const char *program)
+//{
+//}
+
+static FILE *my_popen_read(const char *s)
+{
+	int p[2]; // file descriptors of the pipe: p[0]=read p[1]=write
+	if (pipe(p) != 0)
+		return 0;
+
+	int pid = fork();
+	if (pid == 0) {          // CHILD
+		close(p[0]);     // close read-end of the pipe
+		dup2(p[1], 1);   // attach 1=stdout to write-end of the pipe
+		close(p[1]);     // close the write-end of the pipe
+		execl(s, "s", "caca", NULL);
+		return 0;
+	} else {                 // PARENT, pid = pid of child
+		close(p[1]);     // close write-end of the pipe
+		return fdopen(p[0], "r");
+	}
+}
+
+static int my_popen_readwrite(FILE *rw[2], const char *s)
+{
+	int pr[2], pw[2];
+	if (pipe(pr)) return 1;
+	if (pipe(pw)) return 2;
+
+	fprintf(stderr, "pr = %d %d\n", pr[0], pr[1]);
+	fprintf(stderr, "pw = %d %d\n", pw[0], pw[1]);
+
+	int pid = fork();
+	fprintf(stderr, "pid = %d\n", pid);
+	if (pid == 0) { // CHILD
+		close(pr[1]);
+		close(pw[0]);
+		dup2(pr[0], 0); // stdin
+		dup2(pw[1], 1); // stdout
+		fprintf(stderr, "i'm the child!\n");
+		execl(s, "s", "caca", NULL);
+		fprintf(stderr, "the child is done\n");
+		_exit(127);
+	}
+	// PARENT, pid = pid of child
+	close(pr[0]);
+	close(pw[1]);
+	fprintf(stderr, "i'm the parent!\n");
+	fprintf(stderr, "rw[0] %d, rw[1] %d\n", pr[1], pw[0]);
+	rw[0] = fdopen(pr[1], "w");
+	rw[1] = fdopen(pw[0], "r");
+	return 0;
+}
+
 static void term_action_run_dummy(struct terminal *t)
 {
 	if (t->program) return;
@@ -187,14 +248,20 @@ static void term_action_run_dummy(struct terminal *t)
 	fprintf(stderr, "TERM ACTION RUN DUMMY\n");
 
 	//t->stream  = popen("/bin/yes", "r");
-	t->stream  = popen("./dummy2 write", "r");
+	//t->stream  = my_popen_read("/bin/yes");
+	//t->stream  = popen("./dummy2 write", "r");
+	int r = my_popen_readwrite(t->streams, "./dummy");
+	fprintf(stderr, "my_popen_readwrite = %d\n", r);
 }
 
 static void term_action_getchar(struct terminal *t)
 {
 	if (!t->program) return;
+	fprintf(stderr, "term action getchar\n");
 
-	int c = fgetc(t->stream);
+	fputc('p', t->streams[0]);
+	fprintf(stderr, "   just gave it 'p'!\n");
+	int c = fgetc(t->streams[1]);
 	fprintf(stderr, "stream gave me c=%d '%c'\n", c, isprint(c)?c:' ');
 
 	char s[2];
@@ -210,17 +277,21 @@ static char *global_table_of_keycodes_to_consolecodes[0x2000] = {
 	[FTR_KEY_LEFT]  = "D",
 };
 
-#include <ctype.h>
 static void term_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
 	fprintf(stderr, "TERM_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
 			k, isalpha(k)?k:' ', m, x, y);
 	if (k == '\033')
 		ftr_notify_the_desire_to_stop_this_loop(f, 1);
-	if (k == 'x')
+	if (k == 'x') {
 		term_action_run_dummy(f->userdata);
-	if (k == ' ')
+		return;
+	}
+	if (k == ' ') {
 		term_action_getchar(f->userdata);
+		f->changed = 1;
+		return;
+	}
 
 
 	if (k >= 0x2000) {
