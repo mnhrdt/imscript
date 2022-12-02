@@ -261,7 +261,9 @@ static void term_action_getchar(struct terminal *t)
 
 	fputc('p', t->streams[0]);
 	fprintf(stderr, "   just gave it 'p'!\n");
+	fflush(t->streams[0]); fflush(t->streams[1]);
 	int c = fgetc(t->streams[1]);
+	fflush(t->streams[0]); fflush(t->streams[1]);
 	fprintf(stderr, "stream gave me c=%d '%c'\n", c, isprint(c)?c:' ');
 
 	char s[2];

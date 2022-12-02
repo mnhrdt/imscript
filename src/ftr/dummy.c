@@ -14,7 +14,9 @@ int main()
 	while (1)
 	{
 		fprintf(stderr, " (going to wait for a char)\n");
+		fflush(stdin); fflush(stdout);
 		int c = getchar();
+		fflush(stdin); fflush(stdout);
 		fprintf(stderr, " (got c=%d)\n", c);
 		printf("got c = %d", c);
 		if (isprint(c))
