@@ -1743,6 +1743,16 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 	bool broken = planarity == PLANARCONFIG_SEPARATE;
 	complicated = complicated && broken; // complicated = complex and broken
 
+	uint16_t compression;
+	r = TIFFGetField(tif, TIFFTAG_COMPRESSION, &compression);
+	if (r != 1) compression = 1; // 1 == no compression
+	IIO_DEBUG("TIFF Tag Compression = %d\n", compression);
+
+	uint16_t rows_per_strip;
+	r = TIFFGetField(tif, TIFFTAG_ROWSPERSTRIP, &rows_per_strip);
+	if (r != 1) rows_per_strip = 0;
+	IIO_DEBUG("TIFF Tag Rows Per Strip = %d\n", rows_per_strip);
+
 
 	// acquire memory block
 	uint32_t scanline_size = (w * spp * bps)/8;
@@ -1840,6 +1850,7 @@ go_on:
 		if (broken && bps < 8) fail("cannot unpack broken scanlines");
 		if (!broken) FORI(h) {
 			r = TIFFReadScanline(tif, buf, i, 0);
+			IIO_DEBUG("TIFFReadScanline r = %d\n", r);
 			if (r < 0) fail("error read tiff row %d/%d", i, (int)h);
 
 			if (bps < 8) {
@@ -1853,12 +1864,14 @@ go_on:
 		}
 		else {
 			int f = complicated ? 2 : 1; // bizarre case, squeeze!
-			FORI(h)
+			if (compression==1) FORI(h)
 			{
 				unsigned char *dest = data + i*spp*sls/f;
 				FORJ(spp/f)
 				{
 					r = TIFFReadScanline(tif, buf, i, j);
+					IIO_DEBUG("TIFFReadScanline (%d,%d) "
+						       "=> %d\n", i, j, r);
 					if (r < 0)
 						fail("tiff bad %d/%d;%d (%d)",
 								i, (int)h, j,f);
@@ -1867,6 +1880,9 @@ go_on:
 				if (!complicated)
 					repair_broken_pixels_inplace(dest,
 							w, spp, bps/8);
+			} else { // compression > 1
+				unsigned char *dest = data;
+				fail("shit not implemented yet");
 			}
 		}
 	}

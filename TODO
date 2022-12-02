@@ -21,6 +21,7 @@ Release 4:
 
 - arrange core/misc divide: move and remove stuff
 - refactor interface to remove some envvars in favor of options
+- guix packaging
 
 
 Release 5:
