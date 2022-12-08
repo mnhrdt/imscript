@@ -14,17 +14,31 @@ Release 2:
 
 Release 3:
 
-- build single executable as an αpε
+- guix packaging
+- sourcehut becomes the actual entry point (maybe quit github altogether?)
+- stagit automated deploy on purple or boucantrin
 
 
 Release 4:
 
-- arrange core/misc divide: move and remove stuff
-- refactor interface to remove some envvars in favor of options
-- guix packaging
+- build single executable as an αpε
 
 
 Release 5:
 
+- arrange core/misc divide: move and remove stuff
+- refactor interface to remove some envvars in favor of options
+
+
+Release 6:
+
 - ftr: add some neat terminal-based backends (tip, sixel, ...)
 - arrange ftr tools
+- complete srt terminal
+
+
+Release 7:
+
+- the great ftr unification: cpu, icrop2, cpuflip... they all become one
+- cpu refactor into pure MVC, headless interface
+- cpu packaging for python + jupyter access
