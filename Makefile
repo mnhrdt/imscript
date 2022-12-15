@@ -1,6 +1,4 @@
-CC=clang-14
-CFLAGS ?= -march=native -O3
-#CFLAGS ?= -g -Wall -Wextra -Wno-unused
+CFLAGS ?= -O3
 LDLIBS += -lm -lfftw3f
 
 OBJ = src/iio.o src/fancy_image.o

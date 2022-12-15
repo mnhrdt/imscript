@@ -238,8 +238,42 @@ static void overlines(uint8_t (**y)[3], float (**x)[2], int w, int h, float s)
 		overlay_level_line_in_black(y, scalar, w, h, s*i);
 }
 
+static char *help_string_name     = "viewflow";
+static char *help_string_version  = "viewflow 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "represent a vector field using a color code";
+static char *help_string_usage    = "usage:\n\t"
+"SATSCALE [in.flo [out.png]]";
+static char *help_string_long     =
+"Viewflow displays a two-dimensional vector field using a color.\n"
+"\ni.e. "
+"The input is an image with two-dimensional pixels (i.e. a vector field).\n"
+"The output is an RGB image of the same size, where each vector is\n"
+"represented by a different color, according to a two-dimensional palette.\n"
+"For most palettes, the hue indicates the direction and the intensity\n"
+"indicates the magnitude of the vector.\n"
+"Vectors larger than SATSCALE are \"saturated\" to the same intensity.\n"
+"\n"
+"Usage: viewflow SATSCALE in.flo out.png\n"
+"   or: viewflow SATSCALE in.flo > out.npy\n"
+"   or: cat in.flo | viewflow SATSCALE > out.npy\n"
+"\n"
+"Environment:\n"
+" MRANGE\tMaximum range for Middlebury palette (default 0)\n"
+" NOVERLINES\tTotal number of level lines to draw (default 50)\n"
+"Options:\n"
+" -h\t\tdisplay short help message\n"
+" --help\t\tdisplay longer help message\n"
+"\n"
+"Examples:\n"
+" plambda a.png x,g | viewflow 50  View gradient of grayscale image\n"
+"\n"
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
+;
+#include "help_stuff.c" // functions that print the strings named above
 int main_viewflow(int c, char *v[])
 {
+	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
+
 	if (c != 4 && c != 3 && c != 2) {
 		fprintf(stderr, "usage:\n\t%s satscale flow view\n", *v);
 				//          0    1       2     3
