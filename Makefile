@@ -1,4 +1,6 @@
-CFLAGS ?= -O3
+CC=clang-14
+CFLAGS ?= -march=native -O3
+#CFLAGS ?= -g -Wall -Wextra -Wno-unused
 LDLIBS += -lm -lfftw3f
 
 OBJ = src/iio.o src/fancy_image.o
@@ -26,7 +28,7 @@ bin/%  : src/%.o $(OBJ)
 ENABLE_PNG  = 1
 ENABLE_TIFF = 1
 ENABLE_JPEG = 1
-#ENABLE_WEBP = 1
+ENABLE_WEBP = 1
 #ENABLE_HEIF = 1
 #ENABLE_PGSL = 1
 
@@ -63,6 +65,10 @@ tutorial: default
 # build manpages
 manpages: default
 	cd doc && $(SHELL) rebuild_manpages.sh
+
+# deploy stagit
+stagit:       ; cd doc/stagit && sh build.sh
+stagit-clean: ; cd doc/stagit && sh clean.sh
 
 
 
