@@ -102,6 +102,35 @@ static void ifft_2dfloat(float *ifx,  fftwf_complex *fx, int w, int h)
 	fftwf_cleanup();
 }
 
+// Wrapper around FFTW3 that computes the complex-valued inverse Fourier
+// transform of a complex-valued frequantial image.
+// No need for the input data to be hermitic.
+static void ifft_2dfloat_c2c(fftwf_complex *ifx,  fftwf_complex *fx,
+		int w, int h)
+{
+	fftwf_complex *a = fftwf_malloc(w*h*sizeof*a);
+	fftwf_complex *b = fftwf_malloc(w*h*sizeof*b);
+
+	//fprintf(stderr, "planning...\n");
+	evoke_wisdom();
+	fftwf_plan p = fftwf_plan_dft_2d(h, w, a, b,
+						FFTW_BACKWARD, FFTW_ESTIMATE);
+	bequeath_wisdom();
+	//fprintf(stderr, "...planned!\n");
+
+	FORI(w*h) a[i] = fx[i];
+	fftwf_execute(p);
+	float scale = 1.0/(w*h);
+	FORI(w*h) {
+		fftwf_complex z = b[i] * scale;
+		ifx[i] = z;
+	}
+	fftwf_destroy_plan(p);
+	fftwf_free(a);
+	fftwf_free(b);
+	fftwf_cleanup();
+}
+
 // if it finds any strange number, sets it to zero
 static void normalize_float_array_inplace(float *x, int n)
 {
@@ -196,10 +225,31 @@ static void fft_inverse(float *y, float *x, int w, int h, int pd)
 	free(gc);
 }
 
+static void fft_inverse_complex(float *y, float *x, int w, int h, int pd)
+{
+	int pdh = pd/2;
+	assert(pd == 2*pdh);
+	fftwf_complex *c = xmalloc(w*h*sizeof*c);
+	fftwf_complex *gc = xmalloc(w*h*sizeof*gc);
+	FORL(pdh) {
+		FORI(w*h)
+			c[i] = x[i*pd + 2*l] + I * x[i*pd+2*l+1];
+		ifft_2dfloat_c2c(gc, c, w, h);
+		FORI(w*h)
+		{
+			y[2*(i*pdh + l) + 0] = crealf(gc[i]);
+			y[2*(i*pdh + l) + 1] = cimagf(gc[i]);
+		}
+	}
+	free(c);
+	free(gc);
+}
+
 #include "pickopt.c"
 int main_fft(int c, char *v[])
 {
 	int localization = atoi(pick_option(&c, &v, "l", "0"));
+	bool complex_ifft = pick_option(&c, &v, "c", NULL);
 	if (c != 1 && c != 2 && c != 3 && c != 4) {
 		fprintf(stderr, "usage:\n\t%s {1|-1} [in [out]]\n", *v);
 		//                          0  1      2   3
@@ -220,6 +270,9 @@ int main_fft(int c, char *v[])
 	} else
 		pdout = 2*pd;
 
+	if (direction < 0 && complex_ifft)
+		pdout = pd;
+
 	float *y = xmalloc(w*h*pdout*sizeof*y);
 
 	if (localization) {
@@ -229,7 +282,10 @@ int main_fft(int c, char *v[])
 			fft_direct_loc(y, x, w, h, pd, localization);
 	} else {
 		if (direction < 0)
-			fft_inverse(y, x, w, h, pd);
+			if (complex_ifft)
+				fft_inverse_complex(y, x, w, h, pd);
+			else
+				fft_inverse(y, x, w, h, pd);
 		else
 			fft_direct(y, x, w, h, pd);
 	}
