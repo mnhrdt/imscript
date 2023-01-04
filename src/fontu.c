@@ -629,7 +629,7 @@ static void put_pixel_rgb(uint8_t *x, int w, int h, int i, int j, uint8_t *c)
 
 static void put_string_in_float_image(float *x, int w, int h, int pd,
 		int posx, int posy, float *fg, float *bg, int kerning,
-		struct bitmap_font *font, char *string)
+		struct bitmap_font *font, unsigned char *string)
 {
 	int posx0 = posx;
 	while (1)
@@ -658,7 +658,7 @@ static void put_string_in_float_image(float *x, int w, int h, int pd,
 
 static void put_string_in_rgb_image(uint8_t *x, int w, int h,
 		int posx, int posy, uint8_t *fg, uint8_t *bg, int kerning,
-		struct bitmap_font *font, char *string)
+		struct bitmap_font *font, unsigned char *string)
 {
 	int posx0 = posx;
 	while (1)
