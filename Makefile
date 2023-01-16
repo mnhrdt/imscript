@@ -104,11 +104,14 @@ bin/% : src/misc/%.o $(OBJ)
 # this is the end of the "regular" targets.  What follows are fancy build
 # targets, or bizarre graphics/terminal interfaces.
 
+# static libs need all to be explicitly pulled (no recursion)
+STALIBS = -lm -lfftw3f -ltiff -ljpeg -lpng -lwebp -ljbig -lz -llzma -ldeflate -lzstd
+
 
 # single, fat, busybox-like executable
 BINOBJ = $(BIN:bin/%=src/%.o) $(BIN_FTR:bin/%=src/ftr/%.o) src/ftr/ftr.o
 #L = -lfftw3f -lpng -ltiff -ljpeg -llzma -lz -lm -ljbig $(LDLIBS) -lm -lpthread -lgsl -lgslcblas -lzstd
-L = -lfftw3f -lpng -ltiff -ljpeg -llzma -lz -lm -ljbig -lwebp -lpthread -lzstd -lX11 -lxcb -ldl -lgsl -lgslcblas -lhdf5_serial -ldl -lm -lXau -lpthread -lXdmcp -lzstd -lz -lsz -laec
+L = -lfftw3f -lpng -ltiff -ljpeg -llzma -lz -ldeflate -lm -ljbig -lwebp -lpthread -lzstd -lX11 -lxcb -ldl -lgsl -lgslcblas -lhdf5_serial -ldl -lm -lXau -lpthread -lXdmcp -lzstd -lz -lsz -laec
 bin/im.static : src/im.o $(BINOBJ) $(OBJ) src/misc/overflow.o
 	$(CC) $(LDFLAGS) -static -Wl,--allow-multiple-definition -o $@ $^ $L
 
