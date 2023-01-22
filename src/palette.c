@@ -416,7 +416,8 @@ SMART_PARAMETER_SILENT(PLEGEND_NTICKS,3)
 SMART_PARAMETER_SILENT(PLEGEND_REVERSE,0)
 SMART_PARAMETER_SILENT(PLEGEND_FACTOR,1)
 SMART_PARAMETER_SILENT(PLEGEND_HIDE,0)
-void save_legend(char *filename_legend, char *palette_id, float m, float M)
+
+uint8_t *create_legend_rgb(char *palette_id, float m, float M, int *ow, int *oh)
 {
 	m *= PLEGEND_FACTOR();
 	M *= PLEGEND_FACTOR();
@@ -439,6 +440,8 @@ void save_legend(char *filename_legend, char *palette_id, float m, float M)
 
 	// image with the legend
 	uint8_t *rgb = malloc(3*w*h);
+	*ow = w;
+	*oh = h;
 
 	// fill background
 	for (int i = 0; i < 3*w*h; i++)
@@ -511,10 +514,38 @@ void save_legend(char *filename_legend, char *palette_id, float m, float M)
 		put_string_in_rgb_image(rgb,w,h, pos_i, pos_j, fg,bg,0,f,buf);
 	}
 
-	// save legend into file
-	iio_write_image_uint8_vec(filename_legend, rgb, w, h, 3);
-	free(rgb);
+	return rgb;
 }
+
+//void save_legend(char *filename_legend, char *palette_id, float m, float M)
+//{
+//	int w, h;
+//	uint8_t *l = create_legend_rgb(palette_id, m, M, &w, &h);
+//	iio_write_image_uint8_vec(filename_legend, l, w, h, 3);
+//	free(l);
+//}
+
+static int insideP(int w, int h, int i, int j)
+{
+	return i>=0 && j>=0 && i<w && j<h;
+}
+
+static void overlay_br(uint8_t *y, int w, int h, uint8_t *l, int lw, int lh)
+{
+	int ox = w - lw;
+	int oy = h - lh;
+	for (int j = 0; j < lh; j++)
+	for (int i = 0; i < lw; i++)
+	for (int k = 0; k < 3; k++)
+	{
+		int jj = j + oy;
+		int ii = i + ox;
+		if (insideP(w, h, ii, jj))
+			y[(jj*w+ii)*3+k] = l[(j*lw+i)*3+k];
+	}
+
+}
+
 //int main_palette(int c, char *v[])
 //{
 //	char *filename_legend = pick_option(&c, &v, "l", "");
@@ -569,7 +600,7 @@ static char *help_string_long     =
 " pal.gpf    read palette from gnuplot color gradient file\n"
 "\n"
 "Options:\n"
-" -l legend.png\tsave a legend of colors\n"
+" -l legend.png\tsave a legend of colors (if filename=OVERLAY, paste the legend)\n"
 " -h\t\tdisplay short help message\n"
 " --help\t\tdisplay longer help message\n"
 "\n"
@@ -582,8 +613,7 @@ static char *help_string_long     =
 #include "help_stuff.c" // functions that print the strings named above
 int main_palette(int c, char *v[])
 {
-	if (c == 2)
-		if_help_is_requested_print_it_and_exit_the_program(v[1]);
+	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
 
 	char *filename_legend = pick_option(&c, &v, "l", "");
 	if (c != 4 && c != 5 && c != 6 ) {
@@ -606,10 +636,18 @@ int main_palette(int c, char *v[])
 	fprintf(stderr, "from=%g to=%g\n", from, to);
 	apply_palette(y, x, w*h, palette_id, from, to);
 
-	iio_write_image_uint8_vec(filename_out, y, w, h, 3);
+	if (*filename_legend) {
+		int lw, lh;
+		uint8_t *l = create_legend_rgb(palette_id, from, to, &lw, &lh);
 
-	if (*filename_legend)
-		save_legend(filename_legend, palette_id, from, to);
+		if (0 == strcmp(filename_legend, "OVERLAY"))
+			overlay_br(y, w, h, l, lw, lh);
+		else
+			iio_write_image_uint8_vec(filename_legend, l, lw,lh,3);
+		free(l);
+	}
+
+	iio_write_image_uint8_vec(filename_out, y, w, h, 3);
 
 	free(x);
 	free(y);
