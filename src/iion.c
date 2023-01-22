@@ -51,9 +51,9 @@ static char *help_string_long     =
 " --help\t\tdisplay longer help message\n"
 "\n"
 "Examples:\n"
-" iion x.jpg x.tiff                    Convert jpeg to tiff.\n"
-" iion http://path/to/img x.png        Download an image as png\n"
-" cat img.npy | iion -t uint8 img.png  Quantize float data to 8 bits\n"
+" iion http://path/to/img x.png       Download an image as png\n"
+" iion -t uint16 x.jpg x.tiff         Convert jpeg to 16 bit tiff.\n"
+" cat img.npy | iion img.png          Quantize float data to 8 bits\n"
 "\n"
 "Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
 ;

@@ -26,13 +26,13 @@ display short help message
 display longer help message
 .SH EXAMPLES
 .TP
-iion x.jpg x.tiff
-Convert jpeg to tiff.
-.TP
 iion http://path/to/img x.png
 Download an image as png
 .TP
-cat img.npy | iion \-t uint8 img.png
+iion \-t uint16 x.jpg x.tiff
+Convert jpeg to 16 bit tiff.
+.TP
+cat img.npy | iion img.png
 Quantize float data to 8 bits
 .SH AUTHOR
 Written by eml
