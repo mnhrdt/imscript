@@ -416,6 +416,7 @@ SMART_PARAMETER_SILENT(PLEGEND_NTICKS,3)
 SMART_PARAMETER_SILENT(PLEGEND_REVERSE,0)
 SMART_PARAMETER_SILENT(PLEGEND_FACTOR,1)
 SMART_PARAMETER_SILENT(PLEGEND_HIDE,0)
+SMART_PARAMETER_SILENT(PLEGEND_BGCOLOR,0xffffff)
 
 uint8_t *create_legend_rgb(char *palette_id, float m, float M, int *ow, int *oh)
 {
@@ -444,8 +445,17 @@ uint8_t *create_legend_rgb(char *palette_id, float m, float M, int *ow, int *oh)
 	*oh = h;
 
 	// fill background
-	for (int i = 0; i < 3*w*h; i++)
-		rgb[i] = 255;
+	//for (int i = 0; i < 3*w*h; i++)
+	//	rgb[i] = 255;
+	unsigned int bkgi = PLEGEND_BGCOLOR();
+	uint8_t bkg[3] = {
+		(bkgi & 0xff0000) >> 16,
+		(bkgi & 0xff00) >> 8,
+		(bkgi & 0xff)
+	};
+	for (int i = 0; i < w*h; i++)
+	for (int k = 0; k < 3; k++)
+		rgb[3*i+k] = bkg[k];
 
 	// transformation "x -> alpha * j + beta" from positions to values
 	float alpha = (M - m) / (p_j - q_j);
@@ -502,7 +512,8 @@ uint8_t *create_legend_rgb(char *palette_id, float m, float M, int *ow, int *oh)
 
 		// draw number associated to this tick
 		char buf[0x100];
-		uint8_t bg[3] = { 255, 255, 255}, fg[3] = {0, 0, 0};
+		//uint8_t bg[3] = { 255, 255, 255}, fg[3] = {0, 0, 0};
+		uint8_t *bg = bkg, fg[3] = {0, 0, 0};
 		int X = PLEGEND_HIDE();
 		if (!X)
 			snprintf(buf, sizeof buf, "%g", x);
