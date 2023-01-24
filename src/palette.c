@@ -347,7 +347,7 @@ void parse_from_to(float *out_from, float *out_to, float *x, int n,
 	char *mp, *Mp;
 	float m = strtof(from_id, &mp);
 	float M = strtof(to_id,   &Mp);
-	fprintf(stderr, "parse m,M = %g %g\n", m, M);
+	//fprintf(stderr, "parse m,M = %g %g\n", m, M);
 	if (*mp != '%' && *Mp != '%')  // regular case, no percentiles
 	{
 		if (!isfinite(m)) get_min_max(&m, 0, x, n);
@@ -471,7 +471,7 @@ uint8_t *create_legend_rgb(char *palette_id, float m, float M, int *ow, int *oh)
 	{
 		//float x = m + ((M - m) * (j - p_j)) / (q_j - p_j);
 		float x = alpha * j + beta;
-		if (i == 64) fprintf(stderr, "j=%d x=%g\n", j, x);
+		//if (i == 64) fprintf(stderr, "j=%d x=%g\n", j, x);
 		get_palette_color(rgb + 3*(j*w+i), p, x);
 	}
 
@@ -644,7 +644,7 @@ int main_palette(int c, char *v[])
 
 	float from, to;
 	parse_from_to(&from, &to, x, w*h, from_id, to_id);
-	fprintf(stderr, "from=%g to=%g\n", from, to);
+	//fprintf(stderr, "from=%g to=%g\n", from, to);
 	apply_palette(y, x, w*h, palette_id, from, to);
 
 	if (*filename_legend) {
