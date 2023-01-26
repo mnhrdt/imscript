@@ -105,7 +105,12 @@ bin/% : src/misc/%.o $(OBJ)
 # targets, or bizarre graphics/terminal interfaces.
 
 # static libs need all to be explicitly pulled (no recursion)
-STALIBS = -lm -lfftw3f -ltiff -ljpeg -lpng -lwebp -ljbig -lz -llzma -ldeflate -lzstd
+# (NOTE: assumes you want jpeg, tiff, png, webp support)
+STALIBS = -lm -lfftw3f -ltiff -ljpeg -lpng -lwebp -ljbig -lz -llzma -ldeflate -lzstd -lX11 -lxcb -lm -lXau -lXdmcp $(STALIBSX)
+STALIBSX = -lX11 -lxcb -lXau -lXdmcp
+# uncomment the following two lines for static compilation
+#LDFLAGS = -static
+#LDLIBS = $(STALIBS)
 
 
 # single, fat, busybox-like executable
