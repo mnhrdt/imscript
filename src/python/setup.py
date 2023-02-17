@@ -3,7 +3,7 @@ import setuptools
 
 setuptools.setup(
 	name = "seepeeyou",
-	version = "0",
+	version = "1",
 	author = "Enric Meinhardt-Llopis",
 	author_email = "enric.meinhardt@fastmail.com",
 	description = "The Definitive Interface for Image Processing Practitioners",
