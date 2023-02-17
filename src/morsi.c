@@ -242,6 +242,37 @@ void morsi_bothat(float *y, float *x, int w, int h, int *e)
 	free(t);
 }
 
+void morsi_iblur(float *y, float *x, int w, int h, int *e)
+{
+	float *t = xmalloc(w*h*sizeof*t);
+	morsi_erosion(t, x, w, h, e);
+	for (int i = 0; i < w*h; i++)
+		y[i] = (x[i] + t[i])/2;
+	free(t);
+}
+
+void morsi_eblur(float *y, float *x, int w, int h, int *e)
+{
+	float *t = xmalloc(w*h*sizeof*t);
+	morsi_dilation(t, x, w, h, e);
+	for (int i = 0; i < w*h; i++)
+		y[i] = (x[i] + t[i])/2;
+	free(t);
+}
+
+void morsi_cblur(float *y, float *x, int w, int h, int *e)
+{
+	float *t1 = xmalloc(w*h*sizeof*t1);
+	float *t2 = xmalloc(w*h*sizeof*t1);
+	morsi_erosion(t1, x, w, h, e);
+	morsi_dilation(t2, x, w, h, e);
+	for (int i = 0; i < w*h; i++)
+		y[i] = 0.5*x[i] + 0.25*t1[i] + 0.25*t2[i];
+	free(t1);
+	free(t2);
+}
+
+
 void morsi_all(
 	float *o_ero, float *o_dil, float *o_ope, float *o_clo,
 	float *o_grad, float *o_igrad, float *o_egrad,
@@ -484,6 +515,9 @@ int main_morsi(int c, char **v)
 	if (0 == strcmp(v[2], "oscillation")) operation = morsi_oscillation;
 	if (0 == strcmp(v[2], "tophat"     )) operation = morsi_tophat;
 	if (0 == strcmp(v[2], "bothat"     )) operation = morsi_bothat;
+	if (0 == strcmp(v[2], "iblur"      )) operation = morsi_iblur;
+	if (0 == strcmp(v[2], "eblur"      )) operation = morsi_eblur;
+	if (0 == strcmp(v[2], "cblur"      )) operation = morsi_cblur;
 	if (!operation) {
 		fprintf(stderr, "operations = erosion, dilation, opening...\n");
 		return 1;
