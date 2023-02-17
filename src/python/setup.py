@@ -2,7 +2,7 @@
 import setuptools
 
 setuptools.setup(
-	name = "cpu",
+	name = "seepeeyou",
 	version = "0",
 	author = "Enric Meinhardt-Llopis",
 	author_email = "enric.meinhardt@fastmail.com",

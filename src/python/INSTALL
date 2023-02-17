@@ -1,0 +1,8 @@
+To update the pypi hub, you need an account on pypi, and then run the following
+commands:
+
+        # update version number on file setup.py
+        # update version number on file cpu.py
+	python setup.py sdist bdist_wheel
+	python -m twine upload dist/seepeeyou-X.tar.gz
+	rm -rf build dist seepeeyou.egg-info
