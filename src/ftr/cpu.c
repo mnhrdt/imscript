@@ -30,10 +30,12 @@
 #define WHEEL_FACTOR 2
 #define MAX_PYRAMID_LEVELS 30
 
+#define MAX_IMAGES 1000
+
 // data structure for the image viewer
 // this data goes into the "userdata" field of the FTR window structure
 struct pan_state {
-	// 1. image data
+	// 1. image data (for the current image)
 	int w, h;
 	struct fancy_image *i;
 
@@ -61,6 +63,12 @@ struct pan_state {
 	float topographic_P;
 	float topographic_spread;
 
+	// 7. actual image data for the whole series
+	int i_idx, i_num;
+	struct fancy_image *i_tab[MAX_IMAGES];
+	char *i_name[MAX_IMAGES];
+
+
 };
 
 // change of coordinates: from window "int" pixels to image "double" point
@@ -86,6 +94,8 @@ static void get_rgb_from_vec(float *rgb, struct pan_state *e, float *vec)
 		rgb[1] = rgb[2] = vec[1];
 	if (e->i->pd > 2)
 		rgb[2] = vec[2];
+	if (e->i->pd == 4)
+		rgb[1] = rgb[1] + 0.1 * vec[3];
 }
 
 //static float fancy_interpolate(struct fancy_image *f, int oct,
@@ -529,6 +539,32 @@ static void action_reload_image(struct FTR *f)
 	struct pan_state *e = f->userdata;
 	fancy_image_reload(e->i);
 	f->changed = 1;
+}
+
+static void action_flipn(struct FTR *f, int idx)
+{
+	struct pan_state *e = f->userdata;
+	if (idx < 0 || idx >= e->i_num || idx == e->i_idx)
+		fprintf(stderr, "warning: no image to flip\n");
+	else {
+		fprintf(stderr, "flip %d to %d\n", e->i_idx, idx);
+		e->i = e->i_tab[idx];
+		e->i_idx = idx;
+		e->w = e->i->w;
+		e->h = e->i->h;
+		f->changed = 1;
+	}
+}
+
+// todo: flip forward, backward
+static void action_flip(struct FTR *f, int o)
+{
+	struct pan_state *e = f->userdata;
+	int i = e->i_idx;
+	i = i + o;
+	if (i < 0) i = e->i_num - 1;
+	if (i >= e->i_num) i = 0;
+	action_flipn(f, i);
 }
 
 static void action_screenshot(struct FTR *f)
@@ -1031,6 +1067,8 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	}
 
 	if (k == '2') action_reload_image(f);
+	if (k == '3') action_flip(f, +1);
+	if (k == '4') action_flip(f, -1);
 
 //	// if 'k', do weird things
 //	if (k == 'k') {
@@ -1042,10 +1080,16 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 
 #define BAD_MIN(a,b) a<=b?a:b
 #include "pickopt.c"
-int main_cpu(int c, char *v[])
+static char *base_name(char *p)
+{
+	char *b = strrchr(p, '/');
+	return b ? b + 1 : p;
+}
+int main_cpu_single(int c, char *v[])
 {
 	// extract named options
 	char *window_title = pick_option(&c, &v, "t", "cpu");
+	char *filename_alt = pick_option(&c, &v, "a", "");
 
 	// process input arguments
 	if (c != 2 && c != 1) {
@@ -1055,9 +1099,20 @@ int main_cpu(int c, char *v[])
 	}
 	char *filename_in = c > 1 ? v[1] : "-";
 
+	// set window title to something slightly better
+	char default_title[0x100];
+	snprintf(default_title, 0x100, "cpu: %s", base_name(filename_in));
+	if (0 == strcmp(window_title, "cpu"))
+		window_title = default_title;
+
 	// read image
 	struct pan_state e[1];
-	e->i = fancy_image_open(filename_in, "r");
+	//e->i = fancy_image_open(filename_in, "r");
+	e->i_tab[0] = fancy_image_open(filename_in, "r");
+	e->i_tab[1] = NULL;
+	if (*filename_alt)
+		e->i_tab[1] = fancy_image_open(filename_alt, "r");
+	e->i = e->i_tab[0];
 	e->w = e->i->w;
 	e->h = e->i->h;
 
@@ -1081,9 +1136,54 @@ int main_cpu(int c, char *v[])
 	int r = ftr_loop_run(&f);
 
 	// cleanup and exit (optional)
-	for (int i = 0; i < 5; i++) free(e->font[i].data);
-	ftr_close(&f);
-	fancy_image_close(e->i);
+	//for (int i = 0; i < 5; i++) free(e->font[i].data);
+	//ftr_close(&f);
+	//fancy_image_close(e->i);
+	return r - 1;
+}
+int main_cpu_multi(int c, char *v[])
+{
+	// each input argument is an image
+	// if no input arguments, read from stdin
+	int n = c - 1;
+	if (n > MAX_IMAGES) n = MAX_IMAGES;
+	char *t[1+n];
+	t[0] = "-";
+	for (int i = 0; i < n; i++) t[i] = v[i+1];
+	if (n == 0) n = 1;
+
+	// read images
+	struct pan_state e[1];
+	e->i_num = n;
+	for (int i = 0; i < n; i++) e->i_name[i] = t[i];
+	for (int i = 0; i < n; i++) e->i_tab[i]  = fancy_image_open(t[i], "r");
+	e->i = e->i_tab[0];
+	e->w = e->i->w;
+	e->h = e->i->h;
+
+	// setup fonts (TODO, integrate these calls into fontu's caching stuff)
+	e->font[0] = reformat_font(*xfont_4x6, UNPACKED);
+	e->font[1] = reformat_font(*xfont_6x12, UNPACKED);
+	e->font[2] = reformat_font(*xfont_7x13, UNPACKED);
+	e->font[3] = reformat_font(*xfont_9x15, UNPACKED);
+	e->font[4] = reformat_font(*xfont_10x20, UNPACKED);
+	//e->font[0] = reformat_font(*xfont_5x7, UNPACKED);
+
+	// open window
+	struct FTR f = ftr_new_window(BAD_MIN(e->w,1000), BAD_MIN(e->h,800));
+	//ftr_change_title(&f, window_title);
+	f.userdata = e;
+	action_reset_zoom_and_position(&f);
+	ftr_set_handler(&f, "expose", pan_exposer);
+	ftr_set_handler(&f, "motion", pan_motion_handler);
+	ftr_set_handler(&f, "button", pan_button_handler);
+	ftr_set_handler(&f, "key"   , pan_key_handler);
+	int r = ftr_loop_run(&f);
+
+	// cleanup and exit (optional)
+	//for (int i = 0; i < 5; i++) free(e->font[i].data);
+	//ftr_close(&f);
+	//fancy_image_close(e->i);
 	return r - 1;
 }
 
@@ -1136,5 +1236,5 @@ int main(int c, char *v[])
 {
 	if (c == 2)
 		if_help_is_requested_print_it_and_exit_the_program(v[1]);
-	return main_cpu(c, v);
+	return main_cpu_multi(c, v);
 }

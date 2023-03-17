@@ -42,3 +42,8 @@ Release 7:
 - the great ftr unification: cpu, icrop2, cpuflip... they all become one
 - cpu refactor into pure MVC, headless interface
 - cpu packaging for python + jupyter access
+
+
+Release 8:
+
+- review article comparing our numerical results with those of other packages
