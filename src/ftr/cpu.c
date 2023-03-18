@@ -67,8 +67,6 @@ struct pan_state {
 	int i_idx, i_num;
 	struct fancy_image *i_tab[MAX_IMAGES];
 	char *i_name[MAX_IMAGES];
-
-
 };
 
 // change of coordinates: from window "int" pixels to image "double" point
@@ -541,6 +539,19 @@ static void action_reload_image(struct FTR *f)
 	f->changed = 1;
 }
 
+static void action_update_window_title(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	int n = 2*FILENAME_MAX;
+	char t[n];
+	if (e->i_num == 1)
+		snprintf(t, n, "%s", e->i_name[0]);
+	else
+		snprintf(t, n, "%s [%d/%d]", e->i_name[e->i_idx],
+				1 + e->i_idx, e->i_num);
+	ftr_change_title(f, t);
+}
+
 static void action_flipn(struct FTR *f, int idx)
 {
 	struct pan_state *e = f->userdata;
@@ -556,7 +567,6 @@ static void action_flipn(struct FTR *f, int idx)
 	}
 }
 
-// todo: flip forward, backward
 static void action_flip(struct FTR *f, int o)
 {
 	struct pan_state *e = f->userdata;
@@ -565,6 +575,7 @@ static void action_flip(struct FTR *f, int o)
 	if (i < 0) i = e->i_num - 1;
 	if (i >= e->i_num) i = 0;
 	action_flipn(f, i);
+	action_update_window_title(f);
 }
 
 static void action_screenshot(struct FTR *f)
@@ -1067,8 +1078,8 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	}
 
 	if (k == '2') action_reload_image(f);
-	if (k == '3') action_flip(f, +1);
-	if (k == '4') action_flip(f, -1);
+	if (k == '3' || k == ' '       ) action_flip(f, +1);
+	if (k == '4' || k == FTR_KEY_BS) action_flip(f, -1);
 
 //	// if 'k', do weird things
 //	if (k == 'k') {
@@ -1089,7 +1100,6 @@ int main_cpu_single(int c, char *v[])
 {
 	// extract named options
 	char *window_title = pick_option(&c, &v, "t", "cpu");
-	char *filename_alt = pick_option(&c, &v, "a", "");
 
 	// process input arguments
 	if (c != 2 && c != 1) {
@@ -1099,20 +1109,9 @@ int main_cpu_single(int c, char *v[])
 	}
 	char *filename_in = c > 1 ? v[1] : "-";
 
-	// set window title to something slightly better
-	char default_title[0x100];
-	snprintf(default_title, 0x100, "cpu: %s", base_name(filename_in));
-	if (0 == strcmp(window_title, "cpu"))
-		window_title = default_title;
-
 	// read image
 	struct pan_state e[1];
-	//e->i = fancy_image_open(filename_in, "r");
-	e->i_tab[0] = fancy_image_open(filename_in, "r");
-	e->i_tab[1] = NULL;
-	if (*filename_alt)
-		e->i_tab[1] = fancy_image_open(filename_alt, "r");
-	e->i = e->i_tab[0];
+	e->i = fancy_image_open(filename_in, "r");
 	e->w = e->i->w;
 	e->h = e->i->h;
 
@@ -1171,9 +1170,9 @@ int main_cpu_multi(int c, char *v[])
 
 	// open window
 	struct FTR f = ftr_new_window(BAD_MIN(e->w,1000), BAD_MIN(e->h,800));
-	//ftr_change_title(&f, window_title);
 	f.userdata = e;
 	action_reset_zoom_and_position(&f);
+	action_update_window_title(&f);
 	ftr_set_handler(&f, "expose", pan_exposer);
 	ftr_set_handler(&f, "motion", pan_motion_handler);
 	ftr_set_handler(&f, "button", pan_button_handler);

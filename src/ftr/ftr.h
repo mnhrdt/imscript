@@ -51,6 +51,7 @@ ftr_event_handler_t ftr_get_handler(struct FTR *f, char *id);
 
 
 // ascii keys with name (necessary because '\e' is not standard)
+#define FTR_KEY_BS         8
 #define FTR_KEY_ESC        27
 #define FTR_KEY_DEL        127
 
