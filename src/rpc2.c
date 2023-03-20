@@ -105,6 +105,10 @@ static void add_tag_to_rpc(struct rpc *p, char *tag, double x)
 	else if (0 <= (t=pix(tag, "iSAMP_DEN_COEFF_"))) p->idenx  [t] = x;
 	else if (0 <= (t=pix(tag, "iLINE_NUM_COEFF_"))) p->inumy  [t] = x;
 	else if (0 <= (t=pix(tag, "iLINE_DEN_COEFF_"))) p->ideny  [t] = x;
+	else if (0 <= (t=pix(tag, "LON_NUM_COEFF_")))   p->inumx  [t] = x;
+	else if (0 <= (t=pix(tag, "LON_DEN_COEFF_")))   p->idenx  [t] = x;
+	else if (0 <= (t=pix(tag, "LAT_NUM_COEFF_")))   p->inumy  [t] = x;
+	else if (0 <= (t=pix(tag, "LAT_DEN_COEFF_")))   p->ideny  [t] = x;
 	else if (0 == strhas(tag, "FIRST_ROW"))         p->dmval  [1] = x;
 	else if (0 == strhas(tag, "FIRST_COL"))         p->dmval  [0] = x;
 	else if (0 == strhas(tag, "LAST_ROW"))          p->dmval  [3] = x;
