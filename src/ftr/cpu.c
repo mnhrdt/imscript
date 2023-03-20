@@ -1187,22 +1187,25 @@ int main_cpu_multi(int c, char *v[])
 }
 
 static char *help_string_name     = "cpu";
-static char *help_string_version  = "cpu 1.0\n\nWritten by eml";
-static char *help_string_oneliner = "interactive display of an image";
+static char *help_string_version  = "cpu 2.0\n\nWritten by eml";
+static char *help_string_oneliner = "interactive display of an image series";
 static char *help_string_usage    = "usage:\n\tcpu image.png";
 static char *help_string_long     =
-"Cpu is an interface for displaying and exploring a single image.\n"
+"Cpu is an interface for displaying and exploring a list of images.\n"
 "\n"
 "This program can be used for image visualization, but this a side-effect,\n"
-"just an afterthought.  The main goal of this program is to\n"
-"showcase a certain philosophy for image processing: an image is an\n"
-"array of numbers, it can be extrapolated towards the whole plane, and\n"
-"interpolated to infinite resolution, its the values can be positive,\n"
-"negative or d-dimensional vectors, the size can be 1x1 or 10^5x10^5\n"
-"and the running time depends only on the size of the window, etc.\n"
+"just an afterthought.  The main goal of this program is to showcase\n"
+"a certain philosophy for image processing: an image is an array of numbers,\n"
+"it can be extrapolated towards the whole plane, and interpolated to\n"
+"infinite resolution, its the values can be positive, negative, or\n"
+"d-dimensional vectors, the size can be 1x1 or 10^5x10^5, and the running\n"
+"time of each operation depends only on the size of the window.\n"
 "\n"
-"Usage: cpu image.tiff\n"
-"   or: cat image.tiff | cpu\n"
+"Usage: cpu image.png\n"
+"   or: cat image.png | cpu\n"
+"   or: cpu a.png b.png\n"
+"   or: cat a.png | cpu - b.png\n"
+"   or: cpu *.png\n"
 "\n"
 "Keys:\n"
 " q,ESC  quit the program\n"
@@ -1214,7 +1217,9 @@ static char *help_string_long     =
 " c      cycle between color balance modes (MIN-MAX,AVG-STD,MED-IQD)\n"
 " n      normalize the contrast (globally)\n"
 " N      toggle local contrast (using only the viewport data)\n"
-" 2      reload the image\n"
+" 2      reload the current image\n"
+" SPACE  next image\n"
+" BS     previous image\n"
 " r      toggle display of local spectrum\n"
 " t      toggle topographic mode\n"
 " s,S    (in topo-mode) set vertical exaggeration\n"

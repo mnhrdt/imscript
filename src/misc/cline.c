@@ -177,9 +177,11 @@ static void plot_cline(float *l, int n, char *title, float mu, float sigma)
 
 #include "iio.h"
 #include "smapa.h"
+#include "pickopt.c"
 SMART_PARAMETER_SILENT(NFAC,1)
 int main(int c, char *v[])
 {
+	bool term_png = pick_option(&c, &v, "p", NULL);
 	if (c != 2 && c != 3) {
 		fprintf(stderr, "usage:\n\t%s angle [img] >plot\n", *v);
 		//                          0 1      2
@@ -197,6 +199,7 @@ int main(int c, char *v[])
 		cline(musigma, l, n, x, w, h, angle);
 	else
 		clineh(NULL, l, n, x, w, h);
+	if (term_png) printf("set term pngcairo\n");
 	//plot_cline(l, n, v[1], musigma[0], musigma[1]);
 	plot_cline2(l, n);
 	free(x);

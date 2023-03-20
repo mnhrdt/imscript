@@ -68,21 +68,31 @@ egradient
 dilation minus image (outer boundaries)
 .TP
 laplacian
-difference between outer and inner gradient (signed boundaries)
+difference between outer and inner grads (signed boundaries)
 .TP
 enhance
 image minus laplacian (sharpen boundaries and details)
 .TP
 blur
-image plus laplacian (centered smoothing)
+image plus laplacian (centered smoothing, removes deatils)
 .TP
 tophat
 image minus opening (select bright blobs)
 .TP
 bothat
 closing minus image (select dark blobs)
-.IP
-oscillation closing minus opening (measure local oscillation)
+.TP
+oscillation
+closing minus opening (measure local oscillation)
+.TP
+iblur
+average of image and its erosion (blur towards dark)
+.TP
+eblur
+average of image and its dilation (blur towards light)
+.TP
+cblur
+average of iblur and eblur (detail\-preserving smoothing)
 .SH EXAMPLES
 .TP
 morsi cross erosion i.png o.png
