@@ -55,6 +55,7 @@ struct pan_state {
 
 	// 5. user interface
 	struct bitmap_font font[5];
+	int hud;
 
 	// 6. topographic mode
 	int topographic_mode; // 0=no, 1=shadow, 2=linear, 3=lambert, 4=specular
@@ -177,6 +178,7 @@ static void action_reset_zoom_and_position(struct FTR *f)
 
 	e->p = INFINITY;
 	e->auto_qauto = false;
+	e->hud = 0;
 
 	e->roi = 0;
 	e->roi_x = f->w / 2;
@@ -370,6 +372,13 @@ static void action_toggle_roi(struct FTR *f, int x, int y, int dir)
 	fprintf(stderr, "ROI SWITCH(%d) = %d\n", dir, e->roi);
 	e->roi_x = x - e->roi_w / 2;
 	e->roi_y = y - e->roi_w / 2;
+	f->changed = 1;
+}
+
+static void action_cycle_hud(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->hud = !e->hud;
 	f->changed = 1;
 }
 
@@ -778,6 +787,15 @@ static void expose_pixel_values(struct FTR *f)
 	}
 }
 
+static void expose_hud(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	uint8_t fg[3] = {0, 0, 0};
+	uint8_t bg[3] = {255, 255, 255};
+	put_string_in_rgb_image(f->rgb, f->w, f->h, 10, 10, fg, bg, 0,
+			e->font+4, e->i_name[e->i_idx]);
+}
+
 static void expose_roi(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
@@ -974,6 +992,10 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	if (e->zoom_factor > 30)
 		expose_pixel_values(f);
 
+	// if HUD, expose the hud
+	if (e->hud)
+		expose_hud(f);
+
 	// if ROI, expose the roi
 	if (e->roi)
 		expose_roi(f);
@@ -1047,6 +1069,7 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	//if (k == 'B') action_contrast_change(f, 1, -1);
 	if (k == 'n') action_qauto2(f);
 	if (k == 'N') action_toggle_aqauto(f);
+	if (k == 'u') action_cycle_hud(f);
 	if (k == 'r') action_toggle_roi(f, x, y, m&FTR_MASK_SHIFT);
 	if (k == 't') action_toggle_topography(f);
 	if (k == 'c') action_toggle_p(f);
@@ -1221,6 +1244,7 @@ static char *help_string_long     =
 " SPACE  next image\n"
 " BS     previous image\n"
 " r      toggle display of local spectrum\n"
+" u      toggle hud\n"
 " t      toggle topographic mode\n"
 " s,S    (in topo-mode) set vertical exaggeration\n"
 " d,D    (in topo-mode) set topographic view parameter\n"
