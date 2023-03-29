@@ -362,3 +362,15 @@ int main_srt()
 }
 
 int main() { return main_srt(); }
+
+// philosophy:
+//
+// 0. PIXEL IS KING: the terminal window is a grid of pixels
+// 1. NO BLURRY FONTS: only monospace bitmap fonts are supported
+// 2. NO SCALING: a pixel is a pixel.  If text is too small, use a larger font
+// 3. NO GPU: the terminal runs in a single cpu thread
+// 4. NO LIBRARIES: compile it with 0 dependencies and dump output to ppm files
+// 5. NATIVE IMAGES: direct access to the terminal framebuffer via control codes
+// 6. NATIVE VECTOR PRIMITIVES: for simple in-band plotting (segment, polygon)
+// 7. MOCK XTERM: built silently on top of TERM=xterm-256color, no terminfo
+// 8. LIMITED ENVELOPE: can run bash, vim, tmux, bpython and that's it

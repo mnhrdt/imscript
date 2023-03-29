@@ -10,7 +10,8 @@
 // 2. load an arbitrary DEM
 // 3. view the DEM (and the SRTM4)
 // 4. reorganize coordinate changes to simplify the code
-//
+// 5. plot everything against a "globe" background (visible by zooming-out)
+// 6. add "rectification" and "semi-rectification" modes
 
 // #includes {{{1
 #include <assert.h>

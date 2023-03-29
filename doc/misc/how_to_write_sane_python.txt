@@ -85,3 +85,20 @@ S4. export PYTHONDONTWRITEBYTECODE=1
 S5. export PYTHONUSERBASE=~/local/share/python
 S6. export XDG_DATA_HOME=~/local/share/dotlocal
 S7. pip install shit  # only affects your local user
+S8. delete $PYTHONUSERBASE regularly and re-install packages as the need arises
+S9. do not use virtualenvs
+
+
+MATH
+
+M1. (Remember N1) Local variable names are single letters.  No exceptions.
+M2. (Remember N2) Do not fear unicode: from math import pi as π
+M3. (Remember I1) Do not use global imports.  Write functions that import what
+    they need to perform their computation.
+M4. Use dependencies "implicitly": For example, you do not need to import numpy
+    to do most things with numpy arrays.  You just need an external function
+    that returns numpy arrays, and work from there using method functions of the
+    array class.  This has the advantage that if your arrays become of another
+    type (with a compatible interface), you do not need to change anything.  For
+    example, most linear algebra code can be written to work transparently with
+    numpy arrays, sparse matrices, etc.

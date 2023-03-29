@@ -666,6 +666,10 @@ static int matrix_product(float *ab, float *a, float *b, int na, int nb)
 		ab[0] = a[0]*b[0] + a[1]*b[1] + a[2];
 		ab[1] = a[3]*b[0] + a[4]*b[1] + a[5];
 		return 2;
+	} else if (na == 3 && nb == 2) {
+		ab[0] = a[0] * b[0] + a[1] * b[1];
+		ab[1] = a[1] * b[0] + a[2] * b[1];
+		return 2;
 	} else fail("bad matrix product (%d %d)", na, nb);
 	assert(a_ncols == b_nrows);
 
@@ -713,10 +717,25 @@ static int matrix_determinant(float *r, float *a, int n)
 {
 	switch(n) {
 	case 1: *r = *a; break;
+	case 3: *r = a[0]*a[1] - a[1]*a[2]; break;
 	case 4: *r = a[0]*a[3] - a[1]*a[2]; break;
 	case 6: *r = a[0]*a[4] - a[1]*a[3]; break;
 	case 9: *r = a[0]*a[4]*a[8] + a[2]*a[3]*a[7] + a[1]*a[5]*a[6]
 		   - a[2]*a[4]*a[6] - a[1]*a[3]*a[8] - a[0]*a[5]*a[7]; break;
+	default: fail("can not compute determinant of object of size %d", n);
+	}
+	return 1;
+}
+
+// instance of "univector_function"
+static int matrix_trace(float *r, float *a, int n)
+{
+	switch(n) {
+	case 1: *r = *a; break;
+	case 3: *r = a[0] + a[2]; break;
+	case 4: *r = a[0] + a[3]; break;
+	case 6: *r = a[0] + a[4]; break;
+	case 9: *r = a[0] + a[4] + a[8]; break;
 	default: fail("can not compute determinant of object of size %d", n);
 	}
 	return 1;
@@ -761,20 +780,12 @@ static int matrix_inverse(float *r, float *a, int n)
 }
 
 // instance of "univector_function"
-static int matrix_trace(float *r, float *a, int nn)
+static int vector_r90(float *r, float *a, int nn)
 {
-	int n;
-	switch(nn) {
-	case 1: n = 1; break;
-	case 4: n = 2; break;
-	case 9: n = 3; break;
-	default: fail("can not compute trace of object of size %d", nn);
-	}
-	assert(n*n == nn);
-	*r = 0;
-	for (int i = 0; i < n; i++)
-		*r += a[i*n+i];
-	return 1;
+	if (nn != 2) fail("cannot rotate object of size %d", nn);
+	r[0] = -a[1];
+	r[1] = a[0];
+	return 2;
 }
 
 // instance of "univector_function"
@@ -1098,6 +1109,7 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(matrix_inverse,"minv",-6),
 	REGISTER_FUNCTIONN(matrix_trace,"mtrace",-6),
 	REGISTER_FUNCTIONN(matrix_3x3to12x9,"mto12x9",-6),
+	REGISTER_FUNCTIONN(vector_r90,"r90",-6),
 	REGISTER_FUNCTIONN(vector_avg,"vavg",-6),
 	REGISTER_FUNCTIONN(vector_sum,"vsum",-6),
 	REGISTER_FUNCTIONN(vector_min,"vmin",-6),
@@ -2656,12 +2668,16 @@ static int imageop_vector(float *out, float *img, int w, int h, int pd,
 		}
 		return pd/2;
 	case IMAGEOP_HESS: {
+		float *sxx = get_stencil_3x3(IMAGEOP_XX, t->imageop_scheme);
+		float *sxy = get_stencil_3x3(IMAGEOP_XY, t->imageop_scheme);
+		float *syy = get_stencil_3x3(IMAGEOP_YY, t->imageop_scheme);
 		for (int l = 0; l < pd; l++) {
-			out[2*l+0] = apply_3x3_stencil(img,w,h,pd,ai,aj,l, sx);
-			out[2*l+1] = apply_3x3_stencil(img,w,h,pd,ai,aj,l, sy);
+			out[3*l+0] = apply_3x3_stencil(img,w,h,pd,ai,aj,l, sxx);
+			out[3*l+1] = apply_3x3_stencil(img,w,h,pd,ai,aj,l, sxy);
+			out[3*l+2] = apply_3x3_stencil(img,w,h,pd,ai,aj,l, syy);
 		}
+		return 3*pd;
 		}
-		return 0; // TODO: finish this code
 	case IMAGEOP_SHADOW: {
 		if (pd != 1) fail("can not yet compute shadow of a vector");
 		float vdx[3]={1,0,apply_3x3_stencil(img, w,h,pd, ai,aj,0, sx)};
@@ -3097,6 +3113,7 @@ Comma modifiers (pre-defined local operators):\n\
  a,n\tgradient norm\n\
  a,d\tdivergence\n\
  a,S\tshadow operator\n\
+ a,H\tHessian matrix\n\
  a,xf\tx-derivative, forward differences\n\
  a,xb\tx-derivative, backward differences\n\
  a,xc\tx-derivative, centered differences\n\
@@ -3175,6 +3192,7 @@ Vectorial operations (acting over vectors of a certain length):\n\
  vmin\t\tmin component of a vector\n\
  vnorm\t\teuclidean norm of a vector\n\
  vdim\t\tlength of a vector\n\
+ r90\t\trotate a 2d vector by 90 degrees (or multiply by i)\n\
 \n\
 Registers (numbered from 1 to 9):\n\
  >7\tcopy to register 7\n\
