@@ -3,14 +3,15 @@ from setuptools.command.install import install
 class myinstall(install):
 	def run(self):
 		import os
-		os.system("make")
+		os.system("mkdir -p bin")
+		os.system("make bin/plambda bin/qauto")
 		install.run(self)
 
 
 import setuptools
 setuptools.setup(
 	name = "imscript",
-	version = "0.1",
+	version = "0.2",
 	author = "Enric Meinhardt-Llopis",
 	author_email = "enric.meinhardt@fastmail.com",
 	description = "Image Processing with Unix Pipes",

@@ -5,4 +5,4 @@ commands:
         # update version number on file cpu.py
 	python setup.py sdist bdist_wheel
 	python -m twine upload dist/imscript-X.tar.gz
-	rm -rf build dist imscript.egg-info
+	rm -rf bin build dist imscript.egg-info
