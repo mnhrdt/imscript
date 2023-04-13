@@ -38,7 +38,7 @@ static void bequeath_wisdom(void) {}
 // of a real-valued image
 static void fft_2dfloat(fftwf_complex *fx, float *x, int w, int h)
 {
-	fftwf_complex *a = fftwf_malloc(w*h*sizeof*a);
+	fftwf_complex *a = fftwf_malloc(w*(long)h*sizeof*a);
 
 	//fprintf(stderr, "planning...\n");
 	evoke_wisdom();
@@ -78,8 +78,8 @@ static void fft_2dfloat(fftwf_complex *fx, float *x, int w, int h)
 // The input data must be hermitic.
 static void ifft_2dfloat(float *ifx,  fftwf_complex *fx, int w, int h)
 {
-	fftwf_complex *a = fftwf_malloc(w*h*sizeof*a);
-	fftwf_complex *b = fftwf_malloc(w*h*sizeof*b);
+	fftwf_complex *a = fftwf_malloc(w*(long)h*sizeof*a);
+	fftwf_complex *b = fftwf_malloc(w*(long)h*sizeof*b);
 
 	//fprintf(stderr, "planning...\n");
 	evoke_wisdom();
@@ -108,8 +108,8 @@ static void ifft_2dfloat(float *ifx,  fftwf_complex *fx, int w, int h)
 static void ifft_2dfloat_c2c(fftwf_complex *ifx,  fftwf_complex *fx,
 		int w, int h)
 {
-	fftwf_complex *a = fftwf_malloc(w*h*sizeof*a);
-	fftwf_complex *b = fftwf_malloc(w*h*sizeof*b);
+	fftwf_complex *a = fftwf_malloc(w*(long)h*sizeof*a);
+	fftwf_complex *b = fftwf_malloc(w*(long)h*sizeof*b);
 
 	//fprintf(stderr, "planning...\n");
 	evoke_wisdom();
@@ -143,8 +143,8 @@ static void normalize_float_array_inplace(float *x, int n)
 
 static void fft_direct(float *y, float *x, int w, int h, int pd)
 {
-	float *c = xmalloc(w*h*sizeof*c);
-	fftwf_complex *gc = xmalloc(w*h*sizeof*gc);
+	float *c = xmalloc(w*(long)h*sizeof*c);
+	fftwf_complex *gc = xmalloc(w*(long)h*sizeof*gc);
 	FORL(pd) {
 		FORI(w*h)
 			c[i] = x[i*pd + l];
@@ -193,8 +193,8 @@ static void fft_2dfloat_loc(fftwf_complex *fx, float *x, int w, int h, int lw)
 
 static void fft_direct_loc(float *y, float *x, int w, int h, int pd, int lw)
 {
-	float *c = xmalloc(w*h*sizeof*c);
-	fftwf_complex *gc = xmalloc(w*h*sizeof*gc);
+	float *c = xmalloc(w*(long)h*sizeof*c);
+	fftwf_complex *gc = xmalloc(w*(long)h*sizeof*gc);
 	FORL(pd) {
 		FORI(w*h)
 			c[i] = x[i*pd + l];
@@ -212,8 +212,8 @@ static void fft_inverse(float *y, float *x, int w, int h, int pd)
 {
 	int pdh = pd/2;
 	assert(pd == 2*pdh);
-	fftwf_complex *c = xmalloc(w*h*sizeof*c);
-	float *gc = xmalloc(w*h*sizeof*gc);
+	fftwf_complex *c = xmalloc(w*(long)h*sizeof*c);
+	float *gc = xmalloc(w*(long)h*sizeof*gc);
 	FORL(pdh) {
 		FORI(w*h)
 			c[i] = x[i*pd + 2*l] + I * x[i*pd+2*l+1];
@@ -229,8 +229,8 @@ static void fft_inverse_complex(float *y, float *x, int w, int h, int pd)
 {
 	int pdh = pd/2;
 	assert(pd == 2*pdh);
-	fftwf_complex *c = xmalloc(w*h*sizeof*c);
-	fftwf_complex *gc = xmalloc(w*h*sizeof*gc);
+	fftwf_complex *c = xmalloc(w*(long)h*sizeof*c);
+	fftwf_complex *gc = xmalloc(w*(long)h*sizeof*gc);
 	FORL(pdh) {
 		FORI(w*h)
 			c[i] = x[i*pd + 2*l] + I * x[i*pd+2*l+1];
@@ -273,7 +273,7 @@ int main_fft(int c, char *v[])
 	if (direction < 0 && complex_ifft)
 		pdout = pd;
 
-	float *y = xmalloc(w*h*pdout*sizeof*y);
+	float *y = xmalloc(w*(long)h*pdout*sizeof*y);
 
 	if (localization) {
 		if (direction < 0)
