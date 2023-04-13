@@ -1431,7 +1431,7 @@ static void compute_ordered_sample_stats(struct image_stats *s,
 {
 	if (s->init_ordered) return;
 	if (w*h > 1) s->init_ordered = true;
-	int ns = w * h * pd;
+	long ns = w * (long)h * pd;
 	s->sorted_samples = xmalloc(ns*sizeof(float));
 	FORI(ns) s->sorted_samples[i] = x[i];
 	qsort(s->sorted_samples, ns, sizeof(float), compare_floats);
@@ -1443,7 +1443,7 @@ static void compute_ordered_component_stats(struct image_stats *s,
 {
 	if (s->init_cordered) return;
 	if (w*h > 1) s->init_cordered = true;
-	int ns = w * h;
+	long ns = w * (long)h;
 	float *t = xmalloc(pd*ns*sizeof(float));
 	for (int l = 0; l < pd; l++)
 	{
@@ -2994,7 +2994,7 @@ static int main_images(int c, char **v)
 	////print_compiled_program(p);
 	int pdreal = eval_dim(p, x, pd);
 
-	float *out = xmalloc(*w * *h * pdreal * sizeof*out);
+	float *out = xmalloc(*w * (long)*h * pdreal * sizeof*out);
 	int opd = run_program_vectorially(out, pdreal, p, x, w, h, pd);
 	assert(opd == pdreal);
 

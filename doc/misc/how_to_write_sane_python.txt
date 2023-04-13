@@ -102,3 +102,8 @@ M4. Use dependencies "implicitly": For example, you do not need to import numpy
     type (with a compatible interface), you do not need to change anything.  For
     example, most linear algebra code can be written to work transparently with
     numpy arrays, sparse matrices, etc.
+
+
+TYPING
+
+T1. No
