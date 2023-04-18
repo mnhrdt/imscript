@@ -1,1 +1,4 @@
+include Makefile
+include src/*.c
+include src/*.h
 prune bin
