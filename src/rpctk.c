@@ -8,11 +8,14 @@
 // rpctk fillL nx ny nh   > ijhll.txt
 // rpctk fillP nx ny nh   > llhij.txt
 // rpctk zoom f rpc.xml   > rpc.xml
+// rpctk triangulate a.rpc b.rpc < ab.ijij > ab.xyh
 
 
 #include <stdio.h>
 
 #include "xmalloc.c"
+#include "xfopen.c"
+#include "parsenumbers.c"
 
 #include "rpcfit33.c"
 
@@ -282,6 +285,94 @@ int main_rpctk_zoom(int c, char *v[])
 	return 0;
 }
 
+static float *read_alloc_floats(char *fname, int *n)
+{
+	// TODO: if the file is a npy, read it accordingly
+	FILE *f = xfopen(fname, "r");
+	return read_ascii_floats(f, n);
+}
+
+static void write_columns(char *fname, float *x, int w, int h)
+{
+	FILE *f = xfopen(fname, "w");
+	for (int i = 0; i < w*h; i++)
+		fprintf(stderr, "%lf%c", x[i], i%w ? ' ' : '\n');
+}
+
+// Find a point in the epipolar line on right image that is closest to the
+// right point.
+static void triangulate_pixright(
+		float xyhe[4],
+		struct rpc *a,
+		struct rpc *b,
+		float ijij[4]
+		)
+{
+	// left and right points of the given match
+	float *p = ijij;
+	float *q = ijij + 2;
+
+	double e;
+	float h = rpc_height(a, b, p[0], p[1], q[0], q[1], &e);
+	double lonlat[2], ijh[3] = {p[0], p[1], h};
+	rpc_localization(lonlat, a, ijh);
+
+	xyhe[0] = lonlat[0];
+	xyhe[1] = lonlat[1];
+	xyhe[2] = h;
+	xyhe[3] = e;
+}
+
+int main_rpctk_triangulate(int c, char *v[])
+{
+	// load named arguments
+	// (none yet)
+
+	// load positional arguments
+	if (c != 4)
+		return fprintf(stderr, "usage:\n"
+				"\t%s a.rpc b.rpc <ab.ijij >ab.xyh\n", *v);
+				//  0 1     2
+	char *filename_a = v[1];
+	char *filename_b = v[2];
+
+	// read input data
+
+	// rpc files
+	struct rpc a[1], b[1];
+	read_rpc_file_xml(a, filename_a);
+	read_rpc_file_xml(b, filename_b);
+
+	// input matches
+	int n;
+	float *x = read_alloc_floats("-", &n);
+	if (n % 4)
+		fprintf(stderr, "WARNING: read %d numbers (not 0 mod 4)\n", n);
+	n /= 4;
+	float *y = xmalloc(3 * n * sizeof*y);
+
+	// select triangulation function
+	// TODO: consider global triangulations that compute an affine
+	// approximation from the center of the data, or a piecewise affine,
+	// possibly smoothed thing, etc
+	//
+	void (*t)(	              // generic pointwise triangulation
+			float [4],    // output: x, y, h, err (in any units)
+			struct rpc*,  // input: RPC of left (reference) image
+			struct rpc*,  // input: RPC of right (secondary) omage
+			float [4]     // input: match (x0,y0)--(x1,y1)
+			);
+	t = triangulate_pixright;
+
+	// perform computation (triangulate all matches in the list
+	for (int i = 0; i < n; i++)
+		t(y, a, b, x);
+
+	// write output and quit
+	write_columns("-", y, 3, n);
+	return 0;
+}
+
 
 
 #include <string.h>
@@ -297,6 +388,7 @@ int main(int c, char *v[])
 	//if (0 == strcmp(v[1], "fitP"))     return main_rpctk_fitP(c-1, v+1);
 	//if (0 == strcmp(v[1], "fillP"))     return main_rpctk_filPL(c-1, v+1);
 	if (0 == strcmp(v[1], "zoom"))    return main_rpctk_zoom(c-1, v+1);
+	if(0==strcmp(v[1],"triangulate"))return main_rpctk_triangulate(c-1,v+1);
 end:	return fprintf(stderr,
 			"usage:\n\t%s {info|localize|project|fit} ...\n", *v);
 }
