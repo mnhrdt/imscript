@@ -307,6 +307,16 @@ static float kernel_2d_land(float x, float y, float *p)
 	return r;
 }
 
+static float kernel_2d_riesz(float x, float y, float *p)
+{
+	float sigma = p[1];
+
+	float n = hypot(x, y);
+	float a = pow(hypot(x, y), sigma);
+	float r = n ? pow(n, -sigma) : 1;
+	return r;
+}
+
 static float kernel_2d_ynvr(float x, float y, float *p)
 {
 	float sigma = p[1];
@@ -440,7 +450,7 @@ void blur_2d(float *y, float *x, int w, int h, int pd,
 	case 'p': f = kernel_2d_powerlaw2;   break;
 	case 'a': f = kernel_2d_pareto;   break;
 	case 'i': f = kernel_2d_invr;   break;
-	case 'r': f = kernel_2d_land;   break;
+	case 'r': f = kernel_2d_riesz;   break;
 	case 'y': f = kernel_2d_ynvr;   break;
 	case 'z': f = kernel_2d_ilogr;   break;
 	case 't': f = kernel_2d_r2logr;   break;
@@ -498,7 +508,7 @@ static char *help_string_long     =
 " a        pareto\n"
 " i        inverse distance (useful for Shepard interpolation)\n"
 " y        inverse distance (with different parameter normalization)\n"
-" r        Land\n"
+" r        Riesz\n"
 " z        inverse log-distance\n"
 " t        r^2 log(r)  (useful for biharmonic interpolation)\n"
 " o        log(r)\n"
