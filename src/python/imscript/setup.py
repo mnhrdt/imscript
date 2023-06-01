@@ -4,14 +4,14 @@ class myinstall(install):
 	def run(self):
 		import os
 		os.system("mkdir -p bin")
-		os.system("make bin/plambda bin/qauto")
+		os.system("make -j bin/plambda bin/qauto bin/morsi")
 		install.run(self)
 
 
 import setuptools
 setuptools.setup(
 	name = "imscript",
-	version = "0.3",
+	version = "0.5",
 	author = "Enric Meinhardt-Llopis",
 	author_email = "enric.meinhardt@fastmail.com",
 	description = "Image Processing with Unix Pipes",
@@ -23,5 +23,5 @@ setuptools.setup(
 		"Topic :: Scientific/Engineering :: Mathematics"
 		],
 	cmdclass = {'install' : myinstall},
-	data_files = [('bin', ['bin/plambda', 'bin/qauto'])]
+	data_files = [('bin', ['bin/plambda', 'bin/qauto', 'bin/morsi'])]
 )
