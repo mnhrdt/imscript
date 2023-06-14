@@ -76,8 +76,8 @@ stagit-clean: ; cd doc/stagit && sh clean.sh
 
 OBJ_FTR = src/iio.o src/ftr/ftr.o src/ftr/egm96.o src/ftr/fancy_image.o
 
-BIN_FTR = $(shell cat src/ftr/TARGETS)
-BIN_MSC = $(shell cat src/misc/TARGETS)
+BIN_FTR = $(shell test -f src/ftr/TARGETS && cat src/ftr/TARGETS)
+BIN_MSC = $(shell test -f src/misc/TARGETS && cat src/misc/TARGETS)
 
 BIN_FTR := $(addprefix bin/,$(BIN_FTR))
 BIN_MSC := $(addprefix bin/,$(BIN_MSC))

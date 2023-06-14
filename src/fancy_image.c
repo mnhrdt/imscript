@@ -112,6 +112,17 @@ typedef char check_FI_size[sizeof(struct FI)<=sizeof(struct fancy_image)?1:-1];
 #include "smapa.h"
 SMART_PARAMETER_SILENT(FANCY_IMAGE_MINSIDE,2000)
 
+#ifdef FANCY_TIFF
+static bool has_suffix(const char *s, const char *e)
+{
+	int n = strlen(s);
+	int m = strlen(e);
+	bool r = m < n && !strcmp(s + (n - m), e);
+	fprintf(stderr, "has_suffix(\"%s\", \"%s\") = %d\n", s, e, r);
+	return r;
+}
+#endif
+
 
 // check whether a filename corresponds to a small image or a tiled tiff
 static bool filename_corresponds_to_tiffo(char *filename)
@@ -122,17 +133,43 @@ static bool filename_corresponds_to_tiffo(char *filename)
 	struct tiff_info ti[1];
 	disable_tiff_warnings_and_errors();
 	bool r = get_tiff_info_filename_e(ti, filename);
+	fprintf(stderr, "r = %d\n", r);
 	if (!r) {
 		char buf[FILENAME_MAX];
 		snprintf(buf, FILENAME_MAX, filename, 0);
 		r = get_tiff_info_filename_e(ti, buf);
 		if (!r)
 			return false;
-		return ti->tiled;
+		return ti->tiled && has_suffix(filename, ",%d");
 	}
 	return ti->tiled &&
 		(ti->w > FANCY_IMAGE_MINSIDE()
-			|| ti->h > FANCY_IMAGE_MINSIDE());
+			|| ti->h > FANCY_IMAGE_MINSIDE()) &&
+		has_suffix(filename, ",%d");
+#else
+	return false;
+#endif
+}
+
+// check whether a "raw" filename does actually contain a pyramidal tiff
+static bool filename_actually_contains_tiff_pyramid(char *n)
+{
+#ifdef FANCY_TIFF
+	fprintf(stderr, "check whether \"%s\" actually contains pyr\n", n);
+	struct tiff_info t[2];
+	disable_tiff_warnings_and_errors();
+	int r = get_tiff_info_filename_e(t, n);
+	fprintf(stderr, "\tr = %d\n", r);
+	if (!r) return false;
+	char N[2][FILENAME_MAX];
+	snprintf(N[0], FILENAME_MAX, "%s,%d", n, 0);
+	snprintf(N[1], FILENAME_MAX, "%s,%d", n, 1);
+	r += get_tiff_info_filename_e(t+0, N[0]);
+	fprintf(stderr, "\tr = %d\n", r);
+	r += get_tiff_info_filename_e(t+1, N[1]);
+	fprintf(stderr, "\tr = %d\n", r);
+	if (r < 3) return false;
+	return t[1].w < t[0].w && t[0].w < 3*t[1].w;
 #else
 	return false;
 #endif
@@ -316,10 +353,16 @@ static bool has_prefix(const char *s, const char *p)
 }
 #endif
 
+// whether to automatically open tiff pyramids when possible
+SMART_PARAMETER(FANCY_IMAGE_PCD,1)
+
 void generic_read(struct FI *f, char *filename)
 {
+	if (f->option_verbose)
+		fprintf(stderr, "fancy_image generic_read \"%s\"\n", filename);
 	if (filename_corresponds_to_tiffo(filename)) {
 #ifdef FANCY_TIFF
+		if (f->option_verbose) fprintf(stderr, "...corr. to tiffo!\n");
 		f->tiffo = true;
 		tiff_octaves_init0(f->t, filename, f->megabytes,f->max_octaves);
 		if (f->option_write) f->t->option_write = true;
@@ -330,6 +373,12 @@ void generic_read(struct FI *f, char *filename)
 #else
 		assert(false);
 #endif
+	} else if (FANCY_IMAGE_PCD() &&
+			filename_actually_contains_tiff_pyramid(filename)) {
+		if (f->option_verbose) fprintf(stderr, "...add pcd!\n");
+		char fname_pcd[FILENAME_MAX];
+		snprintf(fname_pcd, FILENAME_MAX, "%s,%%d", filename);
+		generic_read(f, fname_pcd);
 	} else if (!f->option_write && FORCE_GDAL()) {
 #ifdef FANCY_GDAL
 		f->gdal = true;
@@ -400,7 +449,6 @@ void fancy_image_reload(struct fancy_image *fi)
 		fprintf(stderr, "WARNING: tiffo reload not implemented!\n");
 	}
 }
-
 
 // API: open a fancy image
 struct fancy_image *fancy_image_open(char *filename, char *options)
