@@ -18,8 +18,9 @@
 
 static uint64_t lcg_knuth_seed = 0;
 
-static void lcg_knuth_srand(uint32_t x)
+static void lcg_knuth_srand(uint64_t x)
 {
+//	fprintf(stderr, "setting knuth srand = %lu\n", x);
 	lcg_knuth_seed = x;
 }
 
@@ -32,9 +33,13 @@ static uint32_t lcg_knuth_rand(void)
 }
 
 
-static void xsrand(unsigned int seed)
+static void xsrand(unsigned long int iseed)
 {
-	lcg_knuth_srand(seed);
+	//uint64_t seed = iseed;
+	//uint64_t f = 2097152 + 17; // cubic root of 2^63
+	//uint64_t g = 549755813888 + 19;
+	//lcg_knuth_srand(g*seed + f);
+	lcg_knuth_srand(iseed);
 }
 
 static int xrand(void)
