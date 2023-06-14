@@ -324,6 +324,8 @@
 #define IMAGEOP_M_TOP 2010 //T
 #define IMAGEOP_M_BOT 2011 //B
 #define IMAGEOP_M_OSC 2012 //Z
+#define IMAGEOP_M_SUM 2013 //S
+#define IMAGEOP_M_AVG 2014 //V
 
 #define SCHEME_FORWARD 0
 #define SCHEME_BACKWARD 1
@@ -1822,6 +1824,8 @@ static void parse_imageop(const char *s, int *op, int *scheme)
 	else if (hasprefix(s, "G")) *op = IMAGEOP_M_GRA;
 	else if (hasprefix(s, "I")) *op = IMAGEOP_M_IGR;
 	else if (hasprefix(s, "Y")) *op = IMAGEOP_M_EGR;
+	else if (hasprefix(s, "V")) *op = IMAGEOP_M_AVG;
+//	else if (hasprefix(s, "S")) *op = IMAGEOP_M_SUM;
 //	else if (hasprefix(s, "T")) *op = IMAGEOP_M_TOP;
 //	else if (hasprefix(s, "B")) *op = IMAGEOP_M_BOT;
 //	else if (hasprefix(s, "Z")) *op = IMAGEOP_M_OSC;
@@ -2532,7 +2536,7 @@ static float *get_stencil_3x3(int operator, int scheme)
 		}
 	case IMAGEOP_M_ERO: case IMAGEOP_M_DIL: case IMAGEOP_M_MED:
 	case IMAGEOP_M_GRA: case IMAGEOP_M_IGR: case IMAGEOP_M_EGR:
-	case IMAGEOP_M_LAP: case IMAGEOP_M_ENH:
+	case IMAGEOP_M_LAP: case IMAGEOP_M_ENH: case IMAGEOP_M_AVG:
 			{ switch(scheme) {
 			case SCHEME_CROSS: return stencil_3x3_m_cross;
 			case SCHEME_NCROSS: return stencil_3x3_m_ncross;
@@ -2576,6 +2580,8 @@ static float apply_3x3_mstencil(float *img, int w, int h, int pd,
 		qsort(v, nv, sizeof*v, compare_floats);
 		r = v[nv/2];
 		break;
+	case IMAGEOP_M_SUM: r=0; for (int i=0; i<nv; i++) r += v[i]   ; break;
+	case IMAGEOP_M_AVG: r=0; for (int i=0; i<nv; i++) r += v[i]/nv; break;
 	case IMAGEOP_M_ERO: r = e           ; break;
 	case IMAGEOP_M_DIL: r = d           ; break;
 	case IMAGEOP_M_GRA: r = d - e       ; break;
@@ -3127,6 +3133,7 @@ Comma modifiers (pre-defined local operators):\n\
  a,I\tmorphological inner gradient\n\
  a,Y\tmorphological outer gradient\n\
  a,G\tmorphological centered gradient\n\
+ a,V\tneighborhood average\n\
  a,E9\tmorphological erosion (using \"square\" structuring element)\n\
  etc\n\
 \n\
