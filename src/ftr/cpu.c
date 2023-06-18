@@ -368,7 +368,7 @@ static void action_qauto2(struct FTR *f)
 static void action_toggle_roi(struct FTR *f, int x, int y, int dir)
 {
 	struct pan_state *e = f->userdata;
-	e->roi = (e->roi + (dir?-1:1)) % 5;
+	e->roi = (e->roi + (dir?-1:1)) % 3;
 	fprintf(stderr, "ROI SWITCH(%d) = %d\n", dir, e->roi);
 	e->roi_x = x - e->roi_w / 2;
 	e->roi_y = y - e->roi_w / 2;
@@ -674,20 +674,15 @@ static void circular_roi(float *y, float *x, int n)
 			y[(j*n+i)*3+l] = x[(j*n+i)*3+l] - y[(j*n+i)*3+l];// + 127;
 }
 
-static void transform_roi_buffers(float *y, float *x, int n, int roi)
+static void fourier_roi(float *y, float *x, int n)
 {
-	if (roi == 4) { circular_roi(y, x, n); return; }
-	float x_p0[3*n*n], *x_p = x_p0;
-	ppsmooth_vec(x_p0, x, n, n, 3);
-	if (roi == 2) x_p = x;
-	if (roi == 3) { for (int i = 0; i < 3*n*n; i++) y[i]=x_p0[i]; return; }
 	float *c = xmalloc(n*n*sizeof*c);
 	float *ys = xmalloc(n*n*sizeof*c);
 	fftwf_complex *fc = fftwf_xmalloc(n*n*sizeof*fc);
 	for (int l = 0; l < 3; l++)
 	{
 		for (int i = 0; i < n*n; i++)
-			c[i] = x_p[3*i+l];
+			c[i] = x[3*i+l];
 		fft_2dfloat(fc, c, n, n);
 		for (int i = 0; i < n*n; i++)
 			//ys[i] = cabs(fc[i]);
@@ -708,6 +703,48 @@ static void transform_roi_buffers(float *y, float *x, int n, int roi)
 	fftwf_free(fc);
 	//float param[1] = {0.5};
 	//blur_2d(y, y, n, n, 3, "cauchy", param, 1);
+}
+
+static void autocorrelation_roi(float *y, float *x, int n)
+{
+	float *c = xmalloc(n*n*sizeof*c);
+	float *ys = xmalloc(n*n*sizeof*c);
+	fftwf_complex *fc = fftwf_xmalloc(n*n*sizeof*fc);
+	for (int l = 0; l < 3; l++)
+	{
+		for (int i = 0; i < n*n; i++)
+			c[i] = x[3*i+l];
+		fft_2dfloat(fc, c, n, n);
+		for (int i = 0; i < n*n; i++)
+			fc[i] = cabs(fc[i]);
+		ifft_2dfloat(c, fc, n, n);
+		for (int i = 0; i < n*n; i++)
+			ys[i] = c[i];
+		//float fac = n*13;
+		float fac = n*3;
+		for (int j = 0; j < n; j++)
+		for (int i = 0; i < n; i++)
+		{
+			int ii = (i + n/2) % n;
+			int jj = (j + n/2) % n;
+			//float norm = hypot(i-n/2-1, j-n/2-1) / fac;
+			y[3*(j*n+i)+l] = ys[jj*n+ii] * 1;//norm;
+		}
+	}
+	free(ys);
+	free(c);
+	fftwf_free(fc);
+}
+
+static void transform_roi_buffers(float *y, float *x, int n, int roi)
+{
+	//if (roi == 4) { circular_roi(y, x, n); return; }
+	float x_p0[3*n*n], *x_p = x_p0;
+	ppsmooth_vec(x_p0, x, n, n, 3);
+	if (roi == 1) { fourier_roi(y, x_p, n); return; }
+	if (roi == 2) { autocorrelation_roi(y, x_p, n); return; }
+	//if (roi == 2) x_p = x;
+	//if (roi == 3) { for (int i = 0; i < 3*n*n; i++) y[i]=x_p0[i]; return; }
 }
 
 // TODO: combine "colormap3" and "pixel"
