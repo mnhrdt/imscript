@@ -1088,8 +1088,8 @@ static void key_handler_print(struct FTR *f, int k, int m, int x, int y)
 static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
 	if (m & FTR_MASK_SHIFT && islower(k)) k = toupper(k);
-	fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
-			k, isprint(k)?k:' ', m, x, y);
+	//fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
+	//		k, isprint(k)?k:' ', m, x, y);
 
 	//if (k == '+') action_increase_zoom(f, f->w/2, f->h/2);
 	//if (k == '-') action_decrease_zoom(f, f->w/2, f->h/2);
