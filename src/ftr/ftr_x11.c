@@ -8,6 +8,8 @@
 //#include <X11/Xutil.h> // only for XDestroyImage, that can be easily removed
 #include <unistd.h> // only for "fork"
 
+#include <assert.h>
+
 
 #include "ftr.h"
 
@@ -43,6 +45,9 @@ struct _FTR {
 	int wheel_ax;
 
 	pid_t child_pid;
+
+	int s;    // display scaling, read from envvar at startup
+	int W, H; // scaled sizes, for convenience
 };
 
 // Check that _FTR can fit inside a FTR
@@ -91,6 +96,11 @@ char *event_names[] ={
 "LASTEvent		36"};
 
 
+static int getenv_int(char *s, int d)
+{
+	char *t = getenv(s);
+	return t ? atoi(t) : d;
+}
 
 struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 {
@@ -105,6 +115,14 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	for (int i = 0; i < 3*w*h; i++)
 		f->rgb[i] = x ? x[i] : 0;
 
+	// scaling hack
+	f->s = getenv_int("FTR_SCALING", 1);
+	f->W = f->w * f->s;
+	f->H = f->h * f->s;
+	fprintf(stderr, "w,h = %d,%d\n", f->w, f->h);
+	fprintf(stderr, "s = %d\n", f->s);
+	fprintf(stderr, "W,H = %d,%d\n", f->W, f->H);
+
 	// specific to X11 backend
 	f->display = XOpenDisplay(NULL);
 	if (!f->display) exit(fprintf(stderr, "Cannot open display\n"));
@@ -113,9 +131,8 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	int black = BlackPixel(f->display, s);
 	f->gc = DefaultGC(f->display, s);
 	f->visual = DefaultVisual(f->display, s);
-	f->window = XCreateSimpleWindow(f->display,
-			RootWindow(f->display, s), 10, 10, f->w, f->h, 1,
-			black, white);
+	f->window = XCreateSimpleWindow(f->display, RootWindow(f->display, s),
+			10, 10, f->W, f->H, 1, black, white);
 			//white, black);
 	XStoreName(f->display, f->window, "ftr");
 	f->ximage = NULL;
@@ -241,9 +258,10 @@ static void process_next_event(struct FTR *ff)
 			//f->ximage = XShmGetImage(f->display, f->window,
 			//		0, 0, f->w, f->h, AllPlanes, ZPixmap);
 			f->ximage = XGetImage(f->display, f->window,
-					0, 0, f->w, f->h, AllPlanes, ZPixmap);
+				0, 0, f->W, f->H, AllPlanes, ZPixmap);
 			f->imgupdate = 0;
 		}
+		if (f->s == 1)
 		for (int i = 0; i < f->w*f->h; i++) {
 			// drain bramage
 			f->ximage->data[4*i+0] = f->rgb[3*i+2];
@@ -251,10 +269,30 @@ static void process_next_event(struct FTR *ff)
 			f->ximage->data[4*i+2] = f->rgb[3*i+0];
 			f->ximage->data[4*i+3] = 0;
 		}
+
+		// OK, boys, this is where the actual fucking happens
+		if (f->s > 1) {
+			int s = f->s;
+			for (int j = 0; j < f->h; j++)
+			for (int i = 0; i < f->w; i++)
+			{
+				int ij = i + j*f->w;
+				int IJ = s*i + s*j*f->W;
+				for (int q = 0; q < s; q++)
+				for (int p = 0; p < s; p++)
+				{
+					int Ip = IJ + p + q*f->W;
+					f->ximage->data[4*Ip+0]= f->rgb[3*ij+2];
+					f->ximage->data[4*Ip+1]= f->rgb[3*ij+1];
+					f->ximage->data[4*Ip+2]= f->rgb[3*ij+0];
+					f->ximage->data[4*Ip+3]= 0;
+				}
+			}
+		}
 		//XShmPutImage(f->display, f->window, f->gc, f->ximage,
 		//		0, 0, 0, 0, f->w, f->h, 0);
 		XPutImage(f->display, f->window, f->gc, f->ximage,
-				0, 0, 0, 0, f->w, f->h);
+				0, 0, 0, 0, f->W, f->H);
 		if (f->handle_expose2)
 			f->handle_expose2(ff, 0, 0, 0, 0);
 
@@ -262,9 +300,11 @@ static void process_next_event(struct FTR *ff)
 
 	if (event.type == ConfigureNotify) {
 		XConfigureEvent e = event.xconfigure;
-		if (f->w != e.width || f->h != e.height) {
-			f->w = e.width < f->max_w ? e.width : f->max_w;
-			f->h = e.height< f->max_h ? e.height : f->max_h;
+		if (f->W != e.width || f->H != e.height) {
+			f->w= e.width/f->s  < f->max_w ? e.width/f->s:f->max_w;
+			f->h= e.height/f->s < f->max_h ? e.height/f->s:f->max_h;
+			f->W = f->w * f->s;
+			f->H = f->h * f->s;
 			if (f->handle_resize)
 				f->handle_resize(ff, 0, 0, f->w, f->h);
 			f->imgupdate = 1;
@@ -276,9 +316,11 @@ static void process_next_event(struct FTR *ff)
 		if (e.button == 4 || e.button == 5) {
 			int np = XPending(f->display);
 			f->wheel_ax += e.button==4 ? 1 : -1;
-			fprintf(stderr, "\twheel acc(%d) %d\n", f->wheel_ax, np);
+			fprintf(stderr, "\twheel acc(%d) %d\n", f->wheel_ax,np);
 			if (np < 2) {
-				f->handle_wheel(ff,f->wheel_ax,e.state,e.x,e.y);
+				int x = e.x / f->s;
+				int y = e.y / f->s;
+				f->handle_wheel(ff, f->wheel_ax, e.state, x,y);
 				f->wheel_ax = 0;
 			}
 			return;
@@ -303,12 +345,12 @@ static void process_next_event(struct FTR *ff)
 		XCrossingEvent e = event.xcrossing;
 		//fprintf(stderr, "enter notify (%d %d)\n", e.x, e.y);
 		if (XPending(f->display)) return;
-		f->handle_motion(ff, -1, e.state, e.x, e.y);
+		f->handle_motion(ff, -1, e.state, e.x / f->s, e.y / f->s);
 	}
 	if (event.type == LeaveNotify && f->handle_motion) {
 		XCrossingEvent e = event.xcrossing;
-		int x = do_bound(0, f->w - 1, e.x);
-		int y = do_bound(0, f->h - 1, e.y);
+		int x = do_bound(0, f->w - 1, e.x / f->s);
+		int y = do_bound(0, f->h - 1, e.y / f->s);
 		//fprintf(stderr,"LEAVE notify (%d %d)[%d %d]\n",e.x,e.y,x,y);
 		if (XPending(f->display)) return;
 		f->handle_motion(ff, -2, e.state, x, y);
@@ -318,7 +360,7 @@ static void process_next_event(struct FTR *ff)
 
 	if (event.type == MotionNotify && f->handle_motion) {
 		XMotionEvent e = event.xmotion;
-		f->handle_motion(ff, e.is_hint, e.state, e.x, e.y);
+		f->handle_motion(ff, e.is_hint, e.state, e.x/f->s, e.y/f->s);
 	}
 	if (event.type == ButtonPress && (f->handle_button||f->handle_wheel)) {
 		XButtonEvent e = event.xbutton;
@@ -326,11 +368,13 @@ static void process_next_event(struct FTR *ff)
 			f->wheel_ax += e.button==4 ? 1 : -1;
 			fprintf(stderr, "\twheel ack %d\n", f->wheel_ax);
 			//if (!XPending(f->display)) {
-				f->handle_wheel(ff,f->wheel_ax,e.state,e.x,e.y);
+				int x = e.x / f->s;
+				int y = e.y / f->s;
+				f->handle_wheel(ff, f->wheel_ax, e.state, x,y);
 				f->wheel_ax = 0;
 			//}
 		}
-		f->handle_button(ff, 1<<(7+e.button), e.state, e.x, e.y);
+		f->handle_button(ff, 1<<(7+e.button),e.state,e.x/f->s,e.y/f->s);
 		static int ugly_disable = 1;
 		if (ugly_disable && (e.button == 4 || e.button == 5))
 		{
@@ -342,7 +386,7 @@ static void process_next_event(struct FTR *ff)
 		XButtonEvent e = event.xbutton;
 		if (e.button != 4 && e.button != 5)
 			f->handle_button(ff, -(1<<(7+e.button)),
-					e.state, e.x, e.y);
+					e.state, e.x/f->s, e.y/f->s);
 	}
 	if (event.type == KeyPress && f->handle_key) {
 		XKeyEvent e = event.xkey;
@@ -350,7 +394,7 @@ static void process_next_event(struct FTR *ff)
 		//int keysym = XKeycodeToKeysym(f->display, e.keycode, e.state);
 		if (e.keycode != 77) {
 		int key = keycode_to_ftr(f, e.keycode, e.state);
-		f->handle_key(ff, key, e.state, e.x, e.y);
+		f->handle_key(ff, key, e.state, e.x/f->s, e.y/f->s);
 		}
 	}
 }
