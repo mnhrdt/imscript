@@ -1297,9 +1297,13 @@ static char *help_string_long     =
 ;
 
 #include "help_stuff.c"
-int main(int c, char *v[])
+int main_cpu(int c, char *v[])
 {
 	if (c == 2)
 		if_help_is_requested_print_it_and_exit_the_program(v[1]);
 	return main_cpu_multi(c, v);
 }
+
+#ifndef HIDE_ALL_MAINS
+int main(int c, char **v) { return main_cpu(c, v); }
+#endif
