@@ -119,9 +119,9 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	f->s = getenv_int("FTR_SCALING", 1);
 	f->W = f->w * f->s;
 	f->H = f->h * f->s;
-	fprintf(stderr, "w,h = %d,%d\n", f->w, f->h);
-	fprintf(stderr, "s = %d\n", f->s);
-	fprintf(stderr, "W,H = %d,%d\n", f->W, f->H);
+	//fprintf(stderr, "w,h = %d,%d\n", f->w, f->h);
+	//fprintf(stderr, "s = %d\n", f->s);
+	//fprintf(stderr, "W,H = %d,%d\n", f->W, f->H);
 
 	// specific to X11 backend
 	f->display = XOpenDisplay(NULL);

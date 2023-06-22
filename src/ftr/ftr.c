@@ -10,18 +10,10 @@
 #  define FTR_BACKEND FTR_BACKEND_X11
 #endif
 
-//#ifdef FTR_BACKEND
-//#
-//#  if FTR_BACKEND == FTR_BACKEND_X11
-#    include "ftr_x11.c"
-//#  endif
-//#
-//#   if FTR_BACKEND == FTR_BACKEND_FREEGLUT
-//#    include "ftr_freeglut.c"
-//#   endif
-//#
-//#else
-//#
-//#   error "please define FTR BACKEND"
-//#
-//#endif
+#if FTR_BACKEND == FTR_BACKEND_X11
+#  include "ftr_x11.c"
+#elif FTR_BACKEND == FTR_BACKEND_FREEGLUT
+#  include "ftr_freeglut.c"
+#else
+#  error "please define FTR_BACKEND to a 'x' or 'f'"
+#endif

@@ -82,8 +82,7 @@ BIN_MSC = $(shell test -f src/misc/TARGETS && cat src/misc/TARGETS)
 BIN_FTR := $(addprefix bin/,$(BIN_FTR))
 BIN_MSC := $(addprefix bin/,$(BIN_MSC))
 
-LDLIBS_FTR = $(LDLIBS) -lGL -lglut
-LDLIBS_FTR = $(LDLIBS) -lX11
+LDLIBS_FTR = $(LDLIBS)
 LDLIBS_MSC = $(LDLIBS) -lgsl -lgslcblas
 
 OBJ_ALL = $(OBJ) $(OBJ_FTR)
@@ -99,6 +98,16 @@ bin/% : src/ftr/%.o $(OBJ_FTR)
 
 bin/% : src/misc/%.o $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS_MSC)
+
+
+ifdef FTR_GLUT
+LDLIBS_FTR += -lGL -lglut
+src/iio.o: CPPFLAGS += -DI_CAN_HAS_LIBTIFF
+src/ftr/ftr.o : CFLAGS += -DFTR_BACKEND=\'f\'
+else
+LDLIBS_FTR += -lX11
+endif
+
 
 
 # this is the end of the "regular" targets.  What follows are fancy build
