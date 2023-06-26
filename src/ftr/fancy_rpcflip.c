@@ -396,7 +396,7 @@ static struct pan_view *obtain_view(struct pan_state *e)
 	return e->view + e->current_view;
 }
 
-static int obtain_octave(struct pan_state *e)
+static int obtain_octave_bad(struct pan_state *e)
 {
 	// The octave depends on the zoom factor.
 	// It is not exactly an octave, but an index to an image to query
@@ -418,6 +418,11 @@ static int obtain_octave(struct pan_state *e)
 		fprintf(stderr, "oo z=%g r=%d\n", e->zoom_factor, r);
 		return r;
 	}
+}
+
+static int obtain_octave(struct pan_state *e)
+{
+	return floor(fmax(0,-log2(e->zoom_factor)));
 }
 
 //static void debug_view_info(struct pan_state *e)
@@ -1175,9 +1180,9 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 	if (e->image_space)      win_to_img = window_to_image_apm;
 	else if (e->force_exact) win_to_img = window_to_image_ex;
 
-	//int o = 0;
-	int o = obtain_octave(e);
-	fprintf(stderr, "o = %d\n", o);
+	//int o = 2;
+	int o = 2+obtain_octave(e);
+	fprintf(stderr, "o = %d\n", o-2);
 	int interp = e->interpolation_order;
 
 //#pragma omp parallel for
@@ -1854,10 +1859,10 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 
 	if (k == 'a') action_multiply_contrast(f, 1.3);
 	if (k == 's') action_multiply_contrast(f, 1/1.3);
-	if (k == 'u' && m & FTR_MASK_SHIFT){action_offset_base_h(f, +1);return;}
-	if (k == 'd' && m & FTR_MASK_SHIFT){action_offset_base_h(f, -1);return;}
-	if (k == 'u') {action_offset_base_h(f, +10);return;}
-	if (k == 'd') {action_offset_base_h(f, -10);return;}
+	if (k == 'u' && m&FTR_MASK_SHIFT){action_offset_base_h(f, +0.2);return;}
+	if (k == 'd' && m&FTR_MASK_SHIFT){action_offset_base_h(f, -0.2);return;}
+	if (k == 'u') {action_offset_base_h(f, +5);return;}
+	if (k == 'd') {action_offset_base_h(f, -5);return;}
 
 	if (k == 'e') action_toggle_exact_rpc(f);
 	if (k == 'z') action_toggle_srtm4(f);

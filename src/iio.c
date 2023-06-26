@@ -1673,6 +1673,7 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 	int r = 0, fmt_iio=-1;
 	r += TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &w);
 	IIO_DEBUG("tiff get field width %d (r=%d)\n", (int)w, r);
+	IIO_DEBUG("w = %d\n", (int)w);
 	r += TIFFGetField(tif, TIFFTAG_IMAGELENGTH, &h);
 	IIO_DEBUG("tiff get field length %d (r=%d)\n", (int)h, r);
 	if (r != 2) fail("can not read tiff of unknown size");
@@ -1695,6 +1696,7 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 	IIO_DEBUG("rps %d (r=%d)\n", rps, r);
 
 	IIO_DEBUG("fmt  = %d\n", fmt);
+	IIO_DEBUG("w = %d\n", (int)w);
 
 	// deal with complex issues
 	bool complicated = false; // complicated = complex and broken
@@ -1747,24 +1749,33 @@ static int read_whole_tiff(struct iio_image *x, const char *filename)
 	r = TIFFGetField(tif, TIFFTAG_COMPRESSION, &compression);
 	if (r != 1) compression = 1; // 1 == no compression
 	IIO_DEBUG("TIFF Tag Compression = %d\n", compression);
+	IIO_DEBUG("w = %d\n", (int)w);
 
-	uint16_t rows_per_strip;
+	uint32_t rows_per_strip;
 	r = TIFFGetField(tif, TIFFTAG_ROWSPERSTRIP, &rows_per_strip);
+	IIO_DEBUG("r = %d\n", (int)r);
+	IIO_DEBUG("w = %d\n", (int)w);
 	if (r != 1) rows_per_strip = 0;
 	IIO_DEBUG("TIFF Tag Rows Per Strip = %d\n", rows_per_strip);
+	IIO_DEBUG("w = %d\n", (int)w);
 
 
 	// acquire memory block
-	uint32_t scanline_size = (w * spp * bps)/8;
+	uint32_t scanline_size = (w * (int)spp * (int)bps)/8;
 	int rbps = (bps/8) ? (bps/8) : 1;
-	uint32_t uscanline_size = w * spp * rbps;
+	uint32_t uscanline_size = w * (int)spp * (int)rbps;
+	IIO_DEBUG("w = %d\n", (int)w);
 	IIO_DEBUG("bps = %d\n", (int)bps);
 	IIO_DEBUG("spp = %d\n", (int)spp);
+	IIO_DEBUG("rbps = %d\n", (int)rbps);
 	IIO_DEBUG("sls = %d\n", (int)scanline_size);
 	IIO_DEBUG("uss = %d\n", (int)uscanline_size);
 	int sls = TIFFScanlineSize(tif);
 	IIO_DEBUG("sls(r) = %d\n", (int)sls);
 	IIO_DEBUG("planarity = %d (%s)\n", r, broken?"broken":"normal");
+
+	if (xgetenv("IIO_OVERRIDE_SLS"))
+		scanline_size = sls;
 
 	if ((int)scanline_size != sls)
 	{

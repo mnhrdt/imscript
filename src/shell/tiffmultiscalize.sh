@@ -40,9 +40,11 @@ gdal_translate $FNAME_IN  $FNAME_TMP  $TILE_OPTIONS $BT_OPTIONS
 gdaladdo -r average $FNAME_TMP $OPT_L $BT_OPTIONS_O
 
 # 3. retile the pyramid
+# NOTE: edit K_OPTIONS to change the output sample format (int/uint/float...)
 PYR_OPTIONS="-co COPY_SRC_OVERVIEWS=YES --config GDAL_TIFF_OVR_BLOCKSIZE $OPT_N"
 #K_OPTIONS="-co COMPRESS=$OPT_K -co PREDICTOR=$OPT_P"
-K_OPTIONS="-ot UInt16" # -co COMPRESS=$OPT_K -co PREDICTOR=$OPT_P"
+#K_OPTIONS="-ot UInt16" # -co COMPRESS=$OPT_K -co PREDICTOR=$OPT_P"
+K_OPTIONS="-ot Float32" # -co COMPRESS=$OPT_K -co PREDICTOR=$OPT_P"
 ALL_OPTIONS="$TILE_OPTIONS $PYR_OPTIONS $K_OPTIONS $BT_OPTIONS"
 gdal_translate $FNAME_TMP $FNAME_OUT $ALL_OPTIONS
 
