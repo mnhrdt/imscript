@@ -209,6 +209,14 @@ static void my_idle(void)
 	}
 }
 
+static char *name_with_pid(void)
+{
+	static char n[FILENAME_MAX];
+	pid_t p = getpid();
+	snprintf(n, FILENAME_MAX, "ftr_win_pid_%d", p);
+	return n;
+}
+
 // setup_glut_environment {{{2
 static void setup_glut_environment(struct _FTR *f)
 {
@@ -218,7 +226,7 @@ static void setup_glut_environment(struct _FTR *f)
 	glutInitDisplayMode(GLUT_DOUBLE|GLUT_RGB|GLUT_DEPTH);
 	glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE,
 			GLUT_ACTION_GLUTMAINLOOP_RETURNS);
-	glutCreateWindow("Whatever");
+	glutCreateWindow(name_with_pid());
 	glutReshapeWindow(f->w * f->s, f->h * f->s);
 	glutDisplayFunc(my_displayfunc);
 	glutReshapeFunc(my_reshapefunc);

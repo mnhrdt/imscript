@@ -151,6 +151,14 @@ struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 	XSelectInput(f->display, f->window, mask);
 	XMapWindow(f->display, f->window);
 
+	// immanentize the pid
+	{
+		Atom a = XInternAtom(f->display, "_NET_WM_PID", 0);
+		int p = getpid();
+		XChangeProperty(f->display, f->window,
+				a, 6, 32, 0, (void*)&p, 1);
+	}
+
 	// general again
 	f->handle_key = ftr_handler_exit_on_ESC;
 	f->handle_button = NULL;
