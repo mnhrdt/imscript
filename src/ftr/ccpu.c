@@ -38,6 +38,18 @@ int cpu_new(float *x, int w, int h, int d)
 	return 0;
 }
 
+void cpu_send_key(int n, int k)
+{
+	assert(n == 0);
+	struct cpu_view *v = global_table_of_cpu_views + n;
+
+	char c[FILENAME_MAX]; // command line to run
+	snprintf(c, FILENAME_MAX,
+		"xdotool search --any --pid %d --name ftr_win_pid_%d key %c",
+		v->p, v->p, k);
+	system(c);
+}
+
 // API: update the view determined by this handle
 void cpu_update(int n, float *x, int w, int h, int d)
 {
@@ -45,23 +57,16 @@ void cpu_update(int n, float *x, int w, int h, int d)
 	struct cpu_view *v = global_table_of_cpu_views + n;
 
 	iio_write_image_float_vec(v->f, x, w, h, d);
-	char c[FILENAME_MAX]; // command line to run
-	snprintf(c, FILENAME_MAX,
-		"xdotool search --any --pid %d --name ftr_win_pid_%d key 2",
-		v->p, v->p);
-	system(c);
+	cpu_send_key(n, '2');
 }
 
 // API: close the cpu window
 void cpu_close(int n)
 {
+	assert(n == 0);
 	struct cpu_view *v = global_table_of_cpu_views + n;
 
-	char c[FILENAME_MAX]; // command line to run
-	snprintf(c, FILENAME_MAX,
-		"xdotool search --any --pid %d --name ftr_win_pid_%d key q",
-		v->p, v->p);
-	system(c);
+	cpu_send_key(n, 'q');
 	unlink(v->f);
 }
 
@@ -79,8 +84,9 @@ int main_try_ccpu(void)
 	return 0;
 }
 
+#ifdef MAIN_CCPU
 int main(void)
 {
 	return main_try_ccpu();
 }
-
+#endif

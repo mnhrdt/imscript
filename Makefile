@@ -74,7 +74,8 @@ stagit-clean: ; cd doc/stagit && sh clean.sh
 # FTR: interactive tools, require X11 or freeglut
 # MSC: "misc" tools, or those requiring GSL
 
-OBJ_FTR = src/iio.o src/ftr/ftr.o src/ftr/egm96.o src/ftr/fancy_image.o
+#OBJ_FTR = src/iio.o src/ftr/ftr.o src/ftr/egm96.o src/ftr/fancy_image.o src/ftr/ccpu.o
+OBJ_FTR = src/iio.o src/ftr/ftr.o src/ftr/fancy_image.o src/ftr/ccpu.o
 
 BIN_FTR = $(shell test -f src/ftr/TARGETS && cat src/ftr/TARGETS)
 BIN_MSC = $(shell test -f src/misc/TARGETS && cat src/misc/TARGETS)

@@ -8,6 +8,11 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+#define CPU_SIGUSR
+#ifdef CPU_SIGUSR
+#include <signal.h>
+#endif//CPU_SIGUSR
+
 #include "fancy_image.h"
 
 #ifndef FTR_BACKEND
@@ -547,6 +552,26 @@ static void action_reload_image(struct FTR *f)
 	fancy_image_reload(e->i);
 	f->changed = 1;
 }
+
+#ifdef CPU_SIGUSR
+static struct FTR *global_f_for_sigusr = NULL;
+void handle_signal(int n)
+{
+	if (false) {
+		;
+	} else if (n == SIGUSR1) {
+		fprintf(stderr, "signal %d received\n", n);
+		action_reload_image(global_f_for_sigusr);
+	} else if (n == SIGUSR2) {
+		fprintf(stderr, "signal %d received\n", n);
+		ftr_notify_the_desire_to_stop_this_loop(global_f_for_sigusr, 1);
+	}
+	else
+		fprintf(stderr, "signal %d unrecognized\n", n);
+
+}
+#endif//CPU_SIGUSR
+
 
 static void action_update_window_title(struct FTR *f)
 {
@@ -1237,6 +1262,12 @@ int main_cpu_multi(int c, char *v[])
 	ftr_set_handler(&f, "motion", pan_motion_handler);
 	ftr_set_handler(&f, "button", pan_button_handler);
 	ftr_set_handler(&f, "key"   , pan_key_handler);
+#ifdef CPU_SIGUSR
+	global_f_for_sigusr = &f;
+	signal(SIGUSR1, handle_signal);
+	signal(SIGUSR2, handle_signal);
+#endif//CPU_SIGUSR
+
 	int r = ftr_loop_run(&f);
 
 	// cleanup and exit (optional)

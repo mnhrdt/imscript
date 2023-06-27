@@ -29,6 +29,7 @@
 double egm96(double,double);
 
 #include "ftr.h"
+#include "ccpu.h"
 
 #include "fancy_image.h"
 #include "srtm4o.c"
