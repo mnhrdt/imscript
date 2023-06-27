@@ -476,9 +476,9 @@ static void print_parametric_datum(FILE *f, struct printable_data *p, int idx,
 			else
 				ppos = p->pd*(argv[0]*p->w + argv[1])+argv[2];
 		}
-		double y = 0;
-		if (ppos >= 0 && ppos < p->w * p->h * p->pd)
-			y = p->x[ppos];
+		//double y = 0;
+		//if (ppos >= 0 && ppos < p->w * p->h * p->pd)
+		//	y = p->x[ppos];
 		print_scalar(f, p, p->x[ppos]);
 	} else if (0 == strcmp("getpixel", p->t[idx].name)) {
 		// idx

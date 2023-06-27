@@ -342,7 +342,7 @@ void ftr_notify_the_desire_to_stop_this_loop(struct FTR *ff, int retval)
 	glutLeaveMainLoop();
 }
 
-int ftr_x11_force_redraw(struct FTR *ff)
+void ftr_x11_force_redraw(struct FTR *ff)
 {
 	// just ignore it
 	(void)ff;

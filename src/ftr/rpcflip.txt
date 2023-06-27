@@ -1,0 +1,6 @@
+MODE (i)
+	0 [raw] no rpc needed, just crop at the same absolute position
+	1 [image] each image is shifted so that the centers are srtm/rpc aligned
+	2 [geo] screen grid corresponds to normalized lon lat
+	3 [rectify] rectifying homogs are applied to 2 images
+	4 [semirect] semi-rectification from a base image

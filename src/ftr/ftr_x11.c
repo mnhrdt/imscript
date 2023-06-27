@@ -407,7 +407,7 @@ static void process_next_event(struct FTR *ff)
 	}
 }
 
-int ftr_x11_force_redraw(struct FTR *ff)
+void ftr_x11_force_redraw(struct FTR *ff)
 {
 	struct _FTR *f = (void*)ff;
 	XEvent e;
