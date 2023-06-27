@@ -557,14 +557,21 @@ static void action_reload_image(struct FTR *f)
 static struct FTR *global_f_for_sigusr = NULL;
 void handle_signal(int n)
 {
+	void ftr_x11_force_redraw(struct FTR*);
 	if (false) {
 		;
 	} else if (n == SIGUSR1) {
 		fprintf(stderr, "signal %d received\n", n);
 		action_reload_image(global_f_for_sigusr);
+#if FTR_BACKEND == 'x'
+		ftr_x11_force_redraw(global_f_for_sigusr);
+#endif
 	} else if (n == SIGUSR2) {
 		fprintf(stderr, "signal %d received\n", n);
 		ftr_notify_the_desire_to_stop_this_loop(global_f_for_sigusr, 1);
+#if FTR_BACKEND == 'x'
+		ftr_x11_force_redraw(global_f_for_sigusr);
+#endif
 	}
 	else
 		fprintf(stderr, "signal %d unrecognized\n", n);

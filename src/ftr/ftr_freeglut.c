@@ -342,6 +342,12 @@ void ftr_notify_the_desire_to_stop_this_loop(struct FTR *ff, int retval)
 	glutLeaveMainLoop();
 }
 
+int ftr_x11_force_redraw(struct FTR *ff)
+{
+	// just ignore it
+	(void)ff;
+}
+
 #include "ftr_common_inc.c"
 
 // vim:set foldmethod=marker:

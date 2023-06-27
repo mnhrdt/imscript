@@ -103,6 +103,7 @@ struct pan_state {
 	int log_scale;
 	int show_srtm4, so;
 	int srtm4_base;
+	int cpu_view;
 };
 
 // TODO: integrate this variable into the state
@@ -342,6 +343,7 @@ static void init_state(struct pan_state *e,
 	e->show_srtm4 = 0;
 	e->so = 0;
 	e->srtm4_base = 0;
+	e->cpu_view = 0;
 	msoctaves_instead_of_preview = USE_MSOCTAVES();
 	//msoctaves_instead_of_preview = e->view->tg->noctaves > 4 ||
 	//	(ci && e->view->tc->noctaves > 3);
@@ -1240,6 +1242,9 @@ static void pan_repaint(struct pan_state *e, int w, int h)
 	if (e->qauto == 3)inplace_rgb_span3(v->fdisplay, v->dw, v->dh, 40*e->a);
 	for (int i = 0; i < v->dw * v->dh * 3; i++)
 		v->display[i] = float_to_uint8(v->fdisplay[i]);
+
+	//if (e->cpu_view)
+	//	cpu_update(0, NULL, 0, 0, 0);
 }
 
 // CALLBACK: pan_exposer {{{1
@@ -1404,6 +1409,25 @@ static void action_toggle_diff_mode(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
 	e->diff_mode = !e->diff_mode;
+	request_repaints(f);
+}
+
+static void action_toggle_cpu_view(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	if (!e->cpu_view) {
+		// start a cpu view with the diff image
+		float *frgb = xmalloc(f->w * f->h * 3 * sizeof*frgb);
+		for (int i = 0; i < 3*f->w*f->h; i++)
+			frgb[i] = f->rgb[i];
+		int n = cpu_new(frgb, f->w, f->h, 3);
+		assert(n == 0);
+		xfree(frgb);
+	} else {
+		// close the existing cpu view
+		cpu_close(0);
+	}
+	e->cpu_view = !e->cpu_view;
 	request_repaints(f);
 }
 
@@ -1891,6 +1915,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'r') action_cycle_rotation_status(f);
 	if (k == 'c') action_cycle_contrast(f, +1);
 	if (k == 'C') action_cycle_contrast(f, -1);
+	if (k == ')') action_toggle_cpu_view(f);
 
 	// arrows move the viewport
 	if (k > 1000) {

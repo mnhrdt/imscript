@@ -47,7 +47,8 @@ void cpu_send_key(int n, int k)
 	snprintf(c, FILENAME_MAX,
 		"xdotool search --any --pid %d --name ftr_win_pid_%d key %c",
 		v->p, v->p, k);
-	system(c);
+	int r = system(c);
+	(void)r;
 }
 
 // API: update the view determined by this handle
@@ -56,7 +57,8 @@ void cpu_update(int n, float *x, int w, int h, int d)
 	assert(n == 0);
 	struct cpu_view *v = global_table_of_cpu_views + n;
 
-	iio_write_image_float_vec(v->f, x, w, h, d);
+	if (x)
+		iio_write_image_float_vec(v->f, x, w, h, d);
 	cpu_send_key(n, '2');
 }
 

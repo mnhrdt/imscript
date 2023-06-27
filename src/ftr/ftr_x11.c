@@ -407,6 +407,15 @@ static void process_next_event(struct FTR *ff)
 	}
 }
 
+int ftr_x11_force_redraw(struct FTR *ff)
+{
+	struct _FTR *f = (void*)ff;
+	XEvent e;
+	e.type = Expose;
+	XSendEvent(f->display, f->window, 0, NoEventMask, &e);
+	XFlush(f->display);
+}
+
 int ftr_loop_run(struct FTR *ff)
 {
 	struct _FTR *f = (void*)ff;
