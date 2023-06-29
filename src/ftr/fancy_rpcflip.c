@@ -58,7 +58,7 @@ struct pan_view {
 	struct fancy_image *tc; // MS
 	int gray_only, general_mode;
 
-	// RGB preview of the whole image
+	// RGB preview of the whole image (optional)
 	uint8_t *preview;
 	int pw, ph;
 	char *pfg, *pfc; // filenames
@@ -389,6 +389,31 @@ static void init_state_no_preview(struct pan_state *e,
 	msoctaves_instead_of_preview = true;//e->view->tg->noctaves > 4 ||
 	//	(ci && e->view->tc->noctaves > 3);
 }
+
+// TODO: organize all these views in separate "modes"
+//
+// 0 [raw] no rpc needed, just crop at the same absolute position
+// 1 [image] each image is shifted so that the centers are srtm/rpc aligned
+//   1.0. only shift, images are not rotated
+//   1.1. images are rotated so that up=vertical direction
+//   1.R. (toggle) global rotation state by 0,90,180,270 degrees
+//   1.E. (toggle) use linearized/exact RPC
+//   1.S. (toggle) use 0/srtm4/egm96 for alignement
+// 2 [geo] screen grid corresponds to geographic coordinates
+//   2.0. normalized lon/lat
+//   2.1. easting/northing
+//   2.R. (toggle) global rotation state by 0,90,180,270 degrees
+//   2.E. (toggle) use linearized/exact RPC
+//   2.S. (toggle) use 0/srtm4/egm96 for alignement
+// 3 [rectify] rectifying homogs are applied to 2 images
+// 4 [semirect] semi-rectification from a base image
+//
+// Observation: many options (e.g. the toggles and the diff mode) are
+// orthogonal to the mode, and are best considered to apply to all, even if
+// some combinations make no sense, in which case they are ignored.
+//
+
+
 
 // state query functions {{{1
 static struct pan_view *obtain_view(struct pan_state *e)

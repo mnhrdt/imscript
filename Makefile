@@ -215,6 +215,6 @@ endif
 # create and include non-standard file dependences
 # (this is needed because some .c files include other .c files directly)
 # it's not a big deal, you can comment this lines if they fail
-DIRS = src src/ftr src/misc
-.deps.mk:;for i in $(DIRS);do $(CC) -MM $$i/*.c|sed "\:^[^ ]:s:^:$$i/:g";done>$@
--include .deps.mk
+D = src src/ftr src/misc
+src/dep.mk : ; for i in $D;do $(CC) -MM $$i/*.c|sed "\:^[^ ]:s:^:$$i/:g";done>$@
+-include src/dep.mk
