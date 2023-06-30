@@ -335,16 +335,17 @@
 #define SCHEME_SOBEL 5
 #define SCHEME_PREWITT 6
 #define SCHEME_SCHARR 7
-#define SCHEME_MORPHO5_FORWARD 8
-#define SCHEME_MORPHO5_BACKWARD 9
-#define SCHEME_MORPHO5_CENTERED 10
-#define SCHEME_MORPHO9_FORWARD 11
-#define SCHEME_MORPHO9_BACKWARD 12
-#define SCHEME_MORPHO9_CENTERED 13
-#define SCHEME_CROSS 14
-#define SCHEME_NCROSS 15
-#define SCHEME_SQUARE 16
-#define SCHEME_NSQUARE 17
+#define SCHEME_ROBERTS 8
+#define SCHEME_MORPHO5_FORWARD 9
+#define SCHEME_MORPHO5_BACKWARD 10
+#define SCHEME_MORPHO5_CENTERED 11
+#define SCHEME_MORPHO9_FORWARD 12
+#define SCHEME_MORPHO9_BACKWARD 13
+#define SCHEME_MORPHO9_CENTERED 14
+#define SCHEME_CROSS 15
+#define SCHEME_NCROSS 16
+#define SCHEME_SQUARE 17
+#define SCHEME_NSQUARE 18
 
 
 // local functions {{{1
@@ -1840,6 +1841,7 @@ static void parse_imageop(const char *s, int *op, int *scheme)
 	else if (hassuffix(s, "c")) *scheme = SCHEME_CENTERED;
 	else if (hassuffix(s, "s")) *scheme = SCHEME_SOBEL;
 	else if (hassuffix(s, "p")) *scheme = SCHEME_PREWITT;
+	else if (hassuffix(s, "r")) *scheme = SCHEME_ROBERTS;
 	else if (hassuffix(s, "5")) *scheme = SCHEME_CROSS;
 	else if (hassuffix(s, "4")) *scheme = SCHEME_NCROSS;
 	else if (hassuffix(s, "9")) *scheme = SCHEME_SQUARE;
@@ -2476,6 +2478,7 @@ static float getsample_cfg(float *x, int w, int h, int pd, int i, int j, int l)
 #define H 0.5
 #define Q 0.25
 #define O 0.125
+#define R 0.707
 static float stencil_3x3_identity[9] =  {0,0,0,  0,1,0, 0,0,0};
 static float stencil_3x3_dx_forward[9] =  {0,0,0,  0,-1,1, 0,0,0};
 static float stencil_3x3_dx_backward[9] = {0,0,0,  -1,1,0, 0,0,0};
@@ -2487,6 +2490,8 @@ static float stencil_3x3_dy_sobel[9] = {-O,-2*O,-O,  0,0,0, O,2*O,O};
 static float stencil_3x3_dx_sobel[9] = {-O,0,O,  -2*O,0,2*O, -O,0,O};
 static float stencil_3x3_dx_prewitt[9] =  {0,0,0,  0,-H,H, 0,-H,H};
 static float stencil_3x3_dy_prewitt[9] =  {0,0,0,  0,-H,-H, 0,H,H};
+static float stencil_3x3_dx_roberts[9] =  {0,0,0,  0,R,0, 0,0,-R};
+static float stencil_3x3_dy_roberts[9] =  {0,0,0,  0,0,R, 0,-R,0};
 static float stencil_3x3_laplace[9] =  {0,1,0,  1,-4,1, 0,1,0};
 static float stencil_3x3_dxx[9] =  {0,0,0,  1,-2,1, 0,0,0};
 static float stencil_3x3_dyy[9] =  {0,1,0,  0,-2,0, 0,1,0};
@@ -2498,6 +2503,7 @@ static float stencil_3x3_m_cross[9] =   {0,1,0,  1,1,1, 0,1,0};
 static float stencil_3x3_m_ncross[9] =  {0,1,0,  1,0,1, 0,1,0};
 static float stencil_3x3_m_square[9] =  {1,1,1,  1,1,1, 1,1,1};
 static float stencil_3x3_m_nsquare[9] = {1,1,1,  1,0,1, 1,1,1};
+#undef R
 #undef H
 #undef Q
 #undef O
@@ -2522,6 +2528,7 @@ static float *get_stencil_3x3(int operator, int scheme)
 			case SCHEME_CENTERED: return stencil_3x3_dx_centered;
 			case SCHEME_SOBEL: return stencil_3x3_dx_sobel;
 			case SCHEME_PREWITT: return stencil_3x3_dx_prewitt;
+			case SCHEME_ROBERTS: return stencil_3x3_dx_roberts;
 			default: fail("unrecognized stencil,x %d", scheme);
 			}
 		}
@@ -2531,6 +2538,7 @@ static float *get_stencil_3x3(int operator, int scheme)
 			case SCHEME_CENTERED: return stencil_3x3_dy_centered;
 			case SCHEME_SOBEL: return stencil_3x3_dy_sobel;
 			case SCHEME_PREWITT: return stencil_3x3_dy_prewitt;
+			case SCHEME_ROBERTS: return stencil_3x3_dy_roberts;
 			default: fail("unrecognized stencil,y %d", scheme);
 			}
 		}
