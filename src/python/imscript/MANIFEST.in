@@ -1,5 +1,5 @@
 include Makefile
-include .deps.mk
+include src/dep.mk
 include src/*.c
 include src/*.h
 prune bin
