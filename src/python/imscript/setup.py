@@ -16,7 +16,7 @@ class myinstall(install):
 import setuptools
 setuptools.setup(
 	name = "imscript",
-	version = "0.8",
+	version = "0.82",
 	author = "Enric Meinhardt-Llopis",
 	author_email = "enric.meinhardt@fastmail.com",
 	description = "Image Processing with Unix Pipes",

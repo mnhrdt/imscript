@@ -76,7 +76,7 @@ float **matrix(int nrl, int nrh, int ncl, int nch)
 static
 void free_vector(float *v, int nl, int nh)
 {
-  free((char*) (v+nl));
+  free(v + nl);
 }
 
 static
@@ -84,8 +84,8 @@ void free_matrix(float **m, int nrl, int nrh, int ncl, int nch)
 {
   int i;
 
-  for(i=nrh;i>=nrl;i--) free((char*) (m[i]+ncl));
-  free((char*) (m+nrl));
+  for(i=nrh;i>=nrl;i--) free(m[i] + ncl - 1);
+  free(m + nrl);
 }
 
 /* Singular Value Decomposition routine */
