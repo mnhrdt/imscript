@@ -3,16 +3,18 @@
 #include <stdio.h>
 #include <math.h>
 
-static void *xmalloc(size_t size)
-{
-	void *new = malloc(size);
-	if (!new) {
-		fprintf(stderr, "ERROR: out of memory when requesting "
-			       "%zu bytes\n", size);
-		abort();
-	}
-	return new;
-}
+
+#include "xmalloc.c"
+//static void *xmalloc(size_t size)
+//{
+//	void *new = malloc(size);
+//	if (!new) {
+//		fprintf(stderr, "ERROR: out of memory when requesting "
+//			       "%zu bytes\n", size);
+//		abort();
+//	}
+//	return new;
+//}
 
 typedef float (*getpixel_operator)(float*,int,int,int,int);
 
@@ -414,7 +416,9 @@ static int *build_Drec(float radius)
 	return e;
 }
 
+#ifndef OMIT_MORSI_MAIN
 #define MORSI_TEST_MAIN
+#endif
 
 #ifdef MORSI_TEST_MAIN
 #include <string.h>

@@ -1,10 +1,12 @@
 CFLAGS = -g
 CFLAGS = -O3 -march=native
 
-LDLIBS = -lX11 -ljpeg
+LDLIBS = -lm -lfftw3f -lX11 -ljpeg
 
-BIN = camview
-OBJ = camview.o cam.o ftr.o iio.o
+BIN = camview corrview
+OBJ = cam.o ftr.o iio.o
+
+all : $(BIN)
 
 $(BIN) : $(OBJ)
 
