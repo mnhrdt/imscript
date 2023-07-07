@@ -141,6 +141,10 @@ OBJ_FTR_TERM = src/ftr/ftr_term.o $(filter-out src/ftr/ftr.o,$(OBJ_FTR))
 bin/%_term : src/ftr/%.o $(OBJ_FTR_TERM)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
+OBJ_FTR_SIX = src/ftr/ftr_sixel.o $(filter-out src/ftr/ftr.o,$(OBJ_FTR))
+bin/%_six : src/ftr/%.o $(OBJ_FTR_SIX)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+
 
 
 
