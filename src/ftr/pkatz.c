@@ -5,23 +5,34 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <assert.h>
 
 //// user interface library
 #include "ftr.h"
 
 // radius of the disks that are displayed around control points
-#define DISK_RADIUS 7
+#define DISK_RADIUS 7.3
+
+// radius of the points
+#define POINT_RADIUS 2.3
 
 // zoom factor for zoom-in and zoom-out
 #define ZOOM_FACTOR 1.43
 
+// radius scaling factor for the inversion circle
+#define RADIUS_FACTOR 1.13
 
 // data structure to store the state of the viewer
 struct viewer_state {
-	// point data
+	// point data (input)
 	int n;       // number of points
 	float *x;    // point coordinates (x[2*i+0], x[2*i+1]) for 0<=i<n
+
+	// computed point data (intermediary)
+	float *y;    // coordinates of inverted points
+	float *z;    // coordinates of the points of the convex hull
+	int m;       // number of points in the convex hull
 
 	// katz
 	float c[2];  // center of view
@@ -100,9 +111,95 @@ static void vector_product(float axb[3], float a[3], float b[3])
 	axb[2] = a[0] * b[1] - a[1] * b[0];
 }
 
+// SECTION 3. Katz algorithm                                                {{{1
+
+
+static void invert_point(float y[2], float c[2], float R, float x[2])
+{
+	float r = hypot(x[0] - c[0], x[1] - c[1]);
+	y[0] = c[0] + R*R*(x[0] - c[0])/r/r;
+	y[1] = c[1] + R*R*(x[1] - c[1])/r/r;
+}
+
+static void invert_points(float *y, float c[2], float R, float *x, int n)
+{
+	for (int i = 0; i < n; i++)
+		invert_point(y + 2*i, c, R, x + 2*i);
+}
+
+static void compute_points_inversion(struct viewer_state *e)
+{
+	invert_points(e->y, e->c, e->r, e->x, e->n);
+}
+
+
+static int compare_points_lexicographically(const void *aa, const void *bb)
+{
+	const float *a = (const float *)aa;
+	const float *b = (const float *)bb;
+	int p = (a[0] > b[0]) - (a[0] < b[0]);
+	if (p)
+		return p;
+	else
+		return ((a[1] > b[1]) - (a[1] < b[1]));
+}
+
+// oriented area of a triangle
+static float det(float a[2], float b[2], float c[2])
+{
+	float p[2] = {b[0] - a[0], b[1] - a[1]};
+	float q[2] = {c[0] - a[0], c[1] - a[1]};
+	return p[0] * q[1] - p[1] * q[0];
+}
+
+// function to compute the convex hull of a set of points in the plane
+// (note: the input points x are sorted in-place)
+static int do_the_andrew_parkour(
+		float *y,  // output: coordinates of points on the convex hull
+		float *x,  // input: list of points in the plane
+		int n      // input: number of input points
+		)          // return value: number of points in the convex hull
+{
+	// sort the given points lexicographically (in place)
+	qsort(x, n, 2*sizeof*x, compare_points_lexicographically);
+
+	// number of points in the hull found so far
+	int r = 0;
+
+	// fill-in the lower hull
+	for (int i = 0; i < n; i++)
+	{
+		while (r >= 2 && det(y+2*(r-2), y+2*(r-1), x+2*i) <= 0)
+			r -= 1;
+		y[2*r+0] = x[2*i+0];
+		y[2*r+1] = x[2*i+1];
+		r += 1;
+	}
+
+	// fill-in the upper hull
+	int k = r + 1; // start of the upper hull
+	for (int i = n-2; i >= 0; i--)
+	{ // NOTE: the body of this loop is exactly the same as above
+		while (r >= 2 && det(y+2*(r-2), y+2*(r-1), x+2*i) <= 0)
+			r -= 1;
+		y[2*r+0] = x[2*i+0];
+		y[2*r+1] = x[2*i+1];
+		r += 1;
+	}
+
+	return r;
+}
+
+static void compute_red_points_convex_hull(struct viewer_state *e)
+{
+	e->m = do_the_andrew_parkour(e->z, e->y, e->n);
+	fprintf(stderr, "convex hull of %d points has %d points (%g%%)\n",
+			e->n, e->m, e->m * 100.0 / e->n);
+}
+
 
 
-// SECTION 3. Coordinate Conversions                                        {{{1
+// SECTION 4. Coordinate Conversions                                        {{{1
 
 // "view"   : coordinates in the infinite plane where the points are located
 // "window" : coordinates in the window, which is a rectangluar piece of "view"
@@ -148,6 +245,21 @@ void traverse_segment(int px, int py, int qx, int qy,
 	}
 }
 
+// draw a segment between two points
+static void traverse_circle(int cx, int cy, int r,
+		void (*f)(int,int,void*), void *e)
+{
+	int h = r / sqrt(2);
+	for (int i = -h; i <= h; i++)
+	{
+		int s = sqrt(r*r - i*i);
+		f(cx + i, cy + s, e); // upper quadrant
+		f(cx + i, cy - s, e); // lower quadrant
+		f(cx + s, cy + i, e); // right quadrant
+		f(cx - s, cy + i, e); // left quadrant
+	}
+}
+
 // auxiliary function for drawing a red pixel
 static void plot_pixel_red(int x, int y, void *e)
 {
@@ -172,11 +284,30 @@ static void plot_pixel_green(int x, int y, void *e)
 	}
 }
 
+// auxiliary function for drawing a gray pixel
+static void plot_pixel_gray(int x, int y, void *e)
+{
+	struct FTR *f = e;
+	if (insideP(f, x, y)) {
+		int idx = f->w * y + x;
+		f->rgb[3*idx+0] = 120;
+		f->rgb[3*idx+1] = 120;
+		f->rgb[3*idx+2] = 120;
+	}
+}
+
 // function to draw a red segment
 static void plot_segment_red(struct FTR *f,
 		float x0, float y0, float xf, float yf)
 {
 	traverse_segment(x0, y0, xf, yf, plot_pixel_red, f);
+}
+
+// function to draw a gray segment
+static void plot_segment_gray(struct FTR *f,
+		float x0, float y0, float xf, float yf)
+{
+	traverse_segment(x0, y0, xf, yf, plot_pixel_gray, f);
 }
 
 // function to draw a green segment
@@ -186,9 +317,30 @@ static void plot_segment_green(struct FTR *f,
 	traverse_segment(x0, y0, xf, yf, plot_pixel_green, f);
 }
 
+static void plot_circle_green(struct FTR *f,
+		float x, float y, float r)
+{
+	traverse_circle(x, y, r, plot_pixel_green, f);
+}
+
 
 
 // Subsection 7.2. Drawing user-interface elements                          {{{2
+
+static void splat_disk(uint8_t *rgb, int w, int h, float p[2], float r,
+		uint8_t color[3])
+{
+	for (int j = -r-1 ; j <= r+1; j++)
+	for (int i = -r-1 ; i <= r+1; i++)
+	if (hypot(i, j) < r)
+	{
+		int ii = p[0] + i;
+		int jj = p[1] + j;
+		if (ii>=0 && jj>=0 && ii<w && jj<h)
+			for (int k = 0; k < 3; k++)
+				rgb[3*(w*jj+ii)+k] = color[k];
+	}
+}
 
 // draw the view point
 static void draw_view_center(struct FTR *f)
@@ -199,17 +351,19 @@ static void draw_view_center(struct FTR *f)
 	map_view_to_window(e, P, e->c);
 
 	// grey circle
-	int side = DISK_RADIUS;
-	for (int j = -side-1 ; j <= side+1; j++)
-	for (int i = -side-1 ; i <= side+1; i++)
-	if (hypot(i, j) < side)
-	{
-		int ii = P[0] + i;
-		int jj = P[1] + j;
-		if (insideP(f, ii, jj))
-			for (int c = 0; c < 3; c++)
-				f->rgb[3*(f->w*jj+ii)+c] = 127;
-	}
+	float side = DISK_RADIUS;
+	uint8_t green[3] = {0, 127, 0};
+	splat_disk(f->rgb, f->w, f->h, P, DISK_RADIUS, green);
+	//for (int j = -side-1 ; j <= side+1; j++)
+	//for (int i = -side-1 ; i <= side+1; i++)
+	//if (hypot(i, j) < side)
+	//{
+	//	int ii = P[0] + i;
+	//	int jj = P[1] + j;
+	//	if (insideP(f, ii, jj))
+	//		for (int c = 0; c < 3; c++)
+	//			f->rgb[3*(f->w*jj+ii)+c] = 127;
+	//}
 
 	// central green dot
 	int ii = P[0];
@@ -222,15 +376,35 @@ static void draw_red_points(struct FTR *f)
 {
 	struct viewer_state *e = f->userdata;
 
+	uint8_t red[3] = {255, 0, 0};
 	for (int i = 0; i < e->n; i++)
 	{
 		float P[2];
 		map_view_to_window(e, P, e->x + 2*i);
-		plot_pixel_red(P[0], P[1], f);
-		plot_pixel_red(P[0]+1, P[1], f);
-		plot_pixel_red(P[0]-1, P[1], f);
-		plot_pixel_red(P[0], P[1]+1, f);
-		plot_pixel_red(P[0], P[1]-1, f);
+		splat_disk(f->rgb, f->w, f->h, P, POINT_RADIUS, red);
+		//plot_pixel_red(P[0], P[1], f);
+		//plot_pixel_red(P[0]+1, P[1], f);
+		//plot_pixel_red(P[0]-1, P[1], f);
+		//plot_pixel_red(P[0], P[1]+1, f);
+		//plot_pixel_red(P[0], P[1]-1, f);
+	}
+}
+
+static void draw_gray_points(struct FTR *f)
+{
+	struct viewer_state *e = f->userdata;
+
+	uint8_t gray[3] = {120, 120, 120};
+	for (int i = 0; i < e->n; i++)
+	{
+		float P[2];
+		map_view_to_window(e, P, e->y + 2*i);
+		splat_disk(f->rgb, f->w, f->h, P, POINT_RADIUS, gray);
+		//plot_pixel_gray(P[0], P[1], f);
+		//plot_pixel_gray(P[0]+1, P[1], f);
+		//plot_pixel_gray(P[0]-1, P[1], f);
+		//plot_pixel_gray(P[0], P[1]+1, f);
+		//plot_pixel_gray(P[0], P[1]-1, f);
 	}
 }
 
@@ -249,6 +423,14 @@ static void draw_red_points(struct FTR *f)
 //	}
 //}
 
+static void draw_inversion_circle(struct FTR *f)
+{
+	struct viewer_state *e = f->userdata;
+	float P[2];
+	map_view_to_window(e, P, e->c);
+	plot_circle_green(f, P[0], P[1], e->r * e->scale);
+}
+
 
 
 // Paint the whole scene
@@ -263,6 +445,24 @@ static void paint_state(struct FTR *f)
 
 	draw_red_points(f);
 	draw_view_center(f);
+	draw_inversion_circle(f);
+
+	compute_points_inversion(e);
+	draw_gray_points(f);
+
+	compute_red_points_convex_hull(e);
+	for (int i = 0; i < e->m - 1; i++)
+	{
+		float P[2], Q[2], Z[4];
+		map_view_to_window(e, P, e->z + 2*i);
+		map_view_to_window(e, Q, e->z + 2*i + 2);
+		invert_point(Z + 0, e->c, e->r, e->z + 2*i + 0);
+		invert_point(Z + 2, e->c, e->r, e->z + 2*i + 2);
+		plot_segment_gray(f, P[0], P[1], Q[0], Q[1]);
+		map_view_to_window(e, P, Z + 0);
+		map_view_to_window(e, Q, Z + 2);
+		plot_segment_red(f, P[0], P[1], Q[0], Q[1]);
+	}
 }
 
 
@@ -286,6 +486,13 @@ static void change_view_scale(struct viewer_state *e, int x, int y, float fac)
 	for (int p = 0; p < 2; p++)
 		e->offset[p] = -center[p]*e->scale + X[p];
 	fprintf(stderr, "zoom changed %g\n", e->scale);
+}
+
+// action: inversion radius scale
+static void change_radius(struct viewer_state *e, int x, int y, float fac)
+{
+	e->r *= fac;
+	fprintf(stderr, "radius changed %g\n", e->r);
 }
 
 // action: drag a point in the window domain
@@ -388,9 +595,21 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		e->dragging_background = false;
 	}
 
-	// zoom in/out
-	if (k == FTR_BUTTON_DOWN) change_view_scale(e, x, y, ZOOM_FACTOR);
-	if (k == FTR_BUTTON_UP) change_view_scale(e, x, y, 1.0/ZOOM_FACTOR);
+	// radius in/out (if hit), zoom in/out (if no hit)
+	if (k == FTR_BUTTON_DOWN)
+	{
+		if (hit_point(e, x, y)<0)
+			change_view_scale(e, x, y, ZOOM_FACTOR);
+		else
+			change_radius(e, x, y, RADIUS_FACTOR);
+	}
+	if (k == FTR_BUTTON_UP)
+	{
+		if (hit_point(e, x, y)<0)
+			change_view_scale(e, x, y, 1.0/ZOOM_FACTOR);
+		else
+			change_radius(e, x, y, 1.0/RADIUS_FACTOR);
+	}
 
 	f->changed = 1;
 }
@@ -485,8 +704,11 @@ int main_pkatz(int argc, char *argv[])
 	// initialize state with the given points
 	struct viewer_state e[1];
 	e->x = read_ascii_floats(stdin, &e->n);
+	e->y = malloc(e->n * sizeof*e->y);
+	e->z = malloc(e->n * sizeof*e->y);
 	e->n /= 2;
 	fprintf(stderr, "read %d points from stdin\n", e->n);
+	//compute_points_inversion(e);
 
 	// open the window
 	struct FTR f = ftr_new_window(512,512);

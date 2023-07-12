@@ -8,6 +8,7 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <sys/ioctl.h> // ioctl to extract window size
 
 #include "ftr.h"
 
