@@ -7,6 +7,7 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <sys/ioctl.h> // ioctl to extract window size
 
 #include "ftr.h"
 
@@ -84,17 +85,26 @@ void ftr_change_title(struct FTR *ff, char *s)
 {
 }
 
-#include "smapa.h"
-SMART_PARAMETER(COLUMNS,80)
-SMART_PARAMETER(LINES,25)
+//#include "smapa.h"
+//SMART_PARAMETER(COLUMNS,80)
+//SMART_PARAMETER(LINES,25)
+static void get_term_size(int *w, int *h)
+{
+	struct winsize x;
+	ioctl(0, TIOCGWINSZ, &x);
+	*w = x.ws_col;
+	*h = x.ws_row;
+}
 
 // ftr_new_window_with_image_uint8_rgb {{{2
 struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 {
 	//if (w != 80 || h != 25)
 	//	exit(fprintf(stderr, "this is not a proper terminal!\n"));
-	w = COLUMNS();
-	h = 2*(LINES() - 7) - 4;
+	//w = COLUMNS();
+	//h = 2*(LINES() - 7) - 4;
+	get_term_size(&w, &h);
+	h = 2*(h - 7) - 4;
 
 	struct _FTR f[1];
 

@@ -168,7 +168,7 @@ static void dump_sixels_to_bytestream_gray2(
 		struct bytestream *out,
 		uint8_t *x, int w, int h)
 {
-	int Q = (1<<2); // quantization over [0..255]
+	int Q = (1<<4); // quantization over [0..255]
 	bs_printf(out, "\033Pq\n");
 	for (int i = 0; i < 0x100/Q; i++)
 		bs_printf(out, "#%d;2;%d;%d;%d",
@@ -372,13 +372,17 @@ static void idump_six(uint8_t *x, int w, int h)
 	// NOTE: 0x1b == 033 == 27 == ESC
 
 	printf("\x1b[1;1H");
-	dump_sixels_to_stdout_uint8(x, w, h, 3);
+	dump_sixels_to_stdout_uint8(x, w, h, 1);
 }
 
 static void ftr_term_dump(struct _FTR *f)
 {
 	printf("dump %d %d:\n", f->w, f->h);
-	idump_six(f->rgb, f->w, f->h);
+	uint8_t x[f->w*f->h];
+	for (int i = 0; i < f->w*f->h; i++)
+		x[i] = f->rgb[i*3+1]/2+f->rgb[i*3+0]/2;
+	//idump_six(f->rgb, f->w, f->h);
+	idump_six(x, f->w, f->h);
 }
 
 static void disable_canonical_and_echo_modes(void)
@@ -403,9 +407,16 @@ void ftr_change_title(struct FTR *ff, char *s)
 {
 }
 
-#include "smapa.h"
-SMART_PARAMETER(COLUMNS,80)
-SMART_PARAMETER(LINES,25)
+//#include "smapa.h"
+//SMART_PARAMETER(COLUMNS,80)
+//SMART_PARAMETER(LINES,25)
+static void get_term_size(int *w, int *h)
+{
+	struct winsize x;
+	ioctl(0, TIOCGWINSZ, &x);
+	*w = x.ws_col;
+	*h = x.ws_row;
+}
 
 // ftr_new_window_with_image_uint8_rgb {{{2
 struct FTR ftr_new_window_with_image_uint8_rgb(unsigned char *x, int w, int h)

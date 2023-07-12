@@ -1228,7 +1228,7 @@ int main_cpu_single(int c, char *v[])
 
 	// cleanup and exit (optional)
 	//for (int i = 0; i < 5; i++) free(e->font[i].data);
-	//ftr_close(&f);
+	ftr_close(&f);
 	//fancy_image_close(e->i);
 	return r - 1;
 }
@@ -1279,7 +1279,7 @@ int main_cpu_multi(int c, char *v[])
 
 	// cleanup and exit (optional)
 	//for (int i = 0; i < 5; i++) free(e->font[i].data);
-	//ftr_close(&f);
+	ftr_close(&f);
 	//fancy_image_close(e->i);
 	return r - 1;
 }
