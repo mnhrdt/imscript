@@ -9,6 +9,7 @@ BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
       fft dct dht flambda fancy_crop fancy_downsa autotrim iion mediator     \
       redim colormatch eucdist nonmaxsup gntiply idump warp heatd imhalve    \
       ppsmooth mdither mdither2 rpctk getbands pixdump bandslice points      \
+      columnize
       #geomedian carve
 
 BIN := $(addprefix bin/,$(BIN))

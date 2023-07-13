@@ -179,8 +179,8 @@ static int do_the_andrew_parkour(
 	// fill-in the upper hull
 	int k = r + 1; // start of the upper hull
 	for (int i = n-2; i >= 0; i--)
-	{ // NOTE: the body of this loop is exactly the same as above
-		while (r >= 2 && det(y+2*(r-2), y+2*(r-1), x+2*i) <= 0)
+	{ //                v--- (only difference with previous loop)
+		while (r >= k && det(y+2*(r-2), y+2*(r-1), x+2*i) <= 0)
 			r -= 1;
 		y[2*r+0] = x[2*i+0];
 		y[2*r+1] = x[2*i+1];
@@ -272,6 +272,18 @@ static void plot_pixel_red(int x, int y, void *e)
 	}
 }
 
+// auxiliary function for drawing a blue pixel
+static void plot_pixel_blue(int x, int y, void *e)
+{
+	struct FTR *f = e;
+	if (insideP(f, x, y)) {
+		int idx = f->w * y + x;
+		f->rgb[3*idx+0] = 0;
+		f->rgb[3*idx+1] = 0;
+		f->rgb[3*idx+2] = 255;
+	}
+}
+
 // auxiliary function for drawing a green pixel
 static void plot_pixel_green(int x, int y, void *e)
 {
@@ -301,6 +313,13 @@ static void plot_segment_red(struct FTR *f,
 		float x0, float y0, float xf, float yf)
 {
 	traverse_segment(x0, y0, xf, yf, plot_pixel_red, f);
+}
+
+// function to draw a blue segment
+static void plot_segment_blue(struct FTR *f,
+		float x0, float y0, float xf, float yf)
+{
+	traverse_segment(x0, y0, xf, yf, plot_pixel_blue, f);
 }
 
 // function to draw a gray segment
@@ -461,7 +480,7 @@ static void paint_state(struct FTR *f)
 		plot_segment_gray(f, P[0], P[1], Q[0], Q[1]);
 		map_view_to_window(e, P, Z + 0);
 		map_view_to_window(e, Q, Z + 2);
-		plot_segment_red(f, P[0], P[1], Q[0], Q[1]);
+		plot_segment_blue(f, P[0], P[1], Q[0], Q[1]);
 	}
 }
 
