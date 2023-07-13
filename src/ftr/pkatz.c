@@ -55,6 +55,7 @@ struct viewer_state {
 	bool show_horizon;
 	bool show_grid_points;
 	bool restrict_to_affine;
+	bool show_debug; // show inverted points and full qhulls
 };
 
 
@@ -66,7 +67,7 @@ static void center_view(struct FTR *f)
 	// katz
 	e->c[0] = 100;
 	e->c[1] = 100;
-	e->r = 100;
+	e->r = 400;
 
 	// drag state
 	e->dragging_window_point = false;
@@ -85,6 +86,7 @@ static void center_view(struct FTR *f)
 	e->show_horizon = false;
 	e->show_grid_points = false;
 	e->restrict_to_affine = false;
+	e->show_debug = false;
 
 	f->changed = 1;
 }
@@ -114,12 +116,38 @@ static void vector_product(float axb[3], float a[3], float b[3])
 // SECTION 3. Katz algorithm                                                {{{1
 
 
-static void invert_point(float y[2], float c[2], float R, float x[2])
+static void invert_point_classic(float y[2], float c[2], float R, float x[2])
 {
 	float r = hypot(x[0] - c[0], x[1] - c[1]);
 	y[0] = c[0] + R*R*(x[0] - c[0])/r/r;
 	y[1] = c[1] + R*R*(x[1] - c[1])/r/r;
 }
+
+static void invert_point_gamma(float y[2], float c[2], float R, float x[2])
+{
+	// warning: don't use
+	float gamma = 2;
+	float r = hypot(x[0] - c[0], x[1] - c[1]);
+	y[0] = c[0] + R*(x[0] - c[0])/(r*r*r);
+	y[1] = c[1] + R*(x[1] - c[1])/(r*r*r);
+}
+
+// "katz inversion"
+// Katz-Leifman-Tal
+// Mesh segmentation using feature point and core extraction
+// The Visual Computer (2005)
+static void invert_point_flip(float y[2], float c[2], float R, float x[2])
+{
+	float r = hypot(x[0] - c[0], x[1] - c[1]);
+	y[0] = x[0] + 2*(R-r)*(x[0] - c[0])/r;
+	y[1] = x[1] + 2*(R-r)*(x[1] - c[1])/r;
+}
+
+static void invert_point(float y[2], float c[2], float R, float x[2])
+{
+	invert_point_flip(y, c, R, x);
+}
+
 
 static void invert_points(float *y, float c[2], float R, float *x, int n)
 {
@@ -193,6 +221,7 @@ static int do_the_andrew_parkour(
 static void compute_red_points_convex_hull(struct viewer_state *e)
 {
 	e->m = do_the_andrew_parkour(e->z, e->y, e->n);
+	if (e->show_debug)
 	fprintf(stderr, "convex hull of %d points has %d points (%g%%)\n",
 			e->n, e->m, e->m * 100.0 / e->n);
 }
@@ -284,6 +313,18 @@ static void plot_pixel_blue(int x, int y, void *e)
 	}
 }
 
+// auxiliary function for drawing a cyan pixel
+static void plot_pixel_cyan(int x, int y, void *e)
+{
+	struct FTR *f = e;
+	if (insideP(f, x, y)) {
+		int idx = f->w * y + x;
+		f->rgb[3*idx+0] = 0;
+		f->rgb[3*idx+1] = 255;
+		f->rgb[3*idx+2] = 255;
+	}
+}
+
 // auxiliary function for drawing a green pixel
 static void plot_pixel_green(int x, int y, void *e)
 {
@@ -320,6 +361,13 @@ static void plot_segment_blue(struct FTR *f,
 		float x0, float y0, float xf, float yf)
 {
 	traverse_segment(x0, y0, xf, yf, plot_pixel_blue, f);
+}
+
+// function to draw a cyan segment
+static void plot_segment_cyan(struct FTR *f,
+		float x0, float y0, float xf, float yf)
+{
+	traverse_segment(x0, y0, xf, yf, plot_pixel_cyan, f);
 }
 
 // function to draw a gray segment
@@ -467,20 +515,30 @@ static void paint_state(struct FTR *f)
 	draw_inversion_circle(f);
 
 	compute_points_inversion(e);
-	draw_gray_points(f);
+	if (e->show_debug)
+		draw_gray_points(f);
 
 	compute_red_points_convex_hull(e);
 	for (int i = 0; i < e->m - 1; i++)
 	{
-		float P[2], Q[2], Z[4];
+		float P[2], Q[2], Z[4], C[2];
 		map_view_to_window(e, P, e->z + 2*i);
 		map_view_to_window(e, Q, e->z + 2*i + 2);
 		invert_point(Z + 0, e->c, e->r, e->z + 2*i + 0);
 		invert_point(Z + 2, e->c, e->r, e->z + 2*i + 2);
-		plot_segment_gray(f, P[0], P[1], Q[0], Q[1]);
+		if (e->show_debug)
+			plot_segment_gray(f, P[0], P[1], Q[0], Q[1]);
 		map_view_to_window(e, P, Z + 0);
 		map_view_to_window(e, Q, Z + 2);
-		plot_segment_blue(f, P[0], P[1], Q[0], Q[1]);
+		map_view_to_window(e, C, e->c);
+		if (det(P, Q, C) > 0)
+		{
+			plot_segment_blue(f, P[0], P[1], Q[0], Q[1]);
+			uint8_t blue[3] = {0, 0, 255};
+			splat_disk(f->rgb, f->w, f->h, P, POINT_RADIUS, blue);
+		}
+		else if (e->show_debug)
+			plot_segment_cyan(f, P[0], P[1], Q[0], Q[1]);
 	}
 }
 
@@ -556,6 +614,7 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'w') e->show_horizon = !e->show_horizon;
 	if (k >= '0' && k <= '9') e->interpolation_order = k - '0';
 	if (k == '.') e->show_grid_points = !e->show_grid_points;
+	if (k == 'd') e->show_debug = !e->show_debug;
 	//if (k == 'a') e->restrict_to_affine = !e->restrict_to_affine;
 
 	e->dragging_window_point = e->dragging_image_point = false;
@@ -730,7 +789,7 @@ int main_pkatz(int argc, char *argv[])
 	//compute_points_inversion(e);
 
 	// open the window
-	struct FTR f = ftr_new_window(512,512);
+	struct FTR f = ftr_new_window(800,600);
 	f.userdata = e;
 	center_view(&f);
 
