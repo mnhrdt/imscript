@@ -361,6 +361,49 @@ void fill_continuous_histogram_simple(
 	integrate_values(o, n);
 }
 
+static void accumulate_gradient_at_edge(long double (*o)[2],
+		int n, float m, float M, float a, float b)
+{
+	int A = bin(n, m, M, a);
+	int B = bin(n, m, M, b);
+	if (A == B) return;
+	assert(A < B);
+	o[A][1] += B - A;
+	o[B][1] -= B - A;
+}
+
+void fill_graph_gradient_histogram(
+	long double (*o)[2], // output histogram array of (value,density) pairs
+	int n,               // requested number of bins for the histogram
+	float m,             // requested minimum of the histogram
+	float M,             // requested maximum of the histogram
+	float *x,            // input image data
+	int w,               // input image width
+	int h                // input image height
+	)
+{
+	// initialize bins (n equidistant points between m and M)
+	for (int i = 0; i < n; i++)
+	{
+		o[i][0] = m + i * (M - m) / n;
+		o[i][1] = 0;
+	}
+
+	// compute 1st derivative of gradient histogram
+	for (int j = 0; j < h - 1; j++)
+	for (int i = 0; i < w - 1; i++)
+	{
+		float a = x[(j+0)*w+i+0];
+		float b = x[(j+0)*w+i+1];
+		float c = x[(j+1)*w+i+0];
+		accumulate_gradient_at_edge(o, n, m, M, fmin(a,b), fmax(a,b));
+		accumulate_gradient_at_edge(o, n, m, M, fmin(a,c), fmax(a,c));
+	}
+
+	// integrate once
+	integrate_values(o, n);
+}
+
 void accumulate_histogram(long double (*h)[2], int n)
 {
 	for (int i = 1; i < n; i++)
@@ -491,6 +534,7 @@ static char *help_string_long     =
 "   or: cat img.png | contihist NSAMPLES MIN MAX > histo.g\n"
 "\n"
 "Options:\n"
+" -g\t\tcompute the gradient/graylevel histogram\n"
 " -p\t\twrite a png-producing gnuplot program\n"
 " -h\t\tdisplay short help message\n"
 " --help\t\tdisplay longer help message\n"
@@ -508,6 +552,7 @@ int main_contihist(int c, char *v[])
 
 	// process input arguments
 	bool term_png = pick_option(&c, &v, "p", NULL);
+	bool gradhist = pick_option(&c, &v, "g", NULL);
 	if (c != 5) {
 		fprintf(stderr, "usage:\n\t%s nsamples min max img.png\n", *v);
 		//                          0 1     2   3   4
@@ -529,7 +574,10 @@ int main_contihist(int c, char *v[])
 
 	// compute continuous histogram
 	//fill_continuous_histogram(bins, nbins, hmin, hmax, x, w, h);
+	if (!gradhist)
 	fill_continuous_histogram_simple(bins, nbins, hmin, hmax, x, w, h);
+	else
+	fill_graph_gradient_histogram(bins, nbins, hmin, hmax, x, w, h);
 
 	// dump histogram to stdout
 	if (term_png) printf("set term pngcairo\n");
