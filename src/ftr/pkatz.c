@@ -404,8 +404,12 @@ static void splat_disk(uint8_t *rgb, int w, int h, float p[2], float r,
 		int ii = p[0] + i;
 		int jj = p[1] + j;
 		if (ii>=0 && jj>=0 && ii<w && jj<h)
+		//{
+		//	float a = pow(hypot(i, j)/r, 4);
 			for (int k = 0; k < 3; k++)
 				rgb[3*(w*jj+ii)+k] = color[k];
+		//		rgb[3*(w*jj+ii)+k] = a*255 + (1-a)*color[k];
+		//}
 	}
 }
 

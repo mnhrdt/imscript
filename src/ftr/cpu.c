@@ -63,7 +63,8 @@ struct pan_state {
 	int hud;
 
 	// 6. topographic mode
-	int topographic_mode; // 0=no, 1=shadow, 2=linear, 3=lambert, 4=specular
+	int topographic_mode;
+	// 0=no, 1=botw, 2=shadow, 3=linear, 4=lambert, 5=specular
 	float topographic_sun[3];
 	float topographic_scale;
 	float topographic_P;
@@ -145,6 +146,27 @@ static void pixel(float *out, struct pan_state *e, double p, double q)
 		// TODO, interpolation
 		out[i] = fancy_image_getsample_oct(e->i, oct, p, q, i);
 	}
+}
+
+// evaluate the value a position (p,q) in image coordinates
+static float pixel_height(struct pan_state *e, double p, double q)
+{
+	if (p < 0 || q < 0 || p >= e->i->w || q >= e->i->h)
+		return NAN;
+
+	int oct = 0;
+	if (e->zoom_factor < 0.9999)
+	{
+		int s = round(log2(1/e->zoom_factor));
+		if (s < 0) s = 0;
+		if (s >= MAX_PYRAMID_LEVELS) s = MAX_PYRAMID_LEVELS-1;
+		int sfac = 1<<(s);
+		oct = s;
+		p /= sfac;
+		q /= sfac;
+	}
+
+	return fancy_image_getsample_oct(e->i, oct, p, q, 0);
 }
 
 static void pixel_rgbf(float out[3], struct pan_state *e, double p, double q)
@@ -390,7 +412,7 @@ static void action_cycle_hud(struct FTR *f)
 static void action_toggle_topography(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
-	e->topographic_mode = (1 + e->topographic_mode) % 6;
+	e->topographic_mode = (1 + e->topographic_mode) % 7;
 	f->changed = 1;
 }
 
@@ -433,10 +455,10 @@ static void action_toggle_p(struct FTR *f)
 	f->changed = 1;
 }
 
-static void action_roi_embiggen(struct FTR *f, int d)
+static void action_roi_embiggen(struct FTR *f, float s)
 {
 	struct pan_state *e = f->userdata;
-	e->roi_w += d;
+	e->roi_w *= s;
 	fprintf(stderr, "ROI %d\n", e->roi_w);
 	f->changed = 1;
 }
@@ -922,13 +944,96 @@ static unsigned char bclamp(float x)
 	return x;
 }
 
+// rewrites x a bit (e.g. to fill-in nans)
+static void colorize_botw(uint8_t *y, float *x, int w, int h)
+{
+	// apply botw palette
+	// TODO: add some 2% saturation here
+	float m = INFINITY, M = -INFINITY;
+	for (int i = 0; i < w*h; i++) if (isfinite(x[i])) m = fmin(m, x[i]);
+	for (int i = 0; i < w*h; i++) if (isfinite(x[i])) M = fmax(M, x[i]);
+	for (int i = 0; i < w*h; i++)
+	if (isfinite(x[i]) && x[i] != 32768) {
+		float t = (x[i] - m) / (M - m);
+		y[3*i+0] = bclamp( (1 - t)*65 + t*200 );
+		y[3*i+1] = bclamp( (1 - t)*49 + t*200 );
+		y[3*i+2] = bclamp( (1 - t)*5  + t*180 );
+	} else {
+		y[3*i+0] = 20;
+		y[3*i+1] = 100;
+		y[3*i+2] = 255;
+		x[i] = 0;
+	}
+
+	// ppsmooth
+	float *s = xmalloc(w*h*sizeof*s);
+	ppsmooth(s, x, w, h);
+
+	// compute lssao shading
+	float *z = xmalloc(w * h * sizeof*z);
+	fftwf_complex *S = fftwf_xmalloc(w * h * sizeof*S);
+	fft_2dfloat(S, s, w, h);
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		int ii = i < w/2 ? i : i - w;
+		int jj = j < h/2 ? j : j - h;
+		S[j*w+i] *= hypot(ii*h, jj*w);
+	}
+	ifft_2dfloat(z, S, w, h);
+	fftwf_free(S);
+	for (int i = 0; i < w*h; i++)
+		if (z[i] > 0)
+			z[i] /= 2;
+	m = INFINITY; M = -INFINITY;
+	for (int i = 0; i < w*h; i++) if (isfinite(z[i])) m = fmin(m, z[i]);
+	for (int i = 0; i < w*h; i++) if (isfinite(z[i])) M = fmax(M, z[i]);
+	for (int i = 0; i < w*h; i++)
+		z[i] =  255 * (z[i] - m) / (M - m);
+
+	// combine shading and palette
+	m = INFINITY; M = -INFINITY;
+	for (int i = 0; i < w*h; i++) if (isfinite(x[i])) m = fmin(m, z[i]);
+	for (int i = 0; i < w*h; i++) if (isfinite(x[i])) M = fmax(M, z[i]);
+	float g = (M-m)/10;
+	m += g;
+	M -= g;
+	for (int i = 0; i < w*h; i++)
+		z[i] =  (z[i] - m) / (M - m);
+	for (int i = 0; i < w*h; i++)
+	for (int k = 0; k < 3; k++)
+		y[3*i+k] = bclamp(y[3*i+k] * z[i]);
+		//y[3*i+k] = bclamp(255*z[i]);
+	free(z);
+}
+
 static void expose_topography(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
 
+	if (e->topographic_mode == 1) // botw
+	{
+		float   *x = xmalloc(1 * f->w * f->h * sizeof*x);
+		uint8_t *y = xmalloc(3 * f->w * f->h * sizeof*y);
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < f->w; i++)
+		{
+			double p[2];
+			window_to_image(p, e, i, j);
+			x[j*f->w+i] = pixel_height(e, p[0], p[1]
+					) / e->topographic_scale;
+		}
+		colorize_botw(y, x, f->w, f->h);
+		for (int i = 0; i < 3 * f->w * f->h; i++)
+			f->rgb[i] = y[i];
+		free(x);
+		free(y);
+		return;
+	}
+
 	if (e->zoom_factor != 1 || e->i->pd != 1) return;
 
-	if (e->topographic_mode == 1) // shadows
+	if (e->topographic_mode == 2) // shadows
 	{
 		float *x = xmalloc(f->w * f->h * sizeof*x);
 		for (int j = 0; j < f->h; j++)
@@ -950,7 +1055,8 @@ static void expose_topography(struct FTR *f)
 		return;
 	}
 
-	if (e->topographic_mode == 5) // radar
+
+	if (e->topographic_mode == 6) // radar
 	{
 		float *x = xmalloc(f->w * f->h * sizeof*x);
 		float *y = xmalloc(f->w * f->h * sizeof*x);
@@ -1003,17 +1109,17 @@ static void expose_topography(struct FTR *f)
 		switch(e->topographic_mode) {
 		//case 1: // shadows
 			//break;
-		case 2: // linearized lambertian
+		case 3: // linearized lambertian
 			c = - hx * S[0] - hy * S[1];
 			rgb[0] = rgb[1] = rgb[2] = bclamp(127 + 40 * c);
 			break;
-		case 3: // lambertian (Gouraud)
+		case 4: // lambertian (Gouraud)
 			c = S[2] - hx * S[0] - hy * S[1];
 			c /= sqrt(1 + hx*hx + hy*hy);
 			rgb[0] = rgb[1] = rgb[2] = bclamp(e->topographic_P
 					* fmax(0, c));
 			break;
-		case 4: { // specular (Blinn-Phong)
+		case 5: { // specular (Blinn-Phong)
 			float N[3] = {-hx, -hy, 1};
 			float n = hypot(N[2], hypot(N[1], N[0]));
 			N[0]/=n; N[1]/=n; N[2]/=n; // N = unit normal
@@ -1025,7 +1131,7 @@ static void expose_topography(struct FTR *f)
 					e->topographic_P);
 			rgb[0] = rgb[1] = rgb[2] = bclamp(255 * k);
 			break; }
-		//case 5: // radar
+		//case 6: // radar
 			//break;
 		default: fail("impossible topographic condition %d",
 					 e->topographic_mode);
@@ -1042,7 +1148,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 	{
 		expose_topography(f);
 		f->changed = 1;
-		return;
+		goto cont;
 	}
 
 	// expose the whole image
@@ -1057,6 +1163,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		colormap3(cc, e, c);
 	}
 
+cont:
 	// if pixels are "huge", show their values
 	if (e->zoom_factor > 30)
 		expose_pixel_values(f);
@@ -1066,7 +1173,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 		expose_hud(f);
 
 	// if ROI, expose the roi
-	if (e->roi)
+	if (e->roi && !e->topographic_mode)
 		expose_roi(f);
 
 	// mark shit as changed
@@ -1097,8 +1204,8 @@ static void pan_button_handler(struct FTR *f, int b, int m, int x, int y)
 	//fprintf(stderr, "button b=%d m=%d\n", b, m);
 	struct pan_state *e = f->userdata;
 
-	if (e->roi && b == FTR_BUTTON_UP) { action_roi_embiggen(f,+2); return; }
-	if (e->roi && b == FTR_BUTTON_DOWN){action_roi_embiggen(f,-2); return; }
+	if (e->roi && b == FTR_BUTTON_UP) { action_roi_embiggen(f,1.1); return; }
+	if (e->roi && b == FTR_BUTTON_DOWN){action_roi_embiggen(f,1/1.1); return; }
 	if (b == FTR_BUTTON_UP && m & FTR_MASK_SHIFT) {
 		action_contrast_span(f, 1/1.3); return; }
 	if (b == FTR_BUTTON_DOWN && m & FTR_MASK_SHIFT) {
