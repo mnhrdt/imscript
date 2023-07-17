@@ -20,6 +20,8 @@ src/censust.o: src/censust.c src/iio.h src/pickopt.c
 src/cleant_cgpois.o: src/cleant_cgpois.c src/minicg.c src/smapa.h
 src/colorcoordsf.o: src/colorcoordsf.c
 src/colormatch.o: src/colormatch.c src/smapa.h src/iio.h
+src/columnize.o: src/columnize.c src/iio.h src/help_stuff.c src/pickopt.c \
+  src/xfopen.c src/fail.c
 src/contihist.o: src/contihist.c src/xfopen.c src/fail.c src/xmalloc.c \
   src/iio.h src/pickopt.c src/help_stuff.c
 src/crop.o: src/crop.c src/fail.c src/xmalloc.c src/iio.h
@@ -100,7 +102,7 @@ src/mediator.o: src/mediator.c src/iio.h
 src/minicg.o: src/minicg.c
 src/modes_detector.o: src/modes_detector.c src/smapa.h
 src/moistiv_epipolar.o: src/moistiv_epipolar.c src/fail.c
-src/morsi.o: src/morsi.c src/iio.h src/help_stuff.c
+src/morsi.o: src/morsi.c src/xmalloc.c src/fail.c src/iio.h src/help_stuff.c
 src/nnint.o: src/nnint.c src/abstract_heap.h src/xmalloc.c src/fail.c \
   src/help_stuff.c src/iio.h src/pickopt.c
 src/nonmaxsup.o: src/nonmaxsup.c src/smapa.h src/iio.h
@@ -256,8 +258,8 @@ src/ftr/ftr.o: src/ftr/ftr.c src/ftr/ftr_x11.c src/ftr/ftr.h \
 src/ftr/ftr_common_inc.o: src/ftr/ftr_common_inc.c
 src/ftr/ftr_freeglut.o: src/ftr/ftr_freeglut.c src/ftr/ftr.h \
   src/ftr/ftr_common_inc.c
-src/ftr/ftr_term.o: src/ftr/ftr_term.c src/ftr/ftr.h src/ftr/smapa.h \
-  src/ftr/ftr_common_inc.c
+src/ftr/ftr_sixel.o: src/ftr/ftr_sixel.c src/ftr/ftr.h src/ftr/ftr_common_inc.c
+src/ftr/ftr_term.o: src/ftr/ftr_term.c src/ftr/ftr.h src/ftr/ftr_common_inc.c
 src/ftr/ftr_x11.o: src/ftr/ftr_x11.c src/ftr/ftr.h src/ftr/ftr_common_inc.c
 src/ftr/help_stuff.o: src/ftr/help_stuff.c
 src/ftr/icrop.o: src/ftr/icrop.c src/ftr/iio.h src/ftr/ftr.h
@@ -266,6 +268,8 @@ src/ftr/marching_interpolation.o: src/ftr/marching_interpolation.c
 src/ftr/minisimpois.o: src/ftr/minisimpois.c
 src/ftr/parsenumbers.o: src/ftr/parsenumbers.c src/ftr/xmalloc.c src/ftr/fail.c
 src/ftr/pickopt.o: src/ftr/pickopt.c
+src/ftr/pkatz.o: src/ftr/pkatz.c src/ftr/ftr.h src/ftr/parsenumbers.c \
+  src/ftr/xmalloc.c src/ftr/fail.c
 src/ftr/pleview.o: src/ftr/pleview.c src/ftr/tiffu.c src/ftr/ftr.h src/ftr/iio.h
 src/ftr/powerkill.o: src/ftr/powerkill.c src/ftr/iio.h src/ftr/ftr.h \
   src/ftr/xmalloc.c src/ftr/fail.c src/ftr/pickopt.c
@@ -751,6 +755,8 @@ src/misc/vecstack.o: src/misc/vecstack.c src/misc/iio.h
 src/misc/watermark.o: src/misc/watermark.c src/misc/xmalloc.c src/misc/fail.c \
   src/misc/xfopen.c src/misc/font_6x12.c src/misc/iio.h
 src/misc/wgs84.o: src/misc/wgs84.c
+src/misc/wmask.o: src/misc/wmask.c src/misc/iio.h src/misc/fail.c \
+  src/misc/xmalloc.c src/misc/ccproc.c src/misc/abstract_dsf.c
 src/misc/xfopen.o: src/misc/xfopen.c src/misc/fail.c
 src/misc/xmalloc.o: src/misc/xmalloc.c src/misc/fail.c
 src/misc/xmalloc_stats.o: src/misc/xmalloc_stats.c

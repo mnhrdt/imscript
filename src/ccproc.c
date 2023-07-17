@@ -542,6 +542,7 @@ int ccproc(
 	assert_consistency(out_idx, out_all, out_size, out_first, r);
 
 	// reorder out_all so that boundarying points come first
+	if (out_bdsize)
 	reorder_boundaries(out_bdsize, out_idx, out_all, out_first, out_size,
 	                   w, h, r);
 
