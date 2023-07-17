@@ -944,14 +944,33 @@ static unsigned char bclamp(float x)
 	return x;
 }
 
+static void getpercentiles(float *m, float *M, float *x, int n, float q)
+{
+	float *t = xmalloc(n * sizeof*t);
+	memcpy(t, x, n*sizeof*t);
+	int N = 0;
+	for (int i = 0; i < n; i++)
+		if (!isnan(x[i]))
+			t[N++] = x[i];
+	qsort(t, N, sizeof*t, compare_floats);
+	int a = q/100*N;
+	int b = (1-q/100)*N;
+	if (a < 0) a = 0;
+	if (b < 0) b = 0;
+	if (a >= N) a = N-1;
+	if (b >= N) b = N-1;
+	*m = t[a];
+	*M = t[b];
+	free(t);
+}
+
 // rewrites x a bit (e.g. to fill-in nans)
 static void colorize_botw(uint8_t *y, float *x, int w, int h)
 {
 	// apply botw palette
 	// TODO: add some 2% saturation here
-	float m = INFINITY, M = -INFINITY;
-	for (int i = 0; i < w*h; i++) if (isfinite(x[i])) m = fmin(m, x[i]);
-	for (int i = 0; i < w*h; i++) if (isfinite(x[i])) M = fmax(M, x[i]);
+	float m, M;
+	getpercentiles(&m, &M, x, w*h, 1.0);
 	for (int i = 0; i < w*h; i++)
 	if (isfinite(x[i]) && x[i] != 32768) {
 		float t = (x[i] - m) / (M - m);
@@ -984,25 +1003,14 @@ static void colorize_botw(uint8_t *y, float *x, int w, int h)
 	fftwf_free(S);
 	for (int i = 0; i < w*h; i++)
 		if (z[i] > 0)
-			z[i] /= 2;
-	m = INFINITY; M = -INFINITY;
-	for (int i = 0; i < w*h; i++) if (isfinite(z[i])) m = fmin(m, z[i]);
-	for (int i = 0; i < w*h; i++) if (isfinite(z[i])) M = fmax(M, z[i]);
-	for (int i = 0; i < w*h; i++)
-		z[i] =  255 * (z[i] - m) / (M - m);
-
+			z[i] /= 4;
 	// combine shading and palette
-	m = INFINITY; M = -INFINITY;
-	for (int i = 0; i < w*h; i++) if (isfinite(x[i])) m = fmin(m, z[i]);
-	for (int i = 0; i < w*h; i++) if (isfinite(x[i])) M = fmax(M, z[i]);
-	float g = (M-m)/10;
-	m += g;
-	M -= g;
+	getpercentiles(&m, &M, z, w*h, 5.0);
 	for (int i = 0; i < w*h; i++)
 		z[i] =  (z[i] - m) / (M - m);
 	for (int i = 0; i < w*h; i++)
 	for (int k = 0; k < 3; k++)
-		y[3*i+k] = bclamp(y[3*i+k] * z[i]);
+		y[3*i+k] = bclamp(y[3*i+k] * (0.5+z[i]/2));
 		//y[3*i+k] = bclamp(255*z[i]);
 	free(z);
 }
