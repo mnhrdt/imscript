@@ -169,6 +169,53 @@ static float pixel_height(struct pan_state *e, double p, double q)
 	return fancy_image_getsample_oct(e->i, oct, p, q, 0);
 }
 
+// fill-in the image y with a dem corresponding to the current window
+// notice that the output size may be smaller than the window due to crops
+//
+// return the scaling factor to undo a zoom-out (factor = 1 or larger)
+static int extract_local_dem(float *y, int *w, int *h, struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	if (e->zoom_factor < 1.00001) // zoom-out, must return factor 1
+	{
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < f->w; i++)
+		{
+			double p[2];
+			window_to_image(p, e, i, j);
+			y[j*f->w+i] = pixel_height(e, p[0], p[1]);
+		}
+		*w = f->w;
+		*h = f->h;
+		return 1;
+	} else { // zoom-in with repeated pixels, must return rep factor > 1
+		int lF = round(log2(e->zoom_factor));
+		int F = 1 << lF;
+		if (F != e->zoom_factor)
+			fail("non-dyadic zoom factor %d\n", e->zoom_factor);
+		assert(F == e->zoom_factor);
+
+		*w = f->w/F;
+		*h = f->h/F;
+		for (int j = 0; j < *h; j++)
+		for (int i = 0; i < *w; i++)
+		{
+			double p[2];
+			window_to_image(p, e, F*i, F*j);
+			y[j**w+i] = pixel_height(e, p[0], p[1]);
+		}
+		return F;
+	}
+		//for (int j = 0; j < f->h; j++)
+		//for (int i = 0; i < f->w; i++)
+		//{
+		//	double p[2];
+		//	window_to_image(p, e, i, j);
+		//	x[j*f->w+i] = pixel_height(e, p[0], p[1]);
+		//}
+}
+
+
 static void pixel_rgbf(float out[3], struct pan_state *e, double p, double q)
 {
 	float v[e->i->pd];
@@ -967,26 +1014,39 @@ static void getpercentiles(float *m, float *M, float *x, int n, float q)
 // rewrites x a bit (e.g. to fill-in nans)
 static void colorize_botw(uint8_t *y, float *x, int w, int h)
 {
+	// define botw palette
+	//uint8_t lo[3] = {65, 49, 5};      // bottom of palette
+	//uint8_t hi[3] = {200, 200, 180};  // top of palette
+	uint8_t lo[3] = {65, 49, 5};      // bottom of palette
+	uint8_t hi[3] = {200, 200, 180};  // top of palette
+	uint8_t no[3] = {20, 100, 255};   // holes and water planes
+
 	// apply botw palette
-	// TODO: add some 2% saturation here
 	float m, M;
-	getpercentiles(&m, &M, x, w*h, 1.0);
+	getpercentiles(&m, &M, x, w*h, 0.5);
 	for (int i = 0; i < w*h; i++)
 	if (isfinite(x[i]) && x[i] != 32768) {
 		float t = (x[i] - m) / (M - m);
-		y[3*i+0] = bclamp( (1 - t)*65 + t*200 );
-		y[3*i+1] = bclamp( (1 - t)*49 + t*200 );
-		y[3*i+2] = bclamp( (1 - t)*5  + t*180 );
+		for (int k = 0; k < 3; k++)
+			y[3*i+k] = bclamp( (1 - t)*lo[k] + t*hi[k] );
 	} else {
-		y[3*i+0] = 20;
-		y[3*i+1] = 100;
-		y[3*i+2] = 255;
-		x[i] = 0;
+		for (int k = 0; k < 3; k++)
+			y[3*i+k] = no[k];
+	//	x[i] = 0;
 	}
+
+	//void iio_write_image_float(char*,float*,int,int);
+
+	// fill-in nans for computing the shading
+	//iio_write_image_float("/tmp/whatever_before.npy", x, w, h);
+	simplest_inpainting(x, w, h);
+	//iio_write_image_float("/tmp/whatever_inpainted.npy", x, w, h);
 
 	// ppsmooth
 	float *s = xmalloc(w*h*sizeof*s);
 	ppsmooth(s, x, w, h);
+
+	//iio_write_image_float("/tmp/whatever_smoothed.npy", s, w, h);
 
 	// compute lssao shading
 	float *z = xmalloc(w * h * sizeof*z);
@@ -1003,9 +1063,9 @@ static void colorize_botw(uint8_t *y, float *x, int w, int h)
 	fftwf_free(S);
 	for (int i = 0; i < w*h; i++)
 		if (z[i] > 0)
-			z[i] /= 4;
+			z[i] /= 3;
 	// combine shading and palette
-	getpercentiles(&m, &M, z, w*h, 5.0);
+	getpercentiles(&m, &M, z, w*h, 9.0);
 	for (int i = 0; i < w*h; i++)
 		z[i] =  (z[i] - m) / (M - m);
 	for (int i = 0; i < w*h; i++)
@@ -1021,19 +1081,25 @@ static void expose_topography(struct FTR *f)
 
 	if (e->topographic_mode == 1) // botw
 	{
-		float   *x = xmalloc(1 * f->w * f->h * sizeof*x);
+		float *x = xmalloc(1 * f->w * f->h * sizeof*x);
+		int w, h;
+		int F = extract_local_dem(x, &w, &h, f);
 		uint8_t *y = xmalloc(3 * f->w * f->h * sizeof*y);
+		//for (int j = 0; j < f->h; j++)
+		//for (int i = 0; i < f->w; i++)
+		//{
+		//	double p[2];
+		//	window_to_image(p, e, i, j);
+		//	x[j*f->w+i] = pixel_height(e, p[0], p[1]);
+		//}
+		colorize_botw(y, x, w, h);
+		//for (int i = 0; i < 3*f->w*f->h; i++) f->rgb[i] = 127;
 		for (int j = 0; j < f->h; j++)
 		for (int i = 0; i < f->w; i++)
-		{
-			double p[2];
-			window_to_image(p, e, i, j);
-			x[j*f->w+i] = pixel_height(e, p[0], p[1]
-					) / e->topographic_scale;
-		}
-		colorize_botw(y, x, f->w, f->h);
-		for (int i = 0; i < 3 * f->w * f->h; i++)
-			f->rgb[i] = y[i];
+		for (int k = 0; k < 3; k++)
+			f->rgb[(j*f->w+i)*3+k] = y[3*((j/F)*w+(i/F))+k];
+		//for (int i = 0; i < 3 * f->w * f->h; i++)
+		//	f->rgb[i] = y[i];
 		free(x);
 		free(y);
 		return;
