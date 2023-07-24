@@ -396,7 +396,7 @@ static void action_toggle_roi(struct FTR *f, int x, int y, int dir)
 {
 	struct pan_state *e = f->userdata;
 	e->roi = (e->roi + (dir?-1:1)) % 3;
-	fprintf(stderr, "ROI SWITCH(%d) = %d\n", dir, e->roi);
+	//fprintf(stderr, "ROI SWITCH(%d) = %d\n", dir, e->roi);
 	e->roi_x = x - e->roi_w / 2;
 	e->roi_y = y - e->roi_w / 2;
 	f->changed = 1;
@@ -409,10 +409,10 @@ static void action_cycle_hud(struct FTR *f)
 	f->changed = 1;
 }
 
-static void action_toggle_topography(struct FTR *f)
+static void action_toggle_topography(struct FTR *f, int dir)
 {
 	struct pan_state *e = f->userdata;
-	e->topographic_mode = (1 + e->topographic_mode) % 7;
+	e->topographic_mode = (dir + e->topographic_mode) % 7;
 	f->changed = 1;
 }
 
@@ -459,7 +459,7 @@ static void action_roi_embiggen(struct FTR *f, float s)
 {
 	struct pan_state *e = f->userdata;
 	e->roi_w *= s;
-	fprintf(stderr, "ROI %d\n", e->roi_w);
+	//fprintf(stderr, "ROI %d\n", e->roi_w);
 	f->changed = 1;
 }
 
@@ -1255,7 +1255,8 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'N') action_toggle_aqauto(f);
 	if (k == 'u') action_cycle_hud(f);
 	if (k == 'r') action_toggle_roi(f, x, y, m&FTR_MASK_SHIFT);
-	if (k == 't') action_toggle_topography(f);
+	if (k == 't') action_toggle_topography(f, 1);
+	if (k == 'T') action_toggle_topography(f, -1);
 	if (k == 'c') action_toggle_p(f);
 	if (k == 's') action_topography_span(f, 1/1.3);
 	if (k == 'S') action_topography_span(f, 1.3);
