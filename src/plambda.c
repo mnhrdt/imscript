@@ -2951,13 +2951,14 @@ static char *pick_option(int *c, char ***v, char *o, char *d)
 {
 	int argc = *c;
 	char **argv = *v;
-	for (int i = 0; i < argc - 1; i++)
+	int id = d ? 1 : 0;
+	for (int i = 0; i < argc - id; i++)
 		if (argv[i][0] == '-' && 0 == strcmp(argv[i]+1, o))
 		{
-			char *r = argv[i+1];
-			*c -= 2;
-			for (int j = i; j < argc - 1; j++)
-				(*v)[j] = (*v)[j+2];
+			char *r = argv[i+1] + 1 - id;
+			*c -= id + 1;
+			for (int j = i; j < argc - id; j++)
+				(*v)[j] = (*v)[j+id+1];
 			return r;
 		}
 	return d;
@@ -2974,6 +2975,7 @@ static int main_images(int c, char **v)
 		//                          0 1   2         c-1
 		return EXIT_FAILURE;
 	}
+	bool verbose = pick_option(&c, &v, "v", NULL);
 	char *filename_out = pick_option(&c, &v, "o", "-");
 
 	struct plambda_program p[1];
@@ -2999,7 +3001,7 @@ static int main_images(int c, char **v)
 	//	if (w[0] != w[i+1] || h[0] != h[i+1])// || pd[0] != pd[i+1])
 	//		fail("input images size mismatch");
 
-	if (n>1) FORI(n) if (!strstr(p->var->t[i], "hidden"))
+	if (n>1) FORI(n) if (!strstr(p->var->t[i], "hidden") && verbose)
 		fprintf(stderr, "plambda correspondence \"%s\" = \"%s\"\n",
 				p->var->t[i], v[i+1]);
 
@@ -3046,6 +3048,7 @@ Usage: plambda a.png b.png c.png ... \"EXPRESSION\" > output\n\
 \n\
 Options:\n\
  -o file\tsave output to named file\n\
+ -v\t\tverbose (print correspondence between files and variables)\n\
  -c\t\tact as a symbolic calculator\n\
  -h\t\tdisplay short help message\n\
  --help\t\tdisplay longer help message\n\
