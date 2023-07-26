@@ -122,7 +122,7 @@ static void bilaplacian_operator(double *y, double *x, int n, void *ee)
 
 #include "smapa.h"
 //SMART_PARAMETER(CG_MAXIT,-1)
-SMART_PARAMETER(CG_EPS,-1)
+SMART_PARAMETER_SILENT(CG_EPS,-1)
 
 
 //void poisson_extension_by_cg(float *out, float *in, float *dat, int w, int h,
@@ -251,8 +251,7 @@ void linear_extension_by_cg(float *out, void (*A)(double*,double*,int,void*),
 	for (int i = 0; i < w*h; i++)
 		out[i] = in[i];
 	for (int p = 0; p < nmask; p++) {
-		if (nmask < 33)
-			fprintf(stderr, "sol[%d] = %g\n", p, solution[p]);
+		//if (nmask<33) fprintf(stderr,"sol[%d] = %g\n", p,solution[p]);
 		out[mask[p][2]] = solution[p];
 	}
 
