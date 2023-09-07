@@ -196,6 +196,8 @@ src/ftr/blur.o: src/ftr/blur.c src/ftr/fail.c src/ftr/xmalloc.c src/ftr/smapa.h 
   src/ftr/help_stuff.c src/ftr/parsenumbers.c src/ftr/pickopt.c \
   src/ftr/iio.h
 src/ftr/ccpu.o: src/ftr/ccpu.c src/ftr/iio.h
+src/ftr/cloudette.o: src/ftr/cloudette.c src/ftr/ftr.h src/ftr/xmalloc.c \
+  src/ftr/fail.c
 src/ftr/cpu.o: src/ftr/cpu.c src/ftr/fancy_image.h src/ftr/ftr.h src/ftr/fontu.c \
   src/ftr/xmalloc.c src/ftr/fail.c src/ftr/xfopen.c src/ftr/dataconv.c \
   src/ftr/fonts/xfonts_all.c src/ftr/fonts/xfont_4x6.c \
