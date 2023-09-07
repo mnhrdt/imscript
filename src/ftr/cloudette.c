@@ -66,6 +66,8 @@ struct viewer_state {
 
 	// ui
 	struct bitmap_font font[5]; // from small to large
+	int p;                      // whether to show point p
+	int px, py;                 // position for showing it
 };
 
 
@@ -92,6 +94,9 @@ static void center_view(struct FTR *f)
 	e->show_grid_points = false;
 	e->restrict_to_affine = false;
 	e->show_debug = false;
+
+	// x
+	e->p = -1;
 
 	f->changed = 1;
 }
@@ -396,6 +401,16 @@ static void paint_state(struct FTR *f)
 
 	draw_red_points(f);
 
+	if (e->p >= 0)
+	{
+		uint8_t white[3] = {255, 255, 255};
+		uint8_t black[3] = {0, 0, 0};
+		struct bitmap_font *font = e->font + 4;
+		put_string_in_rgb_image(f->rgb, f->w, f->h,
+				e->px, e->py - font->height,
+				white, black, 0, font, e->f[e->p]);
+	}
+
 	//compute_red_points_convex_hull(e);
 	//for (int i = 0; i < e->m - 1; i++)
 	//{
@@ -524,7 +539,7 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	//}
 
 	// begin dragging a the WINDOW BACKGROUND
-	if (k == FTR_BUTTON_LEFT && hit_point(e, x, y) < 0)
+	if (k == FTR_BUTTON_LEFT)// && hit_point(e, x, y) < 0)
 	{
 		e->drag_handle[0] = x;
 		e->drag_handle[1] = y;
@@ -543,15 +558,17 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	// radius in/out (if hit), zoom in/out (if no hit)
 	if (k == FTR_BUTTON_DOWN)
 	{
-		if (hit_point(e, x, y)<0)
-			change_view_scale(e, x, y, ZOOM_FACTOR);
+		change_view_scale(e, x, y, ZOOM_FACTOR);
+		//if (hit_point(e, x, y)<0)
+		//	change_view_scale(e, x, y, ZOOM_FACTOR);
 		//else
 		//	change_radius(e, x, y, RADIUS_FACTOR);
 	}
 	if (k == FTR_BUTTON_UP)
 	{
-		if (hit_point(e, x, y)<0)
-			change_view_scale(e, x, y, 1.0/ZOOM_FACTOR);
+		change_view_scale(e, x, y, 1.0/ZOOM_FACTOR);
+		//if (hit_point(e, x, y)<0)
+		//	change_view_scale(e, x, y, 1.0/ZOOM_FACTOR);
 		//else
 		//	change_radius(e, x, y, 1.0/RADIUS_FACTOR);
 	}
@@ -584,17 +601,13 @@ static void event_motion(struct FTR *f, int b, int m, int x, int y)
 		return;
 	}
 
-	int p = hit_point(e, x, y);
-	if (p >= 0)
+	e->p = hit_point(e, x, y);
+	if (e->p >= 0)
 	{
-		fprintf(stderr, "hit point %d \"%s\" (%d %d)\n", p,e->f[p],x,y);
-		uint8_t fg[3] = {255, 255, 255};
-		uint8_t bg[3] = {0, 0, 0};
-		put_string_in_rgb_image(f->rgb, f->w,f->h, x,y, bg,fg, 0,
-				e->font+4,
-				e->f[p]);
+		fprintf(stderr, "hit point %d (%d %d)\n", e->p, x, y);
+		e->px = x;
+		e->py = y;
 		f->changed = 1;
-
 	}
 
 }
@@ -662,7 +675,6 @@ static struct data_line *read_data_lines(FILE *f, int *N)
 	int n = 0;  // number of lines read
 	int m = 8;  // number of lines allocated
 	struct data_line *r = xmalloc(m * sizeof*r);
-	fprintf(stderr, "sizeof*r = %d\n", (int)sizeof*r);
 	while (6 == fscanf(f, "%g %g %g %g %g %100[^\n]\n",
 				r[n].xyrgb + 0, r[n].xyrgb + 1,
 				r[n].xyrgb + 2, r[n].xyrgb + 3, r[n].xyrgb + 4,
