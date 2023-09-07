@@ -8,8 +8,13 @@
 #include <stdint.h>
 #include <assert.h>
 
-//// user interface library
+// user interface library
 #include "ftr.h"
+
+// bitmap fonts
+#define OMIT_MAIN_FONTU
+#include "fontu.c" // todo: cherry-pick the required fontu functions
+#include "fonts/xfonts_all.c"
 
 // radius of the disks that are displayed around control points
 #define DISK_RADIUS 7.3
@@ -58,6 +63,9 @@ struct viewer_state {
 	bool show_grid_points;
 	bool restrict_to_affine;
 	bool show_debug; // show inverted points and full qhulls
+
+	// ui
+	struct bitmap_font font[5]; // from small to large
 };
 
 
@@ -437,15 +445,17 @@ static void change_view_scale(struct viewer_state *e, int x, int y, float fac)
 
 
 
-// test whether (x,y) is inside one of the four control disks
+// test whether (x,y) hits some point
 static int hit_point(struct viewer_state *e, float x, float y)
 {
+	for (int i = 0; i < e->n; i++)
+	{
+		float P[2];
+		map_view_to_window(e, P, e->x + 2*i);
+		if (hypot(P[0] - x, P[1] - y) < 2 + DISK_RADIUS)
+			return i;
+	}
 	return -1;
-	//float P[2];
-	//map_view_to_window(e, P, e->c);
-	//if (hypot(P[0] - x, P[1] - y) < 2 + DISK_RADIUS)
-	//	return 0;
-	//return -1;
 }
 
 // key handler
@@ -490,8 +500,6 @@ static void event_resize(struct FTR *f, int k, int m, int x, int y)
 static void event_button(struct FTR *f, int k, int m, int x, int y)
 {
 	struct viewer_state *e = f->userdata;
-
-	int p = hit_point(e, x, y);
 
 	//// begin dragging a control point in the WINDOW DOMAIN
 	//if (k == FTR_BUTTON_LEFT && p >= 0)
@@ -556,6 +564,7 @@ static void event_motion(struct FTR *f, int b, int m, int x, int y)
 {
 	struct viewer_state *e = f->userdata;
 
+
 	//// drag WINDOW DOMAIN control point (realtime feedback)
 	//if (e->dragging_window_point && m & FTR_BUTTON_LEFT)
 	//{
@@ -572,7 +581,22 @@ static void event_motion(struct FTR *f, int b, int m, int x, int y)
 		e->drag_handle[0] = x;
 		e->drag_handle[1] = y;
 		f->changed = 1;
+		return;
 	}
+
+	int p = hit_point(e, x, y);
+	if (p >= 0)
+	{
+		fprintf(stderr, "hit point %d \"%s\" (%d %d)\n", p,e->f[p],x,y);
+		uint8_t fg[3] = {255, 255, 255};
+		uint8_t bg[3] = {0, 0, 0};
+		put_string_in_rgb_image(f->rgb, f->w,f->h, x,y, bg,fg, 0,
+				e->font+4,
+				e->f[p]);
+		f->changed = 1;
+
+	}
+
 }
 
 // expose handler
@@ -676,6 +700,13 @@ int main_cloudette(int argc, char *argv[])
 		e->c[3*i+2] = l[i].xyrgb[2];
 		e->f[i] = l[i].name;
 	}
+
+	// init fonts
+	e->font[0] = reformat_font(*xfont_4x6, UNPACKED);
+	e->font[1] = reformat_font(*xfont_6x12, UNPACKED);
+	e->font[2] = reformat_font(*xfont_7x13, UNPACKED);
+	e->font[3] = reformat_font(*xfont_9x15, UNPACKED);
+	e->font[4] = reformat_font(*xfont_10x20, UNPACKED);
 
 	// open the window
 	struct FTR f = ftr_new_window(800,600);
