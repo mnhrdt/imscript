@@ -1025,14 +1025,14 @@ static void colorize_botw(uint8_t *y, float *x, int w, int h)
 	float m, M;
 	getpercentiles(&m, &M, x, w*h, 0.5);
 	for (int i = 0; i < w*h; i++)
-	if (isfinite(x[i]) && x[i] != 32768) {
+	if (isfinite(x[i]) && x[i] != -32768) {
 		float t = (x[i] - m) / (M - m);
 		for (int k = 0; k < 3; k++)
 			y[3*i+k] = bclamp( (1 - t)*lo[k] + t*hi[k] );
 	} else {
 		for (int k = 0; k < 3; k++)
 			y[3*i+k] = no[k];
-	//	x[i] = 0;
+		x[i] = NAN;
 	}
 
 	//void iio_write_image_float(char*,float*,int,int);

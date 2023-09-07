@@ -11,11 +11,13 @@
 
 #define MAX_CPUS 10
 
+// internal struct
 struct cpu_view {
 	pid_t p;  // process id of this cpu viewer
 	char f[FILENAME_MAX];   // interchange filename
 };
 
+// internal data
 struct cpu_view global_table_of_cpu_views[MAX_CPUS];
 
 
@@ -38,6 +40,7 @@ int cpu_new(float *x, int w, int h, int d)
 	return 0;
 }
 
+// API: send a key to a cpu
 void cpu_send_key(int n, int k)
 {
 	assert(n == 0);
