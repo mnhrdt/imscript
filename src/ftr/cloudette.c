@@ -11,13 +11,13 @@
 // user interface library
 #include "ftr.h"
 
+// image input/output
+#include "iio.h"
+
 // bitmap fonts
 #define OMIT_MAIN_FONTU
 #include "fontu.c" // todo: cherry-pick the required fontu functions
 #include "fonts/xfonts_all.c"
-
-// radius of the disks that are displayed around control points
-#define DISK_RADIUS 7.3
 
 // radius of the points
 #define POINT_RADIUS 2.3
@@ -33,7 +33,8 @@ struct viewer_state {
 	// point data (input)
 	int n;       // number of points
 	float *x;    // point coordinates (x[2*i+0], x[2*i+1]) for 0<=i<n
-	float *c;    // rgb coloring of each point
+	//float *c;    // rgb coloring of each point
+	int *C;      // label id of each point
 	char **f;    // filename/id of each point
 
 	//// computed point data (intermediary)
@@ -100,6 +101,27 @@ static void center_view(struct FTR *f)
 
 	f->changed = 1;
 }
+
+
+// xterm-like 16 color palette
+static uint8_t palette[16][3] = {
+	{0, 0, 0},        //  0  black
+	{128, 0, 0},      //  1  dark red
+	{0, 128, 0},      //  2  dark green
+	{128, 128, 0},    //  3  dark yellow
+	{0, 0, 128},      //  4  dark blue
+	{128, 0, 128},    //  5  dark magenta
+	{0, 128, 128},    //  6  dark cyan
+	{192, 192, 192},  //  7  dark white
+	{128, 128, 128},  //  8  gray
+	{255, 0, 0},      //  9  red
+	{0, 255, 0},      // 10  green
+	{255, 255, 0},    // 11  yellow
+	{0, 0, 255},      // 12  blue
+	{255, 0, 255},    // 13  magenta
+	{0, 255, 255},    // 14  cyan
+	{255, 255, 255},  // 15  white
+};
 
 
 // funtion to test whether a point is inside the window
@@ -365,7 +387,8 @@ static void draw_red_points(struct FTR *f)
 	{
 		float P[2];
 		map_view_to_window(e, P, e->x + 2*i);
-		splat_disk(f->rgb, f->w, f->h, P, POINT_RADIUS, red);
+		int Ci = 8 + e->C[i] % 8;
+		splat_disk(f->rgb, f->w, f->h, P, POINT_RADIUS, palette[Ci]);
 		//plot_pixel_red(P[0], P[1], f);
 		//plot_pixel_red(P[0]+1, P[1], f);
 		//plot_pixel_red(P[0]-1, P[1], f);
@@ -389,6 +412,15 @@ static void draw_red_points(struct FTR *f)
 //	}
 //}
 
+static int string_is_filename(char *s)
+{
+	FILE *f = fopen(s, "r");
+	if (!f)
+		return 0;
+	fclose(f);
+	return 1;
+}
+
 // Paint the whole scene
 // This function is called whenever the window needs to be redisplayed.
 static void paint_state(struct FTR *f)
@@ -401,14 +433,31 @@ static void paint_state(struct FTR *f)
 
 	draw_red_points(f);
 
-	if (e->p >= 0)
+	if (e->p >= 0 && e->p < e->n)
 	{
-		uint8_t white[3] = {255, 255, 255};
-		uint8_t black[3] = {0, 0, 0};
-		struct bitmap_font *font = e->font + 4;
-		put_string_in_rgb_image(f->rgb, f->w, f->h,
-				e->px, e->py - font->height,
-				white, black, 0, font, e->f[e->p]);
+		char *fn = e->f[e->p];
+		if (string_is_filename(fn))
+		{
+			int w, h;
+			uint8_t *a = iio_read_image_uint8(fn, &w, &h);
+			for (int j = 0; j < h; j++)
+			for (int i = 0; i < w; i++)
+			{
+				int ii = i + e->px;
+				int jj = j + e->py - h;
+				if (insideP(f, ii, jj))
+				for (int k = 0; k < 3; k++)
+					f->rgb[3*(jj*f->w+ii)+k]=a[j*w+i];
+			}
+			xfree(a);
+		} else {
+			uint8_t white[3] = {255, 255, 255};
+			uint8_t black[3] = {0, 0, 0};
+			struct bitmap_font *font = e->font + 4;
+			put_string_in_rgb_image(f->rgb, f->w, f->h,
+					e->px, e->py - font->height,
+					white, black, 0, font, fn);
+		}
 	}
 
 	//compute_red_points_convex_hull(e);
@@ -458,6 +507,16 @@ static void change_view_scale(struct viewer_state *e, int x, int y, float fac)
 	fprintf(stderr, "zoom changed %g\n", e->scale);
 }
 
+static void action_screenshot(struct FTR *f)
+{
+	static int c = 0;
+	char n[FILENAME_MAX];
+	snprintf(n, FILENAME_MAX, "screenshot_cloudette_%d.png", c);
+	void iio_write_image_uint8_vec(char*,uint8_t*,int,int,int);
+	iio_write_image_uint8_vec(n, f->rgb, f->w, f->h, 3);
+	fprintf(stderr, "wrote sreenshot on file \"%s\"\n", n);
+	c += 1;
+}
 
 
 // test whether (x,y) hits some point
@@ -467,7 +526,7 @@ static int hit_point(struct viewer_state *e, float x, float y)
 	{
 		float P[2];
 		map_view_to_window(e, P, e->x + 2*i);
-		if (hypot(P[0] - x, P[1] - y) < 2 + DISK_RADIUS)
+		if (hypot(P[0] - x, P[1] - y) < 0.5 + POINT_RADIUS)
 			return i;
 	}
 	return -1;
@@ -500,6 +559,7 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if (k == '.') e->show_grid_points = !e->show_grid_points;
 	if (k == 'd') e->show_debug = !e->show_debug;
 	//if (k == 'a') e->restrict_to_affine = !e->restrict_to_affine;
+	if (k == ',') action_screenshot(f);
 
 	e->dragging_window_point = e->dragging_image_point = false;
 	f->changed = 1;
@@ -601,12 +661,18 @@ static void event_motion(struct FTR *f, int b, int m, int x, int y)
 		return;
 	}
 
-	e->p = hit_point(e, x, y);
-	if (e->p >= 0)
+	int p = hit_point(e, x, y);
+	if (p >= 0)
 	{
-		fprintf(stderr, "hit point %d (%d %d)\n", e->p, x, y);
+		//fprintf(stderr, "hit point %d (%d %d)\n", p, x, y);
+		e->p = p;
 		e->px = x;
 		e->py = y;
+		f->changed = 1;
+	}
+	if (p < 0 && e->p >= 0)
+	{
+		e->p = -1;
 		f->changed = 1;
 	}
 
@@ -670,7 +736,7 @@ struct data_line {
 	char name[FILENAME_MAX];
 };
 
-static struct data_line *read_data_lines(FILE *f, int *N)
+static struct data_line *read_data_lines_rgb(FILE *f, int *N)
 {
 	int n = 0;  // number of lines read
 	int m = 8;  // number of lines allocated
@@ -679,6 +745,21 @@ static struct data_line *read_data_lines(FILE *f, int *N)
 				r[n].xyrgb + 0, r[n].xyrgb + 1,
 				r[n].xyrgb + 2, r[n].xyrgb + 3, r[n].xyrgb + 4,
 				r[n].name)
+			)
+		if (++n >= m)
+			r = xrealloc(r, (m *= 2) * sizeof*r);
+	*N = n;
+	return r;
+}
+
+static struct data_line *read_data_lines_id(FILE *f, int *N)
+{
+	int n = 0;  // number of lines read
+	int m = 8;  // number of lines allocated
+	struct data_line *r = xmalloc(m * sizeof*r);
+	while (4 == fscanf(f, "%g %g %g %100[^\n]\n",
+				r[n].xyrgb + 0, r[n].xyrgb + 1,
+				r[n].xyrgb + 2, r[n].name )
 			)
 		if (++n >= m)
 			r = xrealloc(r, (m *= 2) * sizeof*r);
@@ -695,21 +776,33 @@ int main_cloudette(int argc, char *argv[])
 
 	// read input data
 	int n;
-	struct data_line *l = read_data_lines(stdin, &n);
+	//struct data_line *l = read_data_lines_rgb(stdin, &n);
+	struct data_line *l = read_data_lines_id(stdin, &n);
+	fprintf(stderr, "got %d points from stdin\n", n);
+	if (n > 10)
+	for (int i = 0; i < 10; i++)
+		fprintf(stderr, "[%d] %g %g %g \"%s\"\n",
+				i,
+				l[i].xyrgb[0],
+				l[i].xyrgb[1],
+				l[i].xyrgb[2],
+				l[i].name);
 
 	// initialize state with the given points
 	struct viewer_state e[1];
 	e->n = n;
 	e->x = xmalloc(2*n * sizeof*e->x);
-	e->c = xmalloc(3*n * sizeof*e->c);
+	//e->c = xmalloc(3*n * sizeof*e->c);
+	e->C = xmalloc(1*n * sizeof*e->C);
 	e->f = xmalloc(1*n * sizeof*e->f);
 	for (int i = 0; i < n; i++)
 	{
 		e->x[2*i+0] = l[i].xyrgb[0];
 		e->x[2*i+1] = l[i].xyrgb[1];
-		e->c[3*i+0] = l[i].xyrgb[0];
-		e->c[3*i+1] = l[i].xyrgb[1];
-		e->c[3*i+2] = l[i].xyrgb[2];
+		//e->c[3*i+0] = l[i].xyrgb[2];
+		//e->c[3*i+1] = l[i].xyrgb[3];
+		//e->c[3*i+2] = l[i].xyrgb[4];
+		e->C[i] = l[i].xyrgb[2];
 		e->f[i] = l[i].name;
 	}
 
