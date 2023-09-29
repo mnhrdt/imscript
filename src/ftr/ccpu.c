@@ -25,7 +25,7 @@ struct cpu_view global_table_of_cpu_views[MAX_CPUS];
 // returns a handle to the view
 int cpu_new(float *x, int w, int h, int d)
 {
-	struct cpu_view *v = global_table_of_cpu_views + 0;
+	struct cpu_view *v = global_table_of_cpu_views + 0; // TODO: do increase this
 
 	snprintf(v->f, FILENAME_MAX,
 			"/tmp/cpu_view_%d_%d.npy", getuid(), getpid());
@@ -50,6 +50,9 @@ void cpu_send_key(int n, int k)
 	snprintf(c, FILENAME_MAX,
 		"xdotool search --any --pid %d --name ftr_win_pid_%d key %c",
 		v->p, v->p, k);
+	// NOTE: this xdotool call is a subtle hack to support transparently
+	// plain x11 and glut FTR windows.  The "pid" field is only used for
+	// plain x11, the "name" field is only used for ftr_freeglut.
 	int r = system(c);
 	(void)r;
 }
@@ -63,6 +66,9 @@ void cpu_update(int n, float *x, int w, int h, int d)
 	if (x)
 		iio_write_image_float_vec(v->f, x, w, h, d);
 	cpu_send_key(n, '2');
+	// TODO: maybe send an actual expose event to the window?
+	// caveat: i don't know how to capture it from glut, so it would need
+	// some more hacking on the client side
 }
 
 // API: close the cpu window
