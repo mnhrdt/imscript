@@ -149,6 +149,16 @@ static void center_view(struct FTR *f)
 	f->changed = 1;
 }
 
+// function to reset and center the viewer (with pixel identity map)
+static void center_view_0(struct FTR *f)
+{
+	struct viewer_state *e = f->userdata;
+	center_view(f);
+	for (int i = 0; i < 4; i++)
+	for (int k = 0; k < 2; k++)
+		e->c[i][k] = e->p[i][k];
+}
+
 
 // funtion to test whether a point is inside the window
 static int insideP(struct FTR *f, int x, int y)
@@ -856,6 +866,7 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	struct viewer_state *e = f->userdata;
 
 	if (k == 'c') center_view(f);
+	if (k == 'v') center_view_0(f);
 	if (k == 'j') change_view_offset(e, 0, -10);
 	if (k == 'k') change_view_offset(e, 0, 10);
 	if (k == 'h') change_view_offset(e, 10, 0);
