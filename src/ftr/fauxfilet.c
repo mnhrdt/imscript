@@ -31,16 +31,18 @@
 // data structure to store the state of the viewer
 struct viewer_state {
 	// bullseye parameters
-	float f;        // frequency of the strata before folding
-	float p;        // parameter of parabolic fold
-	float a, b, c;  // euler angles of parabolic sheaf
+	float f;          // frequency of the strata before folding
+	float p;          // parameter of parabolic fold
+	float a, b, c;    // euler angles of parabolic sheaf
 
-
-	// below is unused by now
+	// cylinder radius
+	float R;
 
 	// window viewport
-	float offset[2];
-	float scale;
+	float offset[2];  // horizontal (T) and vertical (R) offset
+	float scale;      // vertical scale
+
+	// below is unused by now
 
 	// dragging state
 	bool dragging_window_point;
@@ -63,20 +65,27 @@ struct viewer_state {
 
 
 // function to reset and center the viewer
-static void center_view(struct FTR *f)
+static void center_state(struct viewer_state *e)
 {
-	struct viewer_state *e = f->userdata;
+	// bullseye
+	e->f = 0.1;  // width of the strata = 10 pixels
+	e->p = 0.0001;    // flat strata (zero parabolic fold)
+	e->a = 0;    // euler angles zeroed (vertical cylinter)
+	e->b = 0;
+	e->c = 0;
+
+	e->R = 20;
+
+	// viewport
+	e->offset[0] = 0;
+	e->offset[1] = 0;
+	e->scale = 1;
 
 	// drag state
 	e->dragging_window_point = false;
 	e->dragging_image_point = false;
 	e->dragged_point = -1;
 	e->dragging_background = false;
-
-	// viewport
-	e->offset[0] = 0;
-	e->offset[1] = 0;
-	e->scale = 1;
 
 	// visualization options
 	e->interpolation_order = 0;
@@ -85,10 +94,12 @@ static void center_view(struct FTR *f)
 	e->show_grid_points = false;
 	e->restrict_to_affine = false;
 	e->show_debug = false;
+}
 
-	// x
-	e->p = -1;
-
+static void center_view(struct FTR *f)
+{
+	struct viewer_state *e = f->userdata;
+	center_state(e);
 	f->changed = 1;
 }
 
@@ -104,61 +115,9 @@ static int insideP(struct FTR *f, int x, int y)
 
 // SECTION 3. algorithms                                                    {{{1
 
-static int compare_points_lexicographically(const void *aa, const void *bb)
+static float stratum(float x)
 {
-	const float *a = (const float *)aa;
-	const float *b = (const float *)bb;
-	int p = (a[0] > b[0]) - (a[0] < b[0]);
-	if (p)
-		return p;
-	else
-		return ((a[1] > b[1]) - (a[1] < b[1]));
-}
-
-// oriented area of a triangle
-static float det(float a[2], float b[2], float c[2])
-{
-	float p[2] = {b[0] - a[0], b[1] - a[1]};
-	float q[2] = {c[0] - a[0], c[1] - a[1]};
-	return p[0] * q[1] - p[1] * q[0];
-}
-
-// function to compute the convex hull of a set of points in the plane
-// (note: the input points x are sorted in-place)
-static int do_the_andrew_parkour(
-		float *y,  // output: coordinates of points on the convex hull
-		float *x,  // input: list of points in the plane
-		int n      // input: number of input points
-		)          // return value: number of points in the convex hull
-{
-	// sort the given points lexicographically (in place)
-	qsort(x, n, 2*sizeof*x, compare_points_lexicographically);
-
-	// number of points in the hull found so far
-	int r = 0;
-
-	// fill-in the lower hull
-	for (int i = 0; i < n; i++)
-	{
-		while (r >= 2 && det(y+2*(r-2), y+2*(r-1), x+2*i) <= 0)
-			r -= 1;
-		y[2*r+0] = x[2*i+0];
-		y[2*r+1] = x[2*i+1];
-		r += 1;
-	}
-
-	// fill-in the upper hull
-	int k = r + 1; // start of the upper hull
-	for (int i = n-2; i >= 0; i--)
-	{ //                v--- (only difference with previous loop)
-		while (r >= k && det(y+2*(r-2), y+2*(r-1), x+2*i) <= 0)
-			r -= 1;
-		y[2*r+0] = x[2*i+0];
-		y[2*r+1] = x[2*i+1];
-		r += 1;
-	}
-
-	return r;
+	return 127 + 107 * sin(x);
 }
 
 
@@ -182,6 +141,76 @@ static void map_window_to_view(struct viewer_state *e, float y[2], float x[2])
 		y[k] = ( x[k] - e->offset[k] ) / e->scale;
 }
 
+static void matvec33(float y[3], float A[3][3], float x[3])
+{
+	for (int i = 0; i < 3; i++)
+		y[i] = 0;
+	for (int i = 0; i < 3; i++)
+	for (int j = 0; j < 3; j++)
+		y[i] += A[i][j] * x[j];
+}
+
+// apply euler rotations to a 3d point
+static void map_euler(struct viewer_state *e, float X[3], float x[3], int dir)
+{
+	float a = dir * e->a * M_PI / 180;
+	float b = dir * e->b * M_PI / 180;
+	float c = dir * e->c * M_PI / 180;
+
+	float R[3][3][3] = {
+		{
+			{ cos(a), sin(a), 0 },
+			{ -sin(a), cos(a), 0 },
+			{ 0, 0, 1}
+		},
+		{
+			{ cos(b), 0, -sin(b) },
+			{ 0, 1, 0},
+			{ sin(b), 0, cos(b) }
+		},
+		{
+			{ 1, 0, 0},
+			{ 0, cos(c), sin(c) },
+			{ 0, -sin(c), cos(c) }
+		}
+	};
+
+	float t[3];
+	if (dir > 0) {
+		matvec33(X, R[0], x);
+		matvec33(t, R[1], X);
+		matvec33(X, R[2], t);
+	} else {
+		matvec33(X, R[2], x);
+		matvec33(t, R[1], X);
+		matvec33(X, R[0], t);
+	}
+}
+
+// take a point of the unfolded cylinder (rectangle), and map it to 3D
+static void map_cyl_unfold(struct viewer_state *e, float xyz[3], float ij[2])
+{
+	float XYZ[3] = {
+		e->R * cos(ij[0] * M_PI / 180),
+		e->R * sin(ij[0] * M_PI / 180),
+		ij[1]
+	};
+	//xyz[0] = XYZ[0];
+	//xyz[1] = XYZ[1];
+	//xyz[2] = XYZ[2];
+	map_euler(e, xyz, XYZ, 1);
+}
+
+// get the cylindrical coordinates of a 3d point
+static void map_getcyl(struct viewer_state *e, float rth[3], float xyz[3])
+{
+	float XYZ[3];
+	map_euler(e, XYZ, xyz, -1);
+	rth[0] = hypot(XYZ[0], XYZ[1]);
+	rth[1] = atan2(XYZ[1], XYZ[0]) * 180 / M_PI;
+	rth[2] = XYZ[2];
+}
+
 
 // SECTION 7. Drawing                                                       {{{1
 
@@ -189,26 +218,12 @@ static void map_window_to_view(struct viewer_state *e, float y[2], float x[2])
 // Subsection 7.2. Drawing user-interface elements                          {{{2
 
 
-
-static void draw_red_points(struct FTR *f)
+static void get_dirt(uint8_t rgb[3], int g)
 {
-	struct viewer_state *e = f->userdata;
-
-	uint8_t red[3] = {255, 0, 0};
-	for (int i = 0; i < e->n; i++)
-	{
-		float P[2];
-		map_view_to_window(e, P, e->x + 2*i);
-		int Ci = 8 + e->C[i] % 8;
-		splat_disk(f->rgb, f->w, f->h, P, POINT_RADIUS, palette[Ci]);
-		//plot_pixel_red(P[0], P[1], f);
-		//plot_pixel_red(P[0]+1, P[1], f);
-		//plot_pixel_red(P[0]-1, P[1], f);
-		//plot_pixel_red(P[0], P[1]+1, f);
-		//plot_pixel_red(P[0], P[1]-1, f);
-	}
+	rgb[1] = 255 - g;
+	rgb[0] = g > 127 ? 510 - 2*g : 255;
+	rgb[2] = g > 127 ? 0 : 255 - 2*g;
 }
-
 
 // Paint the whole scene
 // This function is called whenever the window needs to be redisplayed.
@@ -216,61 +231,61 @@ static void paint_state(struct FTR *f)
 {
 	struct viewer_state *e = f->userdata;
 
-	// clear canvas
-	for (int i = 0 ; i < f->w * f->h * 3; i++)
-		f->rgb[i] = 255; // white
-
-	draw_red_points(f);
-
-	if (e->p >= 0 && e->p < e->n)
+	// clear canvas (dark blue)
+	for (int i = 0 ; i < f->w * f->h; i++)
 	{
-		char *fn = e->f[e->p];
-		if (string_is_filename(fn))
-		{
-			int w, h;
-			uint8_t *a = iio_read_image_uint8(fn, &w, &h);
-			for (int j = 0; j < h; j++)
-			for (int i = 0; i < w; i++)
-			{
-				int ii = i + e->px;
-				int jj = j + e->py - h;
-				if (insideP(f, ii, jj))
-				for (int k = 0; k < 3; k++)
-					f->rgb[3*(jj*f->w+ii)+k]=a[j*w+i];
-			}
-			xfree(a);
-		} else {
-			uint8_t white[3] = {255, 255, 255};
-			uint8_t black[3] = {0, 0, 0};
-			struct bitmap_font *font = e->font + 4;
-			put_string_in_rgb_image(f->rgb, f->w, f->h,
-					e->px, e->py - font->height,
-					white, black, 0, font, fn);
-		}
+		f->rgb[3*i+0] = 0;
+		f->rgb[3*i+1] = 0;
+		f->rgb[3*i+2] = 100;
+	 }
+
+	// window 0: unfolded cylindrical dip
+	// 360x720 starting at 0,0
+	for (int j = 0; j < 720; j++)
+	for (int i = 0; i < 360; i++)
+	{
+		float ij[2] = {i, j-360};
+		float xyz[3];
+		map_cyl_unfold(e, xyz, ij);
+		float h = xyz[2] + e->p * xyz[0] * xyz[0];
+		float c = stratum(e->f * h);
+		uint8_t g = c;
+		uint8_t rgb[3];
+		get_dirt(rgb, g);
+		f->rgb[(j*f->w + i)*3 + 0] = rgb[0];
+		f->rgb[(j*f->w + i)*3 + 1] = rgb[1];
+		f->rgb[(j*f->w + i)*3 + 2] = rgb[2];
 	}
 
-	//compute_red_points_convex_hull(e);
-	//for (int i = 0; i < e->m - 1; i++)
-	//{
-	//	float P[2], Q[2], Z[4], C[2];
-	//	map_view_to_window(e, P, e->z + 2*i);
-	//	map_view_to_window(e, Q, e->z + 2*i + 2);
-	//	invert_point(Z + 0, e->c, e->r, e->z + 2*i + 0);
-	//	invert_point(Z + 2, e->c, e->r, e->z + 2*i + 2);
-	//	if (e->show_debug)
-	//		plot_segment_gray(f, P[0], P[1], Q[0], Q[1]);
-	//	map_view_to_window(e, P, Z + 0);
-	//	map_view_to_window(e, Q, Z + 2);
-	//	map_view_to_window(e, C, e->c);
-	//	if (det(P, Q, C) > 0)
-	//	{
-	//		plot_segment_blue(f, P[0], P[1], Q[0], Q[1]);
-	//		uint8_t blue[3] = {0, 0, 255};
-	//		splat_disk(f->rgb, f->w, f->h, P, POINT_RADIUS, blue);
-	//	}
-	//	else if (e->show_debug)
-	//		plot_segment_cyan(f, P[0], P[1], Q[0], Q[1]);
-	//}
+	// window 1: strata
+	// 720x720 starting at 360,0
+	for (int j = 0; j < 720; j++)
+	for (int i = 0; i < 720; i++)
+	{
+		float x = i - 360;
+		float z = j - 360;
+		float h = z + e->p * x*x;
+		float c = stratum(e->f * h);
+		uint8_t g = c;
+		float xyz[3] = { x, 0, z};
+		float rth[3];
+		map_getcyl(e, rth, xyz);
+		uint8_t rgb[3] = {g, g, g};
+		if (*rth < e->R)
+			get_dirt(rgb, g);
+		f->rgb[(j*f->w + 360+i)*3 + 0] = rgb[0];
+		f->rgb[(j*f->w + 360+i)*3 + 1] = rgb[1];
+		f->rgb[(j*f->w + 360+i)*3 + 2] = rgb[2];
+	}
+
+	// hud
+	uint8_t fg[3] = {0, 255, 0};
+	uint8_t bg[3] = {0, 0, 0};
+	char buf[0x200];
+	snprintf(buf, 0x200, "f=%g p=%g\na=%g b=%g c=%g\nR=%g",
+			e->f, e->p, e->a, e->b, e->c, e->R);
+	put_string_in_rgb_image(f->rgb, f->w, f->h,
+			360+0, 0+0, fg, bg, 0, &e->font[4], buf);
 }
 
 
@@ -296,6 +311,22 @@ static void change_view_scale(struct viewer_state *e, int x, int y, float fac)
 	fprintf(stderr, "zoom changed %g\n", e->scale);
 }
 
+// action: scale strata frequency
+static void scale_strata_frequency(struct viewer_state *e, float f)
+{
+	e->f *= f;
+	//fprintf(stderr, "f = %g\n", e->f);
+}
+static void scale_fold_parameter(struct viewer_state *e, float f)
+{
+	e->p *= f;
+	//fprintf(stderr, "p = %g\n", e->p);
+}
+static void shift_angle_a(struct viewer_state *e, float s) { e->a += s; }
+static void shift_angle_b(struct viewer_state *e, float s) { e->b += s; }
+static void shift_angle_c(struct viewer_state *e, float s) { e->c += s; }
+static void scale_radius(struct viewer_state *e, float f) { e->R *= f; }
+
 static void action_screenshot(struct FTR *f)
 {
 	static int c = 0;
@@ -311,19 +342,23 @@ static void action_screenshot(struct FTR *f)
 // test whether (x,y) hits some point
 static int hit_point(struct viewer_state *e, float x, float y)
 {
-	for (int i = 0; i < e->n; i++)
-	{
-		float P[2];
-		map_view_to_window(e, P, e->x + 2*i);
-		if (hypot(P[0] - x, P[1] - y) < 0.5 + POINT_RADIUS)
-			return i;
-	}
+	//for (int i = 0; i < e->n; i++)
+	//{
+	//	float P[2];
+	//	map_view_to_window(e, P, e->x + 2*i);
+	//	if (hypot(P[0] - x, P[1] - y) < 0.5 + POINT_RADIUS)
+	//		return i;
+	//}
 	return -1;
 }
 
 // key handler
 static void event_key(struct FTR *f, int k, int m, int x, int y)
 {
+	if (islower(k) && m&FTR_MASK_SHIFT)
+		k = toupper(k);
+	fprintf(stderr, "key k=%d m=%d\n", k, m);
+
 	if (k == 'q') {
 		ftr_notify_the_desire_to_stop_this_loop(f, 0);
 		return;
@@ -331,23 +366,35 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 
 	struct viewer_state *e = f->userdata;
 
-	if (k == 'c') center_view(f);
-	if (k == 'j') change_view_offset(e, 0, -10);
-	if (k == 'k') change_view_offset(e, 0, 10);
-	if (k == 'h') change_view_offset(e, 10, 0);
-	if (k == 'l') change_view_offset(e, -10, 0);
-	if (k == FTR_KEY_DOWN ) change_view_offset(e, 0, -100);
-	if (k == FTR_KEY_UP   ) change_view_offset(e, 0, 100);
-	if (k == FTR_KEY_RIGHT) change_view_offset(e, -100, 0);
-	if (k == FTR_KEY_LEFT)  change_view_offset(e, 100, 0);
-	if (k == '+') change_view_scale(e, f->w/2, f->h/2, ZOOM_FACTOR);
-	if (k == '-') change_view_scale(e, f->w/2, f->h/2, 1.0/ZOOM_FACTOR);
-	if (k == 'p') e->tile_plane = !e->tile_plane;
-	if (k == 'w') e->show_horizon = !e->show_horizon;
-	if (k >= '0' && k <= '9') e->interpolation_order = k - '0';
-	if (k == '.') e->show_grid_points = !e->show_grid_points;
-	if (k == 'd') e->show_debug = !e->show_debug;
-	//if (k == 'a') e->restrict_to_affine = !e->restrict_to_affine;
+	//if (k == 'c') center_view(f);
+	if (k == 'f') scale_strata_frequency(e, 1.3);
+	if (k == 'F') scale_strata_frequency(e, 1/1.3);
+	if (k == 'p') scale_fold_parameter(e, 1.3);
+	if (k == 'P') scale_fold_parameter(e, 1/1.3);
+	if (k == 'r') scale_radius(e, 1.3);
+	if (k == 'R') scale_radius(e, 1/1.3);
+	if (k == 'a') shift_angle_a(e, 2);
+	if (k == 'A') shift_angle_a(e, -2);
+	if (k == 'b') shift_angle_b(e, 2);
+	if (k == 'B') shift_angle_b(e, -2);
+	if (k == 'c') shift_angle_c(e, 2);
+	if (k == 'C') shift_angle_c(e, -2);
+	//if (k == 'j') change_view_offset(e, 0, -10);
+	//if (k == 'k') change_view_offset(e, 0, 10);
+	//if (k == 'h') change_view_offset(e, 10, 0);
+	//if (k == 'l') change_view_offset(e, -10, 0);
+	//if (k == FTR_KEY_DOWN ) change_view_offset(e, 0, -100);
+	//if (k == FTR_KEY_UP   ) change_view_offset(e, 0, 100);
+	//if (k == FTR_KEY_RIGHT) change_view_offset(e, -100, 0);
+	//if (k == FTR_KEY_LEFT)  change_view_offset(e, 100, 0);
+	//if (k == '+') change_view_scale(e, f->w/2, f->h/2, ZOOM_FACTOR);
+	//if (k == '-') change_view_scale(e, f->w/2, f->h/2, 1.0/ZOOM_FACTOR);
+	//if (k == 'p') e->tile_plane = !e->tile_plane;
+	//if (k == 'w') e->show_horizon = !e->show_horizon;
+	//if (k >= '0' && k <= '9') e->interpolation_order = k - '0';
+	//if (k == '.') e->show_grid_points = !e->show_grid_points;
+	//if (k == 'd') e->show_debug = !e->show_debug;
+	////if (k == 'a') e->restrict_to_affine = !e->restrict_to_affine;
 	if (k == ',') action_screenshot(f);
 
 	e->dragging_window_point = e->dragging_image_point = false;
@@ -449,21 +496,22 @@ static void event_motion(struct FTR *f, int b, int m, int x, int y)
 		f->changed = 1;
 		return;
 	}
+	f->changed =  1;
 
-	int p = hit_point(e, x, y);
-	if (p >= 0)
-	{
-		//fprintf(stderr, "hit point %d (%d %d)\n", p, x, y);
-		e->p = p;
-		e->px = x;
-		e->py = y;
-		f->changed = 1;
-	}
-	if (p < 0 && e->p >= 0)
-	{
-		e->p = -1;
-		f->changed = 1;
-	}
+//	int p = hit_point(e, x, y);
+//	if (p >= 0)
+//	{
+//		//fprintf(stderr, "hit point %d (%d %d)\n", p, x, y);
+//		e->p = p;
+//		//e->px = x;
+//		//e->py = y;
+//		f->changed = 1;
+//	}
+//	if (p < 0 && e->p >= 0)
+//	{
+//		e->p = -1;
+//		f->changed = 1;
+//	}
 
 }
 
@@ -528,9 +576,7 @@ int main_fauxfilet(int argc, char *argv[])
 
 	// initialize state
 	struct viewer_state e[1];
-	e.f = 1;               // frequency of the strata before folding
-	e.p = 1;               // parameter of parabolic fold
-	e.a = e.b = e.c = 0;   // euler angles of parabolic sheaf
+	center_state(e);
 
 	// init fonts
 	e->font[0] = reformat_font(*xfont_4x6, UNPACKED);
@@ -540,8 +586,9 @@ int main_fauxfilet(int argc, char *argv[])
 	e->font[4] = reformat_font(*xfont_10x20, UNPACKED);
 
 	// open the window
-	struct FTR f = ftr_new_window(360,720);
+	struct FTR f = ftr_new_window(1080,720);
 	f.userdata = e;
+	f.changed = 1;
 
 	// set event handlers
 	ftr_set_handler(&f, "expose", event_expose);
