@@ -1,3 +1,7 @@
+// fauxfilet: a simulator of parabolic folds and their dips
+// compilation: run "make bin/fauxfilet" in the imscript root
+
+
 // SECTION 1. Libraries and data structures                                 {{{1
 
 // standard libraries
@@ -16,17 +20,8 @@
 
 // bitmap fonts
 #define OMIT_MAIN_FONTU
-#include "fontu.c" // todo: cherry-pick the required fontu functions
+#include "fontu.c"
 #include "fonts/xfonts_all.c"
-
-// radius of the points
-#define POINT_RADIUS 2.3
-
-// zoom factor for zoom-in and zoom-out
-#define ZOOM_FACTOR 1.43
-
-// radius scaling factor for the inversion circle
-#define RADIUS_FACTOR 1.13
 
 // data structure to store the state of the viewer
 struct viewer_state {
@@ -38,29 +33,8 @@ struct viewer_state {
 	// cylinder radius
 	float R;
 
-	// window viewport
-	float offset[2];  // horizontal (T) and vertical (R) offset
-	float scale;      // vertical scale
-
-	// below is unused by now
-
-	// dragging state
-	bool dragging_window_point;
-	bool dragging_image_point;
-	bool dragging_background;
-	int dragged_point;
-	int drag_handle[2];
-
-	// display options
-	int interpolation_order; // 0=nearest, 1=linear, 2=bilinear, 3=bicubic
-	bool tile_plane;
-	bool show_horizon;
-	bool show_grid_points;
-	bool restrict_to_affine;
-	bool show_debug; // show inverted points and full qhulls
-
 	// ui
-	struct bitmap_font font[5]; // from small to large
+	struct bitmap_font font[1];
 };
 
 
@@ -75,25 +49,6 @@ static void center_state(struct viewer_state *e)
 	e->c = 0;
 
 	e->R = 20;
-
-	// viewport
-	e->offset[0] = 0;
-	e->offset[1] = 0;
-	e->scale = 1;
-
-	// drag state
-	e->dragging_window_point = false;
-	e->dragging_image_point = false;
-	e->dragged_point = -1;
-	e->dragging_background = false;
-
-	// visualization options
-	e->interpolation_order = 0;
-	e->tile_plane = false;
-	e->show_horizon = false;
-	e->show_grid_points = false;
-	e->restrict_to_affine = false;
-	e->show_debug = false;
 }
 
 static void center_view(struct FTR *f)
@@ -105,41 +60,41 @@ static void center_view(struct FTR *f)
 
 
 
-// funtion to test whether a point is inside the window
-static int insideP(struct FTR *f, int x, int y)
-{
-	return x >= 0 && y >= 0 && x < f->w && y < f->h;
-}
-
-
 
 // SECTION 3. algorithms                                                    {{{1
 
-static float stratum(float x)
+// basic sinusoidal wave
+static float stratum_sin(float x)
 {
 	return 127 + 107 * sin(x);
 }
 
+// frequency modulated sinusoid, non-periodic
+static float stratum_fm(float x)
+{
+	return 127 + 107 * sin(x+cos(M_PI*x));
+}
+
+// amplitude modulated sinusoid, non-periodic
+static float stratum_am(float x)
+{
+	return 127 + 107 * sin(x)*(0.5+0.5*cos(M_PI*x));
+}
+
+// frequency and amplitude modulated
+static float stratum_amfm(float x)
+{
+	return 127 + 107 * sin(1+x+cos(M_PI*x))*(0.5+0.5*cos(M_2_PI*x+sin(x)));
+}
+
+// TODO: interactive access to this choice, and to the modulation parameters
+static float stratum(float x)
+{
+	return stratum_amfm(x);
+}
+
 
 // SECTION 4. Coordinate Conversions                                        {{{1
-
-// "view"   : coordinates in the infinite plane where the points are located
-// "window" : coordinates in the window, which is a rectangluar piece of "view"
-//
-
-// change from plane coordinates to window coordinates
-static void map_view_to_window(struct viewer_state *e, float y[2], float x[2])
-{
-	for (int k = 0; k < 2; k++)
-		y[k] = e->offset[k] + e->scale * x[k];
-}
-
-// change from window coordinates to plane coordinates
-static void map_window_to_view(struct viewer_state *e, float y[2], float x[2])
-{
-	for (int k = 0; k < 2; k++)
-		y[k] = ( x[k] - e->offset[k] ) / e->scale;
-}
 
 static void matvec33(float y[3], float A[3][3], float x[3])
 {
@@ -195,9 +150,6 @@ static void map_cyl_unfold(struct viewer_state *e, float xyz[3], float ij[2])
 		e->R * sin(ij[0] * M_PI / 180),
 		ij[1]
 	};
-	//xyz[0] = XYZ[0];
-	//xyz[1] = XYZ[1];
-	//xyz[2] = XYZ[2];
 	map_euler(e, xyz, XYZ, 1);
 }
 
@@ -218,6 +170,7 @@ static void map_getcyl(struct viewer_state *e, float rth[3], float xyz[3])
 // Subsection 7.2. Drawing user-interface elements                          {{{2
 
 
+// classical ``dirt'' palette, as used by dip pickers
 static void get_dirt(uint8_t rgb[3], int g)
 {
 	rgb[1] = 255 - g;
@@ -251,7 +204,7 @@ static void paint_state(struct FTR *f)
 		float c = stratum(e->f * h);
 		uint8_t g = c;
 		uint8_t rgb[3];
-		get_dirt(rgb, g);
+		get_dirt(rgb, 255-g);
 		f->rgb[(j*f->w + i)*3 + 0] = rgb[0];
 		f->rgb[(j*f->w + i)*3 + 1] = rgb[1];
 		f->rgb[(j*f->w + i)*3 + 2] = rgb[2];
@@ -271,8 +224,9 @@ static void paint_state(struct FTR *f)
 		float rth[3];
 		map_getcyl(e, rth, xyz);
 		uint8_t rgb[3] = {g, g, g};
-		if (*rth < e->R)
-			get_dirt(rgb, g);
+		if (*rth < e->R && fabs(rth[2]) < 360)
+			get_dirt(rgb, 255-g);
+		else {rgb[0]*=0.8;rgb[1]*=0.8;rgb[2]*=0.8;}
 		f->rgb[(j*f->w + 360+i)*3 + 0] = rgb[0];
 		f->rgb[(j*f->w + 360+i)*3 + 1] = rgb[1];
 		f->rgb[(j*f->w + 360+i)*3 + 2] = rgb[2];
@@ -282,34 +236,16 @@ static void paint_state(struct FTR *f)
 	uint8_t fg[3] = {0, 255, 0};
 	uint8_t bg[3] = {0, 0, 0};
 	char buf[0x200];
-	snprintf(buf, 0x200, "f=%g p=%g\na=%g b=%g c=%g\nR=%g",
+	snprintf(buf, 0x200, "f=%g\np=%g\na=%g\nb=%g\nc=%g\nR=%g",
 			e->f, e->p, e->a, e->b, e->c, e->R);
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
-			360+0, 0+0, fg, bg, 0, &e->font[4], buf);
+			360+0, 0+0, fg, bg, 0, e->font, buf);
 }
 
 
 
 // SECTION 8. User-Interface Actions and Events                             {{{1
 
-
-// action: viewport translation
-static void change_view_offset(struct viewer_state *e, float dx, float dy)
-{
-	e->offset[0] += dx;
-	e->offset[1] += dy;
-}
-
-// action: viewport zoom
-static void change_view_scale(struct viewer_state *e, int x, int y, float fac)
-{
-	float center[2], X[2] = {x, y};
-	map_window_to_view(e, center, X);
-	e->scale *= fac;
-	for (int p = 0; p < 2; p++)
-		e->offset[p] = -center[p]*e->scale + X[p];
-	fprintf(stderr, "zoom changed %g\n", e->scale);
-}
 
 // action: scale strata frequency
 static void scale_strata_frequency(struct viewer_state *e, float f)
@@ -339,19 +275,6 @@ static void action_screenshot(struct FTR *f)
 }
 
 
-// test whether (x,y) hits some point
-static int hit_point(struct viewer_state *e, float x, float y)
-{
-	//for (int i = 0; i < e->n; i++)
-	//{
-	//	float P[2];
-	//	map_view_to_window(e, P, e->x + 2*i);
-	//	if (hypot(P[0] - x, P[1] - y) < 0.5 + POINT_RADIUS)
-	//		return i;
-	//}
-	return -1;
-}
-
 // key handler
 static void event_key(struct FTR *f, int k, int m, int x, int y)
 {
@@ -366,38 +289,21 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 
 	struct viewer_state *e = f->userdata;
 
-	//if (k == 'c') center_view(f);
+	if (k == 'z') center_view(f);
 	if (k == 'f') scale_strata_frequency(e, 1.3);
 	if (k == 'F') scale_strata_frequency(e, 1/1.3);
 	if (k == 'p') scale_fold_parameter(e, 1.3);
 	if (k == 'P') scale_fold_parameter(e, 1/1.3);
 	if (k == 'r') scale_radius(e, 1.3);
 	if (k == 'R') scale_radius(e, 1/1.3);
-	if (k == 'a') shift_angle_a(e, 2);
-	if (k == 'A') shift_angle_a(e, -2);
+	if (k == 'a') shift_angle_a(e, 10);
+	if (k == 'A') shift_angle_a(e, -10);
 	if (k == 'b') shift_angle_b(e, 2);
 	if (k == 'B') shift_angle_b(e, -2);
 	if (k == 'c') shift_angle_c(e, 2);
 	if (k == 'C') shift_angle_c(e, -2);
-	//if (k == 'j') change_view_offset(e, 0, -10);
-	//if (k == 'k') change_view_offset(e, 0, 10);
-	//if (k == 'h') change_view_offset(e, 10, 0);
-	//if (k == 'l') change_view_offset(e, -10, 0);
-	//if (k == FTR_KEY_DOWN ) change_view_offset(e, 0, -100);
-	//if (k == FTR_KEY_UP   ) change_view_offset(e, 0, 100);
-	//if (k == FTR_KEY_RIGHT) change_view_offset(e, -100, 0);
-	//if (k == FTR_KEY_LEFT)  change_view_offset(e, 100, 0);
-	//if (k == '+') change_view_scale(e, f->w/2, f->h/2, ZOOM_FACTOR);
-	//if (k == '-') change_view_scale(e, f->w/2, f->h/2, 1.0/ZOOM_FACTOR);
-	//if (k == 'p') e->tile_plane = !e->tile_plane;
-	//if (k == 'w') e->show_horizon = !e->show_horizon;
-	//if (k >= '0' && k <= '9') e->interpolation_order = k - '0';
-	//if (k == '.') e->show_grid_points = !e->show_grid_points;
-	//if (k == 'd') e->show_debug = !e->show_debug;
-	////if (k == 'a') e->restrict_to_affine = !e->restrict_to_affine;
 	if (k == ',') action_screenshot(f);
 
-	e->dragging_window_point = e->dragging_image_point = false;
 	f->changed = 1;
 }
 
@@ -412,61 +318,26 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 {
 	struct viewer_state *e = f->userdata;
 
-	//// begin dragging a control point in the WINDOW DOMAIN
-	//if (k == FTR_BUTTON_LEFT && p >= 0)
-	//{
-	//	e->dragged_point = p;
-	//	e->dragging_window_point = true;
-	//}
-
-	//// end dragging a control point in the WINDOW DOMAIN
-	//if (e->dragging_window_point && k == -FTR_BUTTON_LEFT)
-	//{
-	//	drag_point_in_window_domain(e, x, y);
-	//	e->dragging_window_point = false;
-	//	e->dragged_point = -1;
-	//}
-
-	//// begin dragging a control point in the IMAGE DOMAIN
-	//if (k == FTR_BUTTON_RIGHT && p >= 0)
-	//{
-	//	e->dragged_point = p;
-	//	e->dragging_image_point = true;
-	//}
-
-	// begin dragging a the WINDOW BACKGROUND
-	if (k == FTR_BUTTON_LEFT)// && hit_point(e, x, y) < 0)
-	{
-		e->drag_handle[0] = x;
-		e->drag_handle[1] = y;
-		e->dragging_background = true;
-	}
-
-	// end dragging the WINDOW BACLGROUND
-	if (e->dragging_background && k == -FTR_BUTTON_LEFT)
-	{
-		int dx = x - e->drag_handle[0];
-		int dy = y - e->drag_handle[1];
-		change_view_offset(e, dx, dy);
-		e->dragging_background = false;
-	}
-
-	// radius in/out (if hit), zoom in/out (if no hit)
+	// f, p, a, b, c, R hitboxes of font height
+	// 0  1  2  3  4  5
+	int Y = y / e->font->height;
 	if (k == FTR_BUTTON_DOWN)
 	{
-		change_view_scale(e, x, y, ZOOM_FACTOR);
-		//if (hit_point(e, x, y)<0)
-		//	change_view_scale(e, x, y, ZOOM_FACTOR);
-		//else
-		//	change_radius(e, x, y, RADIUS_FACTOR);
+		if (Y == 0) scale_strata_frequency(e, 1/1.3);
+		if (Y == 1) scale_fold_parameter(e, 1/1.3);
+		if (Y == 2) shift_angle_a(e, -10);
+		if (Y == 3) shift_angle_b(e, -2);
+		if (Y == 4) shift_angle_c(e, -2);
+		if (Y == 5) scale_radius(e, 1/1.3);
 	}
 	if (k == FTR_BUTTON_UP)
 	{
-		change_view_scale(e, x, y, 1.0/ZOOM_FACTOR);
-		//if (hit_point(e, x, y)<0)
-		//	change_view_scale(e, x, y, 1.0/ZOOM_FACTOR);
-		//else
-		//	change_radius(e, x, y, 1.0/RADIUS_FACTOR);
+		if (Y == 0) scale_strata_frequency(e, 1.3);
+		if (Y == 1) scale_fold_parameter(e, 1.3);
+		if (Y == 2) shift_angle_a(e, 10);
+		if (Y == 3) shift_angle_b(e, 2);
+		if (Y == 4) shift_angle_c(e, 2);
+		if (Y == 5) scale_radius(e, 1.3);
 	}
 
 	f->changed = 1;
@@ -475,44 +346,7 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 // mouse motion handler
 static void event_motion(struct FTR *f, int b, int m, int x, int y)
 {
-	struct viewer_state *e = f->userdata;
-
-
-	//// drag WINDOW DOMAIN control point (realtime feedback)
-	//if (e->dragging_window_point && m & FTR_BUTTON_LEFT)
-	//{
-	//	drag_point_in_window_domain(e, x, y);
-	//	f->changed = 1;
-	//}
-
-	// drag WINDOW DOMAIN background (realtime feedback)
-	if (e->dragging_background && m & FTR_BUTTON_LEFT)
-	{
-		int dx = x - e->drag_handle[0];
-		int dy = y - e->drag_handle[1];
-		change_view_offset(e, dx, dy);
-		e->drag_handle[0] = x;
-		e->drag_handle[1] = y;
-		f->changed = 1;
-		return;
-	}
-	f->changed =  1;
-
-//	int p = hit_point(e, x, y);
-//	if (p >= 0)
-//	{
-//		//fprintf(stderr, "hit point %d (%d %d)\n", p, x, y);
-//		e->p = p;
-//		//e->px = x;
-//		//e->py = y;
-//		f->changed = 1;
-//	}
-//	if (p < 0 && e->p >= 0)
-//	{
-//		e->p = -1;
-//		f->changed = 1;
-//	}
-
+	;
 }
 
 // expose handler
@@ -524,46 +358,6 @@ static void event_expose(struct FTR *f, int b, int m, int x, int y)
 
 
 // SECTION 9. Image processing
-
-#include "xmalloc.c"
-//
-//#define PYRAMID_LEVELS 20
-//
-//struct image_pyramid {
-//	float *x[PYRAMID_LEVELS];
-//	int w[PYRAMID_LEVELS];
-//	int h[PYRAMID_LEVELS];
-//	int pd;
-//};
-//
-//static void do_pyramid(struct image_pyramid *p, float *x, int w, int h, int pd)
-//{
-//	fprintf(stderr, "building a multiscale pyramid %d x %d x %d\n",
-//			w, h, pd);
-//
-//	int nw = 1 + ceil(log2(w+1));
-//	int nh = 1 + ceil(log2(h+1));
-//	p->n = (nw + nh + abs(nw - nh))/2;
-//	p->x = xmalloc(n * sizeof*p->x);
-//	p->w = xmalloc(n * sizeof*p->w);
-//	p->h = xmalloc(n * sizeof*p->h);
-//
-//	p->w[0] = w;
-//	p->h[0] = h;
-//	for (int i = 1; i < p->n; i++)
-//
-//
-//	fprintf(stderr, "\t%d x %d\n", nw, nh);
-//}
-//
-//static void free_pyramid(struct image_pyramid *p)
-//{
-//	for (int i = 0; i < pyra i++)
-//		free(p->x[i]);
-//	free(p->x);
-//	free(
-//}
-
 
 
 // SECTION 10. Main Program                                                 {{{1
@@ -579,11 +373,7 @@ int main_fauxfilet(int argc, char *argv[])
 	center_state(e);
 
 	// init fonts
-	e->font[0] = reformat_font(*xfont_4x6, UNPACKED);
-	e->font[1] = reformat_font(*xfont_6x12, UNPACKED);
-	e->font[2] = reformat_font(*xfont_7x13, UNPACKED);
-	e->font[3] = reformat_font(*xfont_9x15, UNPACKED);
-	e->font[4] = reformat_font(*xfont_10x20, UNPACKED);
+	e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
 
 	// open the window
 	struct FTR f = ftr_new_window(1080,720);
