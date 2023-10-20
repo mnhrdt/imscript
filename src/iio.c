@@ -5236,9 +5236,9 @@ static int read_image(struct iio_image *x, const char *fname)
 		int s[2], pd = 1;
 		if (3 == sscanf(fname+9, "%g:%dx%d", &value, s, s+1));
 		else fail("bad semantical name \"%s\"", fname);
-		iio_image_build_independent(x, 2, s, IIO_TYPE_CHAR, pd);
+		iio_image_build_independent(x, 2, s, IIO_TYPE_FLOAT, pd);
 		for (int i = 0; i < *s*s[1]*pd; i++)
-			((char*)x->data)[i] = value;
+			((float*)x->data)[i] = value;
 		return 0;
 	}
 
