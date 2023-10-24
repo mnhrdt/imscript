@@ -60,6 +60,12 @@ static void center_view(struct FTR *f)
 
 // SECTION 2. algorithms                                                    {{{1
 
+// parallel parabolic fold of parameter p
+static float fold(float x, float y, float z, float p)
+{
+	return z + p*x*x;
+}
+
 // basic sinusoidal wave
 static float stratum_sin(float x)
 {
@@ -89,6 +95,8 @@ static float stratum(float x)
 {
 	return stratum_amfm(x);
 }
+
+
 
 
 // SECTION 3. Coordinate Conversions                                        {{{1
@@ -140,8 +148,8 @@ static void map_euler(struct viewer_state *e, float X[3], float x[3], int dir)
 	}
 }
 
-// take a point of the unfolded cylinder (rectangle), and map it to 3D
-static void map_cyl_unfold(struct viewer_state *e, float xyz[3], float ij[2])
+// take a point of the unwrapped cylinder (rectangle), and map it to 3D
+static void map_cyl_unwrap(struct viewer_state *e, float xyz[3], float ij[2])
 {
 	float XYZ[3] = {
 		e->R * cos(ij[0] * M_PI / 180),
@@ -164,10 +172,6 @@ static void map_getcyl(struct viewer_state *e, float rth[3], float xyz[3])
 
 // SECTION 4. Drawing                                                       {{{1
 
-
-// Subsection 7.2. Drawing user-interface elements                          {{{2
-
-
 // classical ``dirt'' palette, as used by dip pickers
 static void get_dirt(uint8_t rgb[3], int g)
 {
@@ -175,6 +179,33 @@ static void get_dirt(uint8_t rgb[3], int g)
 	rgb[0] = g > 127 ? 510 - 2*g : 255;
 	rgb[2] = g > 127 ? 0 : 255 - 2*g;
 }
+
+// paint a cylinder on a rgb image
+static void paint_cylinder(uint8_t *x, int w, int h,
+		struct viewer_state *e)
+{
+	// window 0: unwrapped cylindrical dip
+	// WxH=360x720 starting at 0,0
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		float ij[2] = {i*360.0/w, j-h/2.0};
+		float xyz[3];
+		map_cyl_unwrap(e, xyz, ij);
+		float h = fold(xyz[0], xyz[1], xyz[2], e->p);
+		float c = stratum(e->f * h);
+		uint8_t g = c;
+		uint8_t rgb[3];
+		get_dirt(rgb, 255-g);
+		x[(j*w + i)*3 + 0] = rgb[0];
+		x[(j*w + i)*3 + 1] = rgb[1];
+		x[(j*w + i)*3 + 2] = rgb[2];
+	}
+}
+
+
+// Subsection 7.2. Drawing user-interface elements                          {{{2
+
 
 // Paint the whole scene
 // This function is called whenever the window needs to be redisplayed.
@@ -190,15 +221,15 @@ static void paint_state(struct FTR *f)
 		f->rgb[3*i+2] = 100;
 	 }
 
-	// window 0: unfolded cylindrical dip
+	// window 0: unwrapped cylindrical dip
 	// 360x720 starting at 0,0
 	for (int j = 0; j < 720; j++)
 	for (int i = 0; i < 360; i++)
 	{
 		float ij[2] = {i, j-360};
 		float xyz[3];
-		map_cyl_unfold(e, xyz, ij);
-		float h = xyz[2] + e->p * xyz[0] * xyz[0];
+		map_cyl_unwrap(e, xyz, ij);
+		float h = fold(xyz[0], xyz[1], xyz[2], e->p);
 		float c = stratum(e->f * h);
 		uint8_t g = c;
 		uint8_t rgb[3];
@@ -215,7 +246,7 @@ static void paint_state(struct FTR *f)
 	{
 		float x = i - 360;
 		float z = j - 360;
-		float h = z + e->p * x*x;
+		float h = fold(x, 0, z, e->p);
 		float c = stratum(e->f * h);
 		uint8_t g = c;
 		float xyz[3] = { x, 0, z};
@@ -364,28 +395,6 @@ static void event_expose(struct FTR *f, int b, int m, int x, int y)
 
 #include "pickopt.c"
 
-static void paint_cylinder(uint8_t *x, int w, int h,
-		struct viewer_state *e)
-{
-	// window 0: unfolded cylindrical dip
-	// WxH=360x720 starting at 0,0
-	for (int j = 0; j < h; j++)
-	for (int i = 0; i < w; i++)
-	{
-		float ij[2] = {i*w/360.0, j-h/2.0};
-		float xyz[3];
-		map_cyl_unfold(e, xyz, ij);
-		float h = xyz[2] + e->p * xyz[0] * xyz[0];
-		float c = stratum(e->f * h);
-		uint8_t g = c;
-		uint8_t rgb[3];
-		get_dirt(rgb, 255-g);
-		x[(j*w + i)*3 + 0] = rgb[0];
-		x[(j*w + i)*3 + 1] = rgb[1];
-		x[(j*w + i)*3 + 2] = rgb[2];
-	}
-}
-
 int main_fauxfilet_noninteractive(int c, char *v[])
 {
 	// initialize state (sets dummy default arguments)
@@ -414,9 +423,47 @@ int main_fauxfilet_noninteractive(int c, char *v[])
 	return 0;
 }
 
+static char *help_string_name     = "fauxfilet";
+static char *help_string_version  = "fauxfilet 1.0\n\nWritten by eml";
+static char *help_string_oneliner = "interactive display parabolic folds";
+static char *help_string_usage    = "usage:\n\tfauxfilet";
+static char *help_string_long     =
+"Fauxfilet is an interface for exploring parabolic folds.\n"
+"\n"
+"A geological structure in the shape of a parallel parabolic fold\n"
+"is traversed by a cylindrical borehole.  You can rotate the cylinder\n"
+"and look at the intersection of the strata.  To change parameters,\n"
+"use the mouse wheel over each parameter name."
+"\n"
+"Usage: fauxfilet\n"
+"   or: fauxfilet -n [options]\n"
+"\n"
+"Keys:\n"
+" q,ESC  quit the program\n"
+" z      go back to default parameters\n"
+"\n"
+"Options:\n"
+"\n"
+" -n\tenable non-interactive mode\n"
+" -o X\twrite output to file X (default stdout)\n"
+" -w X\tset image width (default=360)\n"
+" -h X\tset image height (default=720)\n"
+" -f X\tset strata frequency parameter (default=0.1)\n"
+" -p X\tset parabola curvature (default=0.001)\n"
+" -a X\tset cylinder orientation, first euler angle (default=0)\n"
+" -b X\tset cylinder orientation, second euler angle (default=0)\n"
+" -c X\tset cylinder orientation, third euler angle (default=0)\n"
+" -R X\tset cylinder radius (default=50)\n"
+"Report bugs to <enric.meinhardt@ens-paris-saclay.fr>.\n"
+;
 
+#include "help_stuff.c"
 int main_fauxfilet(int c, char *v[])
 {
+	// if requested, print help
+	if (c == 2)
+		if_help_is_requested_print_it_and_exit_the_program(v[1]);
+
 	// if -n option, run noninteractively
 	if (pick_option(&c, &v, "n", 0))
 		return main_fauxfilet_noninteractive(c, v);
