@@ -11,12 +11,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
+#include <unistd.h> // for getpid only
 
 // user interface library
 #include "ftr.h"
-
-// image input/output
-#include "iio.h"
 
 // bitmap fonts
 #define OMIT_MAIN_FONTU
@@ -29,6 +27,7 @@ struct viewer_state {
 	float f;          // frequency of the strata before folding
 	float p;          // parameter of parabolic fold
 	float a, b, c;    // euler angles of parabolic sheaf
+	//float s;          // shift of the fold
 
 	// cylinder radius
 	float R;
@@ -58,10 +57,8 @@ static void center_view(struct FTR *f)
 	f->changed = 1;
 }
 
-
-
 
-// SECTION 3. algorithms                                                    {{{1
+// SECTION 2. algorithms                                                    {{{1
 
 // basic sinusoidal wave
 static float stratum_sin(float x)
@@ -94,8 +91,9 @@ static float stratum(float x)
 }
 
 
-// SECTION 4. Coordinate Conversions                                        {{{1
+// SECTION 3. Coordinate Conversions                                        {{{1
 
+// y = Ax
 static void matvec33(float y[3], float A[3][3], float x[3])
 {
 	for (int i = 0; i < 3; i++)
@@ -164,7 +162,7 @@ static void map_getcyl(struct viewer_state *e, float rth[3], float xyz[3])
 }
 
 
-// SECTION 7. Drawing                                                       {{{1
+// SECTION 4. Drawing                                                       {{{1
 
 
 // Subsection 7.2. Drawing user-interface elements                          {{{2
@@ -244,7 +242,7 @@ static void paint_state(struct FTR *f)
 
 
 
-// SECTION 8. User-Interface Actions and Events                             {{{1
+// SECTION 5. User-Interface Actions and Events                             {{{1
 
 
 // action: scale strata frequency
@@ -262,12 +260,14 @@ static void shift_angle_a(struct viewer_state *e, float s) { e->a += s; }
 static void shift_angle_b(struct viewer_state *e, float s) { e->b += s; }
 static void shift_angle_c(struct viewer_state *e, float s) { e->c += s; }
 static void scale_radius(struct viewer_state *e, float f) { e->R *= f; }
+//static void shift_shift_s(struct viewer_state *e, float s) { e->s += s; }
 
 static void action_screenshot(struct FTR *f)
 {
 	static int c = 0;
+	int p = getpid();
 	char n[FILENAME_MAX];
-	snprintf(n, FILENAME_MAX, "screenshot_cloudette_%d.png", c);
+	snprintf(n, FILENAME_MAX, "screenshot_fauxfilet_%d_%d.png", p, c);
 	void iio_write_image_uint8_vec(char*,uint8_t*,int,int,int);
 	iio_write_image_uint8_vec(n, f->rgb, f->w, f->h, 3);
 	fprintf(stderr, "wrote sreenshot on file \"%s\"\n", n);
@@ -280,7 +280,7 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 {
 	if (islower(k) && m&FTR_MASK_SHIFT)
 		k = toupper(k);
-	fprintf(stderr, "key k=%d m=%d\n", k, m);
+	//fprintf(stderr, "key k=%d m=%d\n", k, m);
 
 	if (k == 'q') {
 		ftr_notify_the_desire_to_stop_this_loop(f, 0);
@@ -294,6 +294,8 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'F') scale_strata_frequency(e, 1/1.3);
 	if (k == 'p') scale_fold_parameter(e, 1.3);
 	if (k == 'P') scale_fold_parameter(e, 1/1.3);
+//	if (k == 's') shift_shift_s(e, 1);
+//	if (k == 'S') shift_shift_s(e, -1);
 	if (k == 'r') scale_radius(e, 1.3);
 	if (k == 'R') scale_radius(e, 1/1.3);
 	if (k == 'a') shift_angle_a(e, 10);
@@ -318,8 +320,8 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 {
 	struct viewer_state *e = f->userdata;
 
-	// f, p, a, b, c, R hitboxes of font height
-	// 0  1  2  3  4  5
+	// f, p, a, b, c, R, s hitboxes of font height
+	// 0  1  2  3  4  5  6
 	int Y = y / e->font->height;
 	if (k == FTR_BUTTON_DOWN)
 	{
@@ -357,16 +359,71 @@ static void event_expose(struct FTR *f, int b, int m, int x, int y)
 }
 
 
-// SECTION 9. Image processing
-
 
-// SECTION 10. Main Program                                                 {{{1
+// SECTION 6. Main Program                                                 {{{1
 
-int main_fauxfilet(int argc, char *argv[])
+#include "pickopt.c"
+
+static void paint_cylinder(uint8_t *x, int w, int h,
+		struct viewer_state *e)
 {
+	// window 0: unfolded cylindrical dip
+	// WxH=360x720 starting at 0,0
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		float ij[2] = {i*w/360.0, j-h/2.0};
+		float xyz[3];
+		map_cyl_unfold(e, xyz, ij);
+		float h = xyz[2] + e->p * xyz[0] * xyz[0];
+		float c = stratum(e->f * h);
+		uint8_t g = c;
+		uint8_t rgb[3];
+		get_dirt(rgb, 255-g);
+		x[(j*w + i)*3 + 0] = rgb[0];
+		x[(j*w + i)*3 + 1] = rgb[1];
+		x[(j*w + i)*3 + 2] = rgb[2];
+	}
+}
+
+int main_fauxfilet_noninteractive(int c, char *v[])
+{
+	// initialize state (sets dummy default arguments)
+	struct viewer_state e[1];
+	center_state(e);
+
+	// process named arguments
+	int w = atoi(pick_option(&c, &v, "w", "360"));
+	int h = atoi(pick_option(&c, &v, "h", "720"));
+	e->f = atof(pick_option(&c, &v, "f", "0.1"));
+	e->p = atof(pick_option(&c, &v, "p", "0.001"));
+	e->a = atof(pick_option(&c, &v, "a", "0"));
+	e->b = atof(pick_option(&c, &v, "b", "0"));
+	e->c = atof(pick_option(&c, &v, "c", "0"));
+	e->R = atof(pick_option(&c, &v, "R", "50"));
+	char *filename_out = pick_option(&c, &v, "o", "-");
+
+	// fill-in output image
+	uint8_t *x = malloc(3*w*h);
+	paint_cylinder(x, w, h, e);
+
+	// save output image
+	void iio_write_image_uint8_vec(char*,uint8_t*,int,int,int);
+	iio_write_image_uint8_vec(filename_out, x, w, h, 3);
+
+	return 0;
+}
+
+
+int main_fauxfilet(int c, char *v[])
+{
+	// if -n option, run noninteractively
+	if (pick_option(&c, &v, "n", 0))
+		return main_fauxfilet_noninteractive(c, v);
+
 	// process input arguments
-	if (argc != 1)
-		return fprintf(stderr, "usage:\n\t%s\n", *argv);
+	if (c != 1)
+		return fprintf(stderr, "usage:\n\t%s\n", *v);
 
 	// initialize state
 	struct viewer_state e[1];
