@@ -27,13 +27,19 @@ struct viewer_state {
 	float f;          // frequency of the strata before folding
 	float p;          // parameter of parabolic fold
 	float a, b, c;    // euler angles of parabolic sheaf
-	//float s;          // shift of the fold
+	float s;          // horizontal shift of the fold
+	float z0;          // vertical shift of the fold
 
 	// cylinder radius
 	float R;
 
 	// ui
 	struct bitmap_font font[1];
+
+	// data
+	int stratum_w;
+	int stratum_h;
+	uint8_t *stratum;
 };
 
 
@@ -46,8 +52,10 @@ static void center_state(struct viewer_state *e)
 	e->a = 0;    // euler angles zeroed (vertical cylinter)
 	e->b = 0;
 	e->c = 0;
-
 	e->R = 20;
+
+	e->s = 0;
+	e->z0 = 0;
 }
 
 static void center_view(struct FTR *f)
@@ -60,9 +68,11 @@ static void center_view(struct FTR *f)
 
 // SECTION 2. algorithms                                                    {{{1
 
-// parallel parabolic fold of parameter p
-static float fold(float x, float y, float z, float p)
+// parallel parabolic fold of parameter p, horizontal shift s and vert shift z0
+static float fold(float x, float y, float z, float p, float s, float z0)
 {
+	x -= s;
+	z -= z0;
 	return z + p*x*x;
 }
 
@@ -91,9 +101,23 @@ static float stratum_amfm(float x)
 }
 
 // TODO: interactive access to this choice, and to the modulation parameters
-static float stratum(float x)
+static float stratum(struct viewer_state *e, float x)
 {
-	return stratum_amfm(x);
+	x *= e->f;
+	if (e->stratum)
+	{
+		float fj = x + e->stratum_h/2;
+		int j = fj;
+		int i = e->stratum_w/2;
+		if (j < 0) return 0; //j = 0;
+		if (j >= e->stratum_h-1) return 0;//j = e->stratum_h - 1;
+		float a = fj - j;
+		//if (a < 1 
+		return (1-a)*e->stratum[j*e->stratum_w+i]
+			+a*e->stratum[(j+1)*e->stratum_w+i];
+	}
+	else
+		return stratum_amfm(x);
 }
 
 
@@ -114,6 +138,8 @@ static void matvec33(float y[3], float A[3][3], float x[3])
 // apply euler rotations to a 3d point
 static void map_euler(struct viewer_state *e, float X[3], float x[3], int dir)
 {
+	static float ca, sa, cb, sb, cc, sc;
+
 	float a = dir * e->a * M_PI / 180;
 	float b = dir * e->b * M_PI / 180;
 	float c = dir * e->c * M_PI / 180;
@@ -192,8 +218,8 @@ static void paint_cylinder(uint8_t *x, int w, int h,
 		float ij[2] = {i*360.0/w, j-h/2.0};
 		float xyz[3];
 		map_cyl_unwrap(e, xyz, ij);
-		float h = fold(xyz[0], xyz[1], xyz[2], e->p);
-		float c = stratum(e->f * h);
+		float h = fold(xyz[0], xyz[1], xyz[2], e->p, e->s, e->z0);
+		float c = stratum(e, h);
 		uint8_t g = c;
 		uint8_t rgb[3];
 		get_dirt(rgb, 255-g);
@@ -229,8 +255,8 @@ static void paint_state(struct FTR *f)
 		float ij[2] = {i, j-360};
 		float xyz[3];
 		map_cyl_unwrap(e, xyz, ij);
-		float h = fold(xyz[0], xyz[1], xyz[2], e->p);
-		float c = stratum(e->f * h);
+		float h = fold(xyz[0], xyz[1], xyz[2], e->p, e->s, e->z0);
+		float c = stratum(e, h);
 		uint8_t g = c;
 		uint8_t rgb[3];
 		get_dirt(rgb, 255-g);
@@ -246,8 +272,8 @@ static void paint_state(struct FTR *f)
 	{
 		float x = i - 360;
 		float z = j - 360;
-		float h = fold(x, 0, z, e->p);
-		float c = stratum(e->f * h);
+		float h = fold(x, 0, z, e->p, e->s, e->z0);
+		float c = stratum(e, h);
 		uint8_t g = c;
 		float xyz[3] = { x, 0, z};
 		float rth[3];
@@ -265,8 +291,8 @@ static void paint_state(struct FTR *f)
 	uint8_t fg[3] = {0, 255, 0};
 	uint8_t bg[3] = {0, 0, 0};
 	char buf[0x200];
-	snprintf(buf, 0x200, "f=%g\np=%g\na=%g\nb=%g\nc=%g\nR=%g",
-			e->f, e->p, e->a, e->b, e->c, e->R);
+	snprintf(buf, 0x200, "f=%g\np=%g\na=%g\nb=%g\nc=%g\nR=%g\ns=%g\n",
+			e->f, e->p, e->a, e->b, e->c, e->R, e->s);
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
 			360+0, 0+0, fg, bg, 0, e->font, buf);
 }
@@ -291,7 +317,8 @@ static void shift_angle_a(struct viewer_state *e, float s) { e->a += s; }
 static void shift_angle_b(struct viewer_state *e, float s) { e->b += s; }
 static void shift_angle_c(struct viewer_state *e, float s) { e->c += s; }
 static void scale_radius(struct viewer_state *e, float f) { e->R *= f; }
-//static void shift_shift_s(struct viewer_state *e, float s) { e->s += s; }
+static void shift_shift_s(struct viewer_state *e, float s) { e->s += s; }
+static void shift_shift_z(struct viewer_state *e, float s) { e->z0 += s; }
 
 static void action_screenshot(struct FTR *f)
 {
@@ -362,6 +389,8 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 3) shift_angle_b(e, -2);
 		if (Y == 4) shift_angle_c(e, -2);
 		if (Y == 5) scale_radius(e, 1/1.3);
+		if (Y == 6) shift_shift_s(e, -5);
+//		if (Y == 7) shift_shift_z(e, -5);
 	}
 	if (k == FTR_BUTTON_UP)
 	{
@@ -371,6 +400,8 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 3) shift_angle_b(e, 2);
 		if (Y == 4) shift_angle_c(e, 2);
 		if (Y == 5) scale_radius(e, 1.3);
+		if (Y == 6) shift_shift_s(e, 5);
+//		if (Y == 7) shift_shift_z(e, 5);
 	}
 
 	f->changed = 1;
@@ -400,17 +431,26 @@ int main_fauxfilet_noninteractive(int c, char *v[])
 	// initialize state (sets dummy default arguments)
 	struct viewer_state e[1];
 	center_state(e);
+	e->stratum = 0;
 
 	// process named arguments
 	int w = atoi(pick_option(&c, &v, "w", "360"));
 	int h = atoi(pick_option(&c, &v, "h", "720"));
+	char *filename_out = pick_option(&c, &v, "o", "-");
+	char *filename_stratum = pick_option(&c, &v, "S", "");
+	if (*filename_stratum)
+	{
+		uint8_t *iio_read_image_uint8(char*,int*,int*);
+		e->stratum = iio_read_image_uint8(filename_stratum,
+				&e->stratum_w, &e->stratum_h);
+		e->f = 1;
+	}
 	e->f = atof(pick_option(&c, &v, "f", "0.1"));
 	e->p = atof(pick_option(&c, &v, "p", "0.001"));
 	e->a = atof(pick_option(&c, &v, "a", "0"));
 	e->b = atof(pick_option(&c, &v, "b", "0"));
 	e->c = atof(pick_option(&c, &v, "c", "0"));
 	e->R = atof(pick_option(&c, &v, "R", "50"));
-	char *filename_out = pick_option(&c, &v, "o", "-");
 
 	// fill-in output image
 	uint8_t *x = malloc(3*w*h);
@@ -468,13 +508,32 @@ int main_fauxfilet(int c, char *v[])
 	if (pick_option(&c, &v, "n", 0))
 		return main_fauxfilet_noninteractive(c, v);
 
-	// process input arguments
-	if (c != 1)
-		return fprintf(stderr, "usage:\n\t%s\n", *v);
-
 	// initialize state
 	struct viewer_state e[1];
 	center_state(e);
+	e->stratum = 0;
+
+	// extract named arguments
+	char *filename_out = pick_option(&c, &v, "o", "-");
+	char *filename_stratum = pick_option(&c, &v, "S", "");
+	if (*filename_stratum)
+	{
+		uint8_t *iio_read_image_uint8(char*,int*,int*);
+		e->stratum = iio_read_image_uint8(filename_stratum,
+				&e->stratum_w, &e->stratum_h);
+		e->f = 1;
+	}
+	e->f = atof(pick_option(&c, &v, "f", "0.1"));
+	e->p = atof(pick_option(&c, &v, "p", "0.001"));
+	e->a = atof(pick_option(&c, &v, "a", "0"));
+	e->b = atof(pick_option(&c, &v, "b", "0"));
+	e->c = atof(pick_option(&c, &v, "c", "0"));
+	e->R = atof(pick_option(&c, &v, "R", "50"));
+
+	// process input arguments (should be none)
+	if (c != 1)
+		return fprintf(stderr, "usage:\n\t%s\n", *v);
+
 
 	// init fonts
 	e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
