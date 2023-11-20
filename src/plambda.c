@@ -2493,6 +2493,7 @@ static float stencil_3x3_dy_prewitt[9] =  {0,0,0,  0,-H,-H, 0,H,H};
 static float stencil_3x3_dx_roberts[9] =  {0,0,0,  0,R,0, 0,0,-R};
 static float stencil_3x3_dy_roberts[9] =  {0,0,0,  0,0,R, 0,-R,0};
 static float stencil_3x3_laplace[9] =  {0,1,0,  1,-4,1, 0,1,0};
+static float stencil_3x3_xlaplace[9] =  {H,0,H,  0,-2,0, H,0,H};
 static float stencil_3x3_dxx[9] =  {0,0,0,  1,-2,1, 0,0,0};
 static float stencil_3x3_dyy[9] =  {0,1,0,  0,-2,0, 0,1,0};
 static float stencil_3x3_dxy_4point[9] =  {-Q,0,Q,  0,0,0, Q,0,-Q};
@@ -2511,7 +2512,11 @@ static float stencil_3x3_m_nsquare[9] = {1,1,1,  1,0,1, 1,1,1};
 static float *get_stencil_3x3(int operator, int scheme)
 {
 	switch(operator) {
-	case IMAGEOP_LAP: return stencil_3x3_laplace;
+	case IMAGEOP_LAP: { switch(scheme) {
+			case SCHEME_ROBERTS: return stencil_3x3_xlaplace;
+			default: return stencil_3x3_laplace;
+			}
+		}
 	case IMAGEOP_XX: return stencil_3x3_dxx;
 	case IMAGEOP_YY: return stencil_3x3_dyy;
 	case IMAGEOP_XY: { switch(scheme) {
