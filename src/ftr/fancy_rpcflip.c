@@ -1162,6 +1162,7 @@ static void inplace_rgb_span3(float *x, int w, int h, double a)
 static void update_local_projection(struct pan_state *e,
 		double ix, double iy, double h)
 {
+	// NOTE: the use of this function is incorrect and leads to "long jumps"
 	struct pan_view *v = obtain_view(e);
 
 	double xy[2];
@@ -1454,6 +1455,17 @@ static void action_toggle_cpu_view(struct FTR *f)
 	}
 	e->cpu_view = !e->cpu_view;
 	request_repaints(f);
+}
+
+static void action_update_cpu_view(struct FTR *f)
+{
+	float *frgb = xmalloc(f->w * f->h * 3 * sizeof*frgb);
+	for (int i = 0; i < 3*f->w*f->h; i++)
+		frgb[i] = f->rgb[i];
+	int n = 0;
+	assert(n == 0);
+	cpu_update(n, frgb, f->w, f->h, 3);
+	xfree(frgb);
 }
 
 static void action_toggle_log_scale(struct FTR *f)
@@ -1941,6 +1953,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'c') action_cycle_contrast(f, +1);
 	if (k == 'C') action_cycle_contrast(f, -1);
 	if (k == ')') action_toggle_cpu_view(f);
+	if (k == '(') action_update_cpu_view(f);
 
 	// arrows move the viewport
 	if (k > 1000) {
