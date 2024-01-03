@@ -46,7 +46,7 @@ static char *help_string_long     =
 "   or: cat in | iion out.png\n"
 "\n"
 "Options:\n"
-" -t T\t\tuse T as intermediate type (float,double,uint8,uint17)\n"
+" -t T\t\tuse T as intermediate type (float,double,uint8,uint16)\n"
 " -h\t\tdisplay short help message\n"
 " --help\t\tdisplay longer help message\n"
 "\n"
