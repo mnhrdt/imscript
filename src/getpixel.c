@@ -12,7 +12,7 @@ static float getsample_0(float *x, int w, int h, int pd, int i, int j, int l)
 {
 	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
 		return 0;
-	return x[(i+j*w)*pd + l];
+	return x[(i+j*(long)w)*pd + l];
 }
 
 // extrapolate by nearest value
@@ -25,7 +25,7 @@ static float getsample_1(float *x, int w, int h, int pd, int i, int j, int l)
 	if (i >= w) i = w-1;
 	if (j >= h) j = h-1;
 	if (l >= pd) l = pd-1;
-	return x[(i+j*w)*pd + l];
+	return x[(i+j*(long)w)*pd + l];
 }
 
 #ifdef NAN
@@ -35,7 +35,7 @@ static float getsample_nan(float *x, int w, int h, int pd, int i, int j, int l)
 {
 	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
 		return NAN;
-	return x[(i+j*w)*pd + l];
+	return x[(i+j*(long)w)*pd + l];
 }
 #endif//NAN
 
@@ -45,7 +45,7 @@ static float getsample_error(float *x, int w, int h, int pd, int i, int j, int l
 {
 	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
 		return *(volatile int*)0;
-	return x[(i+j*w)*pd + l];
+	return x[(i+j*(long)w)*pd + l];
 }
 
 // abort the program extrapolation is required
@@ -54,7 +54,7 @@ static float getsample_abort(float *x, int w, int h, int pd, int i, int j, int l
 {
 	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
 		abort();
-	return x[(i+j*w)*pd + l];
+	return x[(i+j*(long)w)*pd + l];
 }
 
 // exit the program extrapolation is required
@@ -63,7 +63,7 @@ static float getsample_exit(float *x, int w, int h, int pd, int i, int j, int l)
 {
 	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
 		exit(42);
-	return x[(i+j*w)*pd + l];
+	return x[(i+j*(long)w)*pd + l];
 }
 
 // like n%p, but works for all numbers
@@ -109,7 +109,7 @@ float getsample_constant(float *x, int w, int h, int pd, int i, int j, int l)
 		value = *x;
 	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
 		return value;
-	return x[(i+j*w)*pd + l];
+	return x[(i+j*(long)w)*pd + l];
 }
 
 
@@ -156,7 +156,7 @@ static void setsample_0(float *x, int w, int h, int pd, int i, int j, int l,
 {
 	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
 		return;
-	x[(i+j*w)*pd + l] = v;
+	x[(i+j*(long)w)*pd + l] = v;
 }
 
 inline
@@ -165,7 +165,7 @@ static void setsample_segf(float *x, int w, int h, int pd, int i, int j, int l,
 {
 	if (i < 0 || i >= w || j < 0 || j >= h || l < 0 || l >= pd)
 		*(volatile int*)0 = 0;
-	x[(i+j*w)*pd + l] = v;
+	x[(i+j*(long)w)*pd + l] = v;
 }
 
 typedef float (*getpixel_operator)(float*,int,int,int,int);
@@ -174,7 +174,7 @@ static float getpixel_0(float *x, int w, int h, int i, int j)
 {
 	if (i < 0 || i >= w || j < 0 || j >= h)
 		return 0;
-	return x[i + j*w];
+	return x[i + j*(long)w];
 }
 
 static float getpixel_1(float *x, int w, int h, int i, int j)
@@ -183,7 +183,7 @@ static float getpixel_1(float *x, int w, int h, int i, int j)
 	if (j < 0) j = 0;
 	if (i >= w) i = w-1;
 	if (j >= h) j = h-1;
-	return x[i+j*w];
+	return x[i+j*(long)w];
 }
 
 //

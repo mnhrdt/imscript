@@ -101,11 +101,11 @@ int main_tbcat(int c, char *v[])
 		h[n] += h[k];
 		pd[n] = BAD_MAX(pd[n], pd[k]);
 	}
-	x[n] = xmalloc(w[n] * h[n] * pd[n] * sizeof(x[0][0]));
-	for (int i = 0; i < w[n] * h[n] * pd[n]; i++)
+	x[n] = xmalloc(w[n] * (long)h[n] * pd[n] * sizeof(x[0][0]));
+	for (long i = 0; i < w[n] * (long)h[n] * pd[n]; i++)
 		x[n][i] = BACKGROUND();
 
-	int ok = 0;
+	long ok = 0;
 	for (int k = 0; k < n; k++)
 	{
 		for (int j = 0; j < h[k]; j++)

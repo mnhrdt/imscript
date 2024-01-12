@@ -608,34 +608,34 @@ static void iio_type_unid(int *size, bool *ieefp, bool *signedness, int type)
 }
 
 // internal API
-static int iio_image_number_of_elements(struct iio_image *x)
+static long iio_image_number_of_elements(struct iio_image *x)
 {
 	iio_image_assert_struct_consistency(x);
-	int r = 1;
+	long r = 1;
 	FORI(x->dimension) r *= x->sizes[i];
 	return r;
 }
 
 // internal API
-static int iio_image_number_of_samples(struct iio_image *x)
+static long iio_image_number_of_samples(struct iio_image *x)
 {
 	return iio_image_number_of_elements(x) * x->pixel_dimension;
 }
 
 // internal API
-static size_t  iio_image_sample_size(struct iio_image *x)
+static size_t iio_image_sample_size(struct iio_image *x)
 {
 	return iio_type_size(x->type);
 }
 
 // internal API
-static size_t  iio_image_pixel_size(struct iio_image *x)
+static size_t iio_image_pixel_size(struct iio_image *x)
 {
 	return iio_type_size(x->type) * x->pixel_dimension;
 }
 
 // internal API
-static size_t  iio_image_data_size(struct iio_image *x)
+static size_t iio_image_data_size(struct iio_image *x)
 {
 	return iio_image_sample_size(x) * iio_image_number_of_samples(x);
 }
