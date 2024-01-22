@@ -999,6 +999,7 @@ static void getpercentiles(float *m, float *M, float *x, int n, float q)
 	for (int i = 0; i < n; i++)
 		if (!isnan(x[i]))
 			t[N++] = x[i];
+	//fprintf(stderr, "getperc n=%d N=%d p=%g\n", n, N, N*100.0/n);
 	qsort(t, N, sizeof*t, compare_floats);
 	int a = q/100*N;
 	int b = (1-q/100)*N;
@@ -1017,27 +1018,34 @@ static void colorize_botw(uint8_t *y, float *x, int w, int h)
 	// define botw palette
 	//uint8_t lo[3] = {65, 49, 5};      // bottom of palette
 	//uint8_t hi[3] = {200, 200, 180};  // top of palette
-	uint8_t lo[3] = {65, 49, 5};      // bottom of palette
-	uint8_t hi[3] = {200, 200, 180};  // top of palette
-	uint8_t no[3] = {20, 100, 255};   // holes and water planes
+	uint8_t lo[3] = {65, 49, 5};      // bottom of palette (dark sepia)
+	uint8_t hi[3] = {200, 200, 180};  // top of palette (ligh sepia)
+	uint8_t no[3] = {20, 100, 255};   // holes and water planes (blue)
+
+	bool *H = xmalloc(w*h*sizeof*H); // hole mask (true==hole)
+	for (int i = 0; i < w*h; i++)
+		H[i] = (!isfinite(x[i])) || x[i] < -10000;
+	for (int i = 0; i < w*h; i++)
+		if (H[i])
+			x[i] = NAN;
 
 	// apply botw palette
 	float m, M;
 	getpercentiles(&m, &M, x, w*h, 0.5);
 	for (int i = 0; i < w*h; i++)
-	if (isfinite(x[i]) && x[i] != -32768) {
-		float t = (x[i] - m) / (M - m);
-		for (int k = 0; k < 3; k++)
-			y[3*i+k] = bclamp( (1 - t)*lo[k] + t*hi[k] );
-	} else {
-		for (int k = 0; k < 3; k++)
-			y[3*i+k] = no[k];
-		x[i] = NAN;
-	}
+		if (H[i]) {
+			for (int k = 0; k < 3; k++)
+				y[3*i+k] = no[k];
+		} else {
+			float t = (x[i] - m) / (M - m);
+			for (int k = 0; k < 3; k++)
+				y[3*i+k] = bclamp( (1 - t)*lo[k] + t*hi[k] );
+		}
 
 	//void iio_write_image_float(char*,float*,int,int);
 
 	// fill-in nans for computing the shading
+	//iio_write_image_uint8_vec("/tmp/whatever_y0.npy", y, w, h, 3);
 	//iio_write_image_float("/tmp/whatever_before.npy", x, w, h);
 	simplest_inpainting(x, w, h);
 	//iio_write_image_float("/tmp/whatever_inpainted.npy", x, w, h);
@@ -1062,17 +1070,26 @@ static void colorize_botw(uint8_t *y, float *x, int w, int h)
 	ifft_2dfloat(z, S, w, h);
 	fftwf_free(S);
 	for (int i = 0; i < w*h; i++)
+	{
+		if (H[i])
+			z[i] = NAN;
 		if (z[i] > 0)
 			z[i] /= 3;
+	}
+	//iio_write_image_float("/tmp/whatever_z.npy", z, w, h);
 	// combine shading and palette
 	getpercentiles(&m, &M, z, w*h, 9.0);
+	//fprintf(stderr, "zpercentiles m=%g M=%g\n", m, M);
 	for (int i = 0; i < w*h; i++)
 		z[i] =  (z[i] - m) / (M - m);
 	for (int i = 0; i < w*h; i++)
 	for (int k = 0; k < 3; k++)
-		y[3*i+k] = bclamp(y[3*i+k] * (0.5+z[i]/2));
-		//y[3*i+k] = bclamp(255*z[i]);
+		if (!H[i])
+			y[3*i+k] = bclamp(y[3*i+k] * (0.5+z[i]/2));
+			//y[3*i+k] = bclamp(255*z[i]);
+	//iio_write_image_uint8_vec("/tmp/whatever_y1.npy", y, w, h, 3);
 	free(z);
+	free(H);
 }
 
 static void expose_topography(struct FTR *f)
