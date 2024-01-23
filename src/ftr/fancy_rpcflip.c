@@ -62,6 +62,7 @@ struct pan_view {
 	struct fancy_image *tg; // P
 	struct fancy_image *tc; // MS
 	int gray_only, general_mode;
+	char *fname;
 
 	// RGB preview of the whole image (optional)
 	uint8_t *preview;
@@ -186,6 +187,7 @@ static void init_view(struct pan_view *v,
 	v->pfc = fcpre;
 	v->gray_only = 0;
 	v->general_mode = 0;
+	v->fname = fgrpc;
 
 	// load P and MS
 	//int megabytes = 0;
@@ -226,6 +228,7 @@ static void init_view_no_preview(struct pan_view *v,
 	v->pfc = NULL;
 	v->gray_only = 0;
 	v->general_mode = 0;
+	v->fname = fgrpc;
 
 	// load P and MS
 	//int megabytes = 0;
@@ -1324,17 +1327,34 @@ static void expose_hud(struct FTR *f)
 	struct pan_state *e = f->userdata;
 	uint8_t fg[3] = {0, 0, 0};
 	uint8_t bg[3] = {255, 255, 255};
-#define PF(x,y,...) do {\
+	struct bitmap_font *F = e->font + 4;
+#define PF(y,...) do {\
 	char b[FILENAME_MAX];\
 	snprintf(b, FILENAME_MAX, __VA_ARGS__);\
-	put_string_in_rgb_image(f->rgb,f->w,f->h,x,y,fg,bg,0,e->font+4,b);\
+	int l = 10 + y*F->height;\
+	put_string_in_rgb_image(f->rgb,f->w,f->h,10,l,fg,bg,0,F,b);\
 }while(0)
-	PF(10,10, "view %d/%d", 1 + e->current_view, e->nviews);
+	PF(0, "view %d/%d \"%s\"", 1 + e->current_view, e->nviews,
+			e->view[e->current_view].fname);
 	if (e->hud > 1)
 	{
-		PF(10,10, "\nzoom = %g\noffset = %g %g\n",
-				e->zoom_factor, e->offset_x, e->offset_y);
-		PF(10,10, "\n\nbase_h = %g\n", e->base_h);
+		F = e->font + 3;
+		PF(1, "zoom = %g", e->zoom_factor);
+		PF(2, "offset = %g %g\n", e->offset_x, e->offset_y);
+		PF(3, "base_h = %g\n", e->base_h);
+		PF(4, "rpc: %s", e->force_exact ? "exact" : "affine");
+		PF(5, "space: %s", e->image_space ? "image" : "geographic");
+		PF(6, "rotation: %d \"%s\"", e->image_rotation_status,
+				e->image_rotation_status == 0 ?  "UP" :
+				( e->image_rotation_status == 1 ?
+					"DOWN" : "VERTICAL" ) );
+		PF(7, "qauto: %d \"%s\" a=%g b=%g %s", e->qauto,
+				e->qauto==0 ? "NONE" :
+				(e->qauto==1 ? "MIN-MAX" :
+				(e->qauto==2 ? "AVG-STD" : "MED-IQD")),
+				e->a, e->b,
+				e->log_scale ? "\"LOG-SCALE\"" : ""
+				);
 	}
 #undef PF
 }
