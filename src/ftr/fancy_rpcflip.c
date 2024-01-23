@@ -38,6 +38,11 @@ double egm96(double,double);
 #include "xmalloc.c"
 
 
+#define OMIT_MAIN_FONTU
+#include "fontu.c" // todo: cherry-pick the required fontu functions
+#include "fonts/xfonts_all.c"
+
+
 // #defines {{{1
 
 #ifndef M_PI
@@ -104,6 +109,10 @@ struct pan_state {
 	int show_srtm4, so;
 	int srtm4_base;
 	int cpu_view;
+
+	// 5. user interface
+	struct bitmap_font font[5];
+	int hud;
 };
 
 // TODO: integrate this variable into the state
@@ -305,6 +314,16 @@ static void setup_nominal_pixels_according_to_first_view(struct pan_state *e)
 #include "smapa.h"
 SMART_PARAMETER(USE_MSOCTAVES,0)
 
+static void init_fonts(struct pan_state *e)
+{
+	// setup fonts (TODO, integrate these calls into fontu's caching stuff)
+	e->font[0] = reformat_font(*xfont_4x6, UNPACKED);
+	e->font[1] = reformat_font(*xfont_6x12, UNPACKED);
+	e->font[2] = reformat_font(*xfont_7x13, UNPACKED);
+	e->font[3] = reformat_font(*xfont_9x15, UNPACKED);
+	e->font[4] = reformat_font(*xfont_10x20, UNPACKED);
+}
+
 static void init_state(struct pan_state *e,
 	char *gi[], char *gp[], char *gr[], char *ci[], char *cp[], int n)
 {
@@ -347,6 +366,8 @@ static void init_state(struct pan_state *e,
 	msoctaves_instead_of_preview = USE_MSOCTAVES();
 	//msoctaves_instead_of_preview = e->view->tg->noctaves > 4 ||
 	//	(ci && e->view->tc->noctaves > 3);
+	e->hud = 0;
+	init_fonts(e);
 }
 
 static void init_state_no_preview(struct pan_state *e,
@@ -388,6 +409,8 @@ static void init_state_no_preview(struct pan_state *e,
 	e->srtm4_base = 0;
 	msoctaves_instead_of_preview = true;//e->view->tg->noctaves > 4 ||
 	//	(ci && e->view->tc->noctaves > 3);
+	e->hud = 0;
+	init_fonts(e);
 }
 
 // TODO: organize all these views in separate "modes"
@@ -1294,6 +1317,28 @@ static void overlay_vertdir(struct FTR *f, int i, int j)
 	}
 }
 
+
+
+static void expose_hud(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	uint8_t fg[3] = {0, 0, 0};
+	uint8_t bg[3] = {255, 255, 255};
+#define PF(x,y,...) do {\
+	char b[FILENAME_MAX];\
+	snprintf(b, FILENAME_MAX, __VA_ARGS__);\
+	put_string_in_rgb_image(f->rgb,f->w,f->h,x,y,fg,bg,0,e->font+4,b);\
+}while(0)
+	PF(10,10, "view %d/%d", 1 + e->current_view, e->nviews);
+	if (e->hud > 1)
+	{
+		PF(10,10, "\nzoom = %g\noffset = %g %g\n",
+				e->zoom_factor, e->offset_x, e->offset_y);
+		PF(10,10, "\n\nbase_h = %g\n", e->base_h);
+	}
+#undef PF
+}
+
 static void pan_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
 {
 	(void)unused_x; (void)unused_y;
@@ -1311,6 +1356,10 @@ static void pan_exposer(struct FTR *f, int b, int m, int unused_x, int unused_y)
 	// overlay any requested lines
 	if (e->show_vertdir)
 		overlay_vertdir(f, e->vdx, e->vdy);
+
+	// expose hud
+	if (e->hud)
+		expose_hud(f);
 }
 
 static void request_repaints(struct FTR *f)
@@ -1543,6 +1592,13 @@ static void action_cycle_contrast(struct FTR *f, int dir)
 	if (e->qauto == 2) fprintf(stderr, "AVG-STD\n");
 	if (e->qauto == 3) fprintf(stderr, "MED-IQD\n");
 	request_repaints(f);
+}
+
+static void action_cycle_hud(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	e->hud = (e->hud + 1) % 3; // 0=no, 1=filename, 2=full
+	f->changed = 1;
 }
 
 // This function is only called when "ignoring" the RPC functions.  Even when
@@ -1939,6 +1995,7 @@ void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == '8') action_dump_raw_collection_fancy(f);
 	if (k == ';') action_dump_raw(f);
 	if (k == '9') action_dump_raw_ms(f);
+	if (k == '/') action_cycle_hud(f);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
