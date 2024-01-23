@@ -424,7 +424,6 @@ static void action_qauto2(struct FTR *f)
 	for (int i = 0; i < pd; i++)
 		fprintf(stderr, "musigma[%d] = %g %g\n", i, mu[i], sigma[i]);
 
-
 	// adapt mu/sigma to color
 	float mu_rgb[3], sigma_rgb[3];
 	get_rgb_from_vec(mu_rgb   , e, mu   );
@@ -452,7 +451,7 @@ static void action_toggle_roi(struct FTR *f, int x, int y, int dir)
 static void action_cycle_hud(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
-	e->hud = !e->hud;
+	e->hud = (e->hud + 1) % 3;
 	f->changed = 1;
 }
 
@@ -932,6 +931,13 @@ static void expose_hud(struct FTR *f)
 	uint8_t bg[3] = {255, 255, 255};
 	put_string_in_rgb_image(f->rgb, f->w, f->h, 10, 10, fg, bg, 0,
 			e->font+4, e->i_name[e->i_idx]);
+	if (e->hud > 1) {
+		char buf[0x100];
+		snprintf(buf, 0x100, "\nzoom = %g\noffset = %g %g\n",
+				e->zoom_factor, e->offset_x, e->offset_y);
+		put_string_in_rgb_image(f->rgb, f->w, f->h, 10, 10, fg, bg, 0,
+			e->font+4, buf);
+	}
 }
 
 static void expose_roi(struct FTR *f)
