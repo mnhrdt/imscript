@@ -1342,13 +1342,15 @@ static void expose_hud(struct FTR *f)
 		PF(1, "zoom = %g", e->zoom_factor);
 		PF(2, "offset = %g %g\n", e->offset_x, e->offset_y);
 		PF(3, "base_h = %g\n", e->base_h);
-		PF(4, "rpc: %s", e->force_exact ? "exact" : "affine");
-		PF(5, "space: %s", e->image_space ? "image" : "geographic");
-		PF(6, "rotation: %d \"%s\"", e->image_rotation_status,
+		PF(4, "lon lat = %g %g    deltas = %g %g",
+				e->lon_0, e->lat_0, e->lon_d, e->lat_d);
+		PF(5, "rpc: %s", e->force_exact ? "exact" : "affine");
+		PF(6, "space: %s", e->image_space ? "image" : "geographic");
+		PF(7, "rotation: %d \"%s\"", e->image_rotation_status,
 				e->image_rotation_status == 0 ?  "UP" :
 				( e->image_rotation_status == 1 ?
 					"DOWN" : "VERTICAL" ) );
-		PF(7, "qauto: %d \"%s\" a=%g b=%g %s", e->qauto,
+		PF(8, "qauto: %d \"%s\" a=%g b=%g %s", e->qauto,
 				e->qauto==0 ? "NONE" :
 				(e->qauto==1 ? "MIN-MAX" :
 				(e->qauto==2 ? "AVG-STD" : "MED-IQD")),
