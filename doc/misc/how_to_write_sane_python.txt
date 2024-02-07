@@ -10,6 +10,7 @@ H2. require at least python 3.6.  Previous versions are unusable.
 H3. process strings with % or with f-interpolation;  do not use .format
 H4. try to ignore the existence of exceptions as much as possible
 H5. avoid any kind of boilerplate that helps for 2.7 compatibility
+H6. avoid brain-damaged stuff like type annotation imports
 
 
 NAMING
@@ -20,6 +21,7 @@ N3. function names are long and descriptive
 N4. global variables have long and uppercase names
 N5. do not bring new mixed-case symbols into the world
 N6. either your file is executable or its name ends in .py, but not both
+N7. arguments cannot have the same name as values:  you never see f(x=x)
 
 
 FORMATTING
@@ -68,7 +70,7 @@ E4. use sys.modules[__name__] = foo to avoid foo.foo stupidity
 
 USAGE
 
-U1. prefer string interpolation than concatenation
+U1. use string interpolation instead of concatenation
 U2. avoid os.path.join, use string processing instead
 U3. in numpy, never use .dot, use always @
 U4. use matplotlib for plots, but do not EVER use it for displaying an image
@@ -101,9 +103,25 @@ M4. Use dependencies "implicitly": For example, you do not need to import numpy
     array class.  This has the advantage that if your arrays become of another
     type (with a compatible interface), you do not need to change anything.  For
     example, most linear algebra code can be written to work transparently with
-    numpy arrays, sparse matrices, etc.
+    numpy arrays, sparse matrices, etc.  If you are careful, the same numerical
+    code can work with numpy, torch and jax arrays without ever mentioning them.
 
 
 TYPING
 
 T1. No
+
+
+PACKAGING
+
+P1. your program should be easily usable without need to "install" it
+P2. ideal case: "wget url://to/myprogram.py ; python myprogram.py"
+P3. do not force installation of non-essential dependencies.  If your program
+    requires a dependency just for a small, optional feature, allow to install
+    it and fail at runtime when the dependency is found missing.
+P4. pip is shit, but conda and poetry are orders of magnitude worse: avoid them!
+P5. jupyter notebooks are great for literate programming, but the .ipynb file
+    format is horrific.  Use jupytext to distribute your notebooks as plain
+    python files.  Check that you can run your notebook by invoking it
+    explicitly from the shell: "python notebook.py".  Do away with the .ipynb
+    files entirely.
