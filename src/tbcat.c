@@ -67,6 +67,7 @@ static char *help_string_long     =
 "   or: tbcat in1 in2 in3 ... -o out\n"
 "\n"
 "Options:\n"
+" -m M\t add vertical spacing of M pixels between images\n"
 " -h\t\tdisplay short help message\n"
 " --help\t\tdisplay longer help message\n"
 "\n"
@@ -85,6 +86,7 @@ int main_tbcat(int c, char *v[])
 	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
 
 	char *filename_out = pick_option(&c, &v, "o", "-");
+	int margin = atoi(pick_option(&c, &v, "m", "0"));
 	int n = c - 1;
 	char *filename[n+1];
 	for (int i = 0; i < n; i++)
@@ -101,11 +103,12 @@ int main_tbcat(int c, char *v[])
 		h[n] += h[k];
 		pd[n] = BAD_MAX(pd[n], pd[k]);
 	}
+	h[n] += margin * (n + 1);
 	x[n] = xmalloc(w[n] * (long)h[n] * pd[n] * sizeof(x[0][0]));
 	for (long i = 0; i < w[n] * (long)h[n] * pd[n]; i++)
 		x[n][i] = BACKGROUND();
 
-	long ok = 0;
+	long ok = margin;
 	for (int k = 0; k < n; k++)
 	{
 		for (int j = 0; j < h[k]; j++)
@@ -114,7 +117,7 @@ int main_tbcat(int c, char *v[])
 			float s = getsample_1(x[k], w[k], h[k], pd[k], i, j, l);
 			setsample_0(x[n], w[n], h[n], pd[n], i, j+ok, l, s);
 		}
-		ok += h[k];
+		ok += h[k] + margin;
 	}
 
 	iio_write_image_float_vec(filename[n], x[n], w[n], h[n], pd[n]);

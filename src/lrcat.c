@@ -67,6 +67,7 @@ static char *help_string_long     =
 "   or: lrcat in1 in2 in3 ... -o out\n"
 "\n"
 "Options:\n"
+" -m M\t add horizontal spacing of M pixels between images\n"
 " -h\t\tdisplay short help message\n"
 " --help\t\tdisplay longer help message\n"
 "\n"
@@ -84,6 +85,7 @@ int main_lrcat(int c, char *v[])
 {
 	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
 
+	int margin = atoi(pick_option(&c, &v, "m", "0"));
 	char *filename_out = pick_option(&c, &v, "o", "-");
 	int n = c - 1;
 	char *filename[n+1];
@@ -101,11 +103,12 @@ int main_lrcat(int c, char *v[])
 		h[n] = BAD_MAX(h[n], h[k]);
 		pd[n] = BAD_MAX(pd[n], pd[k]);
 	}
+	w[n] += margin * (n + 1);
 	x[n] = xmalloc(w[n] * h[n] * pd[n] * sizeof(x[0][0]));
 	for (int i = 0; i < w[n] * h[n] * pd[n]; i++)
 		x[n][i] = BACKGROUND();
 
-	int ok = 0;
+	int ok = margin;
 	for (int k = 0; k < n; k++)
 	{
 		for (int j = 0; j < h[k]; j++)
@@ -114,7 +117,7 @@ int main_lrcat(int c, char *v[])
 			float s = getsample_1(x[k], w[k], h[k], pd[k], i, j, l);
 			setsample_0(x[n], w[n], h[n], pd[n], i+ok, j, l, s);
 		}
-		ok += w[k];
+		ok += w[k] + margin;
 	}
 
 	iio_write_image_float_vec(filename[n], x[n], w[n], h[n], pd[n]);
