@@ -50,7 +50,8 @@ struct viewer_state {
 	uint8_t rgb_grid[3];
 	uint8_t rgb_curv[3];
 	uint8_t rgb_nan[3];
-	struct bitmap_font font[5]; // from small to large
+	struct bitmap_font fonts[5]; // from small to large
+	struct bitmap_font *font;
 
 	// drag state
 	bool dragging_window_point;
@@ -73,16 +74,16 @@ static void init_state(struct viewer_state *e)
 	e->h = 600;
 	e->x0 = -1;
 	e->xf = 7;
-	e->y0 = -2;
-	e->yf = 2;
+	e->y0 = -3;
+	e->yf = 3;
 
 	e->rgb_bg[0] = 0;
 	e->rgb_bg[1] = 0;
 	e->rgb_bg[2] = 0;
 
-	e->rgb_fg[0] = 255;
-	e->rgb_fg[1] = 255;
-	e->rgb_fg[2] = 255;
+	e->rgb_fg[0] = 100;
+	e->rgb_fg[1] = 200;
+	e->rgb_fg[2] = 150;
 
 	e->rgb_axes[0] = 200;
 	e->rgb_axes[1] = 200;
@@ -93,8 +94,10 @@ static void init_state(struct viewer_state *e)
 	e->rgb_grid[2] = 40;
 
 	e->rgb_curv[0] = 255;
-	e->rgb_curv[1] = 0;
+	e->rgb_curv[1] = 100;
 	e->rgb_curv[2] = 0;
+
+	e->font = e->fonts + 3;
 
 	// drag state
 	e->dragging_window_point = false;
@@ -332,8 +335,9 @@ static void splat_disk(uint8_t *rgb, int w, int h, float p[2], float r,
 		//{
 		//	float a = pow(hypot(i, j)/r, 4);
 			for (int k = 0; k < 3; k++)
+				//rgb[3*(w*jj+ii)+k] = a*254+(1-a)*color[k];
+		//		rgb[3*(w*jj+ii)+k] = a*0+(1-a)*color[k];
 				rgb[3*(w*jj+ii)+k] = color[k];
-		//		rgb[3*(w*jj+ii)+k] = a*255 + (1-a)*color[k];
 		//}
 	}
 }
@@ -375,17 +379,28 @@ static void paint_state(struct FTR *f)
 	}
 
 	// plot curve
+	double (*F[4])(int,double,double) = {
+		gsl_sf_mathieu_ce, gsl_sf_mathieu_se
+	};
 	for (int i = 0; i < e->w; i++)
 	{
 		float x = e->x0 + i * (e->xf - e->x0) / e->w;
 		//float y = sin(x);
-		float y = gsl_sf_mathieu_se(e->n, e->q, x);
+		float y = F[e->m](e->n, e->q, x);
+		//gsl_sf_mathieu_se(e->n, e->q, x);
 		float j = e->h - 1 - e->h * (y - e->y0) / (e->yf - e->y0);
 		float P[2] = {i, j};
+		//if (0 == i%10) fprintf(stderr, "i=%d x=%g y=%g j=%g\n", i, x, y, j);
 		if (0 == i%10)
-			fprintf(stderr, "i=%d x=%g y=%g j=%g\n", i, x, y, j);
-		splat_disk(f->rgb, f->w, f->h, P, 1.1/*POINT_RADIUS*/, e->rgb_curv);
+		splat_disk(f->rgb, f->w, f->h, P, POINT_RADIUS, e->rgb_curv);
 	}
+
+	// hud
+	char buf[0x400];
+	snprintf(buf, 0x400, "m = %s\nn = %g\nq = %g\n",
+			e->m==0?"ce":"se", e->n, e->q);
+	put_string_in_rgb_image(f->rgb, f->w, f->h,
+			10, 0, e->rgb_fg, e->rgb_bg, 0, e->font, buf);
 }
 
 
@@ -456,66 +471,29 @@ static void event_resize(struct FTR *f, int k, int m, int x, int y)
 	f->changed = 1;
 }
 
+static void toggle_mode(struct viewer_state *e, int s) { e->m = (e->m + s)%2; }
+static void shift_param_n(struct viewer_state *e, float s) { e->n += s; }
+static void shift_param_q(struct viewer_state *e, float s) { e->q += s; }
+
 // mouse button handler
 static void event_button(struct FTR *f, int k, int m, int x, int y)
 {
 	struct viewer_state *e = f->userdata;
 
-	//// begin dragging a control point in the WINDOW DOMAIN
-	//if (k == FTR_BUTTON_LEFT && p >= 0)
-	//{
-	//	e->dragged_point = p;
-	//	e->dragging_window_point = true;
-	//}
-
-	//// end dragging a control point in the WINDOW DOMAIN
-	//if (e->dragging_window_point && k == -FTR_BUTTON_LEFT)
-	//{
-	//	drag_point_in_window_domain(e, x, y);
-	//	e->dragging_window_point = false;
-	//	e->dragged_point = -1;
-	//}
-
-	//// begin dragging a control point in the IMAGE DOMAIN
-	//if (k == FTR_BUTTON_RIGHT && p >= 0)
-	//{
-	//	e->dragged_point = p;
-	//	e->dragging_image_point = true;
-	//}
-
-	// begin dragging a the WINDOW BACKGROUND
-	if (k == FTR_BUTTON_LEFT)// && hit_point(e, x, y) < 0)
-	{
-		e->drag_handle[0] = x;
-		e->drag_handle[1] = y;
-		e->dragging_background = true;
-	}
-
-	// end dragging the WINDOW BACLGROUND
-	if (e->dragging_background && k == -FTR_BUTTON_LEFT)
-	{
-		int dx = x - e->drag_handle[0];
-		int dy = y - e->drag_handle[1];
-		change_view_offset(e, dx, dy);
-		e->dragging_background = false;
-	}
-
-	// radius in/out (if hit), zoom in/out (if no hit)
+	// m, n, q hitboxes of font height
+	// 0  1  2
+	int Y = y / e->font->height;
 	if (k == FTR_BUTTON_DOWN)
 	{
-		change_view_scale(e, x, y, ZOOM_FACTOR);
-		//if (hit_point(e, x, y)<0)
-		//	change_view_scale(e, x, y, ZOOM_FACTOR);
-		//else
-		//	change_radius(e, x, y, RADIUS_FACTOR);
+		if (Y == 0) toggle_mode(e, -1);
+		if (Y == 1) shift_param_n(e, -1);
+		if (Y == 2) shift_param_q(e, -1);
 	}
 	if (k == FTR_BUTTON_UP)
 	{
-		change_view_scale(e, x, y, 1.0/ZOOM_FACTOR);
-		//if (hit_point(e, x, y)<0)
-		//	change_view_scale(e, x, y, 1.0/ZOOM_FACTOR);
-		//else
-		//	change_radius(e, x, y, 1.0/RADIUS_FACTOR);
+		if (Y == 0) toggle_mode(e, +1);
+		if (Y == 1) shift_param_n(e, +1);
+		if (Y == 2) shift_param_q(e, +1);
 	}
 
 	f->changed = 1;
@@ -627,11 +605,11 @@ int main_mathieu(int argc, char *argv[])
 	init_state(e);
 
 	// init fonts
-	e->font[0] = reformat_font(*xfont_4x6, UNPACKED);
-	e->font[1] = reformat_font(*xfont_6x12, UNPACKED);
-	e->font[2] = reformat_font(*xfont_7x13, UNPACKED);
-	e->font[3] = reformat_font(*xfont_9x15, UNPACKED);
-	e->font[4] = reformat_font(*xfont_10x20, UNPACKED);
+	e->fonts[0] = reformat_font(*xfont_4x6, UNPACKED);
+	e->fonts[1] = reformat_font(*xfont_6x12, UNPACKED);
+	e->fonts[2] = reformat_font(*xfont_7x13, UNPACKED);
+	e->fonts[3] = reformat_font(*xfont_9x15, UNPACKED);
+	e->fonts[4] = reformat_font(*xfont_10x20, UNPACKED);
 
 	// open the window
 	//struct FTR f = ftr_new_window(800,600);
