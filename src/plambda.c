@@ -595,21 +595,25 @@ static double mathieu_se(double n, double q, double z)
 static double mathieu_Mc1(double n, double q, double z)
 {
 	if (!isfinite(n) || !isfinite(q) || !isfinite(z)) return NAN;
+	if (q <= 0) return NAN;
 	return gsl_sf_mathieu_Mc(1, n, q, z);
 }
 static double mathieu_Mc2(double n, double q, double z)
 {
 	if (!isfinite(n) || !isfinite(q) || !isfinite(z)) return NAN;
+	if (q <= 0) return NAN;
 	return gsl_sf_mathieu_Mc(2, n, q, z);
 }
 static double mathieu_Ms1(double n, double q, double z)
 {
 	if (!isfinite(n) || !isfinite(q) || !isfinite(z)) return NAN;
+	if (q <= 0) return NAN;
 	return gsl_sf_mathieu_Ms(1, n, q, z);
 }
 static double mathieu_Ms2(double n, double q, double z)
 {
 	if (!isfinite(n) || !isfinite(q) || !isfinite(z)) return NAN;
+	if (q <= 0) return NAN;
 	return gsl_sf_mathieu_Ms(2, n, q, z);
 }
 static double ellipse_dirichlet(double r, double t,
@@ -3321,10 +3325,14 @@ static int print_examples(void)
 "	plambda zero:WxH \"randn randn randn randn  4 njoin $G * pi sqrt * 2 *\"|blur g $G|plambda - \"x[0] x[1] * x[2] x[3] * - 2 sqrt /\"\n"
 "\n"
 "Periodic component of an image\n"
-"	  cat image|fftsym|fft|plambda \":I :I * :J :J * + *\"|ifft|crop 0 0 `imprintf \"%%w %%h\" image`|fft|plambda \":I :I * :J :J * + / 4 /\"|ifft >pcomponent\n"
+"	cat image|fftsym|fft|plambda \":I :I * :J :J * + *\"|ifft|crop 0 0 `imprintf \"%%w %%h\" image`|fft|plambda \":I :I * :J :J * + / 4 /\"|ifft >pcomponent\n"
 "\n"
 "Periodic component of an image (faster, using external tool)\n"
 "	cat image.png | ppsmooth > pcomponent.png\n"
+"\n"
+"Localized elliptical eigenmode\n"
+"	plambda zero:400x400 \":x :y join 6 * toell dup split rot del 1 199 rox3 mathieu-se rot split del 2 9 rox3 mathieu-Ms1 *\"\n"
+"\n"
 );
 }
 

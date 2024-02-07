@@ -359,21 +359,25 @@ static double mathieu_se(int n, double q, double z)
 static double mathieu_Mc1(int n, double q, double z)
 {
 	if (!isfinite(q) || !isfinite(z)) return NAN;
+	if (q <= 0) return NAN;
 	return gsl_sf_mathieu_Mc(1, n, q, z);
 }
 static double mathieu_Mc2(int n, double q, double z)
 {
 	if (!isfinite(q) || !isfinite(z)) return NAN;
+	if (q <= 0) return NAN;
 	return gsl_sf_mathieu_Mc(2, n, q, z);
 }
 static double mathieu_Ms1(int n, double q, double z)
 {
 	if (!isfinite(q) || !isfinite(z)) return NAN;
+	if (q <= 0) return NAN;
 	return gsl_sf_mathieu_Ms(1, n, q, z);
 }
 static double mathieu_Ms2(int n, double q, double z)
 {
 	if (!isfinite(q) || !isfinite(z)) return NAN;
+	if (q <= 0) return NAN;
 	return gsl_sf_mathieu_Ms(2, n, q, z);
 }
 
