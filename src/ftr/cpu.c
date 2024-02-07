@@ -1262,7 +1262,7 @@ static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 
 cont:
 	// if pixels are "huge", show their values
-	if (e->zoom_factor > 30)
+	if (e->zoom_factor > 30 && e->hud)
 		expose_pixel_values(f);
 
 	// if HUD, expose the hud
