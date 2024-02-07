@@ -22,7 +22,8 @@
 #include "fonts/xfonts_all.c"
 
 // radius of the points
-#define POINT_RADIUS 2.3
+//#define POINT_RADIUS 2.3
+#define POINT_RADIUS 1
 
 // zoom factor for zoom-in and zoom-out
 #define ZOOM_FACTOR 1.43
@@ -343,6 +344,38 @@ static void splat_disk(uint8_t *rgb, int w, int h, float p[2], float r,
 }
 
 
+static double mathieu_ce(int n, double q, double z)
+{
+	if (!isfinite(q) || !isfinite(z)) return NAN;
+	//	fprintf(stderr, "mathieu_ce n=%g q=%g z=%g\n", n, q, z);
+	return gsl_sf_mathieu_ce(n, q, z);
+}
+static double mathieu_se(int n, double q, double z)
+{
+	if (!isfinite(q) || !isfinite(z)) return NAN;
+	//fprintf(stderr, "mathieu_se n=%g q=%g z=%g\n", n, q, z);
+	return gsl_sf_mathieu_se(n, q, z);
+}
+static double mathieu_Mc1(int n, double q, double z)
+{
+	if (!isfinite(q) || !isfinite(z)) return NAN;
+	return gsl_sf_mathieu_Mc(1, n, q, z);
+}
+static double mathieu_Mc2(int n, double q, double z)
+{
+	if (!isfinite(q) || !isfinite(z)) return NAN;
+	return gsl_sf_mathieu_Mc(2, n, q, z);
+}
+static double mathieu_Ms1(int n, double q, double z)
+{
+	if (!isfinite(q) || !isfinite(z)) return NAN;
+	return gsl_sf_mathieu_Ms(1, n, q, z);
+}
+static double mathieu_Ms2(int n, double q, double z)
+{
+	if (!isfinite(q) || !isfinite(z)) return NAN;
+	return gsl_sf_mathieu_Ms(2, n, q, z);
+}
 
 
 
@@ -379,26 +412,25 @@ static void paint_state(struct FTR *f)
 	}
 
 	// plot curve
-	double (*F[4])(int,double,double) = {
-		gsl_sf_mathieu_ce, gsl_sf_mathieu_se
+	double (*F[6])(int,double,double) = {
+		mathieu_ce, mathieu_se,
+		mathieu_Mc1, mathieu_Ms1,
+		mathieu_Mc2, mathieu_Ms2
 	};
 	for (int i = 0; i < e->w; i++)
 	{
 		float x = e->x0 + i * (e->xf - e->x0) / e->w;
-		//float y = sin(x);
 		float y = F[e->m](e->n, e->q, x);
-		//gsl_sf_mathieu_se(e->n, e->q, x);
 		float j = e->h - 1 - e->h * (y - e->y0) / (e->yf - e->y0);
 		float P[2] = {i, j};
-		//if (0 == i%10) fprintf(stderr, "i=%d x=%g y=%g j=%g\n", i, x, y, j);
-		if (0 == i%10)
+		//if (0 == i%10)
 		splat_disk(f->rgb, f->w, f->h, P, POINT_RADIUS, e->rgb_curv);
 	}
 
 	// hud
 	char buf[0x400];
-	snprintf(buf, 0x400, "m = %s\nn = %g\nq = %g\n",
-			e->m==0?"ce":"se", e->n, e->q);
+	char *M[6] = {"ce", "se", "Mc1", "Ms1", "Mc2", "Ms2"};
+	snprintf(buf, 0x400, "m = %s\nn = %g\nq = %g\n", M[e->m], e->n, e->q);
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
 			10, 0, e->rgb_fg, e->rgb_bg, 0, e->font, buf);
 }
@@ -471,7 +503,13 @@ static void event_resize(struct FTR *f, int k, int m, int x, int y)
 	f->changed = 1;
 }
 
-static void toggle_mode(struct viewer_state *e, int s) { e->m = (e->m + s)%2; }
+static void toggle_mode(struct viewer_state *e, int s)
+{
+	e->m += s;
+	if (e->m < 0) e->m = 0;
+	if (e->m >= 6) e->m = 5;
+	fprintf(stderr, "e->m = %d\n", e->m);
+}
 static void shift_param_n(struct viewer_state *e, float s) { e->n += s; }
 static void shift_param_q(struct viewer_state *e, float s) { e->q += s; }
 
@@ -549,47 +587,6 @@ static void event_expose(struct FTR *f, int b, int m, int x, int y)
 }
 
 
-// SECTION 9. Image processing
-
-#include "xmalloc.c"
-//
-//#define PYRAMID_LEVELS 20
-//
-//struct image_pyramid {
-//	float *x[PYRAMID_LEVELS];
-//	int w[PYRAMID_LEVELS];
-//	int h[PYRAMID_LEVELS];
-//	int pd;
-//};
-//
-//static void do_pyramid(struct image_pyramid *p, float *x, int w, int h, int pd)
-//{
-//	fprintf(stderr, "building a multiscale pyramid %d x %d x %d\n",
-//			w, h, pd);
-//
-//	int nw = 1 + ceil(log2(w+1));
-//	int nh = 1 + ceil(log2(h+1));
-//	p->n = (nw + nh + abs(nw - nh))/2;
-//	p->x = xmalloc(n * sizeof*p->x);
-//	p->w = xmalloc(n * sizeof*p->w);
-//	p->h = xmalloc(n * sizeof*p->h);
-//
-//	p->w[0] = w;
-//	p->h[0] = h;
-//	for (int i = 1; i < p->n; i++)
-//
-//
-//	fprintf(stderr, "\t%d x %d\n", nw, nh);
-//}
-//
-//static void free_pyramid(struct image_pyramid *p)
-//{
-//	for (int i = 0; i < pyra i++)
-//		free(p->x[i]);
-//	free(p->x);
-//	free(
-//}
-
 
 
 // SECTION 10. Main Program                                                 {{{1
