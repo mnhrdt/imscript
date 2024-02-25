@@ -515,8 +515,10 @@ uint8_t *create_legend_rgb(char *palette_id, float m, float M, int *ow, int *oh)
 		//uint8_t bg[3] = { 255, 255, 255}, fg[3] = {0, 0, 0};
 		uint8_t *bg = bkg, fg[3] = {0, 0, 0};
 		int X = PLEGEND_HIDE();
+		char *fmt = getenv("PLEGEND_FMT");
+		if (!fmt) fmt = "%g";
 		if (!X)
-			snprintf(buf, sizeof buf, "%g", x);
+			snprintf(buf, sizeof buf, fmt, x);
 		else {
 			snprintf(buf, sizeof buf, "XX%2.2lf", fmod(x,100));
 		}
