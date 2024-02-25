@@ -104,6 +104,31 @@ static void dump_histogram(long double (*h)[2], int n)
 	free(a);
 }
 
+static void dump_histogram_c(long double (*h)[2], int n, char *c)
+{
+	long double (*a)[2] = xmalloc(n*sizeof*a);
+	memcpy(a, h, n*sizeof*a);
+	accumulate_histogram(a, n);
+	printf("set xrange [%Lg:%Lg]\n", h[0][0], h[n-1][0]);
+	printf("set yrange [0:]\n");
+	printf("unset key\n");
+	printf("%s\n", c);
+	printf("plot \"-\" w impulses title \"histogram\", \"-\" w lines title \"accumulated histogram\"");
+	printf("\n");
+	long double m = 0;
+	for (int i = 0; i < n; i++)
+	{
+		if (h[i][1] > m) m = h[i][1];
+		printf("\t%Lg\t%Lg\n", h[i][0], h[i][1]);
+	}
+	printf("end\n");
+	long double f = m/a[n-1][1];
+	for (int i = 0; i < n; i++)
+		printf("\t%Lg\t%Lg\n", a[i][0], f*a[i][1]);
+	printf("end\n");
+	free(a);
+}
+
 static char *help_string_name     = "ghisto";
 static char *help_string_version  = "ghisto 1.0\n\nWritten by eml";
 static char *help_string_oneliner = "compute the histogram of an image, in gnuplot format";
@@ -142,6 +167,7 @@ int main_ghisto(int c, char *v[])
 	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
 
 	bool term_png = pick_option(&c, &v, "p", NULL);
+	char *clean_o = pick_option(&c, &v, "c", "");
 	if (c != 2 && c != 1) {
 		fprintf(stderr, "usage:\n\t%s [in]\n", *v);
 		//                         0   1
@@ -156,7 +182,11 @@ int main_ghisto(int c, char *v[])
 
 	long double (*his)[2] = xmalloc(w * h * sizeof*his);
 	int nh = fill_histogram(his, x, w*h);
-	dump_histogram(his, nh);
+	if (*clean_o)
+		dump_histogram_c(his, nh, clean_o);
+	else
+		dump_histogram(his, nh);
+
 
 	free(x);
 	free(his);
