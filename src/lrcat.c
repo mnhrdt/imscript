@@ -83,7 +83,7 @@ static char *help_string_long     =
 #include "help_stuff.c" // functions that print the strings named above
 int main_lrcat(int c, char *v[])
 {
-	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
+	if (c <= 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
 
 	int margin = atoi(pick_option(&c, &v, "m", "0"));
 	char *filename_out = pick_option(&c, &v, "o", "-");
