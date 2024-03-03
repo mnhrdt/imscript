@@ -3,6 +3,7 @@
 #include <stdlib.h>   // malloc, free, rand, RAND_MAX
 #include "ftr.h"      // ftr
 #include "seconds.c"  // seconds
+#include "random.c"   // random_uniform
 
 
 struct les_state {
@@ -16,8 +17,38 @@ struct les_state {
 
 	// 2. visualization data
 	int n;     // number of active particles
-	float *p;  // particle coordinates
+	float *p;  // particle coordinates (n*2)
 };
+
+static void init_state(struct les_state *e, int w, int h, int n)
+{
+	e->w = w;
+	e->h = h;
+	e->n = n;
+	e->u = malloc(w * n * 2 * sizeof*e->u);
+	e->P = malloc(w * n * 1 * sizeof*e->P);
+	e->p = malloc(w * n * 2 * sizeof*e->p);
+	e->t = 0.1;
+
+}
+
+static void fill_in_fields(struct les_state *e)
+{
+	// horizontal velocity field
+	for (int j = 0; j < e->h; j++)
+	for (int i = 0; i < e->w; i++)
+	for (int k = 0; k < 2; k++)
+		e->u[2*(j*e->w + i) + k] = 1 - k;
+
+	// constant pressure
+	for (int j = 0; j < e->h; j++)
+	for (int i = 0; i < e->w; i++)
+		e->P[j*e->w + i] = 1;
+
+	// uniformly distributed particles
+	for (int i = 0; i < e->n; i++) e->p[2*i + 0] = e->w * random_uniform();
+	for (int i = 0; i < e->n; i++) e->p[2*i + 1] = e->h * random_uniform();
+}
 
 
 // piecewise affine sigmoid
@@ -28,6 +59,31 @@ static float lstep(float a, float b, float t, float x)
 	return t*(x-a)/(b-a);
 }
 
+static bool insideP(int w, int h, int x int y)
+{
+}
+
+
+// CALLBACK : idle
+static void step(struct FTR *f, int x, int y, int k, int m)
+{
+	struct state *e = f->userdata;
+	move_particles(e);
+	evolve_fields(e);
+
+	// black background
+	for (int i = 0; i < 3 * f->w * f->h; i++)
+		f->rgb[i] = 0;
+
+	// put each particle as a red point
+	for (int i = 0; i < n; i++)
+	{
+		int x = lrint(e->p[2*n+0]);
+		int y = lrint(e->p[2*n+0]);
+		if (insideP(x, y, f->w; f->h))
+			f->rgb[3*(y*f->w+x)+0] = 255;
+	}
+}
 
 static void draw_fire(struct FTR *f, int x, int y, int k, int m)
 {
@@ -106,11 +162,13 @@ static void draw_fire(struct FTR *f, int x, int y, int k, int m)
 	f->changed = 1;
 }
 
-static void fire_resize(struct FTR *f, int b, int m, int x, int y)
+// CALLBACK : resize
+static void resize(struct FTR *f, int b, int m, int x, int y)
 {
 	fprintf(stderr, "resize %d %d\n", x, y);
 }
 
+// CALLBACK : key
 static void key(struct FTR *f, int k, int m, int x, int y)
 {
 	if  (k == '\033' || k=='q' || k=='Q')
@@ -118,13 +176,18 @@ static void key(struct FTR *f, int k, int m, int x, int y)
 }
 
 // display another animation
-int main_fire(int c, char *v[])
+int main_les(int c, char *v[])
 {
-	struct FTR f = ftr_new_window(800, 600);
-	ftr_set_handler(&f, "idle", draw_fire);
+	struct les_state e[1];
+	init_state(e, 800, 600, 1000);
+	fill_in_fields(e);
+
+	struct FTR f = ftr_new_window(e->w, e->h);
+	f->userdata = e;
+	ftr_set_handler(&f, "idle", step);
 	ftr_set_handler(&f, "key", key);
 	ftr_set_handler(&f, "button", ftr_handler_toggle_idle);
-	ftr_set_handler(&f, "resize", fire_resize);
+	ftr_set_handler(&f, "resize", resize);
 	ftr_loop_run(&f);
 	ftr_close(&f);
 	return 0;
@@ -132,5 +195,5 @@ int main_fire(int c, char *v[])
 
 int main(int c, char *v[])
 {
-	return main_fire(c, v);
+	return main_les(c, v);
 }
