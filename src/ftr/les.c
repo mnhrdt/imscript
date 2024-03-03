@@ -31,6 +31,7 @@ struct les_state {
 	float *p;  // particle coordinates (n*2)
 
 	// 4. ui
+	float r; // point radius
 	struct bitmap_font font[1];
 };
 
@@ -44,6 +45,7 @@ static void init_state(struct les_state *e, int w, int h, int n)
 	e->T = malloc(w * n * 1 * sizeof*e->T);
 	e->p = malloc(w * n * 2 * sizeof*e->p);
 	e->t = 0.3;
+	e->r = 2.3;
 
 	e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
 }
@@ -94,7 +96,7 @@ static void move_particles(struct les_state *e)
 		float u[2];
 		bilinear_interpolation_vec_at(u, e->u, e->w,e->h, 2, x[0],x[1]);
 		for (int k = 0; k < 2; k++)
-			x[k] += u[k] * e->t + e->T0*(random_laplace());
+			x[k] += u[k] * e->t + e->T0*(random_normal());
 		x[0] = fmod2(x[0], e->w);
 		x[1] = fmod2(x[1], e->h);
 	}
@@ -111,6 +113,27 @@ static bool insideP(int w, int h, int x, int y)
 	return  x >= 0  &&  y >= 0  &&  x < w  &&  y < h;
 }
 
+static void splat_disk(uint8_t *rgb, int w, int h, float p[2], float r,
+		uint8_t color[3])
+{
+	for (int j = -r-1 ; j <= r+1; j++)
+	for (int i = -r-1 ; i <= r+1; i++)
+	if (hypot(i, j) < r)
+	{
+		int ii = p[0] + i;
+		int jj = p[1] + j;
+		float R = hypot(ii - p[0], jj - p[1]);
+		if (R >= r) continue;
+		if (insideP(w, h, ii, jj))
+		{
+			float a = pow(R/r, 2);
+			for (int k = 0; k < 3; k++)
+				//rgb[3*(w*jj+ii)+k] = color[k];
+				rgb[3*(w*jj+ii)+k] = a*255 + (1-a)*color[k];
+		}
+	}
+}
+
 // CALLBACK : idle
 static void step(struct FTR *f, int x, int y, int k, int m)
 {
@@ -118,122 +141,42 @@ static void step(struct FTR *f, int x, int y, int k, int m)
 	move_particles(e);
 	evolve_fields(e);
 
-	// black background
+	// white background
 	for (int i = 0; i < 3 * f->w * f->h; i++)
-		f->rgb[i] = 0;
+		f->rgb[i] = 255;
 
 	// put each particle as a red point
+	uint8_t red[3] = {255, 0, 0};
+	uint8_t green[3] = {0, 255, 0};
+	uint8_t white[3] = {255, 255, 255};
+	uint8_t black[3] = {0, 0, 0};
 	for (int i = 0; i < e->n; i++)
 	{
-		int x = lrint(e->p[2*i+0]);
-		int y = lrint(e->p[2*i+1]);
-		if (i == 0)
-		{
-			if (insideP(f->w, f->h, x, y))
-				f->rgb[3*(y*f->w+x)+1] = 255;
-		} else {
-			if (insideP(f->w, f->h, x, y))
-			{
-				f->rgb[3*(y*f->w+x)+0] = 255;
-				f->rgb[3*(y*f->w+x)+1] = 255;
-				f->rgb[3*(y*f->w+x)+2] = 255;
-			}
-		}
+		//int x = lrint(e->p[2*i+0]);
+		//int y = lrint(e->p[2*i+1]);
+		float *p = e->p + 2 * i;
+		float r = e->r;
+		uint8_t *color = black;
+		if (i == 0) color = red;
+		if (i == 1) color = green;
+		splat_disk(f->rgb, f->w, f->h, p, r, color);
 	}
 
 	// hud
 	uint8_t fg[3] = {0, 255, 0};
 	//uint8_t bg[3] = {0, 0, 0};
 	char buf[0x200];
-	snprintf(buf, 0x200, "s = %g\nT0 = %g\n", e->t, e->T0);
+	snprintf(buf, 0x200, "s = %g\nT0 = %g\nr = %g\n", e->t, e->T0, e->r);
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
 			0, 0+0, fg, NULL, 0, e->font, buf);
-}
 
-// piecewise affine sigmoid
-static float lstep(float a, float b, float t, float x)
-{
-	if (x < a) return 0;
-	if (x > b) return t;
-	return t*(x - a)/(b - a);
-}
-
-static void draw_fire(struct FTR *f, int x, int y, int k, int m)
-{
-	// measure time
-	static int cx = 0;
-	cx += 1;
-	if (0 == cx % 100) {
-		static double os = 0;
-		double s = seconds();
-		double dif = s - os;
-		double fps = 100/dif;
-		fprintf(stdout, "CX = %d\t%g FPS\n", cx++, fps);
-		os = s;
-	}
-
-	// build palette
-	static unsigned char *pal = NULL;
-	if (!pal) {
-		pal = malloc(3*256);
-		for (int i = 0; i < 256; i++) {
-			pal[3*i+0] = lstep(0,105,255,i);
-			pal[3*i+1] = lstep(60,120,255,i);
-			pal[3*i+2] = lstep(150,160,255,i);
-		}
-	}
-
-	int num_lines_bottom = 5;
-	int num_lines_hidden = 25;
-
-	// build buffer
-	static float *t = NULL;
-	static int w = 0;
-	static int h = 0;
-	if (!f || w != f->w || h != f->h + num_lines_hidden) {
-		w = f->w;
-		h = f->h + num_lines_hidden;
-		if (t) free(t);
-		t = malloc(w * h * sizeof*f);
-		for (int i = 0; i < w*h; i++)
-			t[i] = 104;
-		cx = 0;
-	}
-
-	// draw random values at the bottom
-	int p = 0;
-	int rfac = cx < 75 ? 200 : 10;
-	for (int j = 0; j < num_lines_bottom; j++)
-	for (int i = 0; i < w; i++) {
-		t[p] = fmod(t[p] + rfac*(rand()/(1.0+RAND_MAX)),256);
-		p++;
-	}
-
-	// paint pixels by combining lower rows
-	for (int j = h-1; j >= num_lines_bottom; j--)
-	for (int i = 0; i < w; i++) {
-		p = j*w+i;
-		t[p+2*w+1] = (1.5*t[p-3*w] + 1.7 * t[p-2*w+1]
-				+ 1.5 * t[p-4*w] + 1.9 * t[p-3*w-1]
-				+ 1.0 * t[p-1*w-2]
-				+1.9 * t[p-4*w+1]
-			) / 9.51;
-	}
-
-	// render with palette
-	for (int j = 0; j < h-num_lines_hidden; j++)
-	for (int i = 0; i < w; i++)
-	{
-		int iidx = w*(h-j-1) + i;
-		int idx = (unsigned char)(lstep(105,145,255,t[iidx]));
-		int pos = w*j + i;
-		f->rgb[3*pos+0] = pal[3*idx+0];
-		f->rgb[3*pos+1] = pal[3*idx+1];
-		f->rgb[3*pos+2] = pal[3*idx+2];
-	}
+	// invert palette
+	for (int i = 0; i < f->w * f->h * 3; i++)
+		f->rgb[i] = 255 - f->rgb[i];
 
 	f->changed = 1;
 }
+
 
 // CALLBACK : resize
 static void resize(struct FTR *f, int b, int m, int x, int y)
@@ -249,6 +192,7 @@ static void key(struct FTR *f, int k, int m, int x, int y)
 }
 
 static void scale_timestep(struct les_state *e, float f) { e->t *= f; }
+static void scale_pointradius(struct les_state *e, float f) { e->r *= f; }
 static void shift_base_temp(struct les_state *e, float f)
 {
 	e->T0 += f;
@@ -260,18 +204,20 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 {
 	struct les_state *e = f->userdata;
 
-	// s, T0 hitboxes of font height
-	// 0  1
+	// s, T0, r hitboxes of font height
+	// 0  1   2
 	int Y = y / e->font->height;
 	if (k == FTR_BUTTON_DOWN)
 	{
-		if (Y == 0) scale_timestep(e, 1/1.3);
+		if (Y == 0) scale_timestep(e, 1/1.2);
 		if (Y == 1) shift_base_temp(e, -0.01);
+		if (Y == 2) scale_pointradius(e, 1/1.1);
 	}
 	if (k == FTR_BUTTON_UP)
 	{
-		if (Y == 0) scale_timestep(e, 1.3);
+		if (Y == 0) scale_timestep(e, 1.2);
 		if (Y == 1) shift_base_temp(e, 0.01);
+		if (Y == 2) scale_pointradius(e, 1.1);
 	}
 
 	f->changed = 1;
