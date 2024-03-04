@@ -126,10 +126,10 @@ static void invert_point_classic(float y[2], float c[2], float R, float x[2])
 static void invert_point_gamma(float y[2], float c[2], float R, float x[2])
 {
 	// warning: don't use
-	float gamma = 2;
+	float gamma = 0.01;
 	float r = hypot(x[0] - c[0], x[1] - c[1]);
-	y[0] = c[0] + R*(x[0] - c[0])/(r*r*r);
-	y[1] = c[1] + R*(x[1] - c[1])/(r*r*r);
+	y[0] = c[0] + R*(x[0] - c[0])/pow(r, gamma);
+	y[1] = c[1] + R*(x[1] - c[1])/pow(r, gamma);
 }
 
 // "katz inversion"
@@ -146,6 +146,7 @@ static void invert_point_flip(float y[2], float c[2], float R, float x[2])
 static void invert_point(float y[2], float c[2], float R, float x[2])
 {
 	invert_point_flip(y, c, R, x);
+	//invert_point_gamma(y, c, R, x);
 }
 
 

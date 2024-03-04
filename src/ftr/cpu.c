@@ -441,7 +441,7 @@ static void action_qauto2(struct FTR *f)
 static void action_toggle_roi(struct FTR *f, int x, int y, int dir)
 {
 	struct pan_state *e = f->userdata;
-	e->roi = (e->roi + (dir?-1:1)) % 3;
+	e->roi = (e->roi + (dir?-1:1)) % 4;
 	//fprintf(stderr, "ROI SWITCH(%d) = %d\n", dir, e->roi);
 	e->roi_x = x - e->roi_w / 2;
 	e->roi_y = y - e->roi_w / 2;
@@ -838,13 +838,13 @@ static void autocorrelation_roi(float *y, float *x, int n)
 
 static void transform_roi_buffers(float *y, float *x, int n, int roi)
 {
-	//if (roi == 4) { circular_roi(y, x, n); return; }
+	if (roi == 4) { circular_roi(y, x, n); return; }
 	float x_p0[3*n*n], *x_p = x_p0;
 	ppsmooth_vec(x_p0, x, n, n, 3);
 	if (roi == 1) { fourier_roi(y, x_p, n); return; }
 	if (roi == 2) { autocorrelation_roi(y, x_p, n); return; }
-	//if (roi == 2) x_p = x;
-	//if (roi == 3) { for (int i = 0; i < 3*n*n; i++) y[i]=x_p0[i]; return; }
+	if (roi == 2) x_p = x;
+	if (roi == 3) { for (int i = 0; i < 3*n*n; i++) y[i]=x_p0[i]; return; }
 }
 
 // TODO: combine "colormap3" and "pixel"

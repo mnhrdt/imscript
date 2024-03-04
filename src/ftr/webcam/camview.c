@@ -97,7 +97,7 @@ int main()
 	// camera stuff
 	int w = 800;
 	int h = 600;
-	e->c = camera_begin("/dev/video2", w, h); // XXX: depends on cam!
+	e->c = camera_begin("/dev/video0", w, h); // XXX: depends on cam!
 
 	e->prev = malloc(2*3 * w * h);
 	e->diff_mode = 0;

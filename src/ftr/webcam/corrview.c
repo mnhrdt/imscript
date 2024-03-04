@@ -262,9 +262,9 @@ int main()
 	struct kam_state e[1];
 
 	// camera stuff
-	int w = 800;
-	int h = 600;
-	e->c = camera_begin("/dev/video2", w, h); // XXX: depends on cam!
+	int w = 640;//800;
+	int h = 480;//600;
+	e->c = camera_begin("/dev/video0", w, h); // XXX: depends on cam!
 
 	e->prev = malloc(2*3 * w * h);
 	e->diff_mode = 0;
