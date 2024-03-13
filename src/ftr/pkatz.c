@@ -237,6 +237,19 @@ static void compute_red_points_convex_hull(struct viewer_state *e)
 
 
 // SECTION 4. Biasutti's algorithm                                          {{{1
+
+// angle comparison function
+static float angle_dist(float a, float b)
+{
+	return M_PI - fabs(fmod(fabs(a - b), 2*M_PI) - M_PI);
+}
+
+static float point_dist(float *a, float *b)
+{
+	return hypot(a[0] - b[0], a[1] - b[1]);
+}
+
+// main algorithm
 static void biasutti(struct viewer_state *e)
 {
 	// compute and sort the angles of each point
@@ -252,7 +265,34 @@ static void biasutti(struct viewer_state *e)
 	int t[e->n][e->N];
 	for (int i = 0; i < e->n; i++)
 	{
-		;
+		int n = 0;      // total number of points so far
+		int p = i + 1;  // current candidate in the PLUS direction
+		int m = i - 1;  // current candidate in the MINUS direction
+		do {
+			if (m < 0) m += e->N;
+			if (p >= e->N) p -= e->N;
+			assert(m >= 0); assert(p >= 0);
+			assert(m < e->N); assert(p < e->N);
+			float dp = angle_dist(a[2*i+0], a[2*(i+p)+0]);
+			float dm = angle_dist(a[2*i+0], a[2*(i+m)+0]);
+			if (dp <= dm)
+				t[i][n++] = p++;
+			else
+				t[i][n++] = m--;
+		} while (n < e->N && n < e->n);
+	}
+
+	// compute the energy of each point
+	float E[e->n];
+	for (int i = 0; i < e->n; i++)
+	{
+		int im = a[2*t[i][ 0      ]+1]; // index of closest neighbor
+		int iM = a[2*t[i][e->N - 1]+1]; // index of farthest neighbor
+		float di = point_dist(e->c, e->x + 2*i );
+		float dm = point_dist(e->c, e->x + 2*im);
+		float dM = point_dist(e->c, e->x + 2*iM);
+		float x = (di - dm) / (dM - dm);
+		E[i] = exp(-x*x);
 	}
 }
 
