@@ -29,14 +29,22 @@ struct viewer_state {
 	int n;       // number of points
 	float *x;    // point coordinates (x[2*i+0], x[2*i+1]) for 0<=i<n
 
-	// computed point data (intermediary)
+	// general data used for all methods
+	float c[2];  // center of view
+
+	int mode; // 0=katz, 1=biasutti
+
+	// katz-specific data
+	float r;     // radius of inversion
 	float *y;    // coordinates of inverted points
 	float *z;    // coordinates of the points of the convex hull
 	int m;       // number of points in the convex hull
 
-	// katz
-	float c[2];  // center of view
-	float r;     // radius of inversion
+	// biasutti-specific data
+	int N;   // number of knn points
+	float a; // a-parameter (between 0 and 1)
+
+
 
 	// window viewport
 	float offset[2];
@@ -228,8 +236,28 @@ static void compute_red_points_convex_hull(struct viewer_state *e)
 }
 
 
+// SECTION 4. Biasutti's algorithm                                          {{{1
+static void biasutti(struct viewer_state *e)
+{
+	// compute and sort the angles of each point
+	float a[2*e->n]; // [angle,index]
+	for (int i = 0; i < e->n; i++)
+	{
+		a[2*i+0] = atan2(e->x[2*i+1], e->x[2*i+0]);
+		a[2*i+1] = i;
+	}
+	qsort(a, e->n, 2*sizeof*a, compare_points_lexicographically);
+
+	// for each of the n point, find its N nearest neighbors
+	int t[e->n][e->N];
+	for (int i = 0; i < e->n; i++)
+	{
+		;
+	}
+}
+
 
-// SECTION 4. Coordinate Conversions                                        {{{1
+// SECTION 5. Coordinate Conversions                                        {{{1
 
 // "view"   : coordinates in the infinite plane where the points are located
 // "window" : coordinates in the window, which is a rectangluar piece of "view"
