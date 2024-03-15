@@ -512,7 +512,7 @@ static void draw_view_center(struct FTR *f)
 		f->rgb[3*(f->w*jj+ii)+1]=255;
 }
 
-static void draw_red_points(struct FTR *f)
+static void draw_x_points_in_red(struct FTR *f)
 {
 	struct viewer_state *e = f->userdata;
 
@@ -530,7 +530,7 @@ static void draw_red_points(struct FTR *f)
 	}
 }
 
-static void draw_gray_points(struct FTR *f)
+static void draw_y_points_in_gray(struct FTR *f)
 {
 	struct viewer_state *e = f->userdata;
 
@@ -563,7 +563,7 @@ static void draw_gray_points(struct FTR *f)
 //	}
 //}
 
-static void draw_inversion_circle(struct FTR *f)
+static void draw_c_circle_in_green(struct FTR *f)
 {
 	struct viewer_state *e = f->userdata;
 	float P[2];
@@ -572,10 +572,9 @@ static void draw_inversion_circle(struct FTR *f)
 }
 
 
-
 // Paint the whole scene
 // This function is called whenever the window needs to be redisplayed.
-static void paint_state(struct FTR *f)
+static void paint_state_katz(struct FTR *f)
 {
 	struct viewer_state *e = f->userdata;
 
@@ -583,13 +582,13 @@ static void paint_state(struct FTR *f)
 	for (int i = 0 ; i < f->w * f->h * 3; i++)
 		f->rgb[i] = 255; // white
 
-	draw_red_points(f);
+	draw_x_points_in_red(f);
 	draw_view_center(f);
-	draw_inversion_circle(f);
+	draw_c_circle_in_green(f);
 
 	compute_points_inversion(e);
 	if (e->show_debug)
-		draw_gray_points(f);
+		draw_y_points_in_gray(f);
 
 	compute_red_points_convex_hull(e);
 	for (int i = 0; i < e->m - 1; i++)
@@ -615,6 +614,30 @@ static void paint_state(struct FTR *f)
 	}
 }
 
+static void paint_state_biasutti(struct FTR *f)
+{
+	struct viewer_state *e = f->userdata;
+
+	// clear canvas
+	for (int i = 0 ; i < f->w * f->h * 3; i++)
+		f->rgb[i] = 255; // white
+
+	draw_x_points_in_red(f);
+	draw_view_center(f);
+
+	//run_biasutti();
+}
+
+static void paint_state(struct FTR *f)
+{
+	struct viewer_state *e = f->userdata;
+
+	if (e->mode == 0)
+		paint_state_katz(f);
+	if (e->mode == 1)
+		paint_state_biasutti(f);
+
+}
 
 
 // SECTION 8. User-Interface Actions and Events                             {{{1
