@@ -774,6 +774,52 @@ static int main_dumptry(int c, char **v)
 	return 0;
 }
 
+void font_fill_from_string(struct bitmap_font *f, char *s)
+{
+	struct bitmap_font **F = xfonts_all;
+	do if (0 == strcmp(6+(*F)->name, s)) break; while(*++F);
+	if (*F)
+		f[0] = reformat_font(**F, UNPACKED);
+	else
+		font_fill_from_bdf(f, s);
+}
+
+static int main_topng(int c, char **v)
+{
+	if (c != 2 && c != 3) {
+		fprintf(stderr, "usage:\n\t"
+			"%s [font [out.png]]\n", *v);
+		//        0  1     2
+		return 1;
+	}
+	char *font_string = c > 1 ? v[1] : "-";
+	char *filename_out = c > 2 ? v[2] : "-";
+
+	struct bitmap_font f[1];
+	font_fill_from_string(f, font_string);
+
+	int w = 32 * f->width;
+	int h = ceil(f->height * f->number_of_glyphs / 32.0);
+	float *x = malloc(w * h * sizeof*x);
+	float bg[] = {255};
+	float fg[] = {0};
+	for (int i = 0; i < w*h; i++)
+		x[i] = *bg;
+	for (int i = 0; i < f->number_of_glyphs; i++)
+	{
+		char t[1] = {i};
+		put_string_in_float_image(x, w, h, 1,
+				f->width * (i % 32), f->height * (i / 32),
+				fg, bg, 0, f, t);
+	}
+
+	void iio_write_image_float_vec(char*,float*,int,int,int);
+	iio_write_image_float_vec(filename_out, x, w, h, 1);
+
+
+	return 0;
+}
+
 // fontu puts [-f bdf] [-c color] "string" [in.png [out.png]]
 
 #include "iio.h"
@@ -799,12 +845,13 @@ static int main_puts(int c, char **v)
 	char *filename_out = c > 6 ? v[6] : "-";
 
 	struct bitmap_font f[1];
-	struct bitmap_font **F = xfonts_all;
-	do if (0 == strcmp(6+(*F)->name, bdf)) break; while(*++F);
-	if (*F)
-		f[0] = reformat_font(**F, UNPACKED);
-	else
-		font_fill_from_bdf(f, bdf);
+	font_fill_from_string(f, bdf);
+	//struct bitmap_font **F = xfonts_all;
+	//do if (0 == strcmp(6+(*F)->name, bdf)) break; while(*++F);
+	//if (*F)
+	//	f[0] = reformat_font(**F, UNPACKED);
+	//else
+	//	font_fill_from_bdf(f, bdf);
 
 	int w, h, pd;
 	float *x = iio_read_image_float_vec(filename_in, &w, &h, &pd);
@@ -841,6 +888,7 @@ int main_fontu(int c, char **v)
 	else if (0 == strcmp(v[1], "cdump")) return main_cdump(c-1, v+1);
 	else if (0 == strcmp(v[1], "cdumpf")) return main_cdumpf(c-1, v+1);
 	else if (0 == strcmp(v[1], "dumptry")) return main_dumptry(c-1, v+1);
+	else if (0 == strcmp(v[1], "topng")) return main_topng(c-1, v+1);
 	else if (0 == strcmp(v[1], "puts")) return main_puts(c-1, v+1);
 	else if (0 == strcmp(v[1], "list")) return main_list(c-1, v+1);
 	else {
