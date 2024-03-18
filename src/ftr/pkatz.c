@@ -42,7 +42,12 @@ struct viewer_state {
 
 	// biasutti-specific data
 	int N;   // number of knn points
-	float a; // a-parameter (between 0 and 1)
+	float alpha; // a-parameter (between 0 and 1)
+	float *P; // coordinates of chosen points
+	//int *closest; // index of closest point
+	//int *farthest; // index of farthest point
+
+
 
 
 
@@ -265,10 +270,12 @@ static void biasutti(struct viewer_state *e)
 	int t[e->n][e->N];
 	for (int i = 0; i < e->n; i++)
 	{
+		fprintf(stderr, "i=%d\n", i);
 		int n = 0;      // total number of points so far
 		int p = i + 1;  // current candidate in the PLUS direction
 		int m = i - 1;  // current candidate in the MINUS direction
 		do {
+			fprintf(stderr, "\tn=%d p=%d m=%d\n", n, p, m);
 			if (m < 0) m += e->N;
 			if (p >= e->N) p -= e->N;
 			assert(m >= 0); assert(p >= 0);
@@ -293,6 +300,17 @@ static void biasutti(struct viewer_state *e)
 		float dM = point_dist(e->c, e->x + 2*iM);
 		float x = (di - dm) / (dM - dm);
 		E[i] = exp(-x*x);
+	}
+
+	// fill-in the passing points in angular order
+	e->m = 0;
+	for (int i = 0; i < e->n; i++)
+	if (E[i] < e->alpha)
+	{
+		int j = a[2*i+1]; // original index
+		e->P[2*e->m + 0] = e->x[2*j+0];
+		e->P[2*e->m + 1] = e->x[2*j+1];
+		e->m += 1;
 	}
 }
 
@@ -625,7 +643,20 @@ static void paint_state_biasutti(struct FTR *f)
 	draw_x_points_in_red(f);
 	draw_view_center(f);
 
-	//run_biasutti();
+	biasutti(e); // always recompute energies
+	for (int i = 0; i < e->m - 1; i++)
+	{
+		float P[2], Q[2], C[2];
+		map_view_to_window(e, P, e->P + 2*i);
+		map_view_to_window(e, Q, e->P + 2*i + 2);
+		map_view_to_window(e, C, e->c);
+		//if (det(P, Q, C) > 0)
+		{
+			plot_segment_blue(f, P[0], P[1], Q[0], Q[1]);
+			uint8_t blue[3] = {0, 0, 255};
+			splat_disk(f->rgb, f->w, f->h, P, POINT_RADIUS, blue);
+		}
+	}
 }
 
 static void paint_state(struct FTR *f)
@@ -711,6 +742,7 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if (k >= '0' && k <= '9') e->interpolation_order = k - '0';
 	if (k == '.') e->show_grid_points = !e->show_grid_points;
 	if (k == 'd') e->show_debug = !e->show_debug;
+	if (k == 'm') e->mode = !e->mode;
 	//if (k == 'a') e->restrict_to_affine = !e->restrict_to_affine;
 
 	e->dragging_window_point = e->dragging_image_point = false;
@@ -880,7 +912,11 @@ int main_pkatz(int argc, char *argv[])
 	e->x = read_ascii_floats(stdin, &e->n);
 	e->y = malloc(e->n * sizeof*e->y);
 	e->z = malloc(e->n * sizeof*e->y);
+	e->P = malloc(e->n * sizeof*e->P);
 	e->n /= 2;
+	e->mode = 0; // 0=katz, 1=biasutti
+	e->alpha = 0.5;
+	e->N = 13;
 	fprintf(stderr, "read %d points from stdin\n", e->n);
 	//compute_points_inversion(e);
 
