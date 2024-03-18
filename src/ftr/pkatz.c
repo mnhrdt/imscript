@@ -261,32 +261,43 @@ static void biasutti(struct viewer_state *e)
 	float a[2*e->n]; // [angle,index]
 	for (int i = 0; i < e->n; i++)
 	{
-		a[2*i+0] = atan2(e->x[2*i+1], e->x[2*i+0]);
+		a[2*i+0] = atan2(e->x[2*i+1] - e->c[1], e->x[2*i+0] - e->c[0]);
 		a[2*i+1] = i;
 	}
 	qsort(a, e->n, 2*sizeof*a, compare_points_lexicographically);
+	//for (int i = 0; i < e->n; i++)
+	//	fprintf(stderr, "a[%d] = %g %g\n", i, a[2*i+0], a[2*i+1]);
+
 
 	// for each of the n point, find its N nearest neighbors
 	int t[e->n][e->N];
 	for (int i = 0; i < e->n; i++)
 	{
-		fprintf(stderr, "i=%d\n", i);
+		//fprintf(stderr, "i=%d\n", i);
 		int n = 0;      // total number of points so far
 		int p = i + 1;  // current candidate in the PLUS direction
 		int m = i - 1;  // current candidate in the MINUS direction
-		do {
-			fprintf(stderr, "\tn=%d p=%d m=%d\n", n, p, m);
-			if (m < 0) m += e->N;
-			if (p >= e->N) p -= e->N;
+		while (n < e->N && n < e->n)
+		{
+			//fprintf(stderr, "\tn=%d p=%d m=%d ", n, p, m);
+			if (m < 0) m += e->n;
+			if (p >= e->n) p -= e->n;
+			//fprintf(stderr, "\t(p=%d m=%d) ", p, m);
 			assert(m >= 0); assert(p >= 0);
-			assert(m < e->N); assert(p < e->N);
-			float dp = angle_dist(a[2*i+0], a[2*(i+p)+0]);
-			float dm = angle_dist(a[2*i+0], a[2*(i+m)+0]);
+			assert(m < e->n); assert(p < e->n);
+			float dp = angle_dist(a[2*i+0], a[2*p+0]);
+			float dm = angle_dist(a[2*i+0], a[2*m+0]);
+			//fprintf(stderr, "\t{ai=%g ap=%g am=%g}",
+			//		a[2*i+0],
+			//		a[2*p+0],
+			//		a[2*m+0]
+			//		);
+			//fprintf(stderr, "\t(dp=%g dm=%g)\n", dp, dm);
 			if (dp <= dm)
 				t[i][n++] = p++;
 			else
 				t[i][n++] = m--;
-		} while (n < e->N && n < e->n);
+		}
 	}
 
 	// compute the energy of each point
@@ -300,18 +311,20 @@ static void biasutti(struct viewer_state *e)
 		float dM = point_dist(e->c, e->x + 2*iM);
 		float x = (di - dm) / (dM - dm);
 		E[i] = exp(-x*x);
+		//fprintf(stderr, "E[%d] = %g\n", i, E[i]);
 	}
 
 	// fill-in the passing points in angular order
 	e->m = 0;
 	for (int i = 0; i < e->n; i++)
-	if (E[i] < e->alpha)
+	if (E[i] > e->alpha)
 	{
 		int j = a[2*i+1]; // original index
 		e->P[2*e->m + 0] = e->x[2*j+0];
 		e->P[2*e->m + 1] = e->x[2*j+1];
 		e->m += 1;
 	}
+	fprintf(stderr, "m=%d/%d\n", e->m, e->n);
 }
 
 
@@ -915,7 +928,7 @@ int main_pkatz(int argc, char *argv[])
 	e->P = malloc(e->n * sizeof*e->P);
 	e->n /= 2;
 	e->mode = 0; // 0=katz, 1=biasutti
-	e->alpha = 0.5;
+	e->alpha = 0.99;
 	e->N = 13;
 	fprintf(stderr, "read %d points from stdin\n", e->n);
 	//compute_points_inversion(e);
