@@ -11,6 +11,13 @@
 //// user interface library
 #include "ftr.h"
 
+
+// bitmap fonts
+#define OMIT_MAIN_FONTU
+#include "fontu.c"
+#include "fonts/xfonts_all.c"
+
+
 // radius of the disks that are displayed around control points
 #define DISK_RADIUS 7.3
 
@@ -47,6 +54,10 @@ struct viewer_state {
 	//int *closest; // index of closest point
 	//int *farthest; // index of farthest point
 
+	// debug stuff
+	int i; // current debug point
+	float knni[100]; // global indices of debug point angle neighbors
+	float Ni[100][2]; // coordinates of debug point angle neighbors
 
 
 
@@ -69,6 +80,8 @@ struct viewer_state {
 	bool show_grid_points;
 	bool restrict_to_affine;
 	bool show_debug; // show inverted points and full qhulls
+
+	struct bitmap_font font[1];
 };
 
 
@@ -265,38 +278,59 @@ static void biasutti(struct viewer_state *e)
 		a[2*i+1] = i;
 	}
 	qsort(a, e->n, 2*sizeof*a, compare_points_lexicographically);
-	//for (int i = 0; i < e->n; i++)
-	//	fprintf(stderr, "a[%d] = %g %g\n", i, a[2*i+0], a[2*i+1]);
+	for (int i = 0; i < e->n; i++)
+		fprintf(stderr, "a[%d] = %g %g\n", i, a[2*i+0], a[2*i+1]);
 
 
-	// for each of the n point, find its N nearest neighbors
+	// for each of the n point, find its N nearest neighbors (in angle)
 	int t[e->n][e->N];
 	for (int i = 0; i < e->n; i++)
 	{
-		//fprintf(stderr, "i=%d\n", i);
+		if(i==e->i)fprintf(stderr, "i=%d\n", i);
 		int n = 0;      // total number of points so far
 		int p = i + 1;  // current candidate in the PLUS direction
 		int m = i - 1;  // current candidate in the MINUS direction
 		while (n < e->N && n < e->n)
 		{
-			//fprintf(stderr, "\tn=%d p=%d m=%d ", n, p, m);
+			if(i==e->i)fprintf(stderr, "\tn=%d p=%d m=%d ",n,p,m);
 			if (m < 0) m += e->n;
 			if (p >= e->n) p -= e->n;
-			//fprintf(stderr, "\t(p=%d m=%d) ", p, m);
+			if (i==e->i)fprintf(stderr, "\t(p=%d m=%d) ", p, m);
 			assert(m >= 0); assert(p >= 0);
 			assert(m < e->n); assert(p < e->n);
 			float dp = angle_dist(a[2*i+0], a[2*p+0]);
 			float dm = angle_dist(a[2*i+0], a[2*m+0]);
-			//fprintf(stderr, "\t{ai=%g ap=%g am=%g}",
-			//		a[2*i+0],
-			//		a[2*p+0],
-			//		a[2*m+0]
-			//		);
-			//fprintf(stderr, "\t(dp=%g dm=%g)\n", dp, dm);
+			if(i==e->i)fprintf(stderr, "\t{ai=%g ap=%g am=%g}",
+					a[2*i+0],
+					a[2*p+0],
+					a[2*m+0]
+					);
+			if(i==e->i)fprintf(stderr, "\t(dp=%g dm=%g)\n", dp, dm);
 			if (dp <= dm)
 				t[i][n++] = p++;
 			else
 				t[i][n++] = m--;
+		}
+		if(i==e->i) {
+			for (int j = 0; j < e->N; j++)
+			{
+				int tij = t[i][j];
+				fprintf(stderr, "\tt[%d][%d] = %d\t"
+						"a[2*%d+0,1] = %g %g\n",
+					       	i, j, tij,
+						tij,
+						a[2*tij+0],
+						a[2*tij+1]);
+			}
+		}
+		if (i==e->i) {
+			for (int j = 0; j < e->N; j++)
+			if (j < 100)
+			{
+				int k = a[2*t[i][j]+1];
+				e->Ni[j][0] = e->x[2*k+0];
+				e->Ni[j][1] = e->x[2*k+1];
+			}
 		}
 	}
 
@@ -304,11 +338,30 @@ static void biasutti(struct viewer_state *e)
 	float E[e->n];
 	for (int i = 0; i < e->n; i++)
 	{
-		int im = a[2*t[i][ 0      ]+1]; // index of closest neighbor
-		int iM = a[2*t[i][e->N - 1]+1]; // index of farthest neighbor
-		float di = point_dist(e->c, e->x + 2*i );
-		float dm = point_dist(e->c, e->x + 2*im);
-		float dM = point_dist(e->c, e->x + 2*iM);
+		int im = 0; // neighbor index of closest neighbor of i
+		int iM = 0; // neighbor index of farthest neighbor of i
+		for (int j = 0; j < e->N; j++)
+		{
+			// global indices
+			int gj = a[2*t[i][j ]+1];
+			int gm = a[2*t[i][im]+1];
+			int gM = a[2*t[i][iM]+1];
+			float dj = point_dist(e->c, e->x + 2*gj);
+			float dm = point_dist(e->c, e->x + 2*gm);
+			float dM = point_dist(e->c, e->x + 2*gM);
+			if (dj < dm) im = j;
+			if (dj > dM) iM = j;
+			if(i==e->i)
+			fprintf(stderr, "j=%d dj=%g dm=%g dM=%g im=%d iM=%d\n",
+					j, dj, dm, dM, im, iM);
+		}
+		float di = point_dist(e->c, e->x + 2*i);
+		float dm = point_dist(e->c, e->x + 2*(int)a[2*t[i][im]+1]);
+		float dM = point_dist(e->c, e->x + 2*(int)a[2*t[i][iM]+1]);
+		if(i==e->i)
+		fprintf(stderr, "i=%d di dm dM = %g %g %g\n", i, di, dm, dM);
+		//assert(di <= dM);
+		//assert(dm <= di);
 		float x = (di - dm) / (dM - dm);
 		E[i] = exp(-x*x);
 		//fprintf(stderr, "E[%d] = %g\n", i, E[i]);
@@ -325,6 +378,7 @@ static void biasutti(struct viewer_state *e)
 		e->m += 1;
 	}
 	fprintf(stderr, "m=%d/%d\n", e->m, e->n);
+
 }
 
 
@@ -653,23 +707,44 @@ static void paint_state_biasutti(struct FTR *f)
 	for (int i = 0 ; i < f->w * f->h * 3; i++)
 		f->rgb[i] = 255; // white
 
+	// draw input data
 	draw_x_points_in_red(f);
 	draw_view_center(f);
 
-	biasutti(e); // always recompute energies
-	for (int i = 0; i < e->m - 1; i++)
+	// recompute energies (always)
+	biasutti(e);
+
+	// draw visible polygon
+	for (int i = 0; i < e->m; i++)
 	{
 		float P[2], Q[2], C[2];
 		map_view_to_window(e, P, e->P + 2*i);
-		map_view_to_window(e, Q, e->P + 2*i + 2);
+		map_view_to_window(e, Q, e->P + 2*((i+1)%e->m));
 		map_view_to_window(e, C, e->c);
-		//if (det(P, Q, C) > 0)
+		if (det(P, Q, C) > 0)
 		{
 			plot_segment_blue(f, P[0], P[1], Q[0], Q[1]);
 			uint8_t blue[3] = {0, 0, 255};
 			splat_disk(f->rgb, f->w, f->h, P, POINT_RADIUS, blue);
 		}
 	}
+
+	// draw debug stuff
+	for (int j = 0; j < e->N; j++)
+	if (j < 100)
+	{
+		float C[2], N[2];
+		map_view_to_window(e, C, e->c);
+		map_view_to_window(e, N, e->Ni[j]);
+		plot_segment_gray(f, C[0], C[1], N[0], N[1]);
+	}
+
+	// hud
+	uint8_t fg[3] = {0, 0, 0};
+	char buf[0x200];
+	snprintf(buf, 0x200, "N = %d\na = %g\n", e->N, e->alpha);
+	put_string_in_rgb_image(f->rgb, f->w, f->h,
+			0, 0+0, fg, NULL, 0, e->font, buf);
 }
 
 static void paint_state(struct FTR *f)
@@ -681,11 +756,15 @@ static void paint_state(struct FTR *f)
 	if (e->mode == 1)
 		paint_state_biasutti(f);
 
+	f->changed = 1;
 }
 
 
 // SECTION 8. User-Interface Actions and Events                             {{{1
 
+// actions to change parameters
+static void shift_N(struct viewer_state *e, int d) { e->N += d; }
+static void scale_alpha(struct viewer_state *e, int d) { e->alpha += d/100.0; }
 
 // action: viewport translation
 static void change_view_offset(struct viewer_state *e, float dx, float dy)
@@ -773,6 +852,24 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 {
 	struct viewer_state *e = f->userdata;
 
+	// N, a  hitboxes of font height
+	// 0  1   2  3    4    5      6   7
+	int Y = y / e->font->height;
+	if (e->mode == 1 && k == FTR_BUTTON_DOWN && x < 10 * e->font->width)
+	{
+		if (Y == 0) shift_N(e, -1);
+		if (Y == 1) scale_alpha(e, -1);
+		f->changed = 1;
+		return;
+	}
+	if (e->mode == 1 && k == FTR_BUTTON_UP && x < 10 * e->font->width)
+	{
+		if (Y == 0) shift_N(e, 1);
+		if (Y == 1) scale_alpha(e, 1);
+		f->changed = 1;
+		return;
+	}
+
 	int p = hit_point(e, x, y);
 
 	// begin dragging a control point in the WINDOW DOMAIN
@@ -829,6 +926,7 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		else
 			change_radius(e, x, y, 1.0/RADIUS_FACTOR);
 	}
+
 
 	f->changed = 1;
 }
@@ -922,14 +1020,16 @@ int main_pkatz(int argc, char *argv[])
 
 	// initialize state with the given points
 	struct viewer_state e[1];
+	e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
 	e->x = read_ascii_floats(stdin, &e->n);
 	e->y = malloc(e->n * sizeof*e->y);
 	e->z = malloc(e->n * sizeof*e->y);
 	e->P = malloc(e->n * sizeof*e->P);
 	e->n /= 2;
 	e->mode = 0; // 0=katz, 1=biasutti
-	e->alpha = 0.99;
+	e->alpha = 0.95;
 	e->N = 13;
+	e->i = 24;
 	fprintf(stderr, "read %d points from stdin\n", e->n);
 	//compute_points_inversion(e);
 
