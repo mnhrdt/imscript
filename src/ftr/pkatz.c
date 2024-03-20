@@ -503,6 +503,18 @@ static void plot_pixel_gray(int x, int y, void *e)
 	}
 }
 
+// auxiliary function for drawing a black pixel
+static void plot_pixel_black(int x, int y, void *e)
+{
+	struct FTR *f = e;
+	if (insideP(f, x, y)) {
+		int idx = f->w * y + x;
+		f->rgb[3*idx+0] = 0;
+		f->rgb[3*idx+1] = 0;
+		f->rgb[3*idx+2] = 0;
+	}
+}
+
 // function to draw a red segment
 static void plot_segment_red(struct FTR *f,
 		float x0, float y0, float xf, float yf)
@@ -529,6 +541,13 @@ static void plot_segment_gray(struct FTR *f,
 		float x0, float y0, float xf, float yf)
 {
 	traverse_segment(x0, y0, xf, yf, plot_pixel_gray, f);
+}
+
+// function to draw a black segment
+static void plot_segment_black(struct FTR *f,
+		float x0, float y0, float xf, float yf)
+{
+	traverse_segment(x0, y0, xf, yf, plot_pixel_black, f);
 }
 
 // function to draw a green segment
@@ -737,6 +756,12 @@ static void paint_state_biasutti(struct FTR *f)
 		map_view_to_window(e, C, e->c);
 		map_view_to_window(e, N, e->Ni[j]);
 		plot_segment_gray(f, C[0], C[1], N[0], N[1]);
+	}
+	{
+		float C[2], N[2];
+		map_view_to_window(e, C, e->c);
+		map_view_to_window(e, N, e->x + 2*e->i);
+		plot_segment_black(f, C[0], C[1], N[0], N[1]);
 	}
 
 	// hud
