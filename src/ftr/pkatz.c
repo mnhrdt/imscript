@@ -56,7 +56,6 @@ struct viewer_state {
 
 	// debug stuff
 	int i; // current debug point
-	float knni[100]; // global indices of debug point angle neighbors
 	float Ni[100][2]; // coordinates of debug point angle neighbors
 
 
@@ -82,6 +81,7 @@ struct viewer_state {
 	bool show_debug; // show inverted points and full qhulls
 
 	struct bitmap_font font[1];
+	int negative; // for dark-background mode
 };
 
 
@@ -271,68 +271,83 @@ static float point_dist(float *a, float *b)
 static void biasutti(struct viewer_state *e)
 {
 	// compute and sort the angles of each point
-	float a[2*e->n]; // [angle,index]
+	float a[e->n][2]; // [angle, original index]
 	for (int i = 0; i < e->n; i++)
 	{
-		a[2*i+0] = atan2(e->x[2*i+1] - e->c[1], e->x[2*i+0] - e->c[0]);
-		a[2*i+1] = i;
+		a[i][0] = atan2(e->x[2*i+1] - e->c[1], e->x[2*i+0] - e->c[0]);
+		a[i][1] = i;
 	}
-	qsort(a, e->n, 2*sizeof*a, compare_points_lexicographically);
-	for (int i = 0; i < e->n; i++)
-		fprintf(stderr, "a[%d] = %g %g\n", i, a[2*i+0], a[2*i+1]);
+	assert(sizeof*a == 2*sizeof(float));
+	qsort(a, e->n, sizeof*a, compare_points_lexicographically);
+	//for (int i = 0; i < e->n; i++)
+	//	fprintf(stderr, "a[%d] = %g %g\n", i, a[i][0], a[i][1]);
 
 
-	// for each of the n point, find its N nearest neighbors (in angle)
-	int t[e->n][e->N];
+	// for each of the n points, find its N nearest neighbors (in angle)
+	// the zeroth point is itself
+	//
+	int t[e->n][e->N]; // both indices wrt the sorted order
 	for (int i = 0; i < e->n; i++)
 	{
-		if(i==e->i)fprintf(stderr, "i=%d\n", i);
+		//if(i==e->i)fprintf(stderr, "i=%d\n", i);
 		int n = 0;      // total number of points so far
 		int p = i + 1;  // current candidate in the PLUS direction
 		int m = i - 1;  // current candidate in the MINUS direction
+		t[i][n++] = i;  // add i as the first point
 		while (n < e->N && n < e->n)
 		{
-			if(i==e->i)fprintf(stderr, "\tn=%d p=%d m=%d ",n,p,m);
+			//if(i==e->i)fprintf(stderr, "\tn=%d p=%d m=%d ",n,p,m);
 			if (m < 0) m += e->n;
 			if (p >= e->n) p -= e->n;
-			if (i==e->i)fprintf(stderr, "\t(p=%d m=%d) ", p, m);
+			//if (i==e->i)fprintf(stderr, "\t(p=%d m=%d) ", p, m);
 			assert(m >= 0); assert(p >= 0);
 			assert(m < e->n); assert(p < e->n);
-			float dp = angle_dist(a[2*i+0], a[2*p+0]);
-			float dm = angle_dist(a[2*i+0], a[2*m+0]);
-			if(i==e->i)fprintf(stderr, "\t{ai=%g ap=%g am=%g}",
-					a[2*i+0],
-					a[2*p+0],
-					a[2*m+0]
-					);
-			if(i==e->i)fprintf(stderr, "\t(dp=%g dm=%g)\n", dp, dm);
+			float dp = angle_dist(a[i][0], a[p][0]);
+			float dm = angle_dist(a[i][0], a[m][0]);
+			//if(i==e->i)fprintf(stderr, "\t{ai=%g ap=%g am=%g}",
+			//		a[i][0],
+			//		a[p][0],
+			//		a[m][0]
+			//		);
+			//if(i==e->i)fprintf(stderr, "\t(dp=%g dm=%g)\n", dp, dm);
 			if (dp <= dm)
 				t[i][n++] = p++;
 			else
 				t[i][n++] = m--;
 		}
-		if(i==e->i) {
-			for (int j = 0; j < e->N; j++)
-			{
-				int tij = t[i][j];
-				fprintf(stderr, "\tt[%d][%d] = %d\t"
-						"a[2*%d+0,1] = %g %g\n",
-					       	i, j, tij,
-						tij,
-						a[2*tij+0],
-						a[2*tij+1]);
-			}
-		}
-		if (i==e->i) {
+		//if(i==e->i) {
+		//	for (int j = 0; j < e->N; j++)
+		//	{
+		//		int tij = t[i][j];
+		//		fprintf(stderr, "\tt[%d][%d] = %d\t"
+		//				"a[%d] = %g %g\n",
+		//			       	i, j, tij,
+		//				tij,
+		//				a[tij][0],
+		//				a[tij][1]);
+		//	}
+		//}
+		if (a[i][1]==e->i) {
+			int ii = a[i][1];
+			assert(ii >= 0);
+			assert(ii < e->n);
 			for (int j = 0; j < e->N; j++)
 			if (j < 100)
 			{
-				int k = a[2*t[i][j]+1];
+				int tij = t[i][j];
+				int k = a[tij][1];
 				e->Ni[j][0] = e->x[2*k+0];
 				e->Ni[j][1] = e->x[2*k+1];
 			}
 		}
 	}
+	//for (int i = 0; i < e->n; i++)
+	//for (int j = 0; j < e->N; j++)
+	//{
+	//	int x = t[i][j];
+	//	assert(x >= 0);
+	//	assert(x < e->n);
+	//}
 
 	// compute the energy of each point
 	float E[e->n];
@@ -343,25 +358,25 @@ static void biasutti(struct viewer_state *e)
 		for (int j = 0; j < e->N; j++)
 		{
 			// global indices
-			int gj = a[2*t[i][j ]+1];
-			int gm = a[2*t[i][im]+1];
-			int gM = a[2*t[i][iM]+1];
+			int gj = a[t[i][j ]][1];
+			int gm = a[t[i][im]][1];
+			int gM = a[t[i][iM]][1];
 			float dj = point_dist(e->c, e->x + 2*gj);
 			float dm = point_dist(e->c, e->x + 2*gm);
 			float dM = point_dist(e->c, e->x + 2*gM);
 			if (dj < dm) im = j;
 			if (dj > dM) iM = j;
-			if(i==e->i)
-			fprintf(stderr, "j=%d dj=%g dm=%g dM=%g im=%d iM=%d\n",
-					j, dj, dm, dM, im, iM);
+			//if(a[i][1]==e->i)
+			//fprintf(stderr, "j=%d dj=%g dm=%g dM=%g im=%d iM=%d\n",
+			//		j, dj, dm, dM, im, iM);
 		}
-		float di = point_dist(e->c, e->x + 2*i);
-		float dm = point_dist(e->c, e->x + 2*(int)a[2*t[i][im]+1]);
-		float dM = point_dist(e->c, e->x + 2*(int)a[2*t[i][iM]+1]);
-		if(i==e->i)
-		fprintf(stderr, "i=%d di dm dM = %g %g %g\n", i, di, dm, dM);
-		//assert(di <= dM);
-		//assert(dm <= di);
+		float di = point_dist(e->c, e->x + 2*(int)a[ i      ][1]);
+		float dm = point_dist(e->c, e->x + 2*(int)a[t[i][im]][1]);
+		float dM = point_dist(e->c, e->x + 2*(int)a[t[i][iM]][1]);
+		//if(a[i][1]==e->i)
+		//fprintf(stderr, "i=%d di dm dM = %g %g %g\n", i, di, dm, dM);
+		assert(di <= dM);
+		assert(dm <= di);
 		float x = (di - dm) / (dM - dm);
 		E[i] = exp(-x*x);
 		//fprintf(stderr, "E[%d] = %g\n", i, E[i]);
@@ -372,13 +387,12 @@ static void biasutti(struct viewer_state *e)
 	for (int i = 0; i < e->n; i++)
 	if (E[i] > e->alpha)
 	{
-		int j = a[2*i+1]; // original index
+		int j = a[i][1]; // original index
 		e->P[2*e->m + 0] = e->x[2*j+0];
 		e->P[2*e->m + 1] = e->x[2*j+1];
 		e->m += 1;
 	}
 	fprintf(stderr, "m=%d/%d\n", e->m, e->n);
-
 }
 
 
@@ -428,7 +442,7 @@ void traverse_segment(int px, int py, int qx, int qy,
 	}
 }
 
-// draw a segment between two points
+// draw a circle given center and radius
 static void traverse_circle(int cx, int cy, int r,
 		void (*f)(int,int,void*), void *e)
 {
@@ -497,9 +511,9 @@ static void plot_pixel_gray(int x, int y, void *e)
 	struct FTR *f = e;
 	if (insideP(f, x, y)) {
 		int idx = f->w * y + x;
-		f->rgb[3*idx+0] = 120;
-		f->rgb[3*idx+1] = 120;
-		f->rgb[3*idx+2] = 120;
+		f->rgb[3*idx+0] = 180;
+		f->rgb[3*idx+1] = 180;
+		f->rgb[3*idx+2] = 180;
 	}
 }
 
@@ -767,7 +781,7 @@ static void paint_state_biasutti(struct FTR *f)
 	// hud
 	uint8_t fg[3] = {0, 0, 0};
 	char buf[0x200];
-	snprintf(buf, 0x200, "N = %d\na = %g\n", e->N, e->alpha);
+	snprintf(buf, 0x200, "N = %d\na = %g\ni = %d", e->N, e->alpha, e->i);
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
 			0, 0+0, fg, NULL, 0, e->font, buf);
 }
@@ -781,6 +795,10 @@ static void paint_state(struct FTR *f)
 	if (e->mode == 1)
 		paint_state_biasutti(f);
 
+	if (e->negative)
+		for (int i = 0; i < 3 * f->w * f->h; i++)
+			f->rgb[i] = 255 - f->rgb[i];
+
 	f->changed = 1;
 }
 
@@ -789,6 +807,7 @@ static void paint_state(struct FTR *f)
 
 // actions to change parameters
 static void shift_N(struct viewer_state *e, int d) { e->N += d; }
+static void shift_i(struct viewer_state *e, int d) { e->i += d; }
 static void scale_alpha(struct viewer_state *e, int d) { e->alpha += d/100.0; }
 
 // action: viewport translation
@@ -860,6 +879,7 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if (k == '.') e->show_grid_points = !e->show_grid_points;
 	if (k == 'd') e->show_debug = !e->show_debug;
 	if (k == 'm') e->mode = !e->mode;
+	if (k == 'n') e->negative = !e->negative;
 	//if (k == 'a') e->restrict_to_affine = !e->restrict_to_affine;
 
 	e->dragging_window_point = e->dragging_image_point = false;
@@ -877,13 +897,14 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 {
 	struct viewer_state *e = f->userdata;
 
-	// N, a  hitboxes of font height
-	// 0  1   2  3    4    5      6   7
+	// N, a, i : hitboxes of font height
+	// 0  1  2  3    4    5      6   7
 	int Y = y / e->font->height;
 	if (e->mode == 1 && k == FTR_BUTTON_DOWN && x < 10 * e->font->width)
 	{
 		if (Y == 0) shift_N(e, -1);
 		if (Y == 1) scale_alpha(e, -1);
+		if (Y == 2) shift_i(e, -1);
 		f->changed = 1;
 		return;
 	}
@@ -891,6 +912,7 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	{
 		if (Y == 0) shift_N(e, 1);
 		if (Y == 1) scale_alpha(e, 1);
+		if (Y == 2) shift_i(e, 1);
 		f->changed = 1;
 		return;
 	}
@@ -1052,6 +1074,7 @@ int main_pkatz(int argc, char *argv[])
 	e->P = malloc(e->n * sizeof*e->P);
 	e->n /= 2;
 	e->mode = 0; // 0=katz, 1=biasutti
+	e->negative = 0;
 	e->alpha = 0.95;
 	e->N = 13;
 	e->i = 24;
