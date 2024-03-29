@@ -370,9 +370,11 @@ static void biasutti(struct viewer_state *e)
 			//fprintf(stderr, "j=%d dj=%g dm=%g dM=%g im=%d iM=%d\n",
 			//		j, dj, dm, dM, im, iM);
 		}
-		float di = point_dist(e->c, e->x + 2*(int)a[ i      ][1]);
+		float di0 = point_dist(e->c, e->x + 2*(int)a[ i      ][1]);
+		float di = point_dist(e->c, e->x + 2*(int)a[t[i][0 ]][1]);
 		float dm = point_dist(e->c, e->x + 2*(int)a[t[i][im]][1]);
 		float dM = point_dist(e->c, e->x + 2*(int)a[t[i][iM]][1]);
+		assert(di == di0);
 		//if(a[i][1]==e->i)
 		//fprintf(stderr, "i=%d di dm dM = %g %g %g\n", i, di, dm, dM);
 		assert(di <= dM);
@@ -730,6 +732,13 @@ static void paint_state_katz(struct FTR *f)
 		else if (e->show_debug)
 			plot_segment_cyan(f, P[0], P[1], Q[0], Q[1]);
 	}
+
+	// hud
+	uint8_t fg[3] = {0, 0, 0};
+	char buf[0x200];
+	snprintf(buf, 0x200, "R = %g", e->r);
+	put_string_in_rgb_image(f->rgb, f->w, f->h,
+			0, 0+0, fg, NULL, 0, e->font, buf);
 }
 
 static void paint_state_biasutti(struct FTR *f)
@@ -763,19 +772,22 @@ static void paint_state_biasutti(struct FTR *f)
 	}
 
 	// draw debug stuff
-	for (int j = 0; j < e->N; j++)
-	if (j < 100)
+	if (e->show_debug)
 	{
-		float C[2], N[2];
-		map_view_to_window(e, C, e->c);
-		map_view_to_window(e, N, e->Ni[j]);
-		plot_segment_gray(f, C[0], C[1], N[0], N[1]);
-	}
-	{
-		float C[2], N[2];
-		map_view_to_window(e, C, e->c);
-		map_view_to_window(e, N, e->x + 2*e->i);
-		plot_segment_black(f, C[0], C[1], N[0], N[1]);
+		for (int j = 0; j < e->N; j++)
+		if (j < 100)
+		{
+			float C[2], N[2];
+			map_view_to_window(e, C, e->c);
+			map_view_to_window(e, N, e->Ni[j]);
+			plot_segment_gray(f, C[0], C[1], N[0], N[1]);
+		}
+		{
+			float C[2], N[2];
+			map_view_to_window(e, C, e->c);
+			map_view_to_window(e, N, e->x + 2*e->i);
+			plot_segment_black(f, C[0], C[1], N[0], N[1]);
+		}
 	}
 
 	// hud
@@ -913,6 +925,18 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 0) shift_N(e, 1);
 		if (Y == 1) scale_alpha(e, 1);
 		if (Y == 2) shift_i(e, 1);
+		f->changed = 1;
+		return;
+	}
+	if (e->mode == 0 && k == FTR_BUTTON_DOWN && x < 10 * e->font->width)
+	{
+		if (Y == 0) change_radius(e, x, y, 1.0/RADIUS_FACTOR);
+		f->changed = 1;
+		return;
+	}
+	if (e->mode == 0 && k == FTR_BUTTON_UP && x < 10 * e->font->width)
+	{
+		if (Y == 0) change_radius(e, x, y, RADIUS_FACTOR);
 		f->changed = 1;
 		return;
 	}
