@@ -45,14 +45,14 @@ static void init_state(struct les_state *e, int w, int h, int n)
 	e->P = malloc(w * n * 2 * sizeof*e->P);
 	e->V = malloc(w * n * 2 * sizeof*e->V);
 
-	e->s = 10;   // kernel parameter
+	e->s = 2.3;   // kernel parameter
 
 	e->T0 = 0;   // base temperature
-	e->t = 0.3;  // time step
-	e->F = 1.0/5000; // force multiplier
-	e->p = 2;
+	e->t = 6.0;  // time step
+	e->F = 0.004; // force multiplier
+	e->p = 1;
 
-	e->r = 2.3;  // dot radius
+	e->r = 3.3;  // dot radius
 	e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
 }
 
@@ -87,14 +87,19 @@ static void move_particles(struct les_state *e)
 		{
 			float *Q = e->P + 2*j;
 			float D[2] = {Q[0] - P[0], Q[1] - P[1]};
-			float d = fmin(1, hypot(D[0], D[1]));
+			float d = fmax(0.1, hypot(D[0], D[1]));
 			if (d < e->s)
 			{
 				F[i][0] -= D[0] / pow(d,e->p);
 				F[i][1] -= D[1] / pow(d,e->p);
 			}
+			//if (i==0&&j==1)fprintf(stderr,"ij01 P=%g %g ; Q=%g %g ; D=%g %g ; d=%g\n", P[0], P[1], Q[0], Q[1], D[0], D[1], d);
 		}
 	}
+	//fprintf(stderr, "P,V,F[0] = %g %g ; %g %g ; %g %g\n",
+	//		e->P[2*0+0], e->P[2*0+1],
+	//		e->V[2*0+0], e->V[2*0+1],
+	//		F[0][0], F[0][1]);
 
 	// apply forces to all particles
 	for (int i = 0; i < e->N; i++)
@@ -105,8 +110,26 @@ static void move_particles(struct les_state *e)
 		V[1] += e->t * e->F * F[i][1];
 		P[0] += e->t * V[0] + e->T0*(random_normal());
 		P[1] += e->t * V[1] + e->T0*(random_normal());
-		P[0] = fmod2(P[0], e->w);
-		P[1] = fmod2(P[1], e->h);
+		//P[0] = fmod2(P[0], e->w);
+		//P[1] = fmod2(P[1], e->h);
+	}
+
+	// particles that fell outside the domain get put back in the pipe
+	for (int i = 0; i < e->N; i++)
+	{
+		float *P = e->P + 2*i; // particle position
+		float *V = e->V + 2*i; // particle velocity
+		if (P[0]<0 || P[1]<0 || P[0]>=e->w-1 || P[1]>=e->h-1)
+		{
+			// relative coordinates of the pipe
+			float A = 0.05; // relative x-position
+			float H = 0.031; // relative height
+			P[0] = A * e->w;
+			P[1] = ((random_uniform()-0.5)*H + 0.5) * e->h;
+			//V[0] = 1;
+			V[0] = 1 + 0.4*random_normal();
+			V[1] = 0;
+		}
 	}
 }
 
@@ -219,7 +242,7 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	// t, T0, s, F, p, r,   hitboxes of font height
 	// 0  1   2  3  4  5
 	int Y = y / e->font->height;
-	if (k == FTR_BUTTON_DOWN)
+	if (k == FTR_BUTTON_DOWN && x < 20 * e->font->width)
 	{
 		if (Y == 0) scale_timestep(e, 1/1.2);
 		if (Y == 1) shift_base_temp(e, -0.01);
@@ -228,7 +251,7 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 4) scale_power(e, 1/1.1);
 		if (Y == 5) scale_pointradius(e, 1/1.1);
 	}
-	if (k == FTR_BUTTON_UP)
+	if (k == FTR_BUTTON_UP && x < 20 * e->font->width)
 	{
 		if (Y == 0) scale_timestep(e, 1.2);
 		if (Y == 1) shift_base_temp(e, 0.01);
@@ -247,7 +270,7 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 int main_lles(int c, char *v[])
 {
 	struct les_state e[1];
-	init_state(e, 800, 600, 1000);
+	init_state(e, 800, 800, 1000);
 	reset_particles(e);
 
 	struct FTR f = ftr_new_window(e->w, e->h);
