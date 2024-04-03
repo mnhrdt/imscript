@@ -28,6 +28,7 @@ struct les_state {
 	float s;   // kernel parameter
 	float F;   // force multiplier
 	float p;   // force exponent
+	float R;   // momentum transfer coefficient
 
 	float H;   // relative height of the input pipe
 	float V0;  // initial speed at the input pipe
@@ -54,22 +55,25 @@ static void init_state(struct les_state *e, int w, int h, int n)
 	e->P = malloc(w * n * 2 * sizeof*e->P);
 	e->V = malloc(w * n * 2 * sizeof*e->V);
 
-	e->s = 2.3;   // kernel parameter
+	e->s = 6.9;   // kernel parameter
 
 	e->T0 = 0;   // base temperature
-	e->t = 6.0;  // time step
-	e->F = 0.004; // force multiplier
-	e->p = 1;
+	e->t = 2.4;  // time step
+	e->F = 0.112; // force multiplier
+	e->p = 1;     // force decay
+	e->R = 1.1;   // momentum drag
 
-	e->H = 0.031;
+	e->H = 0.45;
+	e->V0 = 4;
 
-	e->o = 0;
+	e->o = 1;
 	e->Oh = 0.07;
 	e->Ox = 0.35;
 	e->Oy = 0.5;
 
-	e->r = 3.3;  // dot radius
-	e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
+	e->r = 3.9;  // dot radius
+	//e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
+	e->font[0] = reformat_font(*xfont_9x18B, UNPACKED);
 }
 
 static void reset_particles(struct les_state *e)
@@ -140,12 +144,16 @@ static void move_particles(struct les_state *e)
 		if (j != i)
 		{
 			float *Q = e->P + 2*j;
+			float *W = e->V + 2*j;
 			float D[2] = {Q[0] - P[0], Q[1] - P[1]};
+			float R[2] = {W[0] - V[0], W[1] - V[1]};
 			float d = fmax(0.1, hypot(D[0], D[1]));
 			if (d < e->s)
 			{
 				F[i][0] -= D[0] / pow(d,e->p);
 				F[i][1] -= D[1] / pow(d,e->p);
+				F[i][0] += e->R * R[0];
+				F[i][1] += e->R * R[1];
 			}
 		}
 	}
@@ -188,7 +196,7 @@ static void move_particles(struct les_state *e)
 			P[0] = A * e->w;
 			P[1] = ((random_uniform()-0.5)*H + 0.5) * e->h;
 			//V[0] = 1;
-			V[0] = 1 + 0.1*random_normal();
+			V[0] = e->V0 * (1 + 0.1*random_normal());
 			V[1] = 0;
 		}
 	}
@@ -258,9 +266,20 @@ static void step(struct FTR *f, int x, int y, int k, int m)
 	uint8_t fg[3] = {0, 255, 0};
 	//uint8_t bg[3] = {0, 0, 0};
 	char buf[0x200] = {0};
-	snprintf(buf, 0x200, "t = %g\nT0 = %g\ns = %g\n"
-			"F = %g\np = %g\nr = %g\nH = %g\n",
-			e->t, e->T0, e->s, e->F, e->p, e->r, e->H);
+	//snprintf(buf, 0x200, "t = %g\nT0 = %g\ns = %g\n"
+	//		"F = %g\np = %g\nr = %g\nH = %g\n"
+	//		"V0 = %g\nR = %g",
+	snprintf(buf, 0x200,
+			"t (timestep)       = %g\n"
+			"T0 (temperature)   = %g\n"
+			"s (kernel scale)   = %g\n"
+			"F (force strength) = %g\n"
+			"p (force decay)    = %g\n"
+			"r (dot radius)     = %g\n"
+			"H (pipe caliber)   = %g\n"
+			"V0 (pipe speed)    = %g\n"
+			"R (momentum drag)  = %g",
+			e->t, e->T0, e->s, e->F, e->p, e->r, e->H, e->V0, e->R);
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
 			0, 0+0, fg, NULL, 0, e->font, buf);
 
@@ -289,10 +308,6 @@ static void key(struct FTR *f, int k, int m, int x, int y)
 }
 
 static void scale_float(float *x, float f)  { *x *= f; }
-//static void scale_timestep(struct les_state *e, float f) { e->t *= f; }
-//static void scale_pointradius(struct les_state *e, float f) { e->r *= f; }
-//static void scale_force(struct les_state *e, float f) { e->F *= f; }
-//static void scale_power(struct les_state *e, float f) { e->p *= f; }
 static void shift_base_temp(struct les_state *e, float f)
 {
 	e->T0 += f;
@@ -308,7 +323,7 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	// t, T0, s, F, p, r,   hitboxes of font height
 	// 0  1   2  3  4  5
 	int Y = y / e->font->height;
-	if (k == FTR_BUTTON_DOWN && x < 20 * e->font->width)
+	if (k == FTR_BUTTON_DOWN && x < 30 * e->font->width)
 	{
 		if (Y == 0) scale_float(&e->t, 1/1.2);
 		if (Y == 1) shift_base_temp(e, -0.1);
@@ -317,8 +332,10 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 4) scale_float(&e->p, 1/1.1);
 		if (Y == 5) scale_float(&e->r, 1/1.1);
 		if (Y == 6) scale_float(&e->H, 1/1.1);
+		if (Y == 7) scale_float(&e->V0,1/1.1);
+		if (Y == 8) scale_float(&e->R, 1/1.2);
 	}
-	if (k == FTR_BUTTON_UP && x < 20 * e->font->width)
+	if (k == FTR_BUTTON_UP && x < 30 * e->font->width)
 	{
 		if (Y == 0) scale_float(&e->t, 1.2);
 		if (Y == 1) shift_base_temp(e, 0.1);
@@ -327,6 +344,8 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 4) scale_float(&e->p, 1.1);
 		if (Y == 5) scale_float(&e->r, 1.1);
 		if (Y == 6) scale_float(&e->H, 1.1);
+		if (Y == 7) scale_float(&e->V0,1.1);
+		if (Y == 8) scale_float(&e->R, 1.2);
 	}
 
 	if (k == FTR_BUTTON_RIGHT) reset_particles(e);
@@ -338,7 +357,7 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 int main_lles(int c, char *v[])
 {
 	struct les_state e[1];
-	init_state(e, 800, 800, 1000);
+	init_state(e, 800, 600, 1000);
 	reset_particles(e);
 
 	struct FTR f = ftr_new_window(e->w, e->h);
