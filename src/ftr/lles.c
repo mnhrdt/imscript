@@ -23,11 +23,20 @@ struct les_state {
 	float *V;  // particle velocities  (N*2)
 
 	// 2. domain data (eulerian)
-	int w, h;     // domain dimensions
-	float T0;     // temperature base (1)
-	float s;      // kernel parameter
-	float F;      // force multiplier
-	float p;      // force exponent
+	int w, h;  // domain dimensions
+	float T0;  // temperature base (1)
+	float s;   // kernel parameter
+	float F;   // force multiplier
+	float p;   // force exponent
+
+	float H;   // relative height of the input pipe
+	float V0;  // initial speed at the input pipe
+
+	int o;     // presence of obstacle
+	float Oh;  // relative height of the obstacle
+	float Ox;  // relative x-pos of the obstacle
+	float Oy;  // relative y-pos of the obstacle
+
 
 	// 3. numeric parameters
 	float t;      // time step
@@ -52,6 +61,13 @@ static void init_state(struct les_state *e, int w, int h, int n)
 	e->F = 0.004; // force multiplier
 	e->p = 1;
 
+	e->H = 0.031;
+
+	e->o = 0;
+	e->Oh = 0.07;
+	e->Ox = 0.35;
+	e->Oy = 0.5;
+
 	e->r = 3.3;  // dot radius
 	e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
 }
@@ -71,6 +87,44 @@ static void reset_particles(struct les_state *e)
 static float fmod2(float x, float m)
 {
 	return x - m * floor(x / m);
+}
+
+// auxiliary function to compute the orientation of a triangle
+// 1 : positive (anticlockwise)
+// 0 : the three points are aligned
+// -1 : negative (clockwise)
+static int ori(float A[2], float B[2], float C[2])
+{
+	float U[2] = {B[0] - A[0], B[1] - A[1]};
+	float V[2] = {C[0] - A[0], C[1] - A[1]};
+	float d = U[0] * V[1] - U[1] * V[0];
+	if (d > 0) return 1;
+	if (d < 0) return -1;
+	return 0;
+}
+
+// whether the segment joining two points crosses the obstacle
+static bool traversed_obstacleP(struct les_state *e, float *P, float *Q)
+{
+	float A[2] = {e->w * e->Ox, e->h * (e->Oy - e->Oh) };
+	float B[2] = {e->w * e->Ox, e->h * (e->Oy + e->Oh) };
+
+	int ABP = ori(A, B, P);
+	int ABQ = ori(A, B, Q);
+	int PQA = ori(P, Q, A);
+	int PQB = ori(P, Q, B);
+
+	return ABP != ABQ && PQA != PQB;
+}
+
+// update Q as the rebound of P-->Q against the obstacle
+static void reflect_against_obstacle(struct les_state *e, float *Q, float *V)
+{
+	// we assume that the obstacle is a vertical segment
+	// thus, only the horizontal position of Q needs to be changed
+	Q[0] = 2 * e->w * e->Ox - Q[0];
+	V[0] = -V[0]/4;
+	V[1] = V[1]/4;
 }
 
 static void move_particles(struct les_state *e)
@@ -93,27 +147,34 @@ static void move_particles(struct les_state *e)
 				F[i][0] -= D[0] / pow(d,e->p);
 				F[i][1] -= D[1] / pow(d,e->p);
 			}
-			//if (i==0&&j==1)fprintf(stderr,"ij01 P=%g %g ; Q=%g %g ; D=%g %g ; d=%g\n", P[0], P[1], Q[0], Q[1], D[0], D[1], d);
 		}
 	}
-	//fprintf(stderr, "P,V,F[0] = %g %g ; %g %g ; %g %g\n",
-	//		e->P[2*0+0], e->P[2*0+1],
-	//		e->V[2*0+0], e->V[2*0+1],
-	//		F[0][0], F[0][1]);
 
 	// apply forces to all particles
+	float P0[e->N][2] ; // (save previous position of each particle)
 	for (int i = 0; i < e->N; i++)
 	{
 		float *P = e->P + 2*i; // particle position
 		float *V = e->V + 2*i; // particle velocity
+		P0[i][0] = P[0];
+		P0[i][1] = P[1];
 		V[0] += e->t * e->F * F[i][0];
 		V[1] += e->t * e->F * F[i][1];
 		P[0] += e->t * V[0] + e->T0*(random_normal());
 		P[1] += e->t * V[1] + e->T0*(random_normal());
+		// periodic boundary conditions
+		// (disabled in favor of pipe re-entry)
 		//P[0] = fmod2(P[0], e->w);
 		//P[1] = fmod2(P[1], e->h);
 	}
 
+	// obstacle:
+	// particles that tried to traverse the obstacle are reversed
+	for (int i = 0; i < e->N; i++)
+		if (e->o && traversed_obstacleP(e, P0[i], e->P + 2*i))
+			reflect_against_obstacle(e, e->P + 2*i, e->V + 2*i);
+
+	// pipe re-entry:
 	// particles that fell outside the domain get put back in the pipe
 	for (int i = 0; i < e->N; i++)
 	{
@@ -123,14 +184,15 @@ static void move_particles(struct les_state *e)
 		{
 			// relative coordinates of the pipe
 			float A = 0.05; // relative x-position
-			float H = 0.031; // relative height
+			float H = e->H; // relative height
 			P[0] = A * e->w;
 			P[1] = ((random_uniform()-0.5)*H + 0.5) * e->h;
 			//V[0] = 1;
-			V[0] = 1 + 0.4*random_normal();
+			V[0] = 1 + 0.1*random_normal();
 			V[1] = 0;
 		}
 	}
+
 }
 
 
@@ -195,10 +257,10 @@ static void step(struct FTR *f, int x, int y, int k, int m)
 	// hud
 	uint8_t fg[3] = {0, 255, 0};
 	//uint8_t bg[3] = {0, 0, 0};
-	char buf[0x200];
+	char buf[0x200] = {0};
 	snprintf(buf, 0x200, "t = %g\nT0 = %g\ns = %g\n"
-			"F = %g\np = %g\nr = %g\n",
-			e->t, e->T0, e->s, e->F, e->p, e->r);
+			"F = %g\np = %g\nr = %g\nH = %g\n",
+			e->t, e->T0, e->s, e->F, e->p, e->r, e->H);
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
 			0, 0+0, fg, NULL, 0, e->font, buf);
 
@@ -221,12 +283,16 @@ static void key(struct FTR *f, int k, int m, int x, int y)
 {
 	if  (k == '\033' || k=='q' || k=='Q')
 		ftr_notify_the_desire_to_stop_this_loop(f, 0);
+
+	struct les_state *e = f->userdata;
+	if (k == 'o') e->o = !e->o;
 }
 
-static void scale_timestep(struct les_state *e, float f) { e->t *= f; }
-static void scale_pointradius(struct les_state *e, float f) { e->r *= f; }
-static void scale_force(struct les_state *e, float f) { e->F *= f; }
-static void scale_power(struct les_state *e, float f) { e->p *= f; }
+static void scale_float(float *x, float f)  { *x *= f; }
+//static void scale_timestep(struct les_state *e, float f) { e->t *= f; }
+//static void scale_pointradius(struct les_state *e, float f) { e->r *= f; }
+//static void scale_force(struct les_state *e, float f) { e->F *= f; }
+//static void scale_power(struct les_state *e, float f) { e->p *= f; }
 static void shift_base_temp(struct les_state *e, float f)
 {
 	e->T0 += f;
@@ -244,21 +310,23 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	int Y = y / e->font->height;
 	if (k == FTR_BUTTON_DOWN && x < 20 * e->font->width)
 	{
-		if (Y == 0) scale_timestep(e, 1/1.2);
-		if (Y == 1) shift_base_temp(e, -0.01);
-		if (Y == 2) scale_sigma(e, 1/1.2);
-		if (Y == 3) scale_force(e, 1/1.1);
-		if (Y == 4) scale_power(e, 1/1.1);
-		if (Y == 5) scale_pointradius(e, 1/1.1);
+		if (Y == 0) scale_float(&e->t, 1/1.2);
+		if (Y == 1) shift_base_temp(e, -0.1);
+		if (Y == 2) scale_float(&e->s, 1/1.2);
+		if (Y == 3) scale_float(&e->F, 1/1.1);
+		if (Y == 4) scale_float(&e->p, 1/1.1);
+		if (Y == 5) scale_float(&e->r, 1/1.1);
+		if (Y == 6) scale_float(&e->H, 1/1.1);
 	}
 	if (k == FTR_BUTTON_UP && x < 20 * e->font->width)
 	{
-		if (Y == 0) scale_timestep(e, 1.2);
-		if (Y == 1) shift_base_temp(e, 0.01);
-		if (Y == 2) scale_sigma(e, 1.2);
-		if (Y == 3) scale_force(e, 1.1);
-		if (Y == 4) scale_power(e, 1.1);
-		if (Y == 5) scale_pointradius(e, 1.1);
+		if (Y == 0) scale_float(&e->t, 1.2);
+		if (Y == 1) shift_base_temp(e, 0.1);
+		if (Y == 2) scale_float(&e->s, 1.2);
+		if (Y == 3) scale_float(&e->F, 1.1);
+		if (Y == 4) scale_float(&e->p, 1.1);
+		if (Y == 5) scale_float(&e->r, 1.1);
+		if (Y == 6) scale_float(&e->H, 1.1);
 	}
 
 	if (k == FTR_BUTTON_RIGHT) reset_particles(e);
