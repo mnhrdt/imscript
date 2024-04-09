@@ -45,7 +45,35 @@ struct les_state {
 	// 4. ui
 	float r;      // point radius
 	struct bitmap_font font[1];
+	int pause;
 };
+
+static void action_screenshot(struct FTR *f)
+{
+	static int c = 0;
+	int p = getpid();
+	char n[FILENAME_MAX];
+	snprintf(n, FILENAME_MAX, "screenshot_lles_%d_%d.png", p, c);
+	void iio_write_image_uint8_vec(char*,uint8_t*,int,int,int);
+	iio_write_image_uint8_vec(n, f->rgb, f->w, f->h, 3);
+	fprintf(stderr, "wrote sreenshot on file \"%s\"\n", n);
+	c += 1;
+}
+
+static void action_saveparticles(struct FTR *f)
+{
+	static int c = 0;
+	int p = getpid();
+	char n[FILENAME_MAX];
+	snprintf(n, FILENAME_MAX, "particles_%d_%d.txt", p, c);
+	struct les_state *e = f->userdata;
+	FILE *F = fopen(n, "w");
+	for (int i = 0; i < e->N; i++)
+		fprintf(F, "%g %g %g %g\n", e->P[2*i+0], e->P[2*i+1],
+				e->V[2*i+0], e->V[2*i+1]);
+	fclose(F);
+	c += 1;
+}
 
 static void init_state(struct les_state *e, int w, int h, int n)
 {
@@ -74,6 +102,7 @@ static void init_state(struct les_state *e, int w, int h, int n)
 	e->r = 3.9;  // dot radius
 	//e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
 	e->font[0] = reformat_font(*xfont_9x18B, UNPACKED);
+	e->pause = 0;
 }
 
 static void reset_particles(struct les_state *e)
@@ -133,15 +162,21 @@ static void reflect_against_obstacle(struct les_state *e, float *Q, float *V)
 
 static void move_particles(struct les_state *e)
 {
+	static int cx = 0;
+	cx += 1;
 	// compute force field at each particle position
 	float F[e->N][2];
+#pragma omp parallel for
 	for (int i = 0; i < e->N; i++)
 	{
 		F[i][0] = F[i][1] = 0;
 		float *P = e->P + 2*i; // particle position
 		float *V = e->V + 2*i; // particle velocity
+		int M = e->N / 1000;
+		//int NTOP = e->N;
+		//if (e->N > 1000) NTOP = 1000;
 		for (int j = 0; j < e->N; j++)
-		if (j != i)
+		if (j != i && (j - cx) % M == 0)
 		{
 			float *Q = e->P + 2*j;
 			float *W = e->V + 2*j;
@@ -196,7 +231,7 @@ static void move_particles(struct les_state *e)
 			P[0] = A * e->w;
 			P[1] = ((random_uniform()-0.5)*H + 0.5) * e->h;
 			//V[0] = 1;
-			V[0] = e->V0 * (1 + 0.1*random_normal());
+			V[0] = e->V0 * (1 + 0.3*random_normal());
 			V[1] = 0;
 		}
 	}
@@ -214,6 +249,14 @@ static bool insideP(int w, int h, int x, int y)
 static void splat_disk(uint8_t *rgb, int w, int h, float p[2], float r,
 		uint8_t color[3])
 {
+	if (r <= 1)
+	{
+		int ii = p[0];
+		int jj = p[1];
+		for (int k = 0; k < 3; k++)
+			rgb[3*(w*jj+ii)+k] = color[k];
+		return;
+	}
 	for (int j = -r-1 ; j <= r+1; j++)
 	for (int i = -r-1 ; i <= r+1; i++)
 	if (hypot(i, j) < r)
@@ -233,9 +276,23 @@ static void splat_disk(uint8_t *rgb, int w, int h, float p[2], float r,
 	}
 }
 
+static double get_fps(double t[10], int c)
+{
+	int prev = c%10 - 2;
+	int curr = c%10 - 1;
+	if (prev < 0) prev += 10;
+	if (curr < 0) curr += 10;
+	return 1.0/(t[curr] - t[prev]);
+}
+
 // CALLBACK : idle
 static void step(struct FTR *f, int x, int y, int k, int m)
 {
+	static int frame_counter = 0;
+	static double frame_times[10] = {0};
+	frame_times[frame_counter++%10] = seconds();
+
+
 	struct les_state *e = f->userdata;
 	move_particles(e);
 	//evolve_fields(e);
@@ -283,11 +340,23 @@ static void step(struct FTR *f, int x, int y, int k, int m)
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
 			0, 0+0, fg, NULL, 0, e->font, buf);
 
+	double fps = get_fps(frame_times, frame_counter);
+	snprintf(buf, 0x200, "FPS = %g\n", fps);
+	put_string_in_rgb_image(f->rgb, f->w, f->h, 0, 0+f->h-e->font->height,
+			fg, NULL, 0, e->font, buf);
+
 	// invert palette
 	//for (int i = 0; i < f->w * f->h * 3; i++)
 	//	f->rgb[i] = 255 - f->rgb[i];
 
 	f->changed = 1;
+}
+
+static void action_toggle_pause(struct FTR *f)
+{
+	struct les_state *e = f->userdata;
+	e->pause = !e->pause;
+	ftr_set_handler(f, "idle", e->pause ? NULL : step);
 }
 
 
@@ -305,6 +374,9 @@ static void key(struct FTR *f, int k, int m, int x, int y)
 
 	struct les_state *e = f->userdata;
 	if (k == 'o') e->o = !e->o;
+	if (k == ',') action_screenshot(f);
+	if (k == ';') action_saveparticles(f);
+	if (k == 'p') action_toggle_pause(f);
 }
 
 static void scale_float(float *x, float f)  { *x *= f; }
@@ -313,7 +385,6 @@ static void shift_base_temp(struct les_state *e, float f)
 	e->T0 += f;
 	if (e->T0 < 0) e->T0 = 0;
 }
-static void scale_sigma(struct les_state *e, float f) { e->s *= f; }
 
 // CALLBACK : mouse button handler
 static void event_button(struct FTR *f, int k, int m, int x, int y)
@@ -354,11 +425,18 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 }
 
 // display another animation
+#include "pickopt.c"
 int main_lles(int c, char *v[])
 {
+	int n = atoi(pick_option(&c, &v, "n", "1000"));
+	int w = atoi(pick_option(&c, &v, "w", "1200"));
+	int h = atoi(pick_option(&c, &v, "h", "600"));
+	float r = atof(pick_option(&c, &v, "r", "3.9"));
+
 	struct les_state e[1];
-	init_state(e, 800, 600, 1000);
+	init_state(e, w, h, n);
 	reset_particles(e);
+	e->r = r;
 
 	struct FTR f = ftr_new_window(e->w, e->h);
 	f.userdata = e;
