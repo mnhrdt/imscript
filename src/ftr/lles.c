@@ -9,6 +9,7 @@
 #include "random.c"   // random_uniform, random_laplace
 
 
+#include "bilinear_interpolation.c"
 
 // bitmap fonts
 #define OMIT_MAIN_FONTU
@@ -29,6 +30,7 @@ struct les_state {
 	float F;   // force multiplier
 	float p;   // force exponent
 	float R;   // momentum transfer coefficient
+	float *B;  // background velocities
 
 	float H;   // relative height of the input pipe
 	float V0;  // initial speed at the input pipe
@@ -93,6 +95,8 @@ static void init_state(struct les_state *e, int w, int h, int n)
 
 	e->H = 0.45;
 	e->V0 = 4;
+
+	e->B = NULL;
 
 	e->o = 1;
 	e->Oh = 0.07;
@@ -199,8 +203,19 @@ static void move_particles(struct les_state *e)
 	{
 		float *P = e->P + 2*i; // particle position
 		float *V = e->V + 2*i; // particle velocity
+		float B[2] = {0, 0};
+		if (e->B)
+		{
+			bilinear_interpolation_vec_at(B, e->B, e->w, e->h, 2,
+					P[0], P[1]);
+			if (0 == i)
+				fprintf(stderr, "P = %g %g    B = %g %g\n",
+						P[0], P[1], B[0], B[1]);
+		}
 		P0[i][0] = P[0];
 		P0[i][1] = P[1];
+		V[0] += e->t * B[0];
+		V[1] += e->t * B[1];
 		V[0] += e->t * e->F * F[i][0];
 		V[1] += e->t * e->F * F[i][1];
 		P[0] += e->t * V[0] + e->T0*(random_normal());
@@ -432,11 +447,22 @@ int main_lles(int c, char *v[])
 	int w = atoi(pick_option(&c, &v, "w", "1200"));
 	int h = atoi(pick_option(&c, &v, "h", "600"));
 	float r = atof(pick_option(&c, &v, "r", "3.9"));
+	char *b = pick_option(&c, &v, "b", "");
+
+	float *B = NULL;
+	if (*b)
+	{
+		float *iio_read_image_float_vec(char*,int*,int*,int*);
+		int pd;
+		B = iio_read_image_float_vec(b, &w, &h, &pd);
+		if (pd != 2) return fprintf(stderr, "bad pd=%d\n", pd);
+	}
 
 	struct les_state e[1];
 	init_state(e, w, h, n);
 	reset_particles(e);
 	e->r = r;
+	e->B = B;
 
 	struct FTR f = ftr_new_window(e->w, e->h);
 	f.userdata = e;
