@@ -2012,6 +2012,7 @@ static void plambda_compile_program(struct plambda_program *p, const char *str)
 {
 	char s[1+strlen(str)], *spacing = " \n\t_";
 	snprintf(s, 1+strlen(str), "%s", str);
+	//fprintf(stderr, "STR \"%s\"\n", s);
 
 	collection_of_varnames_init(p->var);
 	p->n = 0;
@@ -2941,7 +2942,10 @@ static int main_calc(int c, char **v)
 	if (!fmt) fmt = "%.15lf";
 	for (int i = 0; i < od; i++)
 	{
-		printf(fmt, out[i]);
+		if (isnan(out[i]))
+			printf("nan");
+		else
+			printf(fmt, out[i]);
 		putchar(i==(od-1)?'\n':' ');
 	}
 
@@ -2979,6 +2983,7 @@ static int main_images(int c, char **v)
 	//fprintf(stderr, "main images c = %d\n", c);
 	//for (int i = 0; i < c; i++)
 	//	fprintf(stderr, "main images argv[%d] = %s\n", i, v[i]);
+
 	if (c < 2) {
 		fprintf(stderr, "usage:\n\t%s in1 in2 ... \"plambda\"\n", *v);
 		//                          0 1   2         c-1
