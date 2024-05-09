@@ -2,67 +2,104 @@
 <title>image zoom and pan</title>
 
 <style>
-.container {
-	position: relative;
+.cpu {
+	/*position: relative;*/
 	width: 600px;
 	height: 400px;
 	overflow: hidden;
-	border: 1px solid #ccc;
+	border: 1px solid #000;
+	background: #ccc;
+//background-color: #e5e5f7;
+//opacity: 0.2;
+//background-image:  repeating-linear-gradient(45deg, #444cf7 25%, transparent 25%, transparent 75%, #444cf7 75%, #444cf7), repeating-linear-gradient(45deg, #444cf7 25%, #e5e5f7 25%, #e5e5f7 75%, #444cf7 75%, #444cf7);
+//background-position: 0 0, 10px 10px;
+//background-size: 20px 20px;
 }
 
 img {
-	position: absolute;
+	/*position: absolute;*/
 	image-rendering: pixelated; /* Prevents smoothing */
 }
 </style>
 
 <script>
 	window.onload = function(){
+		const cpu = document.getElementById('imageContainer');
 		const img = document.getElementById('zoomImage');
-		const ZOOM_FACTOR = 1.414213562373;
+		const WHEEL_FACTOR = 1.414213562373;
 		let scale = 1;
+		let startX = 0;
+		let startY = 0;
+		let offsetX = 0;
+		let offsetY = 0;
 		let isPanning = false;
-		let startX = 0, startY = 0;
 
-		img.onload = function() {
-			resetImagePosition();
-		};
+		//img.onload = function() {
+		//	resetImagePosition();
+		//};
 
-		function resetImagePosition() {
-			img.style.transform = `translate(0px, 0px) scale(${scale})`;
+		function offset_viewport(dx, dy) {
+			//console.log(`dxy ${dx} ${dy}`);
+			offsetX = offsetX + dx;//*scale;
+			offsetY = offsetY + dy;//*scale;
 		}
 
-		document.getElementById('imageContainer').addEventListener('wheel', function(event) {
+		function apply_transform() {
+			x = offsetX;
+			y = offsetY;
+			s = scale;
+			//console.log(`T ${x} ${y} ${s}`);
+			img.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+		}
+
+		function resetImagePosition() {
+			offsetX = 0;
+			offsetY = 0;
+			scale = 1;
+			apply_transform();
+		}
+
+		cpu.addEventListener('wheel', function(event) {
 			event.preventDefault();
 			const {deltaY} = event;
-			const direction = deltaY > 0 ? -1 : 1;
-			const factor = deltaY > 0 ? ZOOM_FACTOR : 1.0/ZOOM_FACTOR;
+			const factor = deltaY > 0 ? WHEEL_FACTOR : 1.0/WHEEL_FACTOR;
 			scale = factor * scale;
-			img.style.transform = `scale(${scale})`;
+			apply_transform();
 		});
 
 
-		img.addEventListener('mousedown', function(event) {
+		//img.addEventListener('mousedown', function(event) {
+		cpu.addEventListener('mousedown', function(event) {
 			event.preventDefault();
-			isPanning = true;
-			startX = event.clientX - img.offsetLeft;
-			startY = event.clientY - img.offsetTop;
-			img.style.cursor = 'grabbing';
-		});
-
-		img.addEventListener('mousemove', function(event) {
-			if (isPanning) {
-				event.preventDefault();
-				const x = event.clientX - startX;
-				const y = event.clientY - startY;
-				img.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+			if (event.which == 3) resetImagePosition();
+			else {
+				isPanning = true;
+				startX = event.clientX - img.offsetLeft;
+				startY = event.clientY - img.offsetTop;
+				cpu.style.cursor = 'grabbing';
+				//console.log(`grab ${startX} ${startY} cx=${event.clientX} oL=${img.offsetLeft} oT=${img.offsetTop}`);
 			}
 		});
 
-		window.addEventListener('mouseup', function() {
+		//img.addEventListener('mousemove', function(event) {
+		cpu.addEventListener('mousemove', function(event) {
+			if (isPanning) {
+				event.preventDefault();
+				const dx = event.clientX - img.offsetLeft - startX;
+				const dy = event.clientY - img.offsetTop - startY;
+				offset_viewport(dx, dy);
+				apply_transform();
+				startX = event.clientX - img.offsetLeft;
+				startY = event.clientY - img.offsetTop;
+			}
+		});
+
+		//window.addEventListener('mouseup', function() {
+		document.getElementById('imageContainer').addEventListener('mouseup', function(event) {
 			if (isPanning) {
 				isPanning = false;
-				img.style.cursor = 'grab';
+				cpu.style.cursor = 'grab';
+				//window.cursor = 'grab';
 			}
 		});
 	}
@@ -71,8 +108,15 @@ img {
 
 <h1>image zoom and pan</h1>
 
-<div class="container" id="imageContainer">
+<p>First image:
+<div class="cpu" id="imageContainer">
 	<img src="http://gabarro.org/img/barbara.png" id="zoomImage">
+</div>
+
+<p>Second image (does not work yet):
+<!-- TODO: see https://stackoverflow.com/questions/73922207/can-a-javascript-variable-be-made-local-to-a-specific-html-element -->
+<div class="cpu" id="imageContainer">
+	<img src="http://gabarro.org/img/lenak.png" id="zoomImage">
 </div>
 
 <!-- vim: set ts=3 sw=3 ft=javascript: -->
