@@ -20,7 +20,7 @@ img {
 	window.onload = function(){
 			const img = document.getElementById('zoomImage');
 			let scale = 1;
-			const ZOOM_SPEED = 0.1;
+			const ZOOM_FACTOR = 1.414213562373;
 
 			img.onload = function() {
 					resetImagePosition();
@@ -34,7 +34,8 @@ img {
 					event.preventDefault();
 					const {deltaY} = event;
 					const direction = deltaY > 0 ? -1 : 1;
-					const newScale = scale + ZOOM_SPEED * direction;
+					const factor = deltaY > 0 ? ZOOM_FACTOR : 1.0/ZOOM_FACTOR;
+					const newScale = factor * scale;
 
 					if (newScale > 0.2 && newScale < 10) { // Limiting the scale between 0.2x and 10x
 							scale = newScale;
