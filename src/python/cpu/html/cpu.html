@@ -18,58 +18,54 @@ img {
 
 <script>
 	window.onload = function(){
-			const img = document.getElementById('zoomImage');
-			let scale = 1;
-			const ZOOM_FACTOR = 1.414213562373;
+		const img = document.getElementById('zoomImage');
+		const ZOOM_FACTOR = 1.414213562373;
+		let scale = 1;
+		let isPanning = false;
+		let startX = 0, startY = 0;
 
-			img.onload = function() {
-					resetImagePosition();
-				};
+		img.onload = function() {
+			resetImagePosition();
+		};
 
-			function resetImagePosition() {
-					img.style.transform = `translate(0px, 0px) scale(${scale})`;
-				}
-
-			document.getElementById('imageContainer').addEventListener('wheel', function(event) {
-					event.preventDefault();
-					const {deltaY} = event;
-					const direction = deltaY > 0 ? -1 : 1;
-					const factor = deltaY > 0 ? ZOOM_FACTOR : 1.0/ZOOM_FACTOR;
-					const newScale = factor * scale;
-
-					if (newScale > 0.2 && newScale < 10) { // Limiting the scale between 0.2x and 10x
-							scale = newScale;
-							img.style.transform = `scale(${scale})`;
-						}
-				});
-
-			let isPanning = false;
-			let startX = 0, startY = 0;
-
-			img.addEventListener('mousedown', function(event) {
-					event.preventDefault();
-					isPanning = true;
-					startX = event.clientX - img.offsetLeft;
-					startY = event.clientY - img.offsetTop;
-					img.style.cursor = 'grabbing';
-				});
-
-			img.addEventListener('mousemove', function(event) {
-					if (isPanning) {
-							event.preventDefault();
-							const x = event.clientX - startX;
-							const y = event.clientY - startY;
-							img.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
-						}
-				});
-
-			window.addEventListener('mouseup', function() {
-					if (isPanning) {
-							isPanning = false;
-							img.style.cursor = 'grab';
-						}
-				});
+		function resetImagePosition() {
+			img.style.transform = `translate(0px, 0px) scale(${scale})`;
 		}
+
+		document.getElementById('imageContainer').addEventListener('wheel', function(event) {
+			event.preventDefault();
+			const {deltaY} = event;
+			const direction = deltaY > 0 ? -1 : 1;
+			const factor = deltaY > 0 ? ZOOM_FACTOR : 1.0/ZOOM_FACTOR;
+			scale = factor * scale;
+			img.style.transform = `scale(${scale})`;
+		});
+
+
+		img.addEventListener('mousedown', function(event) {
+			event.preventDefault();
+			isPanning = true;
+			startX = event.clientX - img.offsetLeft;
+			startY = event.clientY - img.offsetTop;
+			img.style.cursor = 'grabbing';
+		});
+
+		img.addEventListener('mousemove', function(event) {
+			if (isPanning) {
+				event.preventDefault();
+				const x = event.clientX - startX;
+				const y = event.clientY - startY;
+				img.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+			}
+		});
+
+		window.addEventListener('mouseup', function() {
+			if (isPanning) {
+				isPanning = false;
+				img.style.cursor = 'grab';
+			}
+		});
+	}
 </script>
 
 
@@ -79,4 +75,4 @@ img {
 	<img src="http://gabarro.org/img/barbara.png" id="zoomImage">
 </div>
 
-<!-- vim: set ts=3: -->
+<!-- vim: set ts=3 sw=3 ft=javascript: -->
