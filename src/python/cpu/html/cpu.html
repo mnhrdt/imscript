@@ -44,6 +44,10 @@ img {
 			offsetY = offsetY + dy;//*scale;
 		}
 
+		function scale_viewport(x, y, s) {
+
+		}
+
 		function apply_transform() {
 			x = offsetX;
 			y = offsetY;
@@ -63,12 +67,14 @@ img {
 			event.preventDefault();
 			const {deltaY} = event;
 			const factor = deltaY > 0 ? WHEEL_FACTOR : 1.0/WHEEL_FACTOR;
-			scale = factor * scale;
+			//scale = factor * scale;
+			x = event.clientX - img.offsetLeft;
+			y = event.clientY - img.offsetTop;
+			scale_viewport(x, y, factor)
 			apply_transform();
 		});
 
 
-		//img.addEventListener('mousedown', function(event) {
 		cpu.addEventListener('mousedown', function(event) {
 			event.preventDefault();
 			if (event.which == 3) resetImagePosition();
@@ -81,7 +87,6 @@ img {
 			}
 		});
 
-		//img.addEventListener('mousemove', function(event) {
 		cpu.addEventListener('mousemove', function(event) {
 			if (isPanning) {
 				event.preventDefault();
@@ -94,14 +99,18 @@ img {
 			}
 		});
 
-		//window.addEventListener('mouseup', function() {
-		document.getElementById('imageContainer').addEventListener('mouseup', function(event) {
+		cpu.addEventListener('mouseup', function(event) {
 			if (isPanning) {
 				isPanning = false;
 				cpu.style.cursor = 'grab';
 				//window.cursor = 'grab';
 			}
 		});
+
+		cpu.addEventListener('mouseout', function(event) {
+			isPanning = false;
+		});
+
 	}
 </script>
 
