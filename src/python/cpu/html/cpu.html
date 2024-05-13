@@ -26,7 +26,7 @@ img {
 	window.onload = function(){
 		const cpu = document.getElementById('imageContainer');
 		const img = document.getElementById('zoomImage');
-		const WHEEL_FACTOR = 1.414213562373;
+		const WHEEL_FACTOR = 2;//1.414213562373;
 		let scale = 1;
 		let startX = 0;
 		let startY = 0;
@@ -38,14 +38,25 @@ img {
 		//	resetImagePosition();
 		//};
 
-		function offset_viewport(dx, dy) {
+		function viewport_reset() {
+			offsetX = 0;
+			offsetY = 0;
+			scale = 1;
+		}
+
+		function viewport_offset(dx, dy) {
 			//console.log(`dxy ${dx} ${dy}`);
 			offsetX = offsetX + dx;//*scale;
 			offsetY = offsetY + dy;//*scale;
 		}
 
-		function scale_viewport(x, y, s) {
-
+		function viewport_scale(x, y, lds) {
+			//console.log(`S x=${x} y=${y} lds=${lds} ox=${offsetX} oy=${offsetY}`)
+			cx = (x - offsetX)/scale;
+			cy = (y - offsetY)/scale;
+			scale = lds * scale;
+			offsetX = x - cx*scale;
+			offsetY = y - cy*scale;
 		}
 
 		function apply_transform() {
@@ -53,32 +64,27 @@ img {
 			y = offsetY;
 			s = scale;
 			//console.log(`T ${x} ${y} ${s}`);
+			img.style.transformOrigin = `left top`;
 			img.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
-		}
-
-		function resetImagePosition() {
-			offsetX = 0;
-			offsetY = 0;
-			scale = 1;
-			apply_transform();
 		}
 
 		cpu.addEventListener('wheel', function(event) {
 			event.preventDefault();
 			const {deltaY} = event;
 			const factor = deltaY > 0 ? WHEEL_FACTOR : 1.0/WHEEL_FACTOR;
-			//scale = factor * scale;
 			x = event.clientX - img.offsetLeft;
 			y = event.clientY - img.offsetTop;
-			scale_viewport(x, y, factor)
+			viewport_scale(x, y, factor)
 			apply_transform();
 		});
 
 
 		cpu.addEventListener('mousedown', function(event) {
 			event.preventDefault();
-			if (event.which == 3) resetImagePosition();
-			else {
+			if (event.which == 3) {
+				viewport_reset();
+				apply_transform();
+			} else {
 				isPanning = true;
 				startX = event.clientX - img.offsetLeft;
 				startY = event.clientY - img.offsetTop;
@@ -92,7 +98,7 @@ img {
 				event.preventDefault();
 				const dx = event.clientX - img.offsetLeft - startX;
 				const dy = event.clientY - img.offsetTop - startY;
-				offset_viewport(dx, dy);
+				viewport_offset(dx, dy);
 				apply_transform();
 				startX = event.clientX - img.offsetLeft;
 				startY = event.clientY - img.offsetTop;
@@ -107,7 +113,7 @@ img {
 			}
 		});
 
-		cpu.addEventListener('mouseout', function(event) {
+		cpu.addEventListener('mouseleave', function(event) {
 			isPanning = false;
 		});
 
@@ -127,5 +133,38 @@ img {
 <div class="cpu" id="imageContainer">
 	<img src="http://gabarro.org/img/lenak.png" id="zoomImage">
 </div>
+
+<p>Current situation:
+<ol>
+	<li>Implementation using css transforms
+	<li>Working pan and buggy zoom
+	<li>No contrast changes
+	<li>Limited to one widget per page (uses global variables as state)
+</ol>
+
+<p>Near-term work (with css transforms):
+<ol>
+	<li>Fix zoom center
+	<li>Add simple contrast changes (limited to 8 or 16 bit png images)
+</ol>
+
+<p>Near-term work (with the javascript context):
+<ol>
+	<li>Make it work with multiple widgets per page
+	<li>Integrate seamlessly into notebooks
+	<li>Gallery3 environment to share pans between images of the same group
+	<li>iio integration: add a new .view method
+</ol>
+
+<p>Future work (with canvas):
+<ol>
+	<li>Canvas reimplementation with the same functionality
+	<li>Read numpy arrays from the notebook or .npy file
+	<li>Advanced contrast changes
+	<li>Single pixel explorer (impossible with css transforms)
+	<li>Well-thought out mouse gestures (to reset zoom and contrast, etc.)
+	<li>Inconspicuous but complete help tooltips
+	<li>Affordances to indicate borders, image exterior, maybe click to "start"
+</ol>
 
 <!-- vim: set ts=3 sw=3 ft=javascript: -->
