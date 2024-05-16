@@ -367,13 +367,16 @@ static void splat_disk(uint8_t *rgb, int w, int h, float p[2], float r,
 	{
 		int ii = p[0] + i;
 		int jj = p[1] + j;
+		float R = hypot(ii - p[0], jj - p[1]);
+		//if (R >= r) continue;
 		if (ii>=0 && jj>=0 && ii<w && jj<h)
-		//{
-		//	float a = pow(hypot(i, j)/r, 4);
+		{
+			//float a = pow(R/r, 2);
 			for (int k = 0; k < 3; k++)
 				rgb[3*(w*jj+ii)+k] = color[k];
 		//		rgb[3*(w*jj+ii)+k] = a*255 + (1-a)*color[k];
-		//}
+		//		rgb[3*(w*jj+ii)+k] = a*rgb[3*(w*jj+ii)+k] + (1-a)*color[k];
+		}
 	}
 }
 
@@ -767,8 +770,13 @@ static struct data_line *read_data_lines_id(FILE *f, int *N)
 	return r;
 }
 
+#include "pickopt.c"
+
 int main_cloudette(int argc, char *argv[])
 {
+	float vs = atof(pick_option(&argc, &argv, "vs", "1")); // vertical scale
+	float hs = atof(pick_option(&argc, &argv, "hs", "1")); // horiz scale
+
 	if (argc != 2 && argc != 1) {
 		fprintf(stderr, "usage:\n\t%s < xyrgbn.txt\n", *argv);
 		return 1;
@@ -797,8 +805,9 @@ int main_cloudette(int argc, char *argv[])
 	e->f = xmalloc(1*n * sizeof*e->f);
 	for (int i = 0; i < n; i++)
 	{
-		e->x[2*i+0] = l[i].xyrgb[0];
-		e->x[2*i+1] = l[i].xyrgb[1];
+		e->x[2*i+0] = hs * l[i].xyrgb[0];
+		//e->x[2*i+1] = vs * sqrt(l[i].xyrgb[1]);
+		e->x[2*i+1] = vs * l[i].xyrgb[1];
 		//e->c[3*i+0] = l[i].xyrgb[2];
 		//e->c[3*i+1] = l[i].xyrgb[3];
 		//e->c[3*i+2] = l[i].xyrgb[4];
