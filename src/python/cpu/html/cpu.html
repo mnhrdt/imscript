@@ -3,21 +3,14 @@
 
 <style>
 .cpu {
-	/*position: relative;*/
 	width: 600px;
 	height: 400px;
 	overflow: hidden;
-	border: 1px solid #000;
+	border: 3px solid #000;
 	background: #ccc;
-//background-color: #e5e5f7;
-//opacity: 0.2;
-//background-image:  repeating-linear-gradient(45deg, #444cf7 25%, transparent 25%, transparent 75%, #444cf7 75%, #444cf7), repeating-linear-gradient(45deg, #444cf7 25%, #e5e5f7 25%, #e5e5f7 75%, #444cf7 75%, #444cf7);
-//background-position: 0 0, 10px 10px;
-//background-size: 20px 20px;
 }
 
 img {
-	/*position: absolute;*/
 	image-rendering: pixelated; /* Prevents smoothing */
 }
 </style>
@@ -46,8 +39,8 @@ img {
 
 		function viewport_offset(dx, dy) {
 			//console.log(`dxy ${dx} ${dy}`);
-			offsetX = offsetX + dx;//*scale;
-			offsetY = offsetY + dy;//*scale;
+			offsetX = offsetX + dx;
+			offsetY = offsetY + dy;
 		}
 
 		function viewport_scale(x, y, lds) {
@@ -68,44 +61,52 @@ img {
 			img.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
 		}
 
-		cpu.addEventListener('wheel', function(event) {
-			event.preventDefault();
-			const {deltaY} = event;
+		function cpu_xy(e) {
+			r = cpu.getBoundingClientRect();
+			x = e.clientX - r.x;
+			y = e.clientY - r.y;
+			return [x,y];
+		}
+
+		cpu.addEventListener('wheel', function(e) {
+			e.preventDefault();
+			const {deltaY} = e;
 			const factor = deltaY > 0 ? WHEEL_FACTOR : 1.0/WHEEL_FACTOR;
-			x = event.clientX - img.offsetLeft;
-			y = event.clientY - img.offsetTop;
+			const [x,y]= cpu_xy(e);
 			viewport_scale(x, y, factor)
 			apply_transform();
 		});
 
 
-		cpu.addEventListener('mousedown', function(event) {
-			event.preventDefault();
-			if (event.which == 3) {
+		cpu.addEventListener('mousedown', function(e) {
+			e.preventDefault();
+			if (e.which == 3) {
 				viewport_reset();
 				apply_transform();
 			} else {
 				isPanning = true;
-				startX = event.clientX - img.offsetLeft;
-				startY = event.clientY - img.offsetTop;
+				const [x,y] = cpu_xy(e);
+				startX = x;
+				startY = y;
 				cpu.style.cursor = 'grabbing';
-				//console.log(`grab ${startX} ${startY} cx=${event.clientX} oL=${img.offsetLeft} oT=${img.offsetTop}`);
+				//console.log(`grab ${startX} ${startY}`);
 			}
 		});
 
-		cpu.addEventListener('mousemove', function(event) {
+		cpu.addEventListener('mousemove', function(e) {
 			if (isPanning) {
-				event.preventDefault();
-				const dx = event.clientX - img.offsetLeft - startX;
-				const dy = event.clientY - img.offsetTop - startY;
+				e.preventDefault();
+				const [x,y]= cpu_xy(e);
+				const dx = x - startX;
+				const dy = y - startY;
 				viewport_offset(dx, dy);
 				apply_transform();
-				startX = event.clientX - img.offsetLeft;
-				startY = event.clientY - img.offsetTop;
+				startX = x;
+				startY = y;
 			}
 		});
 
-		cpu.addEventListener('mouseup', function(event) {
+		cpu.addEventListener('mouseup', function(e) {
 			if (isPanning) {
 				isPanning = false;
 				cpu.style.cursor = 'grab';
@@ -113,7 +114,7 @@ img {
 			}
 		});
 
-		cpu.addEventListener('mouseleave', function(event) {
+		cpu.addEventListener('mouseleave', function(e) {
 			isPanning = false;
 		});
 
@@ -122,6 +123,12 @@ img {
 
 
 <h1>image zoom and pan</h1>
+
+<div style="font-size:300%;margin-left:2em">
+	∫<sub><sub>Ω</sub></sub>dω
+	=
+	∫<sub><sub>∂Ω</sub></sub>ω
+</div>
 
 <p>First image:
 <div class="cpu" id="imageContainer">
