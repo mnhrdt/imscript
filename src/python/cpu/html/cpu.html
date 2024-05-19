@@ -6,7 +6,7 @@
 	width: 600px;
 	height: 400px;
 	overflow: hidden;
-	border: 3px solid #000;
+	border: 1px solid #000;
 	background: #ccc;
 }
 
@@ -26,15 +26,20 @@ img {
 		let offsetX = 0;
 		let offsetY = 0;
 		let isPanning = false;
+		let brightness = 1;
+		let contrast = 100;
 
 		//img.onload = function() {
-		//	resetImagePosition();
+		//	viewport_reset();
 		//};
 
 		function viewport_reset() {
 			offsetX = 0;
 			offsetY = 0;
 			scale = 1;
+
+			brightness = 1;
+			contrast = 100;
 		}
 
 		function viewport_offset(dx, dy) {
@@ -45,35 +50,65 @@ img {
 
 		function viewport_scale(x, y, lds) {
 			//console.log(`S x=${x} y=${y} lds=${lds} ox=${offsetX} oy=${offsetY}`)
-			cx = (x - offsetX)/scale;
-			cy = (y - offsetY)/scale;
+			const cx = (x - offsetX)/scale;
+			const cy = (y - offsetY)/scale;
 			scale = lds * scale;
 			offsetX = x - cx*scale;
 			offsetY = y - cy*scale;
 		}
 
+		function brightness_change(d) {
+			if (d < 0)
+				brightness = brightness - 0.05;
+			else
+				brightness = brightness + 0.05;
+			if (brightness < 0)
+				brightness = 0;
+			if (brightness > 9)
+				brightness = 9;
+		}
+
+		function contrast_change(d) {
+			if (d < 0)
+				contrast = contrast - 5;
+			else
+				contrast = contrast + 5;
+			if (contrast < 0)
+				contrast = 0;
+			if (contrast > 900)
+				contrast = 900;
+		}
+
 		function apply_transform() {
-			x = offsetX;
-			y = offsetY;
-			s = scale;
-			//console.log(`T ${x} ${y} ${s}`);
+			const x = offsetX;
+			const y = offsetY;
+			const s = scale;
+			const z = brightness;
+			const t = contrast;
+			//console.log(`T ${x} ${y} ${s} z=${z} t=${t}`);
 			img.style.transformOrigin = `left top`;
 			img.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+			img.style.filter = `brightness(${z}) saturate(${t}%)`;
 		}
 
 		function cpu_xy(e) {
-			r = cpu.getBoundingClientRect();
-			x = e.clientX - r.x;
-			y = e.clientY - r.y;
+			const r = cpu.getBoundingClientRect();
+			const x = e.clientX - r.x;
+			const y = e.clientY - r.y;
 			return [x,y];
 		}
 
 		cpu.addEventListener('wheel', function(e) {
 			e.preventDefault();
-			const {deltaY} = e;
-			const factor = deltaY > 0 ? WHEEL_FACTOR : 1.0/WHEEL_FACTOR;
-			const [x,y]= cpu_xy(e);
-			viewport_scale(x, y, factor)
+			if (e.shiftKey) { // brightness change
+				brightness_change(e.deltaY);
+			} else if (e.ctrlKey) { // contrast change
+				contrast_change(e.deltaY);
+			} else { // zoom
+				const factor = e.deltaY > 0 ? WHEEL_FACTOR : 1.0/WHEEL_FACTOR;
+				const [x,y]= cpu_xy(e);
+				viewport_scale(x, y, factor)
+			}
 			apply_transform();
 		});
 
