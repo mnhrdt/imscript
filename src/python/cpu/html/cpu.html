@@ -10,16 +10,34 @@
 	background: #ccc;
 }
 
-img {
-	image-rendering: pixelated; /* Prevents smoothing */
+.cpu > img {
+	image-rendering: crisp-edges;
 }
 </style>
 
 <script>
 	window.onload = function(){
-		const cpu = document.getElementById('imageContainer');
-		const img = document.getElementById('zoomImage');
+		const cpus = document.getElementsByClassName("cpu");
+		for (let i = 0; i < cpus.length; i++)
+		{
+			let u = cpus[i].getElementsByTagName('img')[0].src;
+			console.log(`i=${i} u=${u}`)
+
+			cpus[i].dataset.fuck = `my shit up ${i}`
+		}
+
+		for (let i = 0; i < cpus.length; i++)
+		{
+			let x = cpus[i].dataset.fuck
+			console.log(`fuck ${x}`);
+		}
+
+
+		const cpu = document.getElementById('cpu2');
+		const img = cpu.getElementsByTagName('img')[0];
 		const WHEEL_FACTOR = 2;//1.414213562373;
+		cpu.tabIndex = 0;
+		let active = false;
 		let scale = 1;
 		let startX = 0;
 		let startY = 0;
@@ -99,6 +117,7 @@ img {
 		}
 
 		cpu.addEventListener('wheel', function(e) {
+			if (!active) return;
 			e.preventDefault();
 			if (e.shiftKey) { // brightness change
 				brightness_change(e.deltaY);
@@ -119,6 +138,8 @@ img {
 				viewport_reset();
 				apply_transform();
 			} else {
+				active = true;
+				cpu.focus();
 				isPanning = true;
 				const [x,y] = cpu_xy(e);
 				startX = x;
@@ -153,6 +174,19 @@ img {
 			isPanning = false;
 		});
 
+		cpu.addEventListener('keyup', function(e) {
+			//console.log(`k = ${e.key}`);
+			if (e.key == "q" || e.key == "Escape") {
+				//console.log(`QHITE`);
+				active = false;
+				document.activeElement.blur();
+			}
+			if (e.key == "r") {
+				viewport_reset();
+				apply_transform();
+			}
+		});
+
 	}
 </script>
 
@@ -166,28 +200,22 @@ img {
 </div>
 
 <p>First image:
-<div class="cpu" id="imageContainer">
-	<img src="http://gabarro.org/img/barbara.png" id="zoomImage">
+<div class="cpu" id="cpu1">
+	<img src="http://gabarro.org/img/barbara.png">
 </div>
 
 <p>Second image (does not work yet):
 <!-- TODO: see https://stackoverflow.com/questions/73922207/can-a-javascript-variable-be-made-local-to-a-specific-html-element -->
-<div class="cpu" id="imageContainer">
-	<img src="http://gabarro.org/img/lenak.png" id="zoomImage">
+<div class="cpu" id="cpu2">
+	<img src="http://gabarro.org/img/lenak.png">
 </div>
 
 <p>Current situation:
 <ol>
 	<li>Implementation using css transforms
-	<li>Working pan and buggy zoom
-	<li>No contrast changes
+	<li>Working pan and zoom
+	<li>Blind contrast changes limited to css filters (brightness, contrast, saturation, huerotation)
 	<li>Limited to one widget per page (uses global variables as state)
-</ol>
-
-<p>Near-term work (with css transforms):
-<ol>
-	<li>Fix zoom center
-	<li>Add simple contrast changes (limited to 8 or 16 bit png images)
 </ol>
 
 <p>Near-term work (with the javascript context):
