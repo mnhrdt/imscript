@@ -33,7 +33,7 @@
 		}
 
 
-		const cpu = document.getElementById('cpu2');
+		const cpu = cpus[0];
 		const img = cpu.getElementsByTagName('img')[0];
 		const WHEEL_FACTOR = 2;//1.414213562373;
 		cpu.tabIndex = 0;
@@ -200,13 +200,13 @@
 </div>
 
 <p>First image:
-<div class="cpu" id="cpu1">
+<div class="cpu">
 	<img src="http://gabarro.org/img/barbara.png">
 </div>
 
 <p>Second image (does not work yet):
 <!-- TODO: see https://stackoverflow.com/questions/73922207/can-a-javascript-variable-be-made-local-to-a-specific-html-element -->
-<div class="cpu" id="cpu2">
+<div class="cpu">
 	<img src="http://gabarro.org/img/lenak.png">
 </div>
 

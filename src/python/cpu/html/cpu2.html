@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<title>image zoom and pan</title>
+
+<style>
+.cpu {
+	width: 600px;
+	height: 400px;
+	overflow: hidden;
+	border: 1px solid #000;
+	background: #ccc;
+}
+
+.cpu > img {
+	image-rendering: crisp-edges;
+}
+</style>
+
+<script>
+	window.onload = function(){
+		// constant global settings
+		const WHEEL_FACTOR = 2;//1.414213562373;
+
+		// global table of all the cpu elements
+		const cpus = document.getElementsByClassName("cpu");
+
+		// initialize state of each cpu
+		for (const c of cpus)
+		{
+			c.tabIndex = 0;
+			c.dataset.active = "false"; // XXX : these will be strings anyway
+			c.dataset.isPanning = "false";
+			viewport_reset(c);
+
+			// this is really fucked up... all members get converted to strings,
+			// no matter what
+			//
+			//console.log(`a=${c.dataset.active} ta=${typeof(c.dataset.active)}`);
+			//const foo = 1.2;
+			//c.dataset.offsetX = foo;
+			//console.log(`x = ${foo} tx = ${typeof(foo)}`);
+			//const bar = c.dataset.offsetX;
+			//console.log(`x = ${bar} tx = ${typeof(bar)}`);
+		}
+
+		//img.onload = function() {
+		//	viewport_reset();
+		//};
+
+		function viewport_reset(c) {
+			c.dataset.offsetX = 0;
+			c.dataset.offsetY = 0;
+			c.dataset.scale = 1;
+			c.dataset.brightness = 1;
+			c.dataset.contrast = 100;
+		}
+
+		function viewport_offset(c, dx, dy) {
+			//console.log(`dxy ${dx} ${dy}`);
+			c.dataset.offsetX = Number(c.dataset.offsetX) + Number(dx);
+			c.dataset.offsetY = Number(c.dataset.offsetY) + Number(dy);
+		}
+
+		function viewport_scale(c, x, y, lds) {
+			//console.log(`S x=${x} y=${y} lds=${lds} ox=${offsetX} oy=${offsetY}`)
+			const cx = (x - Number(c.dataset.offsetX))/Number(c.dataset.scale);
+			const cy = (y - Number(c.dataset.offsetY))/Number(c.dataset.scale);
+			c.dataset.scale = lds * Number(c.dataset.scale);
+			c.dataset.offsetX = x - cx * Number(c.dataset.scale);
+			c.dataset.offsetY = y - cy * Number(c.dataset.scale);
+		}
+
+		function brightness_change(c, d) {
+			let b = Number(c.dataset.brightness);
+			if (d < 0)
+				b = b - 0.05;
+			else
+				b = b + 0.05;
+			if (b < 0)
+				b = 0;
+			if (b > 9)
+				b = 9;
+			c.dataset.brightness = b;
+		}
+
+		function contrast_change(c, d) {
+			let b = Number(c.dataset.contrast);
+			if (d < 0)
+				b = b - 5;
+			else
+				b = b + 5;
+			if (b < 0)
+				b = 0;
+			if (b > 900)
+				b = 900;
+			c.dataset.contrast = b;
+		}
+
+		function apply_transforms(c, i) {
+			const x = Number(c.dataset.offsetX);
+			const y = Number(c.dataset.offsetY);
+			const s = Number(c.dataset.scale);
+			const z = Number(c.dataset.brightness);
+			const t = Number(c.dataset.contrast);
+			//console.log(`tx = ${typeof(x)}`);
+			//console.log(`T ${x} ${y} ${s} z=${z} t=${t}`);
+			for (const i of c.getElementsByTagName("img")) {
+				i.style.transformOrigin = `left top`;
+				i.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+				i.style.filter = `brightness(${z}) saturate(${t}%)`;
+			}
+		}
+
+		function cpu_xy(c, e) {
+			const r = c.getBoundingClientRect();
+			const x = e.clientX - r.x;
+			const y = e.clientY - r.y;
+			return [x,y];
+		}
+
+		for (const c of cpus)
+		c.addEventListener("wheel", function(e) {
+			if (c.dataset.active == "false") return;
+			e.preventDefault();
+			if (e.shiftKey) { // brightness change
+				brightness_change(c, e.deltaY);
+			} else if (e.ctrlKey) { // contrast change
+				contrast_change(c, e.deltaY);
+			} else { // zoom
+				const factor = e.deltaY > 0 ? WHEEL_FACTOR : 1.0/WHEEL_FACTOR;
+				const [x,y]= cpu_xy(c, e);
+				viewport_scale(c, x, y, factor)
+			}
+			apply_transforms(c);
+		});
+
+
+		for (const c of cpus)
+		c.addEventListener("mousedown", function(e) {
+			e.preventDefault();
+			if (e.which == 3) {
+				viewport_reset(c);
+				apply_transforms(c);
+			} else {
+				c.dataset.active = "true";
+				c.focus();
+				c.dataset.isPanning = "true";
+				const [x,y] = cpu_xy(c, e);
+				c.dataset.startX = x;
+				c.dataset.startY = y;
+				c.style.cursor = "grabbing";
+				//console.log(`grab ${c.dataset.startX} ${c.dataset.startY}`);
+			}
+		});
+
+		for (const c of cpus)
+		c.addEventListener("mousemove", function(e) {
+			if (c.dataset.isPanning == "true") {
+				e.preventDefault();
+				const [x,y]= cpu_xy(c, e);
+				const dx = x - Number(c.dataset.startX);
+				const dy = y - Number(c.dataset.startY);
+				viewport_offset(c, dx, dy);
+				apply_transforms(c);
+				c.dataset.startX = x;
+				c.dataset.startY = y;
+			}
+		});
+
+		for (const c of cpus)
+		c.addEventListener("mouseup", function(e) {
+			if (c.dataset.isPanning == "true") {
+				c.dataset.isPanning = "false";
+				c.style.cursor = "grab";
+				//window.cursor = 'grab';
+			}
+		});
+
+		for (const c of cpus)
+		c.addEventListener("mouseleave", function(e) {
+			c.dataset.isPanning = "false";
+		});
+
+		for (const c of cpus)
+		c.addEventListener("keyup", function(e) {
+			//console.log(`k = ${e.key}`);
+			if (e.key == "q" || e.key == "Escape") {
+				//console.log(`QHITE`);
+				c.dataset.active = "false";
+				document.activeElement.blur();
+			}
+			if (e.key == "r") {
+				viewport_reset(c);
+				apply_transforms(c);
+			}
+		});
+
+	}
+</script>
+
+
+<h1>image zoom and pan</h1>
+
+<div style="font-size:300%;margin-left:2em">
+	∫<sub><sub>Ω</sub></sub>dω
+	=
+	∫<sub><sub>∂Ω</sub></sub>ω
+</div>
+
+<p>First image:
+<div class="cpu">
+	<img src="http://gabarro.org/img/barbara.png">
+</div>
+
+<p>Second image:
+<div class="cpu">
+	<img src="http://gabarro.org/img/lenak.png">
+</div>
+
+<p>Current situation:
+<ol>
+	<li>Implementation using css transforms
+	<li>Working pan and zoom
+	<li>Blind contrast changes limited to css filters (brightness, contrast, saturation, huerotation)
+	<li>Works with multiple widgets per page (all state is div-local)
+</ol>
+
+<p>Near-term work (with the javascript context):
+<ol>
+	<li>Fix strange bug of shared focus state between different divs
+	<li>Integrate seamlessly into notebooks
+	<li>Gallery3 environment to share pans between images of the same group
+	<li>iio integration: add a new .view method
+</ol>
+
+<p>Future work (with canvas):
+<ol>
+	<li>Canvas reimplementation with the same functionality
+	<li>Read numpy arrays from the notebook or .npy file
+	<li>Advanced contrast changes
+	<li>Single pixel explorer (impossible with css transforms)
+	<li>Well-thought out mouse gestures (to reset zoom and contrast, etc.)
+	<li>Inconspicuous but complete help tooltips
+	<li>Affordances to indicate borders, image exterior, maybe click to "start"
+</ol>
+
+<!-- vim: set ts=3 sw=3 ft=javascript: -->
