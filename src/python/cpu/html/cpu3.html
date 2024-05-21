@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<title>image zoom and pan</title>
+
+<!--
+This is a different API for the same code as in cpu2.html
+The main difference is that this code is re-entrant, and supposed to be inlined
+in script tags after each cpu widget.  Thus, it can be integrated easily
+into the output cells of an ipython notbook.
+-->
+
+
+<style>
+.cpu {
+	width: 600px;
+	height: 400px;
+	overflow: hidden;
+	border: 1px solid #000;
+	background: #ccc;
+}
+
+.cpu > img {
+	image-rendering: crisp-edges;
+}
+</style>
+
+<h1>image zoom and pan</h1>
+
+<p>
+Instructions
+<ul>
+	<li>Click on the image to activate the viewer
+	<li>Mouse drag: pan the image
+	<li>Mouse wheel: zoom in/out
+	<li>SHIFT+drag: change brightness
+	<li>CTRL+drag: change saturation
+	<li>q or ESC: exit the viewer (the scroll wheel loses its efect)
+</ul>
+
+<p>First image:
+<div class="cpu" id="cpu1">
+	<img src="http://gabarro.org/img/barbara.png">
+</div>
+<script>
+	// get unique cpu element
+	const cpu1 = document.getElementById("cpu1");
+
+	// initialize state of this cpu element
+	for (const c of [cpu1])
+	{
+		c.tabIndex = 0;
+		c.dataset.active = "false";
+		c.dataset.isPanning = "false";
+		viewport_reset_cpu1();
+		console.log(`initialized cpu cpu1 ${cpu1}`);
+	}
+
+	function viewport_reset_cpu1() {
+		const c = cpu1;
+		c.dataset.offsetX = 0;
+		c.dataset.offsetY = 0;
+		c.dataset.scale = 1;
+		c.dataset.brightness = 1;
+		c.dataset.contrast = 100;
+	}
+
+	function viewport_offset_cpu1(dx, dy) {
+		const c = cpu1;
+		//console.log(`dxy ${dx} ${dy}`);
+		c.dataset.offsetX = Number(c.dataset.offsetX) + Number(dx);
+		c.dataset.offsetY = Number(c.dataset.offsetY) + Number(dy);
+	}
+
+	function viewport_scale_cpu1(x, y, lds) {
+		const c = cpu1;
+		//console.log(`S x=${x} y=${y} lds=${lds} ox=${offsetX} oy=${offsetY}`)
+		const cx = (x - Number(c.dataset.offsetX))/Number(c.dataset.scale);
+		const cy = (y - Number(c.dataset.offsetY))/Number(c.dataset.scale);
+		c.dataset.scale = lds * Number(c.dataset.scale);
+		c.dataset.offsetX = x - cx * Number(c.dataset.scale);
+		c.dataset.offsetY = y - cy * Number(c.dataset.scale);
+	}
+
+	function brightness_change_cpu1(d) {
+		const c = cpu1;
+		let b = Number(c.dataset.brightness);
+		if (d < 0)
+			b = b - 0.05;
+		else
+			b = b + 0.05;
+		if (b < 0)
+			b = 0;
+		if (b > 9)
+			b = 9;
+		c.dataset.brightness = b;
+	}
+
+	function contrast_change_cpu1(d) {
+		const c = cpu1;
+		let b = Number(c.dataset.contrast);
+		if (d < 0)
+			b = b - 5;
+		else
+			b = b + 5;
+		if (b < 0)
+			b = 0;
+		if (b > 900)
+			b = 900;
+		c.dataset.contrast = b;
+	}
+
+	function apply_transforms_cpu1() {
+		const c = cpu1;
+		const x = Number(c.dataset.offsetX);
+		const y = Number(c.dataset.offsetY);
+		const s = Number(c.dataset.scale);
+		const z = Number(c.dataset.brightness);
+		const t = Number(c.dataset.contrast);
+		//console.log(`tx = ${typeof(x)}`);
+		//console.log(`T ${x} ${y} ${s} z=${z} t=${t}`);
+		for (const i of c.getElementsByTagName("img")) {
+			i.style.transformOrigin = `left top`;
+			i.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+			i.style.filter = `brightness(${z}) saturate(${t}%)`;
+		}
+	}
+
+	function cpu_xy_cpu1(e) {
+		const c = cpu1;
+		const r = c.getBoundingClientRect();
+		const x = e.clientX - r.x;
+		const y = e.clientY - r.y;
+		return [x,y];
+	}
+
+	for (const c of [cpu1])
+	c.addEventListener("wheel", function(e) {
+		if (c.dataset.active == "false") return;
+		e.preventDefault();
+		if (e.shiftKey) { // brightness change
+			brightness_change_cpu1(e.deltaY);
+		} else if (e.ctrlKey) { // contrast change
+			contrast_change_cpu1(e.deltaY);
+		} else { // zoom
+			const factor = e.deltaY > 0 ? 2 : 0.5;
+			const [x,y]= cpu_xy_cpu1(e);
+			viewport_scale_cpu1(x, y, factor)
+		}
+		apply_transforms_cpu1();
+	});
+
+
+	for (const c of [cpu1])
+	c.addEventListener("mousedown", function(e) {
+		e.preventDefault();
+		if (e.which == 3) {
+			viewport_reset_cpu1();
+			apply_transforms_cpu1();
+		} else {
+			c.dataset.active = "true";
+			c.focus();
+			c.dataset.isPanning = "true";
+			const [x,y] = cpu_xy_cpu1(e);
+			c.dataset.startX = x;
+			c.dataset.startY = y;
+			c.style.cursor = "grabbing";
+			//console.log(`grab ${c.dataset.startX} ${c.dataset.startY}`);
+		}
+	});
+
+	for (const c of [cpu1])
+	c.addEventListener("mousemove", function(e) {
+		if (c.dataset.isPanning == "true") {
+			e.preventDefault();
+			const [x,y]= cpu_xy_cpu1(e);
+			const dx = x - Number(c.dataset.startX);
+			const dy = y - Number(c.dataset.startY);
+			viewport_offset_cpu1(dx, dy);
+			apply_transforms_cpu1();
+			c.dataset.startX = x;
+			c.dataset.startY = y;
+		}
+	});
+
+	for (const c of [cpu1])
+	c.addEventListener("mouseup", function(e) {
+		if (c.dataset.isPanning == "true") {
+			c.dataset.isPanning = "false";
+			c.style.cursor = "grab";
+			//window.cursor = 'grab';
+		}
+	});
+
+	for (const c of [cpu1])
+	c.addEventListener("mouseleave", function(e) {
+		c.dataset.isPanning = "false";
+	});
+
+	for (const c of [cpu1])
+	c.addEventListener("keyup", function(e) {
+		//console.log(`k = ${e.key}`);
+		if (e.key == "q" || e.key == "Escape") {
+			//console.log(`QHITE`);
+			c.dataset.active = "false";
+			document.activeElement.blur();
+		}
+		if (e.key == "r") {
+			viewport_reset_cpu1();
+			apply_transforms_cpu1();
+		}
+	});
+</script>
+
+
+<p>Second image:
+<div class="cpu" id="cpu2">
+	<img src="http://gabarro.org/img/lenak.png">
+</div>
+<script>
+	// get unique cpu element
+	const cpu2 = document.getElementById("cpu2");
+
+	// initialize state of this cpu element
+	for (const c of [cpu2])
+	{
+		c.tabIndex = 0;
+		c.dataset.active = "false";
+		c.dataset.isPanning = "false";
+		viewport_reset_cpu2();
+		console.log(`initialized cpu cpu2 ${cpu2}`);
+	}
+
+	function viewport_reset_cpu2() {
+		const c = cpu2;
+		c.dataset.offsetX = 0;
+		c.dataset.offsetY = 0;
+		c.dataset.scale = 1;
+		c.dataset.brightness = 1;
+		c.dataset.contrast = 100;
+	}
+
+	function viewport_offset_cpu2(dx, dy) {
+		const c = cpu2;
+		//console.log(`dxy ${dx} ${dy}`);
+		c.dataset.offsetX = Number(c.dataset.offsetX) + Number(dx);
+		c.dataset.offsetY = Number(c.dataset.offsetY) + Number(dy);
+	}
+
+	function viewport_scale_cpu2(x, y, lds) {
+		const c = cpu2;
+		//console.log(`S x=${x} y=${y} lds=${lds} ox=${offsetX} oy=${offsetY}`)
+		const cx = (x - Number(c.dataset.offsetX))/Number(c.dataset.scale);
+		const cy = (y - Number(c.dataset.offsetY))/Number(c.dataset.scale);
+		c.dataset.scale = lds * Number(c.dataset.scale);
+		c.dataset.offsetX = x - cx * Number(c.dataset.scale);
+		c.dataset.offsetY = y - cy * Number(c.dataset.scale);
+	}
+
+	function brightness_change_cpu2(d) {
+		const c = cpu2;
+		let b = Number(c.dataset.brightness);
+		if (d < 0)
+			b = b - 0.05;
+		else
+			b = b + 0.05;
+		if (b < 0)
+			b = 0;
+		if (b > 9)
+			b = 9;
+		c.dataset.brightness = b;
+	}
+
+	function contrast_change_cpu2(d) {
+		const c = cpu2;
+		let b = Number(c.dataset.contrast);
+		if (d < 0)
+			b = b - 5;
+		else
+			b = b + 5;
+		if (b < 0)
+			b = 0;
+		if (b > 900)
+			b = 900;
+		c.dataset.contrast = b;
+	}
+
+	function apply_transforms_cpu2() {
+		const c = cpu2;
+		const x = Number(c.dataset.offsetX);
+		const y = Number(c.dataset.offsetY);
+		const s = Number(c.dataset.scale);
+		const z = Number(c.dataset.brightness);
+		const t = Number(c.dataset.contrast);
+		//console.log(`tx = ${typeof(x)}`);
+		//console.log(`T ${x} ${y} ${s} z=${z} t=${t}`);
+		for (const i of c.getElementsByTagName("img")) {
+			i.style.transformOrigin = `left top`;
+			i.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+			i.style.filter = `brightness(${z}) saturate(${t}%)`;
+		}
+	}
+
+	function cpu_xy_cpu2(e) {
+		const c = cpu2;
+		const r = c.getBoundingClientRect();
+		const x = e.clientX - r.x;
+		const y = e.clientY - r.y;
+		return [x,y];
+	}
+
+	for (const c of [cpu2])
+	c.addEventListener("wheel", function(e) {
+		if (c.dataset.active == "false") return;
+		e.preventDefault();
+		if (e.shiftKey) { // brightness change
+			brightness_change_cpu2(e.deltaY);
+		} else if (e.ctrlKey) { // contrast change
+			contrast_change_cpu2(e.deltaY);
+		} else { // zoom
+			const factor = e.deltaY > 0 ? 2 : 0.5;
+			const [x,y]= cpu_xy_cpu2(e);
+			viewport_scale_cpu2(x, y, factor)
+		}
+		apply_transforms_cpu2();
+	});
+
+
+	for (const c of [cpu2])
+	c.addEventListener("mousedown", function(e) {
+		e.preventDefault();
+		if (e.which == 3) {
+			viewport_reset_cpu2();
+			apply_transforms_cpu2();
+		} else {
+			c.dataset.active = "true";
+			c.focus();
+			c.dataset.isPanning = "true";
+			const [x,y] = cpu_xy_cpu2(e);
+			c.dataset.startX = x;
+			c.dataset.startY = y;
+			c.style.cursor = "grabbing";
+			//console.log(`grab ${c.dataset.startX} ${c.dataset.startY}`);
+		}
+	});
+
+	for (const c of [cpu2])
+	c.addEventListener("mousemove", function(e) {
+		if (c.dataset.isPanning == "true") {
+			e.preventDefault();
+			const [x,y]= cpu_xy_cpu2(e);
+			const dx = x - Number(c.dataset.startX);
+			const dy = y - Number(c.dataset.startY);
+			viewport_offset_cpu2(dx, dy);
+			apply_transforms_cpu2();
+			c.dataset.startX = x;
+			c.dataset.startY = y;
+		}
+	});
+
+	for (const c of [cpu2])
+	c.addEventListener("mouseup", function(e) {
+		if (c.dataset.isPanning == "true") {
+			c.dataset.isPanning = "false";
+			c.style.cursor = "grab";
+			//window.cursor = 'grab';
+		}
+	});
+
+	for (const c of [cpu2])
+	c.addEventListener("mouseleave", function(e) {
+		c.dataset.isPanning = "false";
+	});
+
+	for (const c of [cpu2])
+	c.addEventListener("keyup", function(e) {
+		//console.log(`k = ${e.key}`);
+		if (e.key == "q" || e.key == "Escape") {
+			//console.log(`QHITE`);
+			c.dataset.active = "false";
+			document.activeElement.blur();
+		}
+		if (e.key == "r") {
+			viewport_reset_cpu2();
+			apply_transforms_cpu2();
+		}
+	});
+</script>
+
+
+
+
+
+<!-- vim: set ts=3 sw=3 ft=javascript: -->
