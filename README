@@ -67,6 +67,7 @@ desired executables into your PATH (or add imscript/bin into the path).
 	- qeasy: re-scale the dynamic range of an image
 	- qauto: re-scale the dynamic range of an image, automatically
 	- palette: colorize a grayscale image using a palette
+	- sauto: apply a signed palette
 	- dither: binarize an image by error diffusion
 	- iion: copy named input to named output (useful to change file format)
 
@@ -103,6 +104,7 @@ desired executables into your PATH (or add imscript/bin into the path).
 	- ifft: discrete Fourier transform (inverse)
 	- dct: discrete cosine transform
 	- dht: discrete Hartley transform
+	- autocorr: centered autocorrelation (spatial domain, but still)
 
 * Point processing:
 	- pview: display points or matches as an image
