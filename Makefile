@@ -9,7 +9,7 @@ BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
       fft dct dht flambda fancy_crop fancy_downsa autotrim iion mediator     \
       redim colormatch eucdist nonmaxsup gntiply idump warp heatd imhalve    \
       ppsmooth mdither mdither2 rpctk getbands pixdump bandslice points      \
-      columnize
+      columnize autocorr
       #geomedian carve
 
 BIN := $(addprefix bin/,$(BIN))
@@ -27,15 +27,15 @@ bin/%  : src/%.o $(OBJ)
 ENABLE_PNG  = 1
 ENABLE_TIFF = 1
 ENABLE_JPEG = 1
-#ENABLE_WEBP = 1
-#ENABLE_HEIF = 1
-#ENABLE_PGSL = 1
+ENABLE_WEBP = 1
+ENABLE_HEIF = 1
+ENABLE_PGSL = 1
 
 # CAVEAT: if you want to use HDF5, make sure that no "mpich" packages
 # are installed on your computer.  If they are, all programs that link
 # to libdf5 become really slow due to dynamic linking initialization.
 #
-#ENABLE_HDF5 = 1
+ENABLE_HDF5 = 1
 
 
 
@@ -212,6 +212,7 @@ endif
 ifdef ENABLE_PGSL
 bin/plambda: LDLIBS += -lgsl
 src/plambda.o: CPPFLAGS += -DPLAMBDA_WITH_GSL
+bin/mathieu: LDLIBS += -lgsl
 endif
 
 
