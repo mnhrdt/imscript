@@ -16,7 +16,7 @@
 #endif
 
 #define π M_PI
-//#define ∞ INFINITY
+#define i∞ INFINITY
 
 #include "fail.c"
 #include "xmalloc.c"
@@ -121,10 +121,44 @@ static void autocorr(float *y, float *xx, int w, int h, int P)
 	if (P) xfree(x);
 }
 
-static void autocorrC(float *y, float *x, int w, int h, int pd, int P)
+static void autocorr_loc(float *y, float *x, int w, int h, int L)
+{
+	// set background to 0
+	for (int i = 0; i < w*h; i++)
+		y[i] = 0;
+
+	// compute autocorr of all fitting square windows
+	for (int oy = 0; oy+L < h; oy += L)
+	for (int ox = 0; ox+L < w; ox += L)
+	{
+		float x_loc[L*L], y_loc[L*L], sy_loc[L*L];
+		for (int j = 0; j < L; j++)
+		for (int i = 0; i < L; i++)
+			x_loc[j*L+i] = x[(j+oy)*w+i+ox];
+		autocorr(y_loc, x_loc, L, L, 1);
+		for (int j = 0; j < L; j++)
+		for (int i = 0; i < L; i++)
+		{
+			int ii = (i + L/2) % L;
+			int jj = (j + L/2) % L;
+			sy_loc[j*L+i] = y_loc[jj*L+ii];
+		}
+		for (int j = 0; j < L; j++)
+		for (int i = 0; i < L; i++)
+			y[(j+oy)*w+i+ox] = sy_loc[j*L+i];
+	}
+}
+
+static void autocorr_split(float *y, float *x, int w, int h, int pd, int P)
 {
 	for (int i = 0; i < pd; i++)
 		autocorr(y + w*h*i, x + w*h*i, w, h, P);
+}
+
+static void autocorr_loc_split(float *y, float *x, int w, int h, int pd, int L)
+{
+	for (int i = 0; i < pd; i++)
+		autocorr_loc(y + w*h*i, x + w*h*i, w, h, L);
 }
 
 static int good_modulus(int n, int p)
@@ -154,7 +188,7 @@ static void fftshift(float *y, float *x, int w, int h)
 
 }
 
-static void fftshiftC(float *y, float *x, int w, int h, int pd)
+static void fftshift_split(float *y, float *x, int w, int h, int pd)
 {
 	for (int i = 0; i < pd; i++)
 		fftshift(y + w*h*i, x + w*h*i, w, h);
@@ -179,14 +213,14 @@ int main_autocorr(int c, char *v[])
 	float *y = xmalloc(w*(long)h*pd*sizeof*y);
 	normalize_float_array_inplace(x, w*h*pd);
 
-	//if (localization)
-	//	autocorrC_loc(y, x, w, h, pd, localization);
-	//else
-		autocorrC(y, x, w, h, pd, periodization);
+	if (localization)
+		autocorr_loc_split(y, x, w, h, pd, localization);
+	else
+		autocorr_split(y, x, w, h, pd, periodization);
 
 	float *z = xmalloc(w*(long)h*pd*sizeof*z);
-	if (fftshiftization)
-		fftshiftC(z, y, w, h, pd);
+	if (fftshiftization && !localization)
+		fftshift_split(z, y, w, h, pd);
 	else
 		z = y;
 
