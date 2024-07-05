@@ -738,7 +738,7 @@ static void imprintf_2d(FILE *f, char *fmt, float *x, int w, int h, int pd)
 
 
 static char *help_string_name     = "imprintf";
-static char *help_string_version  = "imprintf 1.0\n\nWritten by eml";
+static char *help_string_version  = "imprintf 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "print formatted data about an image";
 static char *help_string_usage    = "usage:\n\t"
 "imprintf format [image]";

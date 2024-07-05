@@ -305,7 +305,7 @@ void poisson_solver_separable(float *out, float *in, float *dat,
 #define MAIN_IPOL_POISSON
 #ifdef MAIN_IPOL_POISSON
 static char *help_string_name     = "simpois";
-static char *help_string_version  = "simpois 1.0\n\nWritten by eml";
+static char *help_string_version  = "simpois 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "a simple Poisson solver for images";
 static char *help_string_usage    = "usage:\n\t"
 "simpois [options] [-m mask.png] [-f data.npy] [-i in.npy] [-o out.npy]";

@@ -4,7 +4,7 @@
 #include "iio.h"    // iio_*
 
 static char *help_string_name     = "qeasy";
-static char *help_string_version  = "qeasy 1.0\n\nWritten by eml";
+static char *help_string_version  = "qeasy 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "quantize an image into [0,255]";
 static char *help_string_usage    = "usage:\n\t"
 "qeasy black white [in [out]]";

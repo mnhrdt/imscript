@@ -52,7 +52,7 @@ int main_lrcat_two(int c, char *v[])
 }
 
 static char *help_string_name     = "lrcat";
-static char *help_string_version  = "lrcat 1.0\n\nWritten by eml";
+static char *help_string_version  = "lrcat 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "concatenate images horizontally";
 static char *help_string_usage    = "usage:\n\t"
 "lrcat in1 in2 ... {> out|-o out}";

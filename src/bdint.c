@@ -118,7 +118,7 @@ void bdint_gen_split(float *x, int w, int h, int pd, accumulator_t *a)
 
 #ifdef USE_BDINT_MAIN
 static char *help_string_name     = "bdint";
-static char *help_string_version  = "bdint 1.0\n\nWritten by eml";
+static char *help_string_version  = "bdint 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "boundary value interpolation";
 static char *help_string_usage    = "usage:\n\t"
 "bdint [-m mask.png] [in.npy [out.npy]]";

@@ -132,7 +132,7 @@ void dither_sep(float *x, int w, int h, int pd, _Bool b)
 #include "pickopt.c"
 
 static char *help_string_name     = "dither";
-static char *help_string_version  = "dither 1.0\n\nWritten by eml";
+static char *help_string_version  = "dither 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "binarize a grayscale image by dithering";
 static char *help_string_usage    = "usage:\n\t"
 "dither [-b] [in [out]]";

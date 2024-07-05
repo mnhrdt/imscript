@@ -142,7 +142,7 @@ void downsa2d(float *oy, float *ox, int w, int h, int pd, int n, int ty)
 }
 
 static char *help_string_name     = "downsa";
-static char *help_string_version  = "downsa 1.0\n\nWritten by eml";
+static char *help_string_version  = "downsa 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "zoom-out by combining NxN pixels into one";
 static char *help_string_usage    = "usage:\n\t"
 "downsa {i|e|a|v|r|n|f} N [in [out]]";

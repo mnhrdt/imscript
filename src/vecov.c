@@ -226,7 +226,7 @@ static bool isgood(float *x, int n)
 }
 
 static char *help_string_name     = "vecov";
-static char *help_string_version  = "vecov 1.0\n\nWritten by eml";
+static char *help_string_version  = "vecov 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "combine several vector images into one";
 static char *help_string_usage    = "usage:\n\t"
 "vecov {sum|avg|med|weisz|modc|...} in1 in2 ... {> out|-o out}";

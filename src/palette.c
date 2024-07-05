@@ -590,7 +590,7 @@ static void overlay_br(uint8_t *y, int w, int h, uint8_t *l, int lw, int lh)
 //}
 
 static char *help_string_name     = "palette";
-static char *help_string_version  = "palette 1.0\n\nWritten by eml";
+static char *help_string_version  = "palette 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "colorize a grayscale image using a palette";
 static char *help_string_usage    = "usage:\n\t"
 "palette from to pal [in [out]] [-l legend.png]";

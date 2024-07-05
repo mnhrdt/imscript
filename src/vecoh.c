@@ -404,7 +404,7 @@ static bool isgood(float *x, int n)
 }
 
 static char *help_string_name     = "vecoh";
-static char *help_string_version  = "vecoh 1.0\n\nWritten by eml";
+static char *help_string_version  = "vecoh 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "pixelwise clustering of scalar images";
 static char *help_string_usage    = "usage:\n\t"
 "vecoh {kmeans|kmedians|contrario} in1 in2 ... {> out|-o out}";

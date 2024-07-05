@@ -408,7 +408,7 @@ static bool isgood_positive(float x) { return x >= 0; }
 static bool isgood_negative(float x) { return x < 0; }
 
 static char *help_string_name     = "veco";
-static char *help_string_version  = "veco 1.0\n\nWritten by eml";
+static char *help_string_version  = "veco 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "combine several scalar images into one";
 static char *help_string_usage    = "usage:\n\t"
 "veco {sum|min|max|mul|med|...} in1 in2 ... {> out|-o out}";

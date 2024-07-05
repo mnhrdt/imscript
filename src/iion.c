@@ -31,7 +31,7 @@ X(uint16)
 
 
 static char *help_string_name     = "iion";
-static char *help_string_version  = "iion 1.0\n\nWritten by eml";
+static char *help_string_version  = "iion 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "read and write a named image using iio";
 static char *help_string_usage    = "usage:\n\t"
 "iion [-t {float,double,uint8,uint16}] [in] out";

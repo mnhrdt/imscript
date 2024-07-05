@@ -130,7 +130,7 @@ static void dump_histogram_c(long double (*h)[2], int n, char *c)
 }
 
 static char *help_string_name     = "ghisto";
-static char *help_string_version  = "ghisto 1.0\n\nWritten by eml";
+static char *help_string_version  = "ghisto 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "compute the histogram of an image, in gnuplot format";
 static char *help_string_usage    = "usage:\n\t"
 "ghisto [-p] [img.png] > histo.g";

@@ -90,7 +90,7 @@ static void flip_identity(float *X, int *WH, float *x, int w, int h)
 
 
 static char *help_string_name     = "imflip";
-static char *help_string_version  = "imflip 1.0\n\nWritten by eml";
+static char *help_string_version  = "imflip 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "flip an image";
 static char *help_string_usage    = "usage:\n\t"
 "flip {leftright|topdown|transpose} [in [out]]";

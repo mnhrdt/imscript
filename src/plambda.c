@@ -3038,7 +3038,7 @@ static int main_images(int c, char **v)
 }
 
 static char *help_string_name     = "plambda";
-static char *help_string_version  = "plambda 1.0\n\nWritten by eml";
+static char *help_string_version  = "plambda 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "evaluate an expression with "
                                                          "images as variables";
 

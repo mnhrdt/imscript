@@ -83,6 +83,7 @@ static float interpolate_cell(float a, float b, float c, float d,
 	switch(method) {
 	case 0: return interpolate_nearest(a, b, c, d, x, y);
 	case 1: return marchi(a, b, c, d, x, y);
+	case -1: return -marchi(-a, -b, -c, -d, x, y);
 	case 2: return interpolate_bilinear(a, b, c, d, x, y);
 	case -2: return interpolate_bilinear_fade(a, b, c, d, x, y);
 	case -3: return interpolate_bilinear_fadeinv(a, b, c, d, x, y);

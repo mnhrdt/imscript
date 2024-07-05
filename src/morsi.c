@@ -424,7 +424,7 @@ static int *build_Drec(float radius)
 #include <string.h>
 #include "iio.h"
 static char *help_string_name     = "morsi";
-static char *help_string_version  = "morsi 1.0\n\nWritten by eml";
+static char *help_string_version  = "morsi 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "simple gray-scale morphology";
 static char *help_string_usage    = "usage:\n\t"
 "morsi {cross|square|disk5...} {erosion|dilation...} [in [out]]";

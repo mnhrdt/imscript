@@ -96,7 +96,7 @@ int shomwarp(float *X, int W, int H, double M[9], float *x,
 
 // now begins the main function of the CLI interface
 static char *help_string_name     = "homwarp";
-static char *help_string_version  = "homwarp 1.0\n\nWritten by eml";
+static char *help_string_version  = "homwarp 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "warp an image by an homography";
 static char *help_string_usage    = "usage:\n\t"
 "homwarp [-i] [-o ORDER] HOMOGRAPHY [W H [in [out]]]";

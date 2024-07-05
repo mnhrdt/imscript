@@ -1102,7 +1102,7 @@ static void grab_options(struct descent_options *o, int *c, char ***v)
 
 
 static char *help_string_name     = "geomedian";
-static char *help_string_version  = "geomedian 1.0\n\nWritten by eml";
+static char *help_string_version  = "geomedian 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "algorithms for the geometric median";
 static char *help_string_usage    = "usage:\n\t"
 "geomedian [options] < points.txt > median.txt";

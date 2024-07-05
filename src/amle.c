@@ -297,7 +297,7 @@ void amle_old(float *y, float *x, int w, int h)
 
 
 static char *help_string_name     = "amle";
-static char *help_string_version  = "amle 1.0\n\nWritten by eml";
+static char *help_string_version  = "amle 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "Absolutely Minimizing Lipschitz Extension";
 static char *help_string_usage    = "usage:\n\t"
 "simpois [in [mask [out]]]";

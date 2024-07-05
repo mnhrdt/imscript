@@ -39,7 +39,7 @@ void columnize(FILE *f, float *x, int w, int h, int pd, bool pz, bool pv)
 
 
 static char *help_string_name     = "columnize";
-static char *help_string_version  = "columnize 1.0\n\nWritten by eml";
+static char *help_string_version  = "columnize 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "describe an image as a multi-column file";
 static char *help_string_usage    = "usage:\n\t"
 "columnize {-z} [in.img [out.txt]]";

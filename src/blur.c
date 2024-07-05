@@ -482,7 +482,7 @@ void blur_2d(float *y, float *x, int w, int h, int pd,
 #ifdef MAIN_BLUR
 
 static char *help_string_name     = "blur";
-static char *help_string_version  = "blur 1.0\n\nWritten by eml";
+static char *help_string_version  = "blur 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "smooth a 2D image using the selected kernel";
 static char *help_string_usage    = "usage:\n\t"
 "blur [-p 5] [-i] [-f]  [in [out]]";

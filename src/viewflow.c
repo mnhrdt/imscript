@@ -239,7 +239,7 @@ static void overlines(uint8_t (**y)[3], float (**x)[2], int w, int h, float s)
 }
 
 static char *help_string_name     = "viewflow";
-static char *help_string_version  = "viewflow 1.0\n\nWritten by eml";
+static char *help_string_version  = "viewflow 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "represent a vector field using a color code";
 static char *help_string_usage    = "usage:\n\t"
 "SATSCALE [in.flo [out.png]]";

@@ -262,7 +262,7 @@ void nnint_split(float *x, int w, int h, int pd)
 
 #ifdef USE_NNINT_MAIN
 static char *help_string_name     = "nnint";
-static char *help_string_version  = "nnint 1.0\n\nWritten by eml";
+static char *help_string_version  = "nnint 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "nearest neighbor interpolation";
 static char *help_string_usage    = "usage:\n\t"
 "nnint [-m mask.png] [in.npy [out.npy]]";

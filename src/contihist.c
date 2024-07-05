@@ -517,7 +517,7 @@ static void update_min_max_if_not_finite(float *m, float *M, float *x, int n)
 #include "pickopt.c"
 
 static char *help_string_name     = "contihist";
-static char *help_string_version  = "contihist 1.0\n\nWritten by eml";
+static char *help_string_version  = "contihist 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "compute the \"continuous\" histogram of an image";
 static char *help_string_usage    = "usage:\n\t"
 "contihist NSAMPLES MIN MAX [-p] [img.png] > histo.g";

@@ -52,7 +52,7 @@ int main_tbcat_two(int c, char *v[])
 }
 
 static char *help_string_name     = "tbcat";
-static char *help_string_version  = "tbcat 1.0\n\nWritten by eml";
+static char *help_string_version  = "tbcat 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "concatenate images vertically";
 static char *help_string_usage    = "usage:\n\t"
 "tbcat in1 in2 ... {> out|-o out}";
