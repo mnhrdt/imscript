@@ -15,95 +15,6 @@ static int compare_floats(const void *a, const void *b)
 	return (*da > *db) - (*da < *db);
 }
 
-static void get_rminmax(float *rmin, float *rmax, float *x, int n, float rb)
-{
-	float *tx = xmalloc(n*sizeof*tx);
-	int N = 0;
-	for (int i = 0; i < n; i++)
-		if (!isnan(x[i]))
-			tx[N++] = x[i];
-	int irb = round(rb);
-	if (N < 1) {
-		fprintf(stderr, "too many NANs (rb N) = %g %d", rb, N);
-		abort();
-	}
-	qsort(tx, N, sizeof*tx, compare_floats);
-	*rmin = tx[irb];
-	*rmax = tx[N-1-irb];
-	free(tx);
-}
-
-static void get_avgstd(float *out_avg, float *out_std, float *x, int n)
-{
-	long double avg = 0;
-	for (int i = 0; i < n; i++)
-		avg += x[i];
-	avg /= n;
-	*out_avg = avg;
-
-	long double var = 0;
-	for (int i = 0; i < n; i++)
-		var += (x[i] - avg) * (x[i] - avg);
-	var /= n;
-	*out_std = sqrt(var);
-}
-
-// adjust contrast by allowing a fixed percentile of top and bottom saturation
-static void simplest_color_balance(float *y, float *x, int w, int h, float p)
-{
-	float rmin, rmax;
-	get_rminmax(&rmin, &rmax, x, w*h, w*h*(p/100));
-	if (global_verbose_flag)
-		fprintf(stderr, "qauto: rminmax = %g %g\n", rmin, rmax);
-
-	for (int i = 0; i < w*h; i++)
-		y[i] = 255 * (x[i] - rmin) / (rmax - rmin);
-}
-
-// adjust contrast by normalizing avg=127 std=s
-static void adjust_avgstd(float *y, float *x, int w, int h, float s)
-{
-	float avg, std;
-	get_avgstd(&avg, &std, x, w*h);
-	fprintf(stderr, "qauto: avgstd = %g %g\n", avg, std);
-
-	for (int i = 0; i < w*h; i++)
-		y[i] = 127 + s * (x[i] - avg) / std;
-}
-
-static void qauto_grey(float *y, float *x, int w, int h, float parameter)
-{
-	if (parameter >= 0)
-		simplest_color_balance(y, x, w, h, parameter);
-	else
-		adjust_avgstd(y, x, w, h, -parameter);
-}
-
-static void quantize_to_byte_values_inplace(float *x, int n)
-{
-	for (int i = 0; i < n; i++)
-	{
-		float g = round(x[i]);
-		int ig = g;
-		if (ig < 0) ig = 0;
-		if (ig > 255) ig = 255;
-		x[i] = ig;
-	}
-}
-
-static void qauto(float *y, float *x, int w, int h, int pd,
-	bool independent_channels, float parameter, bool do_not_quantize)
-{
-	if (independent_channels)
-		for (int l = 0; l < pd; l++)
-			qauto_grey(y + w*h*l, x + w*h*l, w, h, parameter);
-	else
-		qauto_grey(y, x, w, h*pd, parameter);
-
-	if (!do_not_quantize)
-		quantize_to_byte_values_inplace(y, w*h*pd);
-}
-
 static float clip(float x, float a, float b)
 {
 	if (x < a) return a;
@@ -135,8 +46,6 @@ static void sauto(uint8_t *y, float *x, int w, int h, float p)
 		s = t[i];
 	}
 	if (global_verbose_flag) fprintf(stderr, "sauto: s = %g\n", s);
-	assert(s > 0);
-	assert(s <= 1);
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 	{
