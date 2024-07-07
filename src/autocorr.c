@@ -104,9 +104,17 @@ static void normalize_float_array_inplace(float *x, int n)
 #include "ppsmooth.c"
 
 
+static int good_modulus(int n, int p)
+{
+	int r = n % p;
+	r = r < 0 ? r + p : r;
+	assert(r >= 0);
+	assert(r < p);
+	return r;
+}
 
 
-static void autocorr(float *y, float *xx, int w, int h, int P)
+static void autocorr(float *y, float *xx, int w, int h, float z, int P)
 {
 	float *x = P ? xmalloc(w*h*sizeof*x) : xx;
 	if (P) ppsmooth(x, xx, w, h);
@@ -119,9 +127,19 @@ static void autocorr(float *y, float *xx, int w, int h, int P)
 	free(X);
 
 	if (P) xfree(x);
+
+	if (z)
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		int ii = good_modulus(i + w/2, w) - w/2;
+		int jj = good_modulus(j + h/2, h) - h/2;
+		if (hypot(ii, jj) < z)
+			y[j*w + i] = 0;
+	}
 }
 
-static void autocorr_loc(float *y, float *x, int w, int h, int L)
+static void autocorr_loc(float *y, float *x, int w, int h, float z, int L)
 {
 	// set background to 0
 	for (int i = 0; i < w*h; i++)
@@ -135,7 +153,7 @@ static void autocorr_loc(float *y, float *x, int w, int h, int L)
 		for (int j = 0; j < L; j++)
 		for (int i = 0; i < L; i++)
 			x_loc[j*L+i] = x[(j+oy)*w+i+ox];
-		autocorr(y_loc, x_loc, L, L, 1);
+		autocorr(y_loc, x_loc, L, L, z, 1);
 		for (int j = 0; j < L; j++)
 		for (int i = 0; i < L; i++)
 		{
@@ -149,26 +167,20 @@ static void autocorr_loc(float *y, float *x, int w, int h, int L)
 	}
 }
 
-static void autocorr_split(float *y, float *x, int w, int h, int pd, int P)
+static void autocorr_split(float *y,
+		float *x, int w, int h, int pd, float z, int P)
 {
 	for (int i = 0; i < pd; i++)
-		autocorr(y + w*h*i, x + w*h*i, w, h, P);
+		autocorr(y + w*h*i, x + w*h*i, w, h, z, P);
 }
 
-static void autocorr_loc_split(float *y, float *x, int w, int h, int pd, int L)
+static void autocorr_loc_split(float *y,
+		float *x, int w, int h, int pd, float z, int L)
 {
 	for (int i = 0; i < pd; i++)
-		autocorr_loc(y + w*h*i, x + w*h*i, w, h, L);
+		autocorr_loc(y + w*h*i, x + w*h*i, w, h, z, L);
 }
 
-static int good_modulus(int n, int p)
-{
-	int r = n % p;
-	r = r < 0 ? r + p : r;
-	assert(r >= 0);
-	assert(r < p);
-	return r;
-}
 
 typedef float (*extension_operator_float)(float*,int,int,int,int);
 
@@ -188,6 +200,24 @@ static void fftshift(float *y, float *x, int w, int h)
 
 }
 
+static void zeroize_inplace(float *x, int w, int h, float z)
+{
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		int ii = good_modulus(i - w/2, w);
+		int jj = good_modulus(j - h/2, h);
+		if (hypot(ii, jj) < z)
+			x[j*w + i] = 0;
+	}
+}
+
+static void zeroize_inplace_split(float *x, int w, int h, int pd, float z)
+{
+	for (int i = 0; i < pd; i++)
+		zeroize_inplace(x + w*h*i, w, h, z);
+}
+
 static void fftshift_split(float *y, float *x, int w, int h, int pd)
 {
 	for (int i = 0; i < pd; i++)
@@ -200,6 +230,7 @@ int main_autocorr(int c, char *v[])
 	int localization    = atoi(pick_option(&c, &v, "l", "0"));
 	int periodization   = atoi(pick_option(&c, &v, "p", "0"));
 	int fftshiftization = atoi(pick_option(&c, &v, "s", "1"));
+	float zeros         = atof(pick_option(&c, &v, "z", "0"));
 	if (c != 1 && c != 2 && c != 3) {
 		fprintf(stderr, "usage:\n\t%s [in [out]]\n", *v);
 		//                          0  1   2
@@ -214,15 +245,16 @@ int main_autocorr(int c, char *v[])
 	normalize_float_array_inplace(x, w*h*pd);
 
 	if (localization)
-		autocorr_loc_split(y, x, w, h, pd, localization);
+		autocorr_loc_split(y, x, w, h, pd, zeros, localization);
 	else
-		autocorr_split(y, x, w, h, pd, periodization);
+		autocorr_split(y, x, w, h, pd, zeros, periodization);
 
 	float *z = xmalloc(w*(long)h*pd*sizeof*z);
 	if (fftshiftization && !localization)
 		fftshift_split(z, y, w, h, pd);
 	else
 		z = y;
+
 
 	iio_write_image_float_split(filename_out, z, w, h, pd);
 	return EXIT_SUCCESS;
