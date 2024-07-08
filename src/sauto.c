@@ -33,10 +33,12 @@ static void sauto(uint8_t *y, float *x, int w, int h, float p)
 	float s = 0; // saturation quantile
 	if (p >= 0) // p is a percentage
 	{
-		assert(p < 50);
+		//assert(p <= 50);
 		int i = n - 1 - p*n/100;
-		assert(i >= 0);
-		assert(i < n);
+		if (i < 0) i = 0;
+		if (i >= n) i = n;
+		//assert(i >= 0);
+		//assert(i < n);
 		s = t[i];
 	} else { // -p is a number of pixels
 		int i = n + p - 1;
