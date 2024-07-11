@@ -15,8 +15,8 @@
 #define M_PI		3.14159265358979323846	/* pi */
 #endif
 
-#define π M_PI
-#define i∞ INFINITY
+//#define π M_PI
+//#define i∞ INFINITY
 
 #include "fail.c"
 #include "xmalloc.c"
