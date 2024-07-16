@@ -698,6 +698,33 @@ static void action_screenshot(struct FTR *f)
 	c += 1;
 }
 
+static void action_screenshot_float(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	static int c = 0;
+	char n[FILENAME_MAX];
+	snprintf(n, FILENAME_MAX, "dump_cpu_%d.npy", c);
+	void iio_write_image_float_vec(char*,float*,int,int,int);
+	int fpd = e->i->pd;
+	float *fvec = xmalloc(f->w * f->h * fpd * sizeof*fvec);
+
+
+	for (int j = 0; j < f->h; j++)
+	for (int i = 0; i < f->w; i++)
+	{
+		double p[2];
+		window_to_image(p, e, i, j);
+		//float v[fpd];
+		float *v = fvec + (f->w*j + i)*fpd;
+		pixel(v, e, p[0], p[1]);
+	}
+
+	iio_write_image_float_vec(n, fvec, f->w, f->h, fpd);
+	fprintf(stderr, "wrote float dump on file \"%s\"\n", n);
+	c += 1;
+	free(fvec);
+}
+
 static bool insideP(int w, int h, int i, int j)
 {
 	return i>=0 && j>=0 && i<w && j<h;
@@ -1352,6 +1379,7 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'd') action_topography_Pspan(f, 1/1.3);
 	if (k == 'D') action_topography_Pspan(f, 1.3);
 	if (k == ',') action_screenshot(f);
+	if (k == '.') action_screenshot_float(f);
 
 	// if ESC or q, exit
 	if  (k == '\033' || k == 'q')
