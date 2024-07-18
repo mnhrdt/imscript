@@ -14,12 +14,15 @@
 
 #include "iio.h"
 #include "fail.c"
-#include "rpc.h"
+
+#define DONT_USE_TEST_MAIN
+#include "rpc.c"
+
 #include "parsenumbers.c"
 #include "pickopt.c"
 
-#undef USE_TIMING
-#include "timing.h"
+//#undef USE_TIMING
+//#include "timing.h"
 
 
 void utm_alt_zone(double *out, double lat, double lon, int zone);
@@ -232,7 +235,7 @@ int main(int c, char *v[])
     // count number of valid pixels
     uint64_t npoints = 0;
     printf("counting valid points...\n");
-    TIMING_CPUCLOCK_START(0);
+    //TIMING_CPUCLOCK_START(0);
     for (uint64_t pix = 0; pix < (uint64_t) w*h; pix++) {
         if (!isnan(height[pix])) {
             // compute coordinates of pix in the big image
@@ -261,8 +264,8 @@ int main(int c, char *v[])
             }
         }
     }
-    TIMING_CPUCLOCK_TOGGLE(0);
-    TIMING_PRINTF("CPU time spent counting points: %0.6fs\n", TIMING_CPUCLOCK_S(0));
+    //TIMING_CPUCLOCK_TOGGLE(0);
+    //TIMING_PRINTF("CPU time spent counting points: %0.6fs\n", TIMING_CPUCLOCK_S(0));
     printf("found %" PRIu64 " valid points\n", npoints);
 
     // print header for ply file
@@ -279,8 +282,8 @@ int main(int c, char *v[])
 
     // loop over all the pixels of the input height map
     // a 3D point is produced for each 'non Nan' height
-    TIMING_WALLCLOCK_RESET(0);
-    TIMING_WALLCLOCK_TOGGLE(0);
+    //TIMING_WALLCLOCK_RESET(0);
+    //TIMING_WALLCLOCK_TOGGLE(0);
     size_t point_size = 3*sizeof(double);
     if (normals)
         point_size += 3*sizeof(double);
@@ -360,9 +363,9 @@ int main(int c, char *v[])
             ptr[i] += point_size;
         }
     }
-    TIMING_WALLCLOCK_TOGGLE(0);
-    TIMING_PRINTF("WALL time spent computing the points: %0.6fs\n",
-            TIMING_WALLCLOCK_S(0));
+    //TIMING_WALLCLOCK_TOGGLE(0);
+    //TIMING_PRINTF("WALL time spent computing the points: %0.6fs\n",
+    //        TIMING_WALLCLOCK_S(0));
 
     // write the last buffers to file
     for (int i = 0; i < nthreads; i++)
