@@ -311,6 +311,12 @@ static char *xgetenv(const char *s)
 #endif// I_CAN_GETENV
 }
 
+static float xgetenvf(const char *s, float d)
+{
+	const char *v = xgetenv(s);
+	return v ? atof(v) : d;
+}
+
 static void fail(const char *fmt, ...) __attribute__((noreturn,format(printf,1,2)));
 static void fail(const char *fmt, ...)
 
@@ -3830,7 +3836,7 @@ static void trans_pipe(struct iio_image *x, const char *p)
 
 	iio_write_image_default(i, x);
 
-	fprintf(stderr, "IIO_TRANS: running pipe \"%s\"\n", p);
+	IIO_DEBUG("IIO_TRANS: running pipe \"%s\"\n", p);
 	if (!system(c))
 	{
 		// the monkey flies between two branches
@@ -4901,6 +4907,8 @@ static int guess_format(FILE *f, char *buf, int *nbuf, int bufmax)
 			return IIO_FORMAT_JPEG;
 		if (b[3]==0xe2 && b[6]=='I' && b[7]=='C') // ICC_PROFILE
 			return IIO_FORMAT_JPEG;
+		if (b[3]==0xe1 && b[4]==9 && b[5]==0xbd)  // C2PA
+			return IIO_FORMAT_JPEG;
 		if (b[3]==0xee || b[3]==0xed) // Adobe JPEG
 			return IIO_FORMAT_JPEG;
 		if (b[3]==0xdb) // Raw JPEG
@@ -5809,7 +5817,10 @@ static void iio_write_image_default(const char *filename, struct iio_image *x)
 	if (x->dimension != 2) fail("de moment només escrivim 2D");
 	if (!strcmp(filename,"-") && isatty(1))
 	{
-		if (x->sizes[0] <= 855 && x->sizes[1] <= 800 &&
+		if (true 
+			&& x->sizes[0] <= xgetenvf("IIO_SIXEL_MAXW", 855)
+			&& x->sizes[1] <= xgetenvf("IIO_SIXEL_MAXH", 800)
+			&&
 			(x->pixel_dimension==3 || x->pixel_dimension==1))
 			dump_sixels_to_stdout(x);
 		else
