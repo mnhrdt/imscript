@@ -64,6 +64,7 @@ struct viewer_state {
 	bool show_grid_points;
 	bool restrict_to_affine;
 	bool show_debug; // show inverted points and full qhulls
+	bool show_coords;
 
 	// ui
 	struct bitmap_font font[5]; // from small to large
@@ -95,6 +96,7 @@ static void center_view(struct FTR *f)
 	e->show_grid_points = false;
 	e->restrict_to_affine = false;
 	e->show_debug = false;
+	e->show_coords = true;
 
 	// x
 	e->p = -1;
@@ -461,6 +463,18 @@ static void paint_state(struct FTR *f)
 					e->px, e->py - font->height,
 					white, black, 0, font, fn);
 		}
+
+		if (e->show_coords)
+		{
+			uint8_t red[3] = {255, 0, 0};
+			struct bitmap_font *font = e->font + 4;
+			char buf[0x100];
+			snprintf(buf, 0x100, "%g %g",
+				       	e->x[2*e->p+0], e->x[2*e->p+1]);
+			put_string_in_rgb_image(f->rgb, f->w, f->h,
+					e->px, e->py - font->height,
+					red, NULL, 0, font, buf);
+		}
 	}
 
 	//compute_red_points_convex_hull(e);
@@ -806,8 +820,8 @@ int main_cloudette(int argc, char *argv[])
 	for (int i = 0; i < n; i++)
 	{
 		e->x[2*i+0] = hs * l[i].xyrgb[0];
-		//e->x[2*i+1] = vs * sqrt(l[i].xyrgb[1]);
-		e->x[2*i+1] = vs * l[i].xyrgb[1];
+		e->x[2*i+1] = vs * sqrt(l[i].xyrgb[1]);
+		//e->x[2*i+1] = vs * l[i].xyrgb[1];
 		//e->c[3*i+0] = l[i].xyrgb[2];
 		//e->c[3*i+1] = l[i].xyrgb[3];
 		//e->c[3*i+2] = l[i].xyrgb[4];
