@@ -114,7 +114,7 @@ static int good_modulus(int n, int p)
 }
 
 
-static void autocorr(float *y, float *xx, int w, int h, float z, int P)
+static void autocorr(float *y, float *xx, int w, int h, float z, int n, int P)
 {
 	float *x = P ? xmalloc(w*h*sizeof*x) : xx;
 	if (P) ppsmooth(x, xx, w, h);
@@ -123,6 +123,7 @@ static void autocorr(float *y, float *xx, int w, int h, float z, int P)
 	fft_2dfloat(X, x, w, h);
 	for (int i = 0; i < w*h; i++)
 		X[i] = X[i] * conj(X[i]);
+	if (n) X[0] = 0;
 	ifft_2dfloat(y, X, w, h);
 	free(X);
 
@@ -139,7 +140,8 @@ static void autocorr(float *y, float *xx, int w, int h, float z, int P)
 	}
 }
 
-static void autocorr_loc(float *y, float *x, int w, int h, float z, int L)
+static
+void autocorr_loc(float *y, float *x, int w, int h, float z, int n, int L)
 {
 	// set background to 0
 	for (int i = 0; i < w*h; i++)
@@ -153,7 +155,7 @@ static void autocorr_loc(float *y, float *x, int w, int h, float z, int L)
 		for (int j = 0; j < L; j++)
 		for (int i = 0; i < L; i++)
 			x_loc[j*L+i] = x[(j+oy)*w+i+ox];
-		autocorr(y_loc, x_loc, L, L, z, 1);
+		autocorr(y_loc, x_loc, L, L, z, n, 1);
 		for (int j = 0; j < L; j++)
 		for (int i = 0; i < L; i++)
 		{
@@ -168,17 +170,17 @@ static void autocorr_loc(float *y, float *x, int w, int h, float z, int L)
 }
 
 static void autocorr_split(float *y,
-		float *x, int w, int h, int pd, float z, int P)
+		float *x, int w, int h, int pd, float z, int n, int P)
 {
 	for (int i = 0; i < pd; i++)
-		autocorr(y + w*h*i, x + w*h*i, w, h, z, P);
+		autocorr(y + w*h*i, x + w*h*i, w, h, z, n, P);
 }
 
 static void autocorr_loc_split(float *y,
-		float *x, int w, int h, int pd, float z, int L)
+		float *x, int w, int h, int pd, float z, int n, int L)
 {
 	for (int i = 0; i < pd; i++)
-		autocorr_loc(y + w*h*i, x + w*h*i, w, h, z, L);
+		autocorr_loc(y + w*h*i, x + w*h*i, w, h, z, n, L);
 }
 
 
@@ -231,6 +233,7 @@ int main_autocorr(int c, char *v[])
 	int periodization   = atoi(pick_option(&c, &v, "p", "0"));
 	int fftshiftization = atoi(pick_option(&c, &v, "s", "1"));
 	float zeros         = atof(pick_option(&c, &v, "z", "0"));
+	int navg            = atoi(pick_option(&c, &v, "n", "1"));
 	if (c != 1 && c != 2 && c != 3) {
 		fprintf(stderr, "usage:\n\t%s [in [out]]\n", *v);
 		//                          0  1   2
@@ -245,9 +248,9 @@ int main_autocorr(int c, char *v[])
 	normalize_float_array_inplace(x, w*h*pd);
 
 	if (localization)
-		autocorr_loc_split(y, x, w, h, pd, zeros, localization);
+		autocorr_loc_split(y, x, w, h, pd, zeros, navg, localization);
 	else
-		autocorr_split(y, x, w, h, pd, zeros, periodization);
+		autocorr_split(y, x, w, h, pd, zeros, navg, periodization);
 
 	float *z = xmalloc(w*(long)h*pd*sizeof*z);
 	if (fftshiftization && !localization)
