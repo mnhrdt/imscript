@@ -21,6 +21,16 @@ struct cpu_view {
 struct cpu_view global_table_of_cpu_views[MAX_CPUS];
 
 
+#define CCPU_SHOW_DEBUG_MESSAGES
+
+#ifdef CCPU_SHOW_DEBUG_MESSAGES
+#  define CCPU_DEBUG(...) do {\
+	if (getenv("CCPU_DEBUG")) fprintf(stderr, __VA_ARGS__); } while(0)
+#else//CCPU_SHOW_DEBUG_MESSAGES
+#  define CCPU_DEBUG(...) do;while(0) /* nothing */
+#endif// CCPU_SHOW_DEBUG_MESSAGES
+
+
 // API: create a new view with the given image buffer
 // returns a handle to the view
 int cpu_new(float *x, int w, int h, int d)
@@ -29,13 +39,13 @@ int cpu_new(float *x, int w, int h, int d)
 
 	snprintf(v->f, FILENAME_MAX,
 			"/tmp/cpu_view_%d_%d.npy", getuid(), getpid());
-	fprintf(stderr, "cpu_new f = %s\n", v->f);
+	CCPU_DEBUG("cpu_new f = %s\n", v->f);
 	iio_write_image_float_vec(v->f, x, w, h, d);
 	char *a[] = {"cpu", v->f, NULL};
 	extern char **environ;
 	int r = posix_spawnp(&v->p, a[0], NULL, NULL, a, environ);
-	fprintf(stderr, "cpu_new r = %d\n", r);
-	fprintf(stderr, "cpu_new p = %d\n", v->p);
+	CCPU_DEBUG("cpu_new r = %d\n", r);
+	CCPU_DEBUG("cpu_new p = %d\n", v->p);
 
 	return 0;
 }
@@ -43,6 +53,7 @@ int cpu_new(float *x, int w, int h, int d)
 // API: send a key to a cpu
 void cpu_send_key(int n, int k)
 {
+	CCPU_DEBUG("cpu_send_key n=%d k=%d\n", n, k);
 	assert(n == 0);
 	struct cpu_view *v = global_table_of_cpu_views + n;
 
@@ -50,6 +61,7 @@ void cpu_send_key(int n, int k)
 	snprintf(c, FILENAME_MAX,
 		"xdotool search --any --pid %d --name ftr_win_pid_%d key %c",
 		v->p, v->p, k);
+	CCPU_DEBUG("cpu_send_key c=\"%s\"\n", c);
 	// NOTE: this xdotool call is a subtle hack to support transparently
 	// plain x11 and glut FTR windows.  The "pid" field is only used for
 	// plain x11, the "name" field is only used for ftr_freeglut.
@@ -60,6 +72,7 @@ void cpu_send_key(int n, int k)
 // API: update the view determined by this handle
 void cpu_update(int n, float *x, int w, int h, int d)
 {
+	CCPU_DEBUG("cpu_update n=%d x=%p %dx%d,%d\n", n, (void*)x, w, h, d);
 	assert(n == 0);
 	struct cpu_view *v = global_table_of_cpu_views + n;
 
@@ -74,6 +87,7 @@ void cpu_update(int n, float *x, int w, int h, int d)
 // API: close the cpu window
 void cpu_close(int n)
 {
+	CCPU_DEBUG("cpu_close n=%d\n", n);
 	assert(n == 0);
 	struct cpu_view *v = global_table_of_cpu_views + n;
 
