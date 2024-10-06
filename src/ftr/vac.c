@@ -20,6 +20,8 @@
 #include "fontu.c"
 #include "fonts/xfonts_all.c"
 
+// fourier stuff
+
 // data structure to store the state of the viewer
 struct viewer_state {
 	// bullseye parameters
@@ -464,10 +466,10 @@ int main_vac_noninteractive(int c, char *v[])
 
 static char *help_string_name     = "vac";
 static char *help_string_version  = "vac 1.0\n\nWritten by mnhrdt";
-static char *help_string_oneliner = "interactive display parabolic folds";
+static char *help_string_oneliner = "visualize auto correlations";
 static char *help_string_usage    = "usage:\n\tvac";
 static char *help_string_long     =
-"Fauxfilet is an interface for exploring parabolic folds.\n"
+"Vac is an interface for exploring autocorrelation images.\n"
 "\n"
 "A geological structure in the shape of a parallel parabolic fold\n"
 "is traversed by a cylindrical borehole.  You can rotate the cylinder\n"
@@ -485,8 +487,8 @@ static char *help_string_long     =
 "\n"
 " -n\tenable non-interactive mode\n"
 " -o X\twrite output to file X (default stdout)\n"
-" -w X\tset image width (default=360)\n"
-" -h X\tset image height (default=720)\n"
+" -w X\tset image width (default=800)\n"
+" -h X\tset image height (default=800)\n"
 " -f X\tset strata frequency parameter (default=0.1)\n"
 " -p X\tset parabola curvature (default=0.001)\n"
 " -a X\tset cylinder orientation, first euler angle (default=0)\n"
