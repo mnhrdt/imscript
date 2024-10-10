@@ -24,39 +24,41 @@
 
 // data structure to store the state of the viewer
 struct viewer_state {
-	// bullseye parameters
-	float f;          // frequency of the strata before folding
-	float p;          // parameter of parabolic fold
-	float a, b, c;    // euler angles of parabolic sheaf
-	float s;          // horizontal shift of the fold
-	float z0;          // vertical shift of the fold
+	// structural parameters
+	int w;  // scene width
+	int h;  // scene height
+	int o;  // scene orientation 0=horizontal, 1=vertical
 
-	// cylinder radius
-	float R;
+	// input texture parameters
+	int d;          // random seed
+	int g;          // gaussian grain of the texture
+	int l;          // number of laplacian steps
+	float s[2][3];  // two shifts (x,y,sign)
+	float p;        // saturation parameter
+
+	// autocorrelation parameters
+	float r;        // center radius mask
+	float z;        // saturation parameter
 
 	// ui
 	struct bitmap_font font[1];
-
-	// data
-	int stratum_w;
-	int stratum_h;
-	uint8_t *stratum;
 };
 
 
 // function to reset and center the viewer
 static void center_state(struct viewer_state *e)
 {
-	// bullseye
-	e->f = 0.1;  // width of the strata = 10 pixels
-	e->p = 0.0001;    // flat strata (zero parabolic fold)
-	e->a = 0;    // euler angles zeroed (vertical cylinter)
-	e->b = 0;
-	e->c = 0;
-	e->R = 20;
+	// input texture
+	e->d = 1;
+	e->g = 4;
+	e->l = 1;
+	e->s[0][0] = 100; e->s[0][1] =  0; e->s[0][2] = 1;
+	e->s[1][0] =  50; e->s[1][1] = 87; e->s[1][2] = 1;
+	e->p = 1;
 
-	e->s = 0;
-	e->z0 = 0;
+	// autocorrelation view
+	e->r = 20;
+	e->z = 1;
 }
 
 static void center_view(struct FTR *f)
@@ -246,7 +248,11 @@ static void paint_state(struct FTR *f)
 		f->rgb[3*i+0] = 0;
 		f->rgb[3*i+1] = 0;
 		f->rgb[3*i+2] = 100;
-	 }
+	}
+
+	// window 0: base texture
+	//
+
 
 	// window 0: unwrapped cylindrical dip
 	// 360x720 starting at 0,0
@@ -540,7 +546,7 @@ int main_vac(int c, char *v[])
 	e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
 
 	// open the window
-	struct FTR f = ftr_new_window(1080,720);
+	struct FTR f = ftr_new_window(1600,800);
 	f.userdata = e;
 	f.changed = 1;
 
