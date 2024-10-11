@@ -33,7 +33,7 @@ struct viewer_state {
 	int d;          // random seed
 	int g;          // gaussian grain of the texture
 	int l;          // number of laplacian steps
-	float s[2][3];  // two shifts (x,y,sign)
+	int s[2][3];  // two shifts (x,y,sign)
 	float p;        // saturation parameter
 
 	// autocorrelation parameters
@@ -71,166 +71,16 @@ static void center_view(struct FTR *f)
 
 // SECTION 2. algorithms                                                    {{{1
 
-// parallel parabolic fold of parameter p, horizontal shift s and vert shift z0
-static float fold(float x, float y, float z, float p, float s, float z0)
-{
-	x -= s;
-	z -= z0;
-	return z + p*x*x;
-}
-
-// basic sinusoidal wave
-static float stratum_sin(float x)
-{
-	return 127 + 107 * sin(x);
-}
-
-// frequency modulated sinusoid, non-periodic
-static float stratum_fm(float x)
-{
-	return 127 + 107 * sin(x+cos(M_PI*x));
-}
-
-// amplitude modulated sinusoid, non-periodic
-static float stratum_am(float x)
-{
-	return 127 + 107 * sin(x)*(0.5+0.5*cos(M_PI*x));
-}
-
-// frequency and amplitude modulated
-static float stratum_amfm(float x)
-{
-	return 127 + 107 * sin(1+x+cos(M_PI*x))*(0.5+0.5*cos(M_2_PI*x+sin(x)));
-}
-
-// TODO: interactive access to this choice, and to the modulation parameters
-static float stratum(struct viewer_state *e, float x)
-{
-	x *= e->f;
-	if (e->stratum)
-	{
-		float fj = x + e->stratum_h/2;
-		int j = fj;
-		int i = e->stratum_w/2;
-		if (j < 0) return 0; //j = 0;
-		if (j >= e->stratum_h-1) return 0;//j = e->stratum_h - 1;
-		float a = fj - j;
-		//if (a < 1 
-		return (1-a)*e->stratum[j*e->stratum_w+i]
-			+a*e->stratum[(j+1)*e->stratum_w+i];
-	}
-	else
-		return stratum_amfm(x);
-}
 
 
 
 
 // SECTION 3. Coordinate Conversions                                        {{{1
 
-// y = Ax
-static void matvec33(float y[3], float A[3][3], float x[3])
-{
-	for (int i = 0; i < 3; i++)
-		y[i] = 0;
-	for (int i = 0; i < 3; i++)
-	for (int j = 0; j < 3; j++)
-		y[i] += A[i][j] * x[j];
-}
-
-// apply euler rotations to a 3d point
-static void map_euler(struct viewer_state *e, float X[3], float x[3], int dir)
-{
-	static float ca, sa, cb, sb, cc, sc;
-
-	float a = dir * e->a * M_PI / 180;
-	float b = dir * e->b * M_PI / 180;
-	float c = dir * e->c * M_PI / 180;
-
-	float R[3][3][3] = {
-		{
-			{ cos(a), sin(a), 0 },
-			{ -sin(a), cos(a), 0 },
-			{ 0, 0, 1}
-		},
-		{
-			{ cos(b), 0, -sin(b) },
-			{ 0, 1, 0},
-			{ sin(b), 0, cos(b) }
-		},
-		{
-			{ 1, 0, 0},
-			{ 0, cos(c), sin(c) },
-			{ 0, -sin(c), cos(c) }
-		}
-	};
-
-	float t[3];
-	if (dir > 0) {
-		matvec33(X, R[0], x);
-		matvec33(t, R[1], X);
-		matvec33(X, R[2], t);
-	} else {
-		matvec33(X, R[2], x);
-		matvec33(t, R[1], X);
-		matvec33(X, R[0], t);
-	}
-}
-
-// take a point of the unwrapped cylinder (rectangle), and map it to 3D
-static void map_cyl_unwrap(struct viewer_state *e, float xyz[3], float ij[2])
-{
-	float XYZ[3] = {
-		e->R * cos(ij[0] * M_PI / 180),
-		e->R * sin(ij[0] * M_PI / 180),
-		ij[1]
-	};
-	map_euler(e, xyz, XYZ, 1);
-}
-
-// get the cylindrical coordinates of a 3d point
-static void map_getcyl(struct viewer_state *e, float rth[3], float xyz[3])
-{
-	float XYZ[3];
-	map_euler(e, XYZ, xyz, -1);
-	rth[0] = hypot(XYZ[0], XYZ[1]);
-	rth[1] = atan2(XYZ[1], XYZ[0]) * 180 / M_PI;
-	rth[2] = XYZ[2];
-}
 
 
 // SECTION 4. Drawing                                                       {{{1
 
-// classical ``dirt'' palette, as used by dip pickers
-static void get_dirt(uint8_t rgb[3], int g)
-{
-	rgb[1] = 255 - g;
-	rgb[0] = g > 127 ? 510 - 2*g : 255;
-	rgb[2] = g > 127 ? 0 : 255 - 2*g;
-}
-
-// paint a cylinder on a rgb image
-static void paint_cylinder(uint8_t *x, int w, int h,
-		struct viewer_state *e)
-{
-	// window 0: unwrapped cylindrical dip
-	// WxH=360x720 starting at 0,0
-	for (int j = 0; j < h; j++)
-	for (int i = 0; i < w; i++)
-	{
-		float ij[2] = {i*360.0/w, j-h/2.0};
-		float xyz[3];
-		map_cyl_unwrap(e, xyz, ij);
-		float h = fold(xyz[0], xyz[1], xyz[2], e->p, e->s, e->z0);
-		float c = stratum(e, h);
-		uint8_t g = c;
-		uint8_t rgb[3];
-		get_dirt(rgb, 255-g);
-		x[(j*w + i)*3 + 0] = rgb[0];
-		x[(j*w + i)*3 + 1] = rgb[1];
-		x[(j*w + i)*3 + 2] = rgb[2];
-	}
-}
 
 
 // Subsection 7.2. Drawing user-interface elements                          {{{2
@@ -250,55 +100,59 @@ static void paint_state(struct FTR *f)
 		f->rgb[3*i+2] = 100;
 	}
 
+	// space for images and their visualizations
+	float *x = xmalloc(e->w * e->h * sizeof*x);
+	float *X = xmalloc(e->w * e->h * sizeof*X);
+	uint8_t *vx = xmalloc(e->w * e->h);
+	uint8_t *vX = xmalloc(3 * e->w * e->h);
+
+	// perform all the computaitons
+	fill_base_texture(x, e);
+	display_base_texture(vx, x, e);
+	compute_autocorrelation(X, x, e->w, e->h);
+	display_autocorrelation(vX, X, e);
+
 	// window 0: base texture
-	//
-
-
-	// window 0: unwrapped cylindrical dip
-	// 360x720 starting at 0,0
-	for (int j = 0; j < 720; j++)
-	for (int i = 0; i < 360; i++)
+	// WxH starting at (0,0)
+	for (int j = 0; j < e->h; j++)
+	for (int i = 0; i < e->w; i++)
 	{
-		float ij[2] = {i, j-360};
-		float xyz[3];
-		map_cyl_unwrap(e, xyz, ij);
-		float h = fold(xyz[0], xyz[1], xyz[2], e->p, e->s, e->z0);
-		float c = stratum(e, h);
-		uint8_t g = c;
-		uint8_t rgb[3];
-		get_dirt(rgb, 255-g);
-		f->rgb[(j*f->w + i)*3 + 0] = rgb[0];
-		f->rgb[(j*f->w + i)*3 + 1] = rgb[1];
-		f->rgb[(j*f->w + i)*3 + 2] = rgb[2];
+		uint8_t g = vx[j*e->w + i];
+		f->rgb[(j*f->w + i)*3 + 0] = g;
+		f->rgb[(j*f->w + i)*3 + 1] = g;
+		f->rgb[(j*f->w + i)*3 + 2] = g;
 	}
 
-	// window 1: strata
-	// 720x720 starting at 360,0
-	for (int j = 0; j < 720; j++)
-	for (int i = 0; i < 720; i++)
+	// window 1: autocorrelation
+	// if o==0 : WxH starting at (w,0)
+	// if o==1 : WxH starting at (0,h)
+	for (int j = 0; j < e->h; j++)
+	for (int i = 0; i < e->w; i++)
 	{
-		float x = i - 360;
-		float z = j - 360;
-		float h = fold(x, 0, z, e->p, e->s, e->z0);
-		float c = stratum(e, h);
-		uint8_t g = c;
-		float xyz[3] = { x, 0, z};
-		float rth[3];
-		map_getcyl(e, rth, xyz);
-		uint8_t rgb[3] = {g, g, g};
-		if (*rth < e->R && fabs(rth[2]) < 360)
-			get_dirt(rgb, 255-g);
-		else {rgb[0]*=0.8;rgb[1]*=0.8;rgb[2]*=0.8;}
-		f->rgb[(j*f->w + 360+i)*3 + 0] = rgb[0];
-		f->rgb[(j*f->w + 360+i)*3 + 1] = rgb[1];
-		f->rgb[(j*f->w + 360+i)*3 + 2] = rgb[2];
+		uint8_t *c = vX + 3*(j*e->w + i);
+		int oi = e->w * e->o;
+		int oj = e->h * (1 - e->o);
+		f->rgb[((j+oj)*f->w + i+oi)*3 + 0] = c[0];
+		f->rgb[((j+oj)*f->w + i+oi)*3 + 1] = c[1];
+		f->rgb[((j+oj)*f->w + i+oi)*3 + 2] = c[2];
 	}
+
+
+	// free image data
+	free(X); free(vX);
+	free(x); free(vx);
+
 
 	// hud
-	uint8_t fg[3] = {0, 255, 0};
-	uint8_t bg[3] = {0, 0, 0};
+	uint8_t fg[3] = {0, 0, 0};
+	uint8_t bg[3] = {127, 127, 127};
 	char buf[0x200];
-	snprintf(buf, 0x200, "f=%g\np=%g\na=%g\nb=%g\nc=%g\nR=%g\ns=%g\n",
+	snprintf(buf, 0x200,
+			"d = %d\n"      "g = %g\n"      "l = %d\n"
+			"s1 = %d %d\n"  "s2 = %d %d\n"  "p = %g\n"
+			"r = %g\n"      "z = %g\n"
+			e->d, e->g, e->l, e->
+
 			e->f, e->p, e->a, e->b, e->c, e->R, e->s);
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
 			360+0, 0+0, fg, bg, 0, e->font, buf);
