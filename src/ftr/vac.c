@@ -98,6 +98,22 @@ inline static float getsample_periodic(float *x, int w, int h, int i, int j)
 	return x[j*w+i];
 }
 
+static void apply_laplacian_inplace(float *x, int w, int h)
+{
+	float *t = malloc(w * h * sizeof*t);
+	for (int i = 0; i < w * h; i++)
+		t[i] = x[i];
+
+	getsample_operator P = getsample_periodic;
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+		x[j*w+i] = -4 * P(t,w,h,i,j)
+			+ P(t,w,h,i+1,j) + P(t,w,h,i-1,j)
+			+ P(t,w,h,i,j+1) + P(t,w,h,i,j-1);
+
+	free(t);
+}
+
 static void fill_base_texture(float *x, struct viewer_state *e)
 {
 	int w = e->w;
@@ -111,6 +127,10 @@ static void fill_base_texture(float *x, struct viewer_state *e)
 	// blur it with grain e->g
 	float g[1] = { e->g };
 	blur_2d(x, x, w, h, 1, "gaussian", g, 1);
+
+	// apply the laplacians
+	for (int i = 0; i < e->l; i++)
+		apply_laplacian_inplace(x, w, h);
 
 	// apply the given shifts
 	getsample_operator P = getsample_periodic;
@@ -141,10 +161,10 @@ static void getpercentiles(float *m, float *M, float *x, int n, float q)
 	for (int i = 0; i < n; i++)
 		if (!isnan(x[i]))
 			t[N++] = x[i];
-	//fprintf(stderr, "getperc n=%d N=%d p=%g\n", n, N, N*100.0/n);
 	qsort(t, N, sizeof*t, compare_floats);
-	int a = q/100*N;
+	int a = (q/100)*N;
 	int b = (1-q/100)*N;
+	fprintf(stderr, "getperc n=%d N=%d q=%g [a=%d b=%d]\n", n, N, q, a, b);
 	if (a < 0) a = 0;
 	if (b < 0) b = 0;
 	if (a >= N) a = N-1;
@@ -200,6 +220,15 @@ static void compute_autocorrelation(float *y, float *x, int w, int h)
 	fftwf_free(fc);
 }
 
+static void mask_autocorrelation(float *x, struct viewer_state *e)
+{
+	for (int j = 0; j < e->h; j++)
+	for (int i = 0; i < e->w; i++)
+		if (hypot(i - e->w/2, j - e->h/2) < e->r)
+			x[j*e->w + i] = 0;
+
+}
+
 static
 void display_autocorrelation(uint8_t *vX, float *X, struct viewer_state *e)
 {
@@ -218,6 +247,7 @@ void display_autocorrelation(uint8_t *vX, float *X, struct viewer_state *e)
 		vX[3*i+2] = bclamp( 255 * (X[i] - m) / (M - m) );
 	}
 }
+
 
 
 
@@ -259,6 +289,7 @@ static void paint_state(struct FTR *f)
 	fill_base_texture(x, e);
 	display_base_texture(vx, x, e);
 	compute_autocorrelation(X, x, e->w, e->h);
+	mask_autocorrelation(X, e);
 	display_autocorrelation(vX, X, e);
 
 	// window 0: base texture
@@ -342,7 +373,21 @@ static void paint_state(struct FTR *f)
 //static void shift_shift_z(struct viewer_state *e, float s) { e->z0 += s; }
 
 static void shift_random_seed(struct viewer_state *e, float s) { e->d += s; }
+static void shift_num_laplacians(struct viewer_state *e, int s) { e->l += s; }
+static void shift_mask_radius(struct viewer_state *e, int s) { e->r += s; }
 static void scale_gaussian_grain(struct viewer_state *e, float f) { e->g *= f; }
+static void scale_saturation_p(struct viewer_state *e, float f) { e->p *= f; }
+static void scale_saturation_z(struct viewer_state *e, float f) { e->z *= f; }
+
+static void shift_shift(struct viewer_state *e, int p, int q, int s)
+{
+	if (p < 0) p = 0;
+	if (p > 1) p = 1;
+	if (q < 0) q = 0;
+	if (q > 2) q = 2;
+	int f = q < 2 ? 4 : 1;
+	e->s[p][q] += f*s;
+}
 
 static void action_screenshot(struct FTR *f)
 {
@@ -405,29 +450,28 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	// d, g, l, b, c, R, s hitboxes of font height
 	// 0  1  2  3  4  5  6
 	int Y = y / e->font->height;
+	int X = x / e->font->width;
 	if (k == FTR_BUTTON_DOWN)
 	{
 		if (Y == 0) shift_random_seed(e, -1);
 		if (Y == 1) scale_gaussian_grain(e, 1/1.3);
-//		if (Y == 1) scale_fold_parameter(e, 1/1.3);
-//		if (Y == 2) shift_angle_a(e, -10);
-//		if (Y == 3) shift_angle_b(e, -2);
-//		if (Y == 4) shift_angle_c(e, -2);
-//		if (Y == 5) scale_radius(e, 1/1.3);
-//		if (Y == 6) shift_shift_s(e, -5);
-//		if (Y == 7) shift_shift_z(e, -5);
+		if (Y == 2) shift_num_laplacians(e, -1);
+		if (Y == 3) shift_shift(e, 0, (X-20)/4, -1);
+		if (Y == 4) shift_shift(e, 1, (X-20)/4, -1);
+		if (Y == 5) scale_saturation_p(e, 1/1.3);
+		if (Y == 6) shift_mask_radius(e, -1);
+		if (Y == 7) scale_saturation_z(e, 1/1.3);
 	}
 	if (k == FTR_BUTTON_UP)
 	{
 		if (Y == 0) shift_random_seed(e, 1);
 		if (Y == 1) scale_gaussian_grain(e, 1.3);
-//		if (Y == 1) scale_fold_parameter(e, 1.3);
-//		if (Y == 2) shift_angle_a(e, 10);
-//		if (Y == 3) shift_angle_b(e, 2);
-//		if (Y == 4) shift_angle_c(e, 2);
-//		if (Y == 5) scale_radius(e, 1.3);
-//		if (Y == 6) shift_shift_s(e, 5);
-////		if (Y == 7) shift_shift_z(e, 5);
+		if (Y == 2) shift_num_laplacians(e, 1);
+		if (Y == 3) shift_shift(e, 0, (X-20)/4, 1);
+		if (Y == 4) shift_shift(e, 1, (X-20)/4, 1);
+		if (Y == 5) scale_saturation_p(e, 1.3);
+		if (Y == 6) shift_mask_radius(e, 1);
+		if (Y == 7) scale_saturation_z(e, 1.3);
 	}
 
 	f->changed = 1;
@@ -536,7 +580,7 @@ int main_vac(int c, char *v[])
 
 	// initialize state
 	struct viewer_state e[1];
-	int N = 400;
+	int N = 512;
 	e->w = N;
 	e->h = N;
 	e->o = 0;
@@ -567,7 +611,8 @@ int main_vac(int c, char *v[])
 
 	// init fonts
 	//e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
-	e->font[0] = reformat_font(*xfont_8x13, UNPACKED);
+	//e->font[0] = reformat_font(*xfont_8x13, UNPACKED);
+	e->font[0] = reformat_font(*xfont_7x13B, UNPACKED);
 
 	// open the window
 	struct FTR f = ftr_new_window(2*N, N);
