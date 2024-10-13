@@ -20,6 +20,16 @@
 #include "fontu.c"
 #include "fonts/xfonts_all.c"
 
+
+#include "random.c"
+
+#define OMIT_BLUR_MAIN
+#include "blur.c"
+
+#define OMIT_PPSMOOTH_MAIN
+#include "ppsmooth.c"
+
+
 // fourier stuff
 
 // data structure to store the state of the viewer
@@ -31,10 +41,10 @@ struct viewer_state {
 
 	// input texture parameters
 	int d;          // random seed
-	int g;          // gaussian grain of the texture
+	float g;        // gaussian grain of the texture
 	int l;          // number of laplacian steps
 	int s[2][3];  // two shifts (x,y,sign)
-	float p;        // saturation parameter
+	float p;        // saturation parameter (percentile)
 
 	// autocorrelation parameters
 	float r;        // center radius mask
@@ -72,6 +82,77 @@ static void center_view(struct FTR *f)
 // SECTION 2. algorithms                                                    {{{1
 
 
+static void fill_base_texture(float *x, struct viewer_state *e)
+{
+	// create gaussian noise with seed e->d
+	xsrand(e->d);
+	for (int i = 0; i < e->w * e->h; i++)
+		x[i] = random_normal();
+
+	// blur it with grain e->g
+	float g[1] = { e->g };
+	blur_2d(x, x, e->w, e->h, 1, "gaussian", g, 1);
+
+	// apply the given shifts
+}
+
+static int compare_floats(const void *a, const void *b)
+{
+	const float *da = (const float *) a;
+	const float *db = (const float *) b;
+	return (*da > *db) - (*da < *db);
+}
+
+static void getpercentiles(float *m, float *M, float *x, int n, float q)
+{
+	float *t = xmalloc(n * sizeof*t);
+	memcpy(t, x, n*sizeof*t);
+	int N = 0;
+	for (int i = 0; i < n; i++)
+		if (!isnan(x[i]))
+			t[N++] = x[i];
+	//fprintf(stderr, "getperc n=%d N=%d p=%g\n", n, N, N*100.0/n);
+	qsort(t, N, sizeof*t, compare_floats);
+	int a = q/100*N;
+	int b = (1-q/100)*N;
+	if (a < 0) a = 0;
+	if (b < 0) b = 0;
+	if (a >= N) a = N-1;
+	if (b >= N) b = N-1;
+	*m = t[a];
+	*M = t[b];
+	free(t);
+}
+
+static unsigned char bclamp(float x)
+{
+	if (x < 0) return 0;
+	if (x > 255) return 255;
+	return x;
+}
+
+static void display_base_texture(uint8_t *vx, float *x, struct viewer_state *e)
+{
+	// compute e->p percentiles
+	float m, M;
+	getpercentiles(&m, &M, x, e->w * e->h, e->p);
+
+	// saturate at these percentiles
+	for (int i = 0; i < e->w * e->h; i++)
+		vx[i] = bclamp( 255 * (x[i] - m) / (M - m) );
+}
+
+static void compute_autocorrelation(float *y, float *x, int w, int h)
+{
+}
+
+static
+void display_autocorrelation(uint8_t *vX, float *X, struct viewer_state *e)
+{
+	for (int i = 0; i < 3 * e->w * e->h; i++)
+		vX[i] = 127;
+}
+
 
 
 
@@ -80,6 +161,8 @@ static void center_view(struct FTR *f)
 
 
 // SECTION 4. Drawing                                                       {{{1
+
+
 
 
 
@@ -150,12 +233,12 @@ static void paint_state(struct FTR *f)
 	snprintf(buf, 0x200,
 			"d = %d\n"      "g = %g\n"      "l = %d\n"
 			"s1 = %d %d\n"  "s2 = %d %d\n"  "p = %g\n"
-			"r = %g\n"      "z = %g\n"
-			e->d, e->g, e->l, e->
-
-			e->f, e->p, e->a, e->b, e->c, e->R, e->s);
+			"r = %g\n"      "z = %g\n",
+			e->d, e->g, e->l,
+			e->s[0][0], e->s[0][1], e->s[1][0], e->s[1][1], e->p,
+			e->r, e->z);
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
-			360+0, 0+0, fg, bg, 0, e->font, buf);
+			0+0, 0+0, fg, bg, 0, e->font, buf);
 }
 
 
@@ -163,23 +246,23 @@ static void paint_state(struct FTR *f)
 // SECTION 5. User-Interface Actions and Events                             {{{1
 
 
-// action: scale strata frequency
-static void scale_strata_frequency(struct viewer_state *e, float f)
-{
-	e->f *= f;
-	//fprintf(stderr, "f = %g\n", e->f);
-}
-static void scale_fold_parameter(struct viewer_state *e, float f)
-{
-	e->p *= f;
-	//fprintf(stderr, "p = %g\n", e->p);
-}
-static void shift_angle_a(struct viewer_state *e, float s) { e->a += s; }
-static void shift_angle_b(struct viewer_state *e, float s) { e->b += s; }
-static void shift_angle_c(struct viewer_state *e, float s) { e->c += s; }
-static void scale_radius(struct viewer_state *e, float f) { e->R *= f; }
-static void shift_shift_s(struct viewer_state *e, float s) { e->s += s; }
-static void shift_shift_z(struct viewer_state *e, float s) { e->z0 += s; }
+//// action: scale strata frequency
+//static void scale_strata_frequency(struct viewer_state *e, float f)
+//{
+//	e->f *= f;
+//	//fprintf(stderr, "f = %g\n", e->f);
+//}
+//static void scale_fold_parameter(struct viewer_state *e, float f)
+//{
+//	e->p *= f;
+//	//fprintf(stderr, "p = %g\n", e->p);
+//}
+//static void shift_angle_a(struct viewer_state *e, float s) { e->a += s; }
+//static void shift_angle_b(struct viewer_state *e, float s) { e->b += s; }
+//static void shift_angle_c(struct viewer_state *e, float s) { e->c += s; }
+//static void scale_radius(struct viewer_state *e, float f) { e->R *= f; }
+//static void shift_shift_s(struct viewer_state *e, float s) { e->s += s; }
+//static void shift_shift_z(struct viewer_state *e, float s) { e->z0 += s; }
 
 static void action_screenshot(struct FTR *f)
 {
@@ -202,27 +285,27 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	//fprintf(stderr, "key k=%d m=%d\n", k, m);
 
 	if (k == 'q') {
-		ftr_notify_the_desire_to_stop_this_loop(f, 0);
+		ftr_notify_the_desire_to_stop_this_loop(f, 1);
 		return;
 	}
 
 	struct viewer_state *e = f->userdata;
 
 	if (k == 'z') center_view(f);
-	if (k == 'f') scale_strata_frequency(e, 1.3);
-	if (k == 'F') scale_strata_frequency(e, 1/1.3);
-	if (k == 'p') scale_fold_parameter(e, 1.3);
-	if (k == 'P') scale_fold_parameter(e, 1/1.3);
-//	if (k == 's') shift_shift_s(e, 1);
-//	if (k == 'S') shift_shift_s(e, -1);
-	if (k == 'r') scale_radius(e, 1.3);
-	if (k == 'R') scale_radius(e, 1/1.3);
-	if (k == 'a') shift_angle_a(e, 10);
-	if (k == 'A') shift_angle_a(e, -10);
-	if (k == 'b') shift_angle_b(e, 2);
-	if (k == 'B') shift_angle_b(e, -2);
-	if (k == 'c') shift_angle_c(e, 2);
-	if (k == 'C') shift_angle_c(e, -2);
+//	if (k == 'f') scale_strata_frequency(e, 1.3);
+//	if (k == 'F') scale_strata_frequency(e, 1/1.3);
+//	if (k == 'p') scale_fold_parameter(e, 1.3);
+//	if (k == 'P') scale_fold_parameter(e, 1/1.3);
+////	if (k == 's') shift_shift_s(e, 1);
+////	if (k == 'S') shift_shift_s(e, -1);
+//	if (k == 'r') scale_radius(e, 1.3);
+//	if (k == 'R') scale_radius(e, 1/1.3);
+//	if (k == 'a') shift_angle_a(e, 10);
+//	if (k == 'A') shift_angle_a(e, -10);
+//	if (k == 'b') shift_angle_b(e, 2);
+//	if (k == 'B') shift_angle_b(e, -2);
+//	if (k == 'c') shift_angle_c(e, 2);
+//	if (k == 'C') shift_angle_c(e, -2);
 	if (k == ',') action_screenshot(f);
 
 	f->changed = 1;
@@ -242,28 +325,28 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	// f, p, a, b, c, R, s hitboxes of font height
 	// 0  1  2  3  4  5  6
 	int Y = y / e->font->height;
-	if (k == FTR_BUTTON_DOWN)
-	{
-		if (Y == 0) scale_strata_frequency(e, 1/1.3);
-		if (Y == 1) scale_fold_parameter(e, 1/1.3);
-		if (Y == 2) shift_angle_a(e, -10);
-		if (Y == 3) shift_angle_b(e, -2);
-		if (Y == 4) shift_angle_c(e, -2);
-		if (Y == 5) scale_radius(e, 1/1.3);
-		if (Y == 6) shift_shift_s(e, -5);
+//	if (k == FTR_BUTTON_DOWN)
+//	{
+//		if (Y == 0) scale_strata_frequency(e, 1/1.3);
+//		if (Y == 1) scale_fold_parameter(e, 1/1.3);
+//		if (Y == 2) shift_angle_a(e, -10);
+//		if (Y == 3) shift_angle_b(e, -2);
+//		if (Y == 4) shift_angle_c(e, -2);
+//		if (Y == 5) scale_radius(e, 1/1.3);
+//		if (Y == 6) shift_shift_s(e, -5);
 //		if (Y == 7) shift_shift_z(e, -5);
-	}
-	if (k == FTR_BUTTON_UP)
-	{
-		if (Y == 0) scale_strata_frequency(e, 1.3);
-		if (Y == 1) scale_fold_parameter(e, 1.3);
-		if (Y == 2) shift_angle_a(e, 10);
-		if (Y == 3) shift_angle_b(e, 2);
-		if (Y == 4) shift_angle_c(e, 2);
-		if (Y == 5) scale_radius(e, 1.3);
-		if (Y == 6) shift_shift_s(e, 5);
-//		if (Y == 7) shift_shift_z(e, 5);
-	}
+//	}
+//	if (k == FTR_BUTTON_UP)
+//	{
+//		if (Y == 0) scale_strata_frequency(e, 1.3);
+//		if (Y == 1) scale_fold_parameter(e, 1.3);
+//		if (Y == 2) shift_angle_a(e, 10);
+//		if (Y == 3) shift_angle_b(e, 2);
+//		if (Y == 4) shift_angle_c(e, 2);
+//		if (Y == 5) scale_radius(e, 1.3);
+//		if (Y == 6) shift_shift_s(e, 5);
+////		if (Y == 7) shift_shift_z(e, 5);
+//	}
 
 	f->changed = 1;
 }
@@ -287,42 +370,42 @@ static void event_expose(struct FTR *f, int b, int m, int x, int y)
 
 #include "pickopt.c"
 
-int main_vac_noninteractive(int c, char *v[])
-{
-	// initialize state (sets dummy default arguments)
-	struct viewer_state e[1];
-	center_state(e);
-	e->stratum = 0;
-
-	// process named arguments
-	int w = atoi(pick_option(&c, &v, "w", "360"));
-	int h = atoi(pick_option(&c, &v, "h", "720"));
-	char *filename_out = pick_option(&c, &v, "o", "-");
-	char *filename_stratum = pick_option(&c, &v, "S", "");
-	if (*filename_stratum)
-	{
-		uint8_t *iio_read_image_uint8(char*,int*,int*);
-		e->stratum = iio_read_image_uint8(filename_stratum,
-				&e->stratum_w, &e->stratum_h);
-		e->f = 1;
-	}
-	e->f = atof(pick_option(&c, &v, "f", "0.1"));
-	e->p = atof(pick_option(&c, &v, "p", "0.001"));
-	e->a = atof(pick_option(&c, &v, "a", "0"));
-	e->b = atof(pick_option(&c, &v, "b", "0"));
-	e->c = atof(pick_option(&c, &v, "c", "0"));
-	e->R = atof(pick_option(&c, &v, "R", "50"));
-
-	// fill-in output image
-	uint8_t *x = malloc(3*w*h);
-	paint_cylinder(x, w, h, e);
-
-	// save output image
-	void iio_write_image_uint8_vec(char*,uint8_t*,int,int,int);
-	iio_write_image_uint8_vec(filename_out, x, w, h, 3);
-
-	return 0;
-}
+//int main_vac_noninteractive(int c, char *v[])
+//{
+//	// initialize state (sets dummy default arguments)
+//	struct viewer_state e[1];
+//	center_state(e);
+//	e->stratum = 0;
+//
+//	// process named arguments
+//	int w = atoi(pick_option(&c, &v, "w", "360"));
+//	int h = atoi(pick_option(&c, &v, "h", "720"));
+//	char *filename_out = pick_option(&c, &v, "o", "-");
+//	char *filename_stratum = pick_option(&c, &v, "S", "");
+//	if (*filename_stratum)
+//	{
+//		uint8_t *iio_read_image_uint8(char*,int*,int*);
+//		e->stratum = iio_read_image_uint8(filename_stratum,
+//				&e->stratum_w, &e->stratum_h);
+//		e->f = 1;
+//	}
+////	e->f = atof(pick_option(&c, &v, "f", "0.1"));
+////	e->p = atof(pick_option(&c, &v, "p", "0.001"));
+////	e->a = atof(pick_option(&c, &v, "a", "0"));
+////	e->b = atof(pick_option(&c, &v, "b", "0"));
+////	e->c = atof(pick_option(&c, &v, "c", "0"));
+////	e->R = atof(pick_option(&c, &v, "R", "50"));
+//
+//	// fill-in output image
+//	uint8_t *x = malloc(3*w*h);
+//	paint_cylinder(x, w, h, e);
+//
+//	// save output image
+//	void iio_write_image_uint8_vec(char*,uint8_t*,int,int,int);
+//	iio_write_image_uint8_vec(filename_out, x, w, h, 3);
+//
+//	return 0;
+//}
 
 static char *help_string_name     = "vac";
 static char *help_string_version  = "vac 1.0\n\nWritten by mnhrdt";
@@ -365,31 +448,34 @@ int main_vac(int c, char *v[])
 	if (c == 2)
 		if_help_is_requested_print_it_and_exit_the_program(v[1]);
 
-	// if -n option, run noninteractively
-	if (pick_option(&c, &v, "n", 0))
-		return main_vac_noninteractive(c, v);
+//	// if -n option, run noninteractively
+//	if (pick_option(&c, &v, "n", 0))
+//		return main_vac_noninteractive(c, v);
 
 	// initialize state
 	struct viewer_state e[1];
+	e->w = 200;
+	e->h = 200;
+	e->o = 0;
 	center_state(e);
-	e->stratum = 0;
+//	e->stratum = 0;
 
 	// extract named arguments
 	char *filename_out = pick_option(&c, &v, "o", "-");
-	char *filename_stratum = pick_option(&c, &v, "S", "");
-	if (*filename_stratum)
-	{
-		uint8_t *iio_read_image_uint8(char*,int*,int*);
-		e->stratum = iio_read_image_uint8(filename_stratum,
-				&e->stratum_w, &e->stratum_h);
-		e->f = 1;
-	}
-	e->f = atof(pick_option(&c, &v, "f", "0.1"));
-	e->p = atof(pick_option(&c, &v, "p", "0.001"));
-	e->a = atof(pick_option(&c, &v, "a", "0"));
-	e->b = atof(pick_option(&c, &v, "b", "0"));
-	e->c = atof(pick_option(&c, &v, "c", "0"));
-	e->R = atof(pick_option(&c, &v, "R", "50"));
+//	char *filename_stratum = pick_option(&c, &v, "S", "");
+//	if (*filename_stratum)
+//	{
+//		uint8_t *iio_read_image_uint8(char*,int*,int*);
+//		e->stratum = iio_read_image_uint8(filename_stratum,
+//				&e->stratum_w, &e->stratum_h);
+//		e->f = 1;
+//	}
+//	e->f = atof(pick_option(&c, &v, "f", "0.1"));
+//	e->p = atof(pick_option(&c, &v, "p", "0.001"));
+//	e->a = atof(pick_option(&c, &v, "a", "0"));
+//	e->b = atof(pick_option(&c, &v, "b", "0"));
+//	e->c = atof(pick_option(&c, &v, "c", "0"));
+//	e->R = atof(pick_option(&c, &v, "R", "50"));
 
 	// process input arguments (should be none)
 	if (c != 1)
@@ -400,7 +486,7 @@ int main_vac(int c, char *v[])
 	e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
 
 	// open the window
-	struct FTR f = ftr_new_window(1600,800);
+	struct FTR f = ftr_new_window(400,200);
 	f.userdata = e;
 	f.changed = 1;
 
@@ -411,7 +497,7 @@ int main_vac(int c, char *v[])
 	ftr_set_handler(&f, "motion", event_motion);
 	ftr_set_handler(&f, "key", event_key);
 
-	return ftr_loop_run(&f);
+	return ftr_loop_run(&f) - 1;
 }
 
 int main(int c, char *v[]) { return main_vac(c, v); }
