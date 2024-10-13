@@ -43,7 +43,7 @@ struct viewer_state {
 	int d;          // random seed
 	float g;        // gaussian grain of the texture
 	int l;          // number of laplacian steps
-	int s[2][3];  // two shifts (x,y,sign)
+	int s[2][3];    // two shifts (x,y,sign)
 	float p;        // saturation parameter (percentile)
 
 	// autocorrelation parameters
@@ -62,13 +62,13 @@ static void center_state(struct viewer_state *e)
 	e->d = 1;
 	e->g = 4;
 	e->l = 1;
-	e->s[0][0] = 100; e->s[0][1] =  0; e->s[0][2] = 1;
-	e->s[1][0] =  50; e->s[1][1] = 87; e->s[1][2] = 1;
+	e->s[0][0] = 100; e->s[0][1] =  0; e->s[0][2] = +1;
+	e->s[1][0] =  50; e->s[1][1] = 87; e->s[1][2] = -1;
 	e->p = 1;
 
 	// autocorrelation view
 	e->r = 20;
-	e->z = 1;
+	e->z = 0.1;
 }
 
 static void center_view(struct FTR *f)
@@ -81,19 +81,49 @@ static void center_view(struct FTR *f)
 
 // SECTION 2. algorithms                                                    {{{1
 
+typedef float (*getsample_operator)(float*,int,int,int,int);
+
+// like n%p, but works for all numbers
+static int gmod(int x, int m)
+{
+	int r = x % m;
+	return r < 0 ? r + m : r;
+}
+
+// extrapolate by periodicity
+inline static float getsample_periodic(float *x, int w, int h, int i, int j)
+{
+	i = gmod(i, w);
+	j = gmod(j, h);
+	return x[j*w+i];
+}
 
 static void fill_base_texture(float *x, struct viewer_state *e)
 {
+	int w = e->w;
+	int h = e->h;
+
 	// create gaussian noise with seed e->d
 	xsrand(e->d);
-	for (int i = 0; i < e->w * e->h; i++)
+	for (int i = 0; i < w * h; i++)
 		x[i] = random_normal();
 
 	// blur it with grain e->g
 	float g[1] = { e->g };
-	blur_2d(x, x, e->w, e->h, 1, "gaussian", g, 1);
+	blur_2d(x, x, w, h, 1, "gaussian", g, 1);
 
 	// apply the given shifts
+	getsample_operator P = getsample_periodic;
+	float *t = malloc(w * h * sizeof*t);
+	for (int i = 0; i < w * h; i++)
+		t[i] = x[i];
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		x[j*w + i] += e->s[0][2] * P(t,w,h, i+e->s[0][0], j+e->s[0][1]);
+		x[j*w + i] += e->s[1][2] * P(t,w,h, i+e->s[1][0], j+e->s[1][1]);
+	}
+	free(t);
 }
 
 static int compare_floats(const void *a, const void *b)
@@ -144,13 +174,49 @@ static void display_base_texture(uint8_t *vx, float *x, struct viewer_state *e)
 
 static void compute_autocorrelation(float *y, float *x, int w, int h)
 {
+	float *c = xmalloc(w*h*sizeof*c);
+	float *ys = xmalloc(w*h*sizeof*c);
+	fftwf_complex *fc = fftwf_xmalloc(w*h*sizeof*fc);
+	for (int l = 0; l < 1; l++)
+	{
+		for (int i = 0; i < w*h; i++)
+			c[i] = x[i];
+		fft_2dfloat(fc, c, w, h);
+		for (int i = 0; i < w*h; i++)
+			fc[i] = cabs(fc[i]);
+		ifft_2dfloat(c, fc, w, h);
+		for (int i = 0; i < w*h; i++)
+			ys[i] = c[i];
+		for (int j = 0; j < h; j++)
+		for (int i = 0; i < w; i++)
+		{
+			int ii = (i + w/2) % w;
+			int jj = (j + h/2) % h;
+			y[j*w+i] = ys[jj*w+ii] * 1;//norm;
+		}
+	}
+	free(ys);
+	free(c);
+	fftwf_free(fc);
 }
 
 static
 void display_autocorrelation(uint8_t *vX, float *X, struct viewer_state *e)
 {
-	for (int i = 0; i < 3 * e->w * e->h; i++)
-		vX[i] = 127;
+	//for (int i = 0; i < 3 * e->w * e->h; i++)
+	//	vX[i] = 127;
+
+	// compute e->z percentiles
+	float m, M;
+	getpercentiles(&m, &M, X, e->w * e->h, e->z);
+
+	// saturate at these percentiles
+	for (int i = 0; i < e->w * e->h; i++)
+	{
+		vX[3*i+0] = bclamp( 255 * (X[i] - m) / (M - m) );
+		vX[3*i+1] = bclamp( 255 * (X[i] - m) / (M - m) );
+		vX[3*i+2] = bclamp( 255 * (X[i] - m) / (M - m) );
+	}
 }
 
 
@@ -213,8 +279,8 @@ static void paint_state(struct FTR *f)
 	for (int i = 0; i < e->w; i++)
 	{
 		uint8_t *c = vX + 3*(j*e->w + i);
-		int oi = e->w * e->o;
-		int oj = e->h * (1 - e->o);
+		int oi = e->w * (1 - e->o);
+		int oj = e->h * e->o;
 		f->rgb[((j+oj)*f->w + i+oi)*3 + 0] = c[0];
 		f->rgb[((j+oj)*f->w + i+oi)*3 + 1] = c[1];
 		f->rgb[((j+oj)*f->w + i+oi)*3 + 2] = c[2];
@@ -227,8 +293,13 @@ static void paint_state(struct FTR *f)
 
 
 	// hud
-	uint8_t fg[3] = {0, 0, 0};
-	uint8_t bg[3] = {127, 127, 127};
+	//uint8_t fg[3] = {0, 0, 0};
+	//uint8_t bg[3] = {127, 127, 127};
+	uint8_t fg[3] = {0, 255, 0};
+	//uint8_t bg[3] = {100, 100, 100};
+	uint8_t bg[3] = {0, 0, 0};
+	//uint8_t fg[3] = {255, 0, 255};
+	//uint8_t *bg = 0;
 	char buf[0x200];
 	snprintf(buf, 0x200,
 			"d = %d\n"      "g = %g\n"      "l = %d\n"
@@ -454,8 +525,9 @@ int main_vac(int c, char *v[])
 
 	// initialize state
 	struct viewer_state e[1];
-	e->w = 200;
-	e->h = 200;
+	int N = 400;
+	e->w = N;
+	e->h = N;
 	e->o = 0;
 	center_state(e);
 //	e->stratum = 0;
@@ -483,10 +555,11 @@ int main_vac(int c, char *v[])
 
 
 	// init fonts
-	e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
+	//e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
+	e->font[0] = reformat_font(*xfont_8x13, UNPACKED);
 
 	// open the window
-	struct FTR f = ftr_new_window(400,200);
+	struct FTR f = ftr_new_window(2*N, N);
 	f.userdata = e;
 	f.changed = 1;
 
