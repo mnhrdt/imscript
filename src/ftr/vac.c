@@ -302,12 +302,18 @@ static void paint_state(struct FTR *f)
 	//uint8_t *bg = 0;
 	char buf[0x200];
 	snprintf(buf, 0x200,
-			"d = %d\n"      "g = %g\n"      "l = %d\n"
-			"s1 = %d %d\n"  "s2 = %d %d\n"  "p = %g\n"
-			"r = %g\n"      "z = %g\n",
+			"d (random seed)    = %d\n"
+			"g (gaussian grain) = %g\n"
+			"l (num laplacians) = %d\n"
+			"s1 (shift 1)       = %3d %3d %3d\n"
+			"s2 (shift 2)       = %3d %3d %3d\n"
+			"p (texture saturation)    = %g\n"
+			"r (autocorr. mask radius) = %g\n"
+			"z (autocorr. saturation)  = %g\n",
 			e->d, e->g, e->l,
-			e->s[0][0], e->s[0][1], e->s[1][0], e->s[1][1], e->p,
-			e->r, e->z);
+			e->s[0][0], e->s[0][1], e->s[0][2],
+			e->s[1][0], e->s[1][1], e->s[1][2],
+			e->p, e->r, e->z);
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
 			0+0, 0+0, fg, bg, 0, e->font, buf);
 }
@@ -334,6 +340,9 @@ static void paint_state(struct FTR *f)
 //static void scale_radius(struct viewer_state *e, float f) { e->R *= f; }
 //static void shift_shift_s(struct viewer_state *e, float s) { e->s += s; }
 //static void shift_shift_z(struct viewer_state *e, float s) { e->z0 += s; }
+
+static void shift_random_seed(struct viewer_state *e, float s) { e->d += s; }
+static void scale_gaussian_grain(struct viewer_state *e, float f) { e->g *= f; }
 
 static void action_screenshot(struct FTR *f)
 {
@@ -393,12 +402,13 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 {
 	struct viewer_state *e = f->userdata;
 
-	// f, p, a, b, c, R, s hitboxes of font height
+	// d, g, l, b, c, R, s hitboxes of font height
 	// 0  1  2  3  4  5  6
 	int Y = y / e->font->height;
-//	if (k == FTR_BUTTON_DOWN)
-//	{
-//		if (Y == 0) scale_strata_frequency(e, 1/1.3);
+	if (k == FTR_BUTTON_DOWN)
+	{
+		if (Y == 0) shift_random_seed(e, -1);
+		if (Y == 1) scale_gaussian_grain(e, 1/1.3);
 //		if (Y == 1) scale_fold_parameter(e, 1/1.3);
 //		if (Y == 2) shift_angle_a(e, -10);
 //		if (Y == 3) shift_angle_b(e, -2);
@@ -406,10 +416,11 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 //		if (Y == 5) scale_radius(e, 1/1.3);
 //		if (Y == 6) shift_shift_s(e, -5);
 //		if (Y == 7) shift_shift_z(e, -5);
-//	}
-//	if (k == FTR_BUTTON_UP)
-//	{
-//		if (Y == 0) scale_strata_frequency(e, 1.3);
+	}
+	if (k == FTR_BUTTON_UP)
+	{
+		if (Y == 0) shift_random_seed(e, 1);
+		if (Y == 1) scale_gaussian_grain(e, 1.3);
 //		if (Y == 1) scale_fold_parameter(e, 1.3);
 //		if (Y == 2) shift_angle_a(e, 10);
 //		if (Y == 3) shift_angle_b(e, 2);
@@ -417,7 +428,7 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 //		if (Y == 5) scale_radius(e, 1.3);
 //		if (Y == 6) shift_shift_s(e, 5);
 ////		if (Y == 7) shift_shift_z(e, 5);
-//	}
+	}
 
 	f->changed = 1;
 }
