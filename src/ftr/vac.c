@@ -45,6 +45,7 @@ struct viewer_state {
 	int l;          // number of laplacian steps
 	int s[2][3];    // two shifts (x,y,sign)
 	float p;        // saturation parameter (percentile)
+	int q;          // quantization steps (0=no quantization)
 
 	// autocorrelation parameters
 	float r;        // center radius mask
@@ -65,6 +66,7 @@ static void center_state(struct viewer_state *e)
 	e->s[0][0] = 100; e->s[0][1] =  0; e->s[0][2] = +1;
 	e->s[1][0] =  50; e->s[1][1] = 87; e->s[1][2] = -1;
 	e->p = 1;
+	e->q = 0;
 
 	// autocorrelation view
 	e->r = 20;
@@ -169,8 +171,8 @@ static void getpercentiles(float *m, float *M, float *x, int n, float q)
 	if (b < 0) b = 0;
 	if (a >= N) a = N-1;
 	if (b >= N) b = N-1;
-	*m = t[a];
-	*M = t[b];
+	if (m) *m = t[a];
+	if (M) *M = t[b];
 	free(t);
 }
 
@@ -179,6 +181,32 @@ static unsigned char bclamp(float x)
 	if (x < 0) return 0;
 	if (x > 255) return 255;
 	return x;
+}
+
+static void distort_base_texture(float *x, struct viewer_state *e)
+{
+	if (0 == e->q) // q=1 : nothing
+		;
+	else if (1 == e->q)  // q=1 : median thresholding
+	{
+		float m;
+		getpercentiles(&m, 0, x, e->w * e->h, 50);
+		for (int i = 0; i < e->w * e->h; i++)
+			x[i] = -0.5 + (x[i] > m);
+	}
+	else if (e->q > 1) // q>1 : quantize at q steps between satvalues
+	{
+		// TODO: compute the whole quantization steps from the
+		// sorted array, no need for the percentiles
+
+		// compute e->p percentiles
+		float m, M;
+		getpercentiles(&m, &M, x, e->w * e->h, e->p);
+
+		// saturate at these percentiles
+		for (int i = 0; i < e->w * e->h; i++)
+			x[i] = round(e->q * (-0.5 + (x[i]-m)/(M-m) ) )/e->q;
+	}
 }
 
 static void display_base_texture(uint8_t *vx, float *x, struct viewer_state *e)
@@ -229,23 +257,76 @@ static void mask_autocorrelation(float *x, struct viewer_state *e)
 
 }
 
+static float clip(float x, float a, float b)
+{
+	if (x < a) return a;
+	if (x > b) return b;
+	return x;
+}
+
+static void sauto(uint8_t *y, float *x, int w, int h, float p)
+{
+	int n = 0; // number of non-nan samples
+	float *t = xmalloc(w*h*sizeof*t); // table of numeric samples (to sort)
+	for (int i = 0; i < w*h; i++)
+		if (!isnan(x[i]))
+			t[n++] = fabs(x[i]);
+	qsort(t, n, sizeof*t, compare_floats);
+	float s = 0; // saturation quantile
+	if (p >= 0) // p is a percentage
+	{
+		//assert(p <= 50);
+		int i = n - 1 - p*n/100;
+		if (i < 0) i = 0;
+		if (i >= n) i = n;
+		//assert(i >= 0);
+		//assert(i < n);
+		s = t[i];
+	} else { // -p is a number of pixels
+		int i = n + p - 1;
+		if (i < 0) i = 0;
+		if (i >= n) i = n - 1;
+		fprintf(stderr, "n=%d p=%g i=%d\n", n, p, i);
+		s = t[i];
+	}
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
+	{
+		uint8_t rgb[3] = {100, 100, 100}; // color for NAN
+		float v = x[j*w+i];
+		if (!isnan(v))
+		{
+			float r = 1 - clip(v/s, 0, 1);
+			float g = 1 - clip(fabs(v/s), 0, 1);
+			float b = 1 + clip(v/s, -1, 0);
+			rgb[0] = 255*r;
+			rgb[1] = 255*g;
+			rgb[2] = 255*b;
+		}
+		for (int k = 0; k < 3; k++)
+			*y++ = rgb[k];
+	}
+}
+
 static
 void display_autocorrelation(uint8_t *vX, float *X, struct viewer_state *e)
 {
 	//for (int i = 0; i < 3 * e->w * e->h; i++)
 	//	vX[i] = 127;
 
-	// compute e->z percentiles
-	float m, M;
-	getpercentiles(&m, &M, X, e->w * e->h, e->z);
+	//// compute e->z percentiles
+	//float m, M;
+	//getpercentiles(&m, &M, X, e->w * e->h, e->z);
 
-	// saturate at these percentiles
-	for (int i = 0; i < e->w * e->h; i++)
-	{
-		vX[3*i+0] = bclamp( 255 * (X[i] - m) / (M - m) );
-		vX[3*i+1] = bclamp( 255 * (X[i] - m) / (M - m) );
-		vX[3*i+2] = bclamp( 255 * (X[i] - m) / (M - m) );
-	}
+	//// saturate at these percentiles
+	//for (int i = 0; i < e->w * e->h; i++)
+	//{
+	//	vX[3*i+0] = bclamp( 255 * (X[i] - m) / (M - m) );
+	//	vX[3*i+1] = bclamp( 255 * (X[i] - m) / (M - m) );
+	//	vX[3*i+2] = bclamp( 255 * (X[i] - m) / (M - m) );
+	//}
+
+	sauto(vX, X, e->w, e->h, e->z);
 }
 
 
@@ -287,6 +368,7 @@ static void paint_state(struct FTR *f)
 
 	// perform all the computaitons
 	fill_base_texture(x, e);
+	distort_base_texture(x, e);
 	display_base_texture(vx, x, e);
 	compute_autocorrelation(X, x, e->w, e->h);
 	mask_autocorrelation(X, e);
@@ -339,12 +421,13 @@ static void paint_state(struct FTR *f)
 			"s1 (shift 1)       = %3d %3d %3d\n"
 			"s2 (shift 2)       = %3d %3d %3d\n"
 			"p (texture saturation)    = %g\n"
+			"q (texture quantization)  = %d\n"
 			"r (autocorr. mask radius) = %g\n"
 			"z (autocorr. saturation)  = %g\n",
 			e->d, e->g, e->l,
 			e->s[0][0], e->s[0][1], e->s[0][2],
 			e->s[1][0], e->s[1][1], e->s[1][2],
-			e->p, e->r, e->z);
+			e->p, e->q, e->r, e->z);
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
 			0+0, 0+0, fg, bg, 0, e->font, buf);
 }
@@ -375,6 +458,7 @@ static void paint_state(struct FTR *f)
 static void shift_random_seed(struct viewer_state *e, float s) { e->d += s; }
 static void shift_num_laplacians(struct viewer_state *e, int s) { e->l += s; }
 static void shift_mask_radius(struct viewer_state *e, int s) { e->r += s; }
+static void shift_quantization_q(struct viewer_state *e, int s) { e->q += s; }
 static void scale_gaussian_grain(struct viewer_state *e, float f) { e->g *= f; }
 static void scale_saturation_p(struct viewer_state *e, float f) { e->p *= f; }
 static void scale_saturation_z(struct viewer_state *e, float f) { e->z *= f; }
@@ -459,8 +543,9 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 3) shift_shift(e, 0, (X-20)/4, -1);
 		if (Y == 4) shift_shift(e, 1, (X-20)/4, -1);
 		if (Y == 5) scale_saturation_p(e, 1/1.3);
-		if (Y == 6) shift_mask_radius(e, -1);
-		if (Y == 7) scale_saturation_z(e, 1/1.3);
+		if (Y == 6) shift_quantization_q(e, -1);
+		if (Y == 7) shift_mask_radius(e, -1);
+		if (Y == 8) scale_saturation_z(e, 1/1.3);
 	}
 	if (k == FTR_BUTTON_UP)
 	{
@@ -470,8 +555,9 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 3) shift_shift(e, 0, (X-20)/4, 1);
 		if (Y == 4) shift_shift(e, 1, (X-20)/4, 1);
 		if (Y == 5) scale_saturation_p(e, 1.3);
-		if (Y == 6) shift_mask_radius(e, 1);
-		if (Y == 7) scale_saturation_z(e, 1.3);
+		if (Y == 6) shift_quantization_q(e, 1);
+		if (Y == 7) shift_mask_radius(e, 1);
+		if (Y == 8) scale_saturation_z(e, 1.3);
 	}
 
 	f->changed = 1;
@@ -612,7 +698,7 @@ int main_vac(int c, char *v[])
 	// init fonts
 	//e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
 	//e->font[0] = reformat_font(*xfont_8x13, UNPACKED);
-	e->font[0] = reformat_font(*xfont_7x13B, UNPACKED);
+	e->font[0] = reformat_font(*xfont_7x13, UNPACKED);
 
 	// open the window
 	struct FTR f = ftr_new_window(2*N, N);
