@@ -48,6 +48,7 @@ struct viewer_state {
 	int q;          // quantization steps (0=no quantization)
 
 	// autocorrelation parameters
+	float a;        // fractional autocorrelation
 	float r;        // center radius mask
 	float z;        // saturation parameter
 
@@ -69,6 +70,7 @@ static void center_state(struct viewer_state *e)
 	e->q = 0;
 
 	// autocorrelation view
+	e->a = 1;
 	e->r = 20;
 	e->z = 0.1;
 }
@@ -220,7 +222,7 @@ static void display_base_texture(uint8_t *vx, float *x, struct viewer_state *e)
 		vx[i] = bclamp( 255 * (x[i] - m) / (M - m) );
 }
 
-static void compute_autocorrelation(float *y, float *x, int w, int h)
+static void compute_autocorrelation(float *y, float *x, int w, int h, float a)
 {
 	float *c = xmalloc(w*h*sizeof*c);
 	float *ys = xmalloc(w*h*sizeof*c);
@@ -231,7 +233,7 @@ static void compute_autocorrelation(float *y, float *x, int w, int h)
 			c[i] = x[i];
 		fft_2dfloat(fc, c, w, h);
 		for (int i = 0; i < w*h; i++)
-			fc[i] = cabs(fc[i]);
+			fc[i] = pow(cabs(fc[i]), 2*a);
 		ifft_2dfloat(c, fc, w, h);
 		for (int i = 0; i < w*h; i++)
 			ys[i] = c[i];
@@ -370,7 +372,7 @@ static void paint_state(struct FTR *f)
 	fill_base_texture(x, e);
 	distort_base_texture(x, e);
 	display_base_texture(vx, x, e);
-	compute_autocorrelation(X, x, e->w, e->h);
+	compute_autocorrelation(X, x, e->w, e->h, e->a);
 	mask_autocorrelation(X, e);
 	display_autocorrelation(vX, X, e);
 
@@ -422,12 +424,13 @@ static void paint_state(struct FTR *f)
 			"s2 (shift 2)       = %3d %3d %3d\n"
 			"p (texture saturation)    = %g\n"
 			"q (texture quantization)  = %d\n"
+			"a (autocorr. fractional)  = %g\n"
 			"r (autocorr. mask radius) = %g\n"
 			"z (autocorr. saturation)  = %g\n",
 			e->d, e->g, e->l,
 			e->s[0][0], e->s[0][1], e->s[0][2],
 			e->s[1][0], e->s[1][1], e->s[1][2],
-			e->p, e->q, e->r, e->z);
+			e->p, e->q, e->a, e->r, e->z);
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
 			0+0, 0+0, fg, bg, 0, e->font, buf);
 }
@@ -462,6 +465,7 @@ static void shift_quantization_q(struct viewer_state *e, int s) { e->q += s; }
 static void scale_gaussian_grain(struct viewer_state *e, float f) { e->g *= f; }
 static void scale_saturation_p(struct viewer_state *e, float f) { e->p *= f; }
 static void scale_saturation_z(struct viewer_state *e, float f) { e->z *= f; }
+static void scale_fractional_a(struct viewer_state *e, float f) { e->a *= f; }
 
 static void shift_shift(struct viewer_state *e, int p, int q, int s)
 {
@@ -544,8 +548,9 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 4) shift_shift(e, 1, (X-20)/4, -1);
 		if (Y == 5) scale_saturation_p(e, 1/1.3);
 		if (Y == 6) shift_quantization_q(e, -1);
-		if (Y == 7) shift_mask_radius(e, -1);
-		if (Y == 8) scale_saturation_z(e, 1/1.3);
+		if (Y == 7) scale_fractional_a(e, 1/1.1);
+		if (Y == 8) shift_mask_radius(e, -1);
+		if (Y == 9) scale_saturation_z(e, 1/1.3);
 	}
 	if (k == FTR_BUTTON_UP)
 	{
@@ -556,8 +561,9 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 4) shift_shift(e, 1, (X-20)/4, 1);
 		if (Y == 5) scale_saturation_p(e, 1.3);
 		if (Y == 6) shift_quantization_q(e, 1);
-		if (Y == 7) shift_mask_radius(e, 1);
-		if (Y == 8) scale_saturation_z(e, 1.3);
+		if (Y == 7) scale_fractional_a(e, 1.1);
+		if (Y == 8) shift_mask_radius(e, 1);
+		if (Y == 9) scale_saturation_z(e, 1.3);
 	}
 
 	f->changed = 1;
