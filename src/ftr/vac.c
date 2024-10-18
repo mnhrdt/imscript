@@ -15,6 +15,8 @@
 // user interface library
 #include "ftr.h"
 
+#include "iio.h"
+
 // bitmap fonts
 #define OMIT_MAIN_FONTU
 #include "fontu.c"
@@ -38,6 +40,7 @@ struct viewer_state {
 	int w;  // scene width
 	int h;  // scene height
 	int o;  // scene orientation 0=horizontal, 1=vertical
+	float *stratum; // base image
 
 	// input texture parameters
 	int d;          // random seed
@@ -125,8 +128,12 @@ static void fill_base_texture(float *x, struct viewer_state *e)
 
 	// create gaussian noise with seed e->d
 	xsrand(e->d);
-	for (int i = 0; i < w * h; i++)
-		x[i] = random_normal();
+	if (e->stratum)
+		for (int i = 0; i < w * h; i++)
+			x[i] = e->stratum[i];
+	else
+		for (int i = 0; i < w * h; i++)
+			x[i] = random_normal();
 
 	// blur it with grain e->g
 	float g[1] = { e->g };
@@ -222,28 +229,26 @@ static void display_base_texture(uint8_t *vx, float *x, struct viewer_state *e)
 		vx[i] = bclamp( 255 * (x[i] - m) / (M - m) );
 }
 
+// fractional autocorrelation (a=1, regular autocorrelation, etc.)
 static void compute_autocorrelation(float *y, float *x, int w, int h, float a)
 {
 	float *c = xmalloc(w*h*sizeof*c);
 	float *ys = xmalloc(w*h*sizeof*c);
 	fftwf_complex *fc = fftwf_xmalloc(w*h*sizeof*fc);
-	for (int l = 0; l < 1; l++)
+	for (int i = 0; i < w*h; i++)
+		c[i] = x[i];
+	fft_2dfloat(fc, c, w, h);
+	for (int i = 0; i < w*h; i++)
+		fc[i] = pow(cabs(fc[i]), 2*a);
+	ifft_2dfloat(c, fc, w, h);
+	for (int i = 0; i < w*h; i++)
+		ys[i] = c[i];
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
 	{
-		for (int i = 0; i < w*h; i++)
-			c[i] = x[i];
-		fft_2dfloat(fc, c, w, h);
-		for (int i = 0; i < w*h; i++)
-			fc[i] = pow(cabs(fc[i]), 2*a);
-		ifft_2dfloat(c, fc, w, h);
-		for (int i = 0; i < w*h; i++)
-			ys[i] = c[i];
-		for (int j = 0; j < h; j++)
-		for (int i = 0; i < w; i++)
-		{
-			int ii = (i + w/2) % w;
-			int jj = (j + h/2) % h;
-			y[j*w+i] = ys[jj*w+ii] * 1;//norm;
-		}
+		int ii = (i + w/2) % w;
+		int jj = (j + h/2) % h;
+		y[j*w+i] = ys[jj*w+ii] * 1;//norm;
 	}
 	free(ys);
 	free(c);
@@ -672,23 +677,18 @@ int main_vac(int c, char *v[])
 
 	// initialize state
 	struct viewer_state e[1];
-	int N = 512;
-	e->w = N;
-	e->h = N;
+	int W = 512;
+	e->w = W;
+	e->h = W;
 	e->o = 0;
 	center_state(e);
-//	e->stratum = 0;
+	e->stratum = 0;
 
 	// extract named arguments
 	char *filename_out = pick_option(&c, &v, "o", "-");
-//	char *filename_stratum = pick_option(&c, &v, "S", "");
-//	if (*filename_stratum)
-//	{
-//		uint8_t *iio_read_image_uint8(char*,int*,int*);
-//		e->stratum = iio_read_image_uint8(filename_stratum,
-//				&e->stratum_w, &e->stratum_h);
-//		e->f = 1;
-//	}
+	char *filename_base = pick_option(&c, &v, "S", "");
+	if (*filename_base)
+		e->stratum = iio_read_image_float(filename_base, &e->w, &e->h);
 //	e->f = atof(pick_option(&c, &v, "f", "0.1"));
 //	e->p = atof(pick_option(&c, &v, "p", "0.001"));
 //	e->a = atof(pick_option(&c, &v, "a", "0"));
@@ -707,7 +707,7 @@ int main_vac(int c, char *v[])
 	e->font[0] = reformat_font(*xfont_7x13, UNPACKED);
 
 	// open the window
-	struct FTR f = ftr_new_window(2*N, N);
+	struct FTR f = ftr_new_window(2*e->w, e->h);
 	f.userdata = e;
 	f.changed = 1;
 
