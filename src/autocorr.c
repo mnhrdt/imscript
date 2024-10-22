@@ -114,22 +114,35 @@ static int good_modulus(int n, int p)
 }
 
 
-static void autocorr(float *y, float *xx, int w, int h, float z, int n, int P)
+static void autocorr(
+		float *y,  // output array to be filled-in
+		float *xx, // input image
+		int w,     // width
+		int h,     // height
+		float a,   // fractional autocorrelation coefficient
+		float z,   // radius of central mask to zeroize
+		int n,     // whether to normalize to zero mean
+		int P      // whether to preprocess by periodic plus smooth
+		)
 {
 	float *x = P ? xmalloc(w*h*sizeof*x) : xx;
 	if (P) ppsmooth(x, xx, w, h);
 
 	fftwf_complex *X = xmalloc(w*(long)h*sizeof*X);
 	fft_2dfloat(X, x, w, h);
-	for (int i = 0; i < w*h; i++)
-		X[i] = X[i] * conj(X[i]);
+	if (a == 1)
+		for (int i = 0; i < w*h; i++)
+			X[i] = X[i] * conj(X[i]);
+	else
+		for (int i = 0; i < w*h; i++)
+			X[i] = pow(cabs(X[i]), a);
 	if (n) X[0] = 0;
 	ifft_2dfloat(y, X, w, h);
 	free(X);
 
 	if (P) xfree(x);
 
-	if (z)
+	if (z > 0)
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 	{
@@ -141,7 +154,7 @@ static void autocorr(float *y, float *xx, int w, int h, float z, int n, int P)
 }
 
 static
-void autocorr_loc(float *y, float *x, int w, int h, float z, int n, int L)
+void autocorr_loc(float*y, float*x, int w,int h, float a, float z, int n, int L)
 {
 	// set background to 0
 	for (int i = 0; i < w*h; i++)
@@ -155,7 +168,7 @@ void autocorr_loc(float *y, float *x, int w, int h, float z, int n, int L)
 		for (int j = 0; j < L; j++)
 		for (int i = 0; i < L; i++)
 			x_loc[j*L+i] = x[(j+oy)*w+i+ox];
-		autocorr(y_loc, x_loc, L, L, z, n, 1);
+		autocorr(y_loc, x_loc, L, L, a, z, n, 1);
 		for (int j = 0; j < L; j++)
 		for (int i = 0; i < L; i++)
 		{
@@ -170,17 +183,17 @@ void autocorr_loc(float *y, float *x, int w, int h, float z, int n, int L)
 }
 
 static void autocorr_split(float *y,
-		float *x, int w, int h, int pd, float z, int n, int P)
+		float *x, int w, int h, int pd, float a, float z, int n, int P)
 {
 	for (int i = 0; i < pd; i++)
-		autocorr(y + w*h*i, x + w*h*i, w, h, z, n, P);
+		autocorr(y + w*h*i, x + w*h*i, w, h, a, z, n, P);
 }
 
 static void autocorr_loc_split(float *y,
-		float *x, int w, int h, int pd, float z, int n, int L)
+		float *x, int w, int h, int pd, float a, float z, int n, int L)
 {
 	for (int i = 0; i < pd; i++)
-		autocorr_loc(y + w*h*i, x + w*h*i, w, h, z, n, L);
+		autocorr_loc(y + w*h*i, x + w*h*i, w, h, a, z, n, L);
 }
 
 
@@ -229,11 +242,12 @@ static void fftshift_split(float *y, float *x, int w, int h, int pd)
 #include "pickopt.c"
 int main_autocorr(int c, char *v[])
 {
-	int localization    = atoi(pick_option(&c, &v, "l", "0"));
-	int periodization   = atoi(pick_option(&c, &v, "p", "0"));
-	int fftshiftization = atoi(pick_option(&c, &v, "s", "1"));
-	float zeros         = atof(pick_option(&c, &v, "z", "0"));
-	int navg            = atoi(pick_option(&c, &v, "n", "1"));
+	int   l = atoi(pick_option(&c, &v, "l", "0"));  // localization
+	int   p = atoi(pick_option(&c, &v, "p", "0"));  // periodization
+	int   s = atoi(pick_option(&c, &v, "s", "1"));  // shift 0 to center
+	int   n = atoi(pick_option(&c, &v, "n", "1"));  // normalize average
+	float a = atof(pick_option(&c, &v, "a", "1"));  // fractional alpha
+	float R = atof(pick_option(&c, &v, "z", "0"));  // size of center mask
 	if (c != 1 && c != 2 && c != 3) {
 		fprintf(stderr, "usage:\n\t%s [in [out]]\n", *v);
 		//                          0  1   2
@@ -247,13 +261,13 @@ int main_autocorr(int c, char *v[])
 	float *y = xmalloc(w*(long)h*pd*sizeof*y);
 	normalize_float_array_inplace(x, w*h*pd);
 
-	if (localization)
-		autocorr_loc_split(y, x, w, h, pd, zeros, navg, localization);
+	if (l)
+		autocorr_loc_split(y, x, w, h, pd, a, R, n, l);
 	else
-		autocorr_split(y, x, w, h, pd, zeros, navg, periodization);
+		autocorr_split(y, x, w, h, pd, a, R, n, p);
 
 	float *z = xmalloc(w*(long)h*pd*sizeof*z);
-	if (fftshiftization && !localization)
+	if (s && !l)
 		fftshift_split(z, y, w, h, pd);
 	else
 		z = y;
