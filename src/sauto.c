@@ -22,7 +22,7 @@ static float clip(float x, float a, float b)
 	return x;
 }
 
-static void sauto(uint8_t *y, float *x, int w, int h, float p)
+static void sauto(uint8_t *y, float *x, int w, int h, float p, int g)
 {
 	int n = 0; // number of non-nan samples
 	float *t = xmalloc(w*h*sizeof*t); // table of numeric samples (to sort)
@@ -48,6 +48,7 @@ static void sauto(uint8_t *y, float *x, int w, int h, float p)
 		s = t[i];
 	}
 	if (global_verbose_flag) fprintf(stderr, "sauto: s = %g\n", s);
+	if(g)for(int i=0;i<w*h;i++)*y++=(uint8_t)(255*clip(0.5+x[i]/s,0,1));else
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 	{
@@ -88,6 +89,7 @@ static char *help_string_long     =
 "\n"
 "Options:\n"
 " -p X\t\tsaturate a percentile of X% (default X=1)\n"
+" -g\t\tgray scale palette\n"
 " -v\t\tverbose mode (print details of the transformation)\n"
 " -h\t\tdisplay short help message\n"
 " --help\t\tdisplay longer help message\n"
@@ -108,6 +110,7 @@ int main_sauto(int c, char *v[])
 	// extract named options
 	float p = atof(pick_option(&c, &v, "p", "1"));
 	global_verbose_flag = !!pick_option(&c, &v, "v", 0);
+	int g = !!pick_option(&c, &v, "g", 0); // gray palette
 
 	// get positional arguments
 	if (c != 3 && c != 2 && c != 1) {
@@ -127,10 +130,10 @@ int main_sauto(int c, char *v[])
 	uint8_t *y = xmalloc(3*w*h);
 
 	// run the algorithm
-	sauto(y, x, w, h, p);
+	sauto(y, x, w, h, p, g);
 
 	// write result and exit
-	iio_write_image_uint8_vec(out, y, w, h, 3);
+	iio_write_image_uint8_vec(out, y, w, h, g?1:3);
 	return 0;
 }
 
