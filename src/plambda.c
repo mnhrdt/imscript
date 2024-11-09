@@ -383,6 +383,8 @@ static double notfintozero (double x) { return isfinite(x) ? x : 0; }
 static double force_finite (double x) { return isfinite(x) ? x : 0; }
 static double force_normal (double x) { return isnormal(x) ? x : 0; }
 
+static double spow(double a, double b) { return a>0 ? pow(a,b) : -pow(-a,b); }
+
 static double quantize_255 (double x)
 {
 	int ix = x;
@@ -1047,6 +1049,7 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(divide_two_doubles,"/",2),
 	REGISTER_FUNCTIONN(multiply_two_doubles,"*",2),
 	REGISTER_FUNCTIONN(substract_two_doubles,"-",2),
+	REGISTER_FUNCTIONN(spow,"spow",2),
 	REGISTER_FUNCTIONN(random_uniform,"randu",-1),
 	REGISTER_FUNCTIONN(random_normal,"randn",-1),
 	REGISTER_FUNCTIONN(random_normal,"randg",-1),
