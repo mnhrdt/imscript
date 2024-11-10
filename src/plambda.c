@@ -721,6 +721,42 @@ static int vector_cosine(float *ab, float *a, float *b, int na, int nb)
 	return 1;
 }
 
+// instance of "univector function"
+static int homography_build(float *r, float *a, int n)
+{
+	// 0 1 2
+	// 3 4 5
+	// 6 7 8
+	r[0] = r[4] = r[8] = 1;
+	r[1] = r[2] = r[3] = r[5] = r[6] = r[7] = 0;
+	switch(n) {
+	case 1: // rotation of angle a[0] in degrees
+		r[0] = r[4] = cos(M_PI*a[0]/180);
+		r[1] = -sin(M_PI*a[0]/180);
+		r[3] = -r[1];
+		break;
+	case 2: // translation (a[0], a[1])
+		r[2] = a[0];
+		r[5] = a[1];
+		break;
+	}
+	return 9;
+}
+
+// instance of "univector function"
+static int homography_from_cr(float *r, float *a, int n)
+{
+	if (n != 3) fail("hom-cr expects (cx,cy,angle)");
+	float p = -a[0];
+	float q = -a[1];
+	float c =  cos(M_PI*a[2]/180);
+	float s = -sin(M_PI*a[2]/180);
+	r[0] = c;  r[1] = -s;  r[2] = p*c - s*q - p;
+	r[3] = s;  r[4] =  c;  r[5] = p*s + c*q - q;
+	r[6] = 0;  r[7] =  0;  r[8] = 1;
+	return 9;
+}
+
 // instance of "univector_function"
 static int matrix_determinant(float *r, float *a, int n)
 {
@@ -1114,6 +1150,10 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(vector_product,"vprod",-5),
 	REGISTER_FUNCTIONN(scalar_product,"sprod",-5),
 	REGISTER_FUNCTIONN(vector_cosine,"vcos",-5),
+	REGISTER_FUNCTIONN(homography_build,"hbuild",-6),
+	REGISTER_FUNCTIONN(homography_from_cr,"hom-cr",-6),
+//	REGISTER_FUNCTIONN(homography_from_crs,"hdo_crs",-6),
+//	REGISTER_FUNCTIONN(homography_from_crst,"hdo_crst",-6),
 	REGISTER_FUNCTIONN(matrix_determinant,"mdet",-6),
 	REGISTER_FUNCTIONN(matrix_transpose,"mtrans",-6),
 	REGISTER_FUNCTIONN(matrix_inverse,"minv",-6),
@@ -2937,6 +2977,7 @@ static int main_calc(int c, char **v)
 				p->var->t[i], v[i+1]);
 
 	xsrand(100+SRAND());
+	if (SRAND()) fprintf(stderr, "plambda SRAND=%g\n", SRAND());
 
 	float out[pdmax];
 	int od = run_program_vectorially_at(out, p, x, NULL, NULL, pd, 0, 0);
@@ -3023,6 +3064,7 @@ static int main_images(int c, char **v)
 				p->var->t[i], v[i+1]);
 
 	xsrand(100+SRAND());
+	if (verbose) fprintf(stderr, "SRAND=%g\n", SRAND());
 
 	////print_compiled_program(p);
 	int pdreal = eval_dim(p, x, pd);
