@@ -749,8 +749,8 @@ static int homography_from_cr(float *r, float *a, int n)
 	if (n != 3) fail("hom-cr expects (cx,cy,angle)");
 	float p = -a[0];
 	float q = -a[1];
-	float c =  cos(M_PI*a[2]/180);
-	float s = -sin(M_PI*a[2]/180);
+	float c = cos(M_PI*a[2]/180);
+	float s = sin(M_PI*a[2]/180);
 	r[0] = c;  r[1] = -s;  r[2] = p*c - s*q - p;
 	r[3] = s;  r[4] =  c;  r[5] = p*s + c*q - q;
 	r[6] = 0;  r[7] =  0;  r[8] = 1;
