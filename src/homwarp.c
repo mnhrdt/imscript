@@ -121,6 +121,7 @@ static char *help_string_long     =
 "\n"
 "Options:\n"
 " -i        use the inverse homography\n"
+" -p        use periodic boundary conditions\n"
 " -o ORDER  choose a different interpolation method (default = -3)\n"
 " -h        display short help message\n"
 " --help    display longer help message\n"
