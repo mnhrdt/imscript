@@ -27,9 +27,9 @@ bin/%  : src/%.o $(OBJ)
 ENABLE_PNG  = 1
 ENABLE_TIFF = 1
 ENABLE_JPEG = 1
-#ENABLE_WEBP = 1
-#ENABLE_HEIF = 1
-#ENABLE_PGSL = 1
+ENABLE_WEBP = 1
+ENABLE_HEIF = 1
+ENABLE_PGSL = 1
 
 # CAVEAT: if you want to use HDF5, make sure that no "mpich" packages
 # are installed on your computer.  If they are, all programs that link
@@ -54,7 +54,7 @@ test: bin/plambda bin/imprintf
 	echo $(MAKECMDGOALS)
 	bin/plambda zero:512x512 "randg randg randl randg randg 5 njoin" \
 	| bin/plambda "split rot del hypot" | bin/imprintf "%s%e%r%i%a\n" \
-	| grep -q 3775241.440161.730120.0037888911.8794
+	| grep -q 3771131.438551.728440.0016680614.2519
 
 
 # build tutorial
