@@ -26,54 +26,206 @@ static double invert_homography(double o[9], double i[9])
 }
 
 
-typedef float (*gray_interpolator_t)(float *,int,int,float,float);
-
 #include <math.h>
-#include "extrapolators.c"
-#include "bilinear_interpolation.c"
-#include "marching_interpolation.c"
-#include "bicubic_gray.c"
+//#include "extrapolators.c"
+//#include "bilinear_interpolation.c"
+//#include "marching_interpolation.c"
+//#include "bicubic_gray.c"
 #include "spline.c"
 
-static
-float nearest_neighbor_interpolator(float *x, int w, int h, float p, float q)
+// SECTION 4. Extrapolation                                                 {{{1
+
+// A "extrapolator" evaluates an image at an arbitrary integral position.
+// When the position is outside the image domain, the value is extrapolated
+// (by periodization, or by a constant value).
+
+// type of the "extrapolator" functions
+typedef float (*extrapolator_t)(float*,int,int,int,int,int,int);
+
+// auxiliary function: compute n%p correctly, even for huge and negative numbers
+//static int good_modulus(int n, int p)
+//{
+//	int r = n % p;
+//	r = r < 0 ? r + p : r;
+//	assert(r >= 0);
+//	assert(r < p);
+//	return r;
+//}
+
+// instance of "extrapolator_t", extrapolate by periodicity
+static float getsample_per(float *x, int w, int h, int pd, int i, int j, int l)
+{
+	i = good_modulus(i, w);
+	j = good_modulus(j, h);
+	if (l >= pd)
+		l = pd - 1;
+	return x[(i+j*w)*pd + l];
+}
+
+// instance of "extrapolator_t", extrapolate by a constant value
+static float getsample_cons(float *x, int w, int h, int pd, int i, int j, int l)
+{
+	static float value = 0;
+	if (w == 0 && h == 0)
+		value = *x;
+	if (i < 0 || i >= w || j < 0 || j >= h)
+		return value;
+	if (l >= pd)
+		l = pd - 1;
+	return x[(i+j*w)*pd + l];
+}
+
+//// obtain an extrapolator function from the current configuration
+//static extrapolator_t obtain_extrapolator(struct viewer_state *e)
+//{
+//	if (e->tile_plane)
+//		return getsample_per;
+//	float top = 255; // white
+//	getsample_cons(&top, 0, 0, 0, 0, 0, 0);
+//	return getsample_cons;
+//}
+
+
+
+// SECTION 5. Local Interpolation                                           {{{1
+//
+// An "interpolator" evaluates an image at an arbitrary floating-point
+// position.  When the position is not integral, the value is a combination of
+// neighboring values.  Notice that when the position is outside the image
+// domain, an extrapolator is also needed.
+
+// type of the "interpolator" functions
+typedef float (*interpolator_t)(float*,int,int,int,float,float,int,
+		extrapolator_t);
+
+// auxiliary function for bilinear interpolation
+static float evaluate_bilinear_cell(float a, float b, float c, float d,
+							float x, float y)
+{
+	return a * (1-x) * (1-y)
+	     + b * ( x ) * (1-y)
+	     + c * (1-x) * ( y )
+	     + d * ( x ) * ( y );
+}
+
+// instance of "interpolator_t", for bilinear interpolation
+static float bilinear_interpolation_at(float *x, int w, int h, int pd,
+		float p, float q, int l, extrapolator_t pix)
+{
+	int ip = floor(p);
+	int iq = floor(q);
+	float a = pix(x, w, h, pd, ip  , iq  , l);
+	float b = pix(x, w, h, pd, ip+1, iq  , l);
+	float c = pix(x, w, h, pd, ip  , iq+1, l);
+	float d = pix(x, w, h, pd, ip+1, iq+1, l);
+	return evaluate_bilinear_cell(a, b, c, d, p-ip, q-iq);
+}
+
+// auxiliary code for "linear" interpolation
+#include "marching_interpolation.c"
+
+// instance of "interpolator_t", for linear (marching) interpolation
+static float linear_interpolation_at(float *x, int w, int h, int pd,
+		float p, float q, int l, extrapolator_t pix)
+{
+	int ip = floor(p);
+	int iq = floor(q);
+	float a = pix(x, w, h, pd, ip  , iq  , l);
+	float b = pix(x, w, h, pd, ip+1, iq  , l);
+	float c = pix(x, w, h, pd, ip  , iq+1, l);
+	float d = pix(x, w, h, pd, ip+1, iq+1, l);
+	return marchi(a, c, b, d, p-ip, q-iq);
+}
+
+// instance of "interpolator_t" for nearest neighbor interpolation
+static float nearest_neighbor_at(float *x, int w, int h, int pd,
+		float p, float q, int l, extrapolator_t pix)
 {
 	int ip = round(p);
 	int iq = round(q);
-	if (ip < 0) ip = 0;
-	if (iq < 0) iq = 0;
-	if (ip >= w) ip = w - 1;
-	if (iq >= h) iq = h - 1;
-	return x[w*iq+ip];
+	return pix(x, w, h, pd, ip, iq, l);
 }
 
-int homwarp(float *X, int W, int H, double M[9], float *x,
-		int w, int h, int o)
+
+// one-dimensional cubic interpolation of four data points ("Keys")
+static float cubic_interpolation(float v[4], float x)
 {
-	gray_interpolator_t u = bicubic_interpolation_gray;
-	if (o == 0) u = nearest_neighbor_interpolator;
-	if (o == 1) u = marching_interpolation_at;
+	return v[1] + 0.5 * x*(v[2] - v[0]
+			+ x*(2.0*v[0] - 5.0*v[1] + 4.0*v[2] - v[3]
+			+ x*(3.0*(v[1] - v[2]) + v[3] - v[0])));
+}
+
+// two-dimensional separable cubic interpolation, on a 4x4 grid
+static float bicubic_interpolation_cell(float p[4][4], float x, float y)
+{
+	float v[4];
+	v[0] = cubic_interpolation(p[0], y);
+	v[1] = cubic_interpolation(p[1], y);
+	v[2] = cubic_interpolation(p[2], y);
+	v[3] = cubic_interpolation(p[3], y);
+	return cubic_interpolation(v, x);
+}
+
+// instance of "interpolator_t" for bicubic interpolation
+static float bicubic_interpolation_at(float *img, int w, int h, int pd,
+		float x, float y, int l, extrapolator_t p)
+{
+	x -= 1;
+	y -= 1;
+
+	int ix = floor(x);
+	int iy = floor(y);
+	float c[4][4];
+	for (int j = 0; j < 4; j++)
+		for (int i = 0; i < 4; i++)
+			c[i][j] = p(img, w, h, pd, ix + i, iy + j, l);
+	return bicubic_interpolation_cell(c, x - ix, y - iy);
+}
+
+//// obtain an interpolation operator from the current configuration
+//static interpolator_t obtain_interpolator(struct viewer_state *e)
+//{
+//	if (e->dragged_point >= 0 || e->dragging_background)
+//		return nearest_neighbor_at;
+//	if (e->interpolation_order == 1) return linear_interpolation_at;
+//	if (e->interpolation_order == 2) return bilinear_interpolation_at;
+//	if (e->interpolation_order == 3) return bicubic_interpolation_at;
+//	return nearest_neighbor_at;
+//}
+
+
+// SECTION 6. Main warping function                                        {{{1
+
+
+int homwarp(float *X, int W, int H, double M[9], float *x,
+		int w, int h, int o, int bd)
+{
+	interpolator_t u = bicubic_interpolation_at;
+	if (o == 0) u = nearest_neighbor_at;
+	if (o == 1) u = linear_interpolation_at;
 	if (o == 2) u = bilinear_interpolation_at;
-	if (o ==-2) u = quilez3_interpolation_at;
-	if (o ==-4) u = quilez5_interpolation_at;
+	//if (o ==-2) u = quilez3_interpolation_at;
+	//if (o ==-4) u = quilez5_interpolation_at;
+
+	extrapolator_t e = bd ? getsample_per : getsample_cons;
 
 	for (int j = 0; j < H; j++)
 	for (int i = 0; i < W; i++)
 	{
 		double p[2] = {i, j};
 		apply_homography(p, M, p);
-		X[j*W+i] = u(x, w, h, p[0], p[1]);
+		X[j*W+i] = u(x, w, h, 1, p[0], p[1], 0, e);
 	}
 
 	return 0;
 }
 
 int shomwarp(float *X, int W, int H, double M[9], float *x,
-		int w, int h, int o)
+		int w, int h, int o, int bd)
 {
 	// if low order-interpolation, evaluate right away
 	if (o == 0 || o == 1 || o == 2 || o == -2 || o == -3)
-		return homwarp(X, W, H, M, x, w, h, o);
+		return homwarp(X, W, H, M, x, w, h, o, bd);
 
 	// otherwise, pre-filtering is required
 	bool r = prepare_spline(x, w, h, 1, o);
@@ -135,8 +287,8 @@ static char *help_string_long     =
 " 1\tpiecewise linear interpolation\n"
 " 2\tbilinear interpolation\n"
 " -3\tbicubic interpolation\n"
-" -2\tcubic faded bilinear interpolation (a la Inigo Quilez)\n"
-" -4\tquintic faded bilinear interpolation (a la Inigo Quilez)\n"
+//" -2\tcubic faded bilinear interpolation (a la Inigo Quilez)\n"
+//" -4\tquintic faded bilinear interpolation (a la Inigo Quilez)\n"
 " 3,5,7\tspline of order 3,5 or 7\n"
 "\n"
 "Examples:\n"
@@ -159,7 +311,8 @@ int main_homwarp(int c, char *v[])
 {
 	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
 	bool do_invert = pick_option(&c, &v, "i", NULL);
-	int order = atoi(pick_option(&c, &v, "o", "-3"));
+	int ord = atoi(pick_option(&c, &v, "o", "-3"));
+	int bd = !!pick_option(&c, &v, "p", NULL);
 	if (c != 2 && c != 4 && c != 5 && c != 6)
 		return fprintf(stderr, "usage:\n\t"
 		"%s [-i] [-o {0|1|2|-3|3|5|7}] hom [w h [in [out]]]\n"
@@ -184,7 +337,7 @@ int main_homwarp(int c, char *v[])
 
 	int r = 0;
 	for (int i = 0; i < pd; i++)
-		r += shomwarp(y + i*ow*oh, ow, oh, H, x + i*w*h, w, h, order);
+		r += shomwarp(y + i*ow*oh, ow, oh, H, x + i*w*h, w, h, ord, bd);
 
 	iio_write_image_float_split(filename_out, y, ow, oh, pd);
 	return r;
