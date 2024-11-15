@@ -757,6 +757,50 @@ static int homography_from_cr(float *r, float *a, int n)
 	return 9;
 }
 
+// instance of "univector function"
+static int mhtrans(float *r, float *a, int n)
+{
+	if (n != 2) fail("mhtrans expects (tx,ty)");
+	r[0] = 1; r[1] = 0; r[2] = a[0];
+	r[3] = 0; r[4] = 1; r[5] = a[1];
+	r[6] = 0; r[7] = 0; r[8] = 1;
+	return 9;
+}
+
+static int mhrot(float *r, float *a, int n)
+{
+	if (n != 1) fail("mhrot expects θ");
+	float s = sin(M_PI * a[0] / 180);
+	float c = cos(M_PI * a[0] / 180);
+	r[0] = c; r[1] = -s; r[2] = 0;
+	r[3] = s; r[4] = c; r[5] = 0;
+	r[6] = 0; r[7] = 0; r[8] = 1;
+	return 9;
+}
+
+static int mhscale(float *r, float *a, int n)
+{
+	if (n != 1) fail("mhscale expects λ");
+	float l = 1/a[0];
+	r[0] = l; r[1] = 0; r[2] = 0;
+	r[3] = 0; r[4] = l; r[5] = 0;
+	r[6] = 0; r[7] = 0; r[8] = 1;
+	return 9;
+}
+
+static int mhtilt(float *r, float *a, int n)
+{
+	if (n != 2) fail("mhtilt expects (τ,θ)");
+	float t = 1/a[0];
+	float s = sin(M_PI * a[1] / 180);
+	float c = cos(M_PI * a[1] / 180);
+	r[0] = t*c*c + s*s; r[1] = (1 - t)*c*s; r[2] = 0;
+	r[3] = (1 - t)*c*s; r[4] = t*s*s + c*c; r[5] = 0;
+	r[6] = 0          ; r[7] = 0          ; r[8] = 1;
+	return 9;
+}
+
+
 // instance of "univector_function"
 static int matrix_determinant(float *r, float *a, int n)
 {
@@ -1154,6 +1198,10 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(homography_from_cr,"hom-cr",-6),
 //	REGISTER_FUNCTIONN(homography_from_crs,"hdo_crs",-6),
 //	REGISTER_FUNCTIONN(homography_from_crst,"hdo_crst",-6),
+	REGISTER_FUNCTIONN(mhtrans,"mhtrans",-6),
+	REGISTER_FUNCTIONN(mhrot,"mhrot",-6),
+	REGISTER_FUNCTIONN(mhtilt,"mhtilt",-6),
+	REGISTER_FUNCTIONN(mhscale,"mhscale",-6),
 	REGISTER_FUNCTIONN(matrix_determinant,"mdet",-6),
 	REGISTER_FUNCTIONN(matrix_transpose,"mtrans",-6),
 	REGISTER_FUNCTIONN(matrix_inverse,"minv",-6),
