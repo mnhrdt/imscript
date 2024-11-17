@@ -868,6 +868,21 @@ static int matrix_inverse(float *r, float *a, int n)
 	}
 }
 
+// instance of "bivector_function"
+static int matrix_conjugation(float *abia, float *a, float *b, int na, int nb)
+{
+	if (na != 9 || nb != 9)
+		fail("matrix conjugation only implemented for 3x3");
+
+	// compute a * b * a^-1
+	float ia[9], ab[9];
+	matrix_inverse(ia, a, 9);
+	matrix_product_clean(ab  , &na, &nb, a , 3, 3, b , 3, 3);
+	matrix_product_clean(abia, &na, &nb, ab, 3, 3, ia, 3, 3);
+	assert(na == 3 && nb == 3);
+	return 9;
+}
+
 // instance of "univector_function"
 static int vector_r90(float *r, float *a, int nn)
 {
@@ -1191,6 +1206,7 @@ static struct predefined_function {
 	REGISTER_FUNCTIONN(disk_dirichlet, "disk-dirichlet", 5),
 #endif
 	REGISTER_FUNCTIONN(matrix_product,"mprod",-5),
+	REGISTER_FUNCTIONN(matrix_conjugation,"mconj",-5),
 	REGISTER_FUNCTIONN(vector_product,"vprod",-5),
 	REGISTER_FUNCTIONN(scalar_product,"sprod",-5),
 	REGISTER_FUNCTIONN(vector_cosine,"vcos",-5),
@@ -3025,7 +3041,7 @@ static int main_calc(int c, char **v)
 				p->var->t[i], v[i+1]);
 
 	xsrand(100+SRAND());
-	if (SRAND()) fprintf(stderr, "plambda SRAND=%g\n", SRAND());
+	//if (SRAND()) fprintf(stderr, "plambda SRAND=%g\n", SRAND());
 
 	float out[pdmax];
 	int od = run_program_vectorially_at(out, p, x, NULL, NULL, pd, 0, 0);
