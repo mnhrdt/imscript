@@ -157,6 +157,7 @@ static void project(double out[3], struct projection_state *p, double in[3])
 	double x = p->lon_0 + in[0] * p->lon_d;
 	double y = p->lat_0 + in[1] * p->lat_d;
 	eval_rpci(out, p->r, x, y, in[2]);
+	out[2] = in[2];
 }
 
 static void build_projection_states(

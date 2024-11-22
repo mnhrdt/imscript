@@ -463,6 +463,7 @@ static void eval_nrpci_iterative(double *result,
 static void eval_nrpc(double *result,
 		struct rpc *p, double x, double y, double z)
 {
+	result[0] = result[1] = NAN;
 	if (isfinite(p->numx[0])) {
 		double numx = eval_pol20(p->numx, x, y, z);
 		double denx = eval_pol20(p->denx, x, y, z);
@@ -478,6 +479,7 @@ static void eval_nrpc(double *result,
 static void eval_nrpci(double *result,
 		struct rpc *p, double x, double y, double z)
 {
+	result[0] = result[1] = NAN;
 	if (isfinite(p->inumx[0])) {
 		double numx = eval_pol20(p->inumx, x, y, z);
 		double denx = eval_pol20(p->idenx, x, y, z);

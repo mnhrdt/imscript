@@ -464,7 +464,7 @@ int main_fauxfilet_noninteractive(int c, char *v[])
 }
 
 static char *help_string_name     = "fauxfilet";
-static char *help_string_version  = "fauxfilet 1.0\n\nWritten by eml";
+static char *help_string_version  = "fauxfilet 1.0\n\nWritten by mnhrdt";
 static char *help_string_oneliner = "interactive display parabolic folds";
 static char *help_string_usage    = "usage:\n\tfauxfilet";
 static char *help_string_long     =

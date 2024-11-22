@@ -170,7 +170,9 @@ static void move_particles(struct les_state *e)
 	cx += 1;
 	// compute force field at each particle position
 	float F[e->N][2];
+#ifdef _OPENMP
 #pragma omp parallel for
+#endif
 	for (int i = 0; i < e->N; i++)
 	{
 		F[i][0] = F[i][1] = 0;

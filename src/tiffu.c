@@ -1270,6 +1270,7 @@ static void paste_tile(char *filename, int idx, char *tpd)
 void metatiler(char *command, char **fname_in, int n_in,
 		char **fname_out, int n_out)
 {
+	if (n_in < 1) return;
 	// build command line (will be the same at each run)
 	char cmdline[CMDLINE_MAX];
 	char *tpd = create_temporary_directory();

@@ -35,10 +35,10 @@ static uint32_t lcg_knuth_rand(void)
 // hacker's delight 32-bit shuffle
 static uint32_t hdshuf(uint32_t x)
 {
-	x = (x & 0x0000FF00) << 8 | (x >> 8) & 0x0000FF00 | x & 0xFF0000FF;
-	x = (x & 0x00F000F0) << 4 | (x >> 4) & 0x00F000F0 | x & 0xF00FF00F;
-	x = (x & 0x0C0C0C0C) << 2 | (x >> 2) & 0x0C0C0C0C | x & 0xC3C3C3C3;
-	x = (x & 0x22222222) << 1 | (x >> 1) & 0x22222222 | x & 0x99999999;
+	x = (x & 0x0000FF00) << 8 | ((x >> 8) & 0x0000FF00) | (x & 0xFF0000FF);
+	x = (x & 0x00F000F0) << 4 | ((x >> 4) & 0x00F000F0) | (x & 0xF00FF00F);
+	x = (x & 0x0C0C0C0C) << 2 | ((x >> 2) & 0x0C0C0C0C) | (x & 0xC3C3C3C3);
+	x = (x & 0x22222222) << 1 | ((x >> 1) & 0x22222222) | (x & 0x99999999);
 	return x;
 }
 

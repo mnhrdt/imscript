@@ -21,7 +21,8 @@ N3. function names are long and descriptive
 N4. global variables have long and uppercase names
 N5. do not bring new mixed-case symbols into the world
 N6. either your file is executable or its name ends in .py, but not both
-N7. arguments cannot have the same name as values:  you never see f(x=x)
+N7. arguments cannot have the same name as values:  avoid "f(x=x)"
+N8. functions cannot have the same name as modules: avoid "from foo import foo"
 
 
 FORMATTING
