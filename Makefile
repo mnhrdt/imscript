@@ -215,6 +215,9 @@ src/plambda.o: CPPFLAGS += -DPLAMBDA_WITH_GSL
 bin/mathieu: LDLIBS += -lgsl
 endif
 
+# other target-specific variables
+bin/blurd : LDLIBS += -lfftw3
+
 
 
 
