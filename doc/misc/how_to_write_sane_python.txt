@@ -120,7 +120,7 @@ P2. ideal case: "wget url://to/myprogram.py ; python myprogram.py"
 P3. do not force installation of non-essential dependencies.  If your program
     requires a dependency just for a small, optional feature, allow to install
     it and fail at runtime when the dependency is found missing.
-P4. pip is shit, but conda and poetry are orders of magnitude worse: avoid them!
+P4. pip sucks; but conda, uv, poetry are orders of magnitude worse: avoid them!
 P5. jupyter notebooks are great for literate programming, but the .ipynb file
     format is horrific.  Use jupytext to distribute your notebooks as plain
     python files.  Check that you can run your notebook by invoking it
