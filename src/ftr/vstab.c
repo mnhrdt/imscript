@@ -132,6 +132,13 @@ static void getpercentiles(float *m, float *M, float *x, int n, float q)
 	free(t);
 }
 
+static float clip(float x, float a, float b)
+{
+	if (x < a) return a;
+	if (x > b) return b;
+	return x;
+}
+
 static unsigned char bclamp(float x)
 {
 	if (x < 0) return 0;
@@ -165,31 +172,7 @@ static unsigned char bclamp(float x)
 //	}
 //}
 
-static void display_base_texture(uint8_t *vx, float *x, struct viewer_state *e)
-{
-	// compute e->p percentiles
-	float m, M;
-	getpercentiles(&m, &M, x, e->w * e->h, e->p);
-
-	// saturate at these percentiles
-	for (int i = 0; i < e->w * e->h; i++)
-	{
-		float v = bclamp( 255 * (x[i] - m) / (M - m) );
-		vx[3*i+0] = v;
-		vx[3*i+1] = v;
-		vx[3*i+2] = v;
-	}
-}
-
-
-static float clip(float x, float a, float b)
-{
-	if (x < a) return a;
-	if (x > b) return b;
-	return x;
-}
-
-static void sauto(uint8_t *y, float *x, int w, int h, float p)
+static void sauto(uint8_t *y, float *x, int w, int h, float p, int g)
 {
 	int n = 0; // number of non-nan samples
 	float *t = xmalloc(w*h*sizeof*t); // table of numeric samples (to sort)
@@ -214,6 +197,16 @@ static void sauto(uint8_t *y, float *x, int w, int h, float p)
 		fprintf(stderr, "n=%d p=%g i=%d\n", n, p, i);
 		s = t[i];
 	}
+	//if (global_verbose_flag) fprintf(stderr, "sauto: s = %g\n", s);
+	if(g) {
+		for(int i=0;i<w*h;i++)
+		{
+			uint8_t t = 255*clip(0.5*x[i]/s, 0, 1);
+			*y++ = t;
+			*y++ = t;
+			*y++ = t;
+		}
+	} else
 	for (int j = 0; j < h; j++)
 	for (int i = 0; i < w; i++)
 	{
@@ -233,9 +226,10 @@ static void sauto(uint8_t *y, float *x, int w, int h, float p)
 	}
 }
 
-
-
-
+static void display_base_texture(uint8_t *vx, float *x, struct viewer_state *e)
+{
+	sauto(vx, x, e->w, e->h, e->r, e->p % 2);
+}
 
 
 
@@ -350,6 +344,16 @@ static void shift_param_k(struct viewer_state *e, float s)
 	if (e->k < 0) e->k = 0;
 	if (e->k >= NUM_KERNELS) e->k = NUM_KERNELS - 1;
 }
+static void toggle_palette(struct viewer_state *e, int s)
+{
+	e->p += s;
+}
+static void shift_saturation(struct viewer_state *e, float s)
+{
+	e->r += s;
+	if (e->k < 0) e->k = 0;
+	if (e->k > 49) e->k = 49;
+}
 //static void shift_num_laplacians(struct viewer_state *e, int s) { e->l += s; }
 //static void shift_mask_radius(struct viewer_state *e, int s) { e->r += s; }
 //static void shift_quantization_q(struct viewer_state *e, int s) { e->q += s; }
@@ -438,6 +442,8 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 2) shift_param_b(e, -0.1);
 		if (Y == 3) shift_param_k(e, -1);
 		if (Y == 4) scale_param_s(e, 1/1.3);
+		if (Y == 5) toggle_palette(e, -1);
+		if (Y == 6) shift_saturation(e, -0.125);
 //		if (Y == 1) scale_gaussian_grain(e, 1/1.3);
 //		if (Y == 2) shift_num_laplacians(e, -1);
 //		if (Y == 4) shift_shift(e, 1, (X-20)/4, -1);
@@ -454,6 +460,8 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 2) shift_param_b(e, 0.1);
 		if (Y == 3) shift_param_k(e, 1);
 		if (Y == 4) scale_param_s(e, 1.3);
+		if (Y == 5) toggle_palette(e, 1);
+		if (Y == 6) shift_saturation(e, 0.125);
 //		if (Y == 1) scale_gaussian_grain(e, 1.3);
 //		if (Y == 2) shift_num_laplacians(e, 1);
 //		if (Y == 3) shift_shift(e, 0, (X-20)/4, 1);
