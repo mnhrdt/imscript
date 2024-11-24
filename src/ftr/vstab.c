@@ -58,7 +58,7 @@ struct viewer_state {
 
 #define NUM_KERNELS 7
 static char *global_kernel_names[NUM_KERNELS] = {
-	"dirac", "gauss", "laplace", "cauchy", "disk", "rectangle", "riesz",
+	"dirac", "gauss", "laplace", "cauchy", "disk", "square", "riesz",
 	//0       1        2          3         4       5            6
 };
 
@@ -235,7 +235,6 @@ static void sauto(uint8_t *y, float *x, int w, int h, float p)
 
 
 
-// SECTION 4. Drawing                                                       {{{1
 
 
 
@@ -331,10 +330,31 @@ static void paint_state(struct FTR *f)
 //static void shift_shift_z(struct viewer_state *e, float s) { e->z0 += s; }
 
 static void shift_random_seed(struct viewer_state *e, float s) { e->d += s; }
+static void shift_param_b(struct viewer_state *e, float s)
+{
+	e->b += s;
+	e->b = fmin(e->b, 1);
+	e->b = fmax(e->b, -1);
+}
+static void shift_param_a(struct viewer_state *e, float s)
+{
+	float C = 20;
+	float x = -(C-2) + (2*C-2)/e->a;
+	x += s;
+	x = fmax(x, 1);
+	e->a = (2*C-2)/(C-2 + x);
+}
+static void shift_param_k(struct viewer_state *e, float s)
+{
+	e->k += s;
+	if (e->k < 0) e->k = 0;
+	if (e->k >= NUM_KERNELS) e->k = NUM_KERNELS - 1;
+}
 //static void shift_num_laplacians(struct viewer_state *e, int s) { e->l += s; }
 //static void shift_mask_radius(struct viewer_state *e, int s) { e->r += s; }
 //static void shift_quantization_q(struct viewer_state *e, int s) { e->q += s; }
 //static void scale_gaussian_grain(struct viewer_state *e, float f) { e->g *= f; }
+static void scale_param_s(struct viewer_state *e, float f) { e->s *= f; }
 //static void scale_saturation_p(struct viewer_state *e, float f) { e->p *= f; }
 //static void scale_saturation_z(struct viewer_state *e, float f) { e->z *= f; }
 //static void scale_fractional_a(struct viewer_state *e, float f) { e->a *= f; }
@@ -414,9 +434,12 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	if (k == FTR_BUTTON_DOWN)
 	{
 		if (Y == 0) shift_random_seed(e, -1);
+		if (Y == 1) shift_param_a(e, -1);
+		if (Y == 2) shift_param_b(e, -0.1);
+		if (Y == 3) shift_param_k(e, -1);
+		if (Y == 4) scale_param_s(e, 1/1.3);
 //		if (Y == 1) scale_gaussian_grain(e, 1/1.3);
 //		if (Y == 2) shift_num_laplacians(e, -1);
-//		if (Y == 3) shift_shift(e, 0, (X-20)/4, -1);
 //		if (Y == 4) shift_shift(e, 1, (X-20)/4, -1);
 //		if (Y == 5) scale_saturation_p(e, 1/1.3);
 //		if (Y == 6) shift_quantization_q(e, -1);
@@ -427,6 +450,10 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	if (k == FTR_BUTTON_UP)
 	{
 		if (Y == 0) shift_random_seed(e, 1);
+		if (Y == 1) shift_param_a(e, 1);
+		if (Y == 2) shift_param_b(e, 0.1);
+		if (Y == 3) shift_param_k(e, 1);
+		if (Y == 4) scale_param_s(e, 1.3);
 //		if (Y == 1) scale_gaussian_grain(e, 1.3);
 //		if (Y == 2) shift_num_laplacians(e, 1);
 //		if (Y == 3) shift_shift(e, 0, (X-20)/4, 1);
