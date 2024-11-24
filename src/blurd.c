@@ -311,9 +311,9 @@ static double kernel_2d_riesz(double x, double y, double *p)
 {
 	double sigma = p[1];
 
-	double n = hypot(x, y);
-	double a = pow(hypot(x, y), sigma);
-	double r = n ? pow(n, -sigma) : 1;
+	float n = hypot(x, y);
+	float a = pow(hypot(x, y), sigma);
+	float r = n ? pow(n, sigma-2) : 1;
 	return r;
 }
 

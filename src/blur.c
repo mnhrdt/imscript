@@ -313,7 +313,7 @@ static float kernel_2d_riesz(float x, float y, float *p)
 
 	float n = hypot(x, y);
 	float a = pow(hypot(x, y), sigma);
-	float r = n ? pow(n, -sigma) : 1;
+	float r = n ? pow(n, sigma-2) : 1;
 	return r;
 }
 
