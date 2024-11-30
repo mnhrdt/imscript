@@ -22,7 +22,8 @@ N4. global variables have long and uppercase names
 N5. do not bring new mixed-case symbols into the world
 N6. either your file is executable or its name ends in .py, but not both
 N7. arguments cannot have the same name as values:  avoid "f(x=x)"
-N8. functions cannot have the same name as modules: avoid "from foo import foo"
+N8. functions cannot have the same name as modules: avoid "foo.foo"
+N9. functions cannot have the same name as modules: avoid "from foo import foo"
 
 
 FORMATTING
@@ -53,9 +54,10 @@ C5. do not put any licensing/copyright boilerplate at the top of the file
 IMPORTING
 
 I1. strive to minimize the number of imports
-I2. imports should be as local as possible (e.g., inside a function)
-I3. unless your script has code at level 0, global imports are prohibited
-I4. Comparison of importing styles:
+I2. consider unused imports syntax errors
+I3. imports should be as local as possible (e.g., inside a function)
+I4. unless your script has code at level 0, global imports are prohibited
+I5. Comparison of importing styles:
     BAD: import package as pk         # your code becomes un-copypasteable
     GOOD: import package              # code is clear (but may be too verbose)
     BEST: from package import fu bar  # useful for short and function-heavy code
@@ -64,9 +66,10 @@ I4. Comparison of importing styles:
 EXPORTING
 
 E1. do not export visibility of dependencies
-E2. do not export visubility of unnecessary functions
+E2. do not export visibility of unnecessary functions
 E3. each exported function must have a comprehensive docstring
-E4. use sys.modules[__name__] = foo to avoid foo.foo stupidity
+E4. consider un-documented exported functions syntax errors
+E5. use sys.modules[__name__] = foo to avoid foo.foo stupidity
 
 
 USAGE
@@ -76,20 +79,22 @@ U2. avoid os.path.join, use string processing instead
 U3. in numpy, never use .dot, use always @
 U4. use matplotlib for plots, but do not EVER use it for displaying an image
 U5. tkinter is there, and is useful, and is simple; do not be afraid of it
-U6. represent graphs as sparse matrices, not as dictionaries^2
+U6. represent graphs as sparse matrices, not as dictionaries
+U7. avoid json, toml, yaml and all that shit: use text files and parse them
 
 
 SHELL ENVIRONEMENT
 
 S1. rm -rf ~/.local ; touch ~/.local ; chmod 000 ~/.local # once and for all
 S2. mkdir -p ~/local/{bin,share/python,dotlocal}
-S3. export PATH=~/local/bin:~/local/share/python/bin:$PATH
+S3. export PATH=~/local/bin:~/local/share/python/bin:/bin
 S4. export PYTHONDONTWRITEBYTECODE=1
 S5. export PYTHONUSERBASE=~/local/share/python
 S6. export XDG_DATA_HOME=~/local/share/dotlocal
-S7. pip install shit  # only affects your local user
-S8. delete $PYTHONUSERBASE regularly and re-install packages as the need arises
-S9. do not use virtualenvs
+S7. python -m pip config set global.break-system-packages true # allow local pip
+S8. pip install shit  # only affects your local user
+S9. delete $PYTHONUSERBASE regularly and re-install packages as the need arises
+S10. do not use virtualenvs
 
 
 MATH
@@ -119,7 +124,7 @@ P1. your program should be easily usable without need to "install" it
 P2. ideal case: "wget url://to/myprogram.py ; python myprogram.py"
 P3. do not force installation of non-essential dependencies.  If your program
     requires a dependency just for a small, optional feature, allow to install
-    it and fail at runtime when the dependency is found missing.
+    it and let it fail at runtime if the dependency is found missing.
 P4. pip sucks; but conda, uv, poetry are orders of magnitude worse: avoid them!
 P5. jupyter notebooks are great for literate programming, but the .ipynb file
     format is horrific.  Use jupytext to distribute your notebooks as plain
