@@ -23,7 +23,7 @@ N1. all local variables are single letters (like in the rest of mathematics)
     - exception: greek letters like "alpha", "beta" (gcc does not yet grok UTF8)
     - exception: variations of a single letter like "x_in", "x_out"
 N2. all global variables are self-documenting and have the form "global_*"
-N3. all the symbols exposed by a translation unit share a prefix ending in _
+N3. all symbols exposed by foo.o have the form foo_*
 N4. exposed function names are long, self-documenting and lowercase
 N5. static functions may have shorter names and, if short enough, be uppercase
 N6. struct tags are lowercase
@@ -40,6 +40,7 @@ F2. functions have at most 20 or 25 lines, unless they have some symmetry
 F3. no declaration without initialization
     - exception: when the initialization is via a reference on the next line
 F4. max about 7 variables in scope at the same time
+F5. use spaces in the very rare cases where you need to align things
 
 
 
@@ -335,7 +336,9 @@ dilike taking references and prefer acessing struct fields by "->" instead of
 		for (int i = 0; i < g->m; i++)
 		{
 			int *e = g->e + 2*i; // ith edge
-			g->w[i] = compute_weight(g->v[e[0]], g->v[e[1]]);
+			int a = e[0];        // source vertex
+			int b = e[1];        // destination vertex
+			g->w[i] = compute_weight(g->v[a], g->v[b]);
 		}
 	}
 
