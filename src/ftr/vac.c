@@ -175,7 +175,7 @@ static void getpercentiles(float *m, float *M, float *x, int n, float q)
 	qsort(t, N, sizeof*t, compare_floats);
 	int a = (q/100)*N;
 	int b = (1-q/100)*N;
-	fprintf(stderr, "getperc n=%d N=%d q=%g [a=%d b=%d]\n", n, N, q, a, b);
+	//fprintf(stderr, "getperc n=%d N=%d q=%g [a=%d b=%d]\n", n, N, q, a,b);
 	if (a < 0) a = 0;
 	if (b < 0) b = 0;
 	if (a >= N) a = N-1;
