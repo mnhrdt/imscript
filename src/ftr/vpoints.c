@@ -129,6 +129,54 @@ static void map_window_to_view(struct viewer_state *e, float y[2], float x[2])
 		y[k] = ( x[k] - e->offset[k] ) / e->scale;
 }
 
+// funtion to test whether a point is inside the window
+static int insideP(struct FTR *f, int x, int y)
+{
+	return x >= 0 && y >= 0 && x < f->w && y < f->h;
+}
+
+
+// generic function to traverse a segment between two pixels
+void traverse_segment(int px, int py, int qx, int qy,
+		void (*f)(int,int,void*), void *e)
+{
+	if (px == qx && py == qy)
+		f(px, py, e);
+	else if (qx + qy < px + py) // bad quadrants
+		traverse_segment(qx, qy, px, py, f, e);
+	else {
+		if (qx - px > qy - py || px - qx > qy - py) { // horizontal
+			float slope = (qy - py)/(float)(qx - px);
+			for (int i = 0; i < qx-px; i++)
+				f(i+px, lrint(py + i*slope), e);
+		} else { // vertical
+			float slope = (qx - px)/(float)(qy - py);
+			for (int j = 0; j <= qy-py; j++)
+				f(lrint(px + j*slope), j+py, e);
+		}
+	}
+}
+
+// auxiliary function for drawing a black pixel
+static void plot_pixel_black(int x, int y, void *e)
+{
+	struct FTR *f = e;
+	if (insideP(f, x, y)) {
+		int idx = f->w * y + x;
+		f->rgb[3*idx+0] = 0;
+		f->rgb[3*idx+1] = 0;
+		f->rgb[3*idx+2] = 0;
+	}
+}
+
+
+// function to draw a black segment
+static void plot_segment_black(struct FTR *f,
+		float x0, float y0, float xf, float yf)
+{
+	traverse_segment(x0, y0, xf, yf, plot_pixel_black, f);
+}
+
 
 // Subsection 7.2. Drawing user-interface elements                          {{{2
 //
@@ -206,6 +254,11 @@ static void paint_state(struct FTR *f)
 		float ij[2];
 		map_view_to_window(e, ij, P);
 		splat_disk(f->rgb, f->w, f->h, ij, 2*e->point_radius, black);
+
+
+		float Z[2] = {0, 0}, z[2];
+		map_view_to_window(e, z, Z);
+		plot_segment_black(f, z[0], z[1], ij[0], ij[1]);
 	}
 
 
