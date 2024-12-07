@@ -51,6 +51,12 @@ struct viewer_state {
 	float *p; // first projection direction
 	float *q; // second projection direction
 
+	// interaction state
+	int frozen_pq;
+	int click_situation;
+	int click_index;
+	float click_other[2];
+
 	// ui
 	int show_basis;
 	float point_radius;
@@ -74,6 +80,9 @@ static void center_state(struct viewer_state *e)
 
 	e->show_basis = 1;
 	e->point_radius = 2.3;
+
+	e->click_situation = 0;
+	e->frozen_pq = 0;
 }
 
 static void center_view(struct FTR *f)
@@ -96,23 +105,28 @@ static float sprod(float *x, float *y, int d)
 	return d?*x**y+sprod(x+1,y+1,d-1):0;
 }
 
+static void fix_pq(float *p, float *q, int d)
+{
+	float np = vnorm(p, d);
+	for (int i = 0; i < d; i++) p[i] /= np;
+	float pq = sprod(p, q, d);
+	for (int i = 0; i < d; i++) q[i] -= pq * p[i];
+	float nq = vnorm(q, d);
+	for (int i = 0; i < d; i++) q[i] /= nq;
+	np = vnorm(p, d);
+	nq = vnorm(q, d);
+	pq = sprod(p, q, d);
+	assert(fabs(np - 1) < 0.00001);
+	assert(fabs(nq - 1) < 0.00001);
+	assert(fabs(pq - 0) < 0.00001);
+}
+
 static void create_random_directions(struct viewer_state *e)
 {
 	xsrand(e->r);
 	for (int i = 0; i < e->d; i++) e->p[i] = random_normal();
 	for (int i = 0; i < e->d; i++) e->q[i] = random_normal();
-	float np = vnorm(e->p, e->d);
-	for (int i = 0; i < e->d; i++) e->p[i] /= np;
-	float pq = sprod(e->p, e->q, e->d);
-	for (int i = 0; i < e->d; i++) e->q[i] -= pq * e->p[i];
-	float nq = vnorm(e->q, e->d);
-	for (int i = 0; i < e->d; i++) e->q[i] /= nq;
-	np = vnorm(e->p, e->d);
-	nq = vnorm(e->q, e->d);
-	pq = sprod(e->p, e->q, e->d);
-	assert(fabs(np - 1) < 0.00001);
-	assert(fabs(nq - 1) < 0.00001);
-	assert(fabs(pq - 0) < 0.00001);
+	fix_pq(e->p, e->q, e->d);
 }
 
 // change from plane coordinates to window coordinates
@@ -127,6 +141,33 @@ static void map_window_to_view(struct viewer_state *e, float y[2], float x[2])
 {
 	for (int k = 0; k < 2; k++)
 		y[k] = ( x[k] - e->offset[k] ) / e->scale;
+}
+
+
+// trackball motion (in R3 by now)
+static void perform_the_trackballing(struct viewer_state *e)
+{
+	assert(e->click_situation == 1);
+	//assert(e->d == 3);
+
+	int k = e->click_index;
+	float *p = e->p;
+	float *q = e->q;
+	float from[2] = { p[k], q[k] };
+	float to[2];
+	map_window_to_view(e, to, e->click_other);
+	fprintf(stderr, "trackball k=%d (%g %g) -> (%g %g)\n",
+			k, from[0], from[1], to[0], to[1]);
+
+	p[k] = to[0];
+	q[k] = to[1];
+	if (e->d == 3)
+		fprintf(stderr, "pq before (%g %g %g) (%g %g %g)\n",
+			p[0], p[1], p[2], p[0], p[1], p[2]);
+	fix_pq(p, q, e->d);
+	if (e->d == 3)
+		fprintf(stderr, "pq after  (%g %g %g) (%g %g %g)\n",
+			p[0], p[1], p[2], p[0], p[1], p[2]);
 }
 
 // funtion to test whether a point is inside the window
@@ -178,8 +219,6 @@ static void plot_segment_black(struct FTR *f,
 }
 
 
-// Subsection 7.2. Drawing user-interface elements                          {{{2
-//
 static void splat_disk(uint8_t *rgb, int w, int h, float p[2], float r,
 		uint8_t color[3])
 {
@@ -214,7 +253,8 @@ static void paint_state(struct FTR *f)
 	for (int i = 0 ; i < 3 * f->w * f->h; i++)
 		f->rgb[i] = 255;
 
-	create_random_directions(e);
+	if (!e->frozen_pq)
+		create_random_directions(e);
 
 	// draw unit sphere in light gray
 	uint8_t gray[3] = {200, 200, 200};
@@ -287,17 +327,20 @@ static void paint_state(struct FTR *f)
 	//free(x); free(vx);
 
 
-	//// hud
-	////uint8_t fg[3] = {0, 0, 0};
+	// hud
+	uint8_t fg[3] = {0, 0, 0};
 	////uint8_t bg[3] = {127, 127, 127};
 	//uint8_t fg[3] = {0, 255, 0};
 	////uint8_t bg[3] = {100, 100, 100};
 	//uint8_t bg[3] = {0, 0, 0};
 	////uint8_t fg[3] = {255, 0, 255};
-	////uint8_t *bg = 0;
-	//char buf[0x200];
-	//snprintf(buf, 0x200,
-	//		"d (random seed) = %d\n"
+	uint8_t *bg = 0;
+	char buf[0x200];
+	snprintf(buf, 0x200,
+			"r (random seed) = %d\n"
+			,
+			e->r
+		);
 	//		"a (stability)   = %g\n"
 	//		"b (skewness)    = %g\n"
 	//		"k (kernel)      = %s\n"
@@ -307,8 +350,8 @@ static void paint_state(struct FTR *f)
 	//		e->d, e->a, e->b,
 	//		global_kernel_names[e->k],
 	//		e->s, e->p, e->r);
-	//put_string_in_rgb_image(f->rgb, f->w, f->h,
-	//		0+0, 0+0, fg, bg, 0, e->font, buf);
+	put_string_in_rgb_image(f->rgb, f->w, f->h,
+			0+5, 0+0, fg, bg, 0, e->font, buf);
 }
 
 
@@ -334,7 +377,11 @@ static void paint_state(struct FTR *f)
 //static void shift_shift_s(struct viewer_state *e, float s) { e->s += s; }
 //static void shift_shift_z(struct viewer_state *e, float s) { e->z0 += s; }
 
-static void shift_random_seed(struct viewer_state *e, float s) { e->r += s; }
+static void shift_random_seed(struct viewer_state *e, float s)
+{
+	e->frozen_pq = 0;
+	e->r += s;
+}
 //static void shift_param_b(struct viewer_state *e, float s)
 //{
 //	e->b += s;
@@ -394,6 +441,19 @@ static void action_screenshot(struct FTR *f)
 	iio_write_image_uint8_vec(n, f->rgb, f->w, f->h, 3);
 	fprintf(stderr, "wrote sreenshot on file \"%s\"\n", n);
 	c += 1;
+}
+
+// test whether (x,y) hits some point
+static int hit_basis_vector(struct viewer_state *e, float x, float y)
+{
+	for (int k = 0; k < e->d; k++)
+	{
+		float P[2] = {e->p[k], e->q[k]}, Q[2];
+		map_view_to_window(e, Q, P);
+		if (hypot(Q[0] - x, Q[1] - y) < 6)
+			return k;
+	}
+	return -1;
 }
 
 
@@ -482,6 +542,29 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 //		if (Y == 7) scale_fractional_a(e, 1.1);
 //		if (Y == 8) shift_mask_radius(e, 1);
 //		if (Y == 9) scale_saturation_z(e, 1.3);
+	}
+
+
+	if (k == FTR_BUTTON_LEFT)
+	{
+		int p = hit_basis_vector(e, x, y);
+
+		if (p >= 0 && e->click_situation == 0)
+		{
+			fprintf(stderr, "hit e_%d at (%d %d)\n", p, x, y);
+			e->click_index = p;
+			e->click_situation = 1;
+			e->frozen_pq = 1;
+		}
+		else if (e->click_situation == 1)
+		{
+			fprintf(stderr, "other at (%d %d)\n", x, y);
+			e->click_other[0] = x;
+			e->click_other[1] = y;
+			perform_the_trackballing(e);
+			e->click_situation = 0;
+		}
+
 	}
 
 	f->changed = 1;
@@ -618,8 +701,8 @@ int main_vpoints(int c, char *v[])
 
 
 	// init fonts
-	//e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
-	e->font[0] = reformat_font(*xfont_8x13, UNPACKED);
+	e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
+	//e->font[0] = reformat_font(*xfont_8x13, UNPACKED);
 	//e->font[0] = reformat_font(*xfont_7x13, UNPACKED);
 
 	// open the window
