@@ -53,7 +53,8 @@ struct viewer_state {
 
 	// interaction state
 	int frozen_pq;
-	int click_situation;
+	//int click_situation;
+	int dragging_state;
 	int click_index;
 	float click_other[2];
 
@@ -81,7 +82,8 @@ static void center_state(struct viewer_state *e)
 	e->show_basis = 1;
 	e->point_radius = 2.3;
 
-	e->click_situation = 0;
+	//e->click_situation = 0;
+	e->dragging_state = 0;
 	e->frozen_pq = 0;
 }
 
@@ -147,7 +149,8 @@ static void map_window_to_view(struct viewer_state *e, float y[2], float x[2])
 // trackball motion (in R3 by now)
 static void perform_the_trackballing(struct viewer_state *e)
 {
-	assert(e->click_situation == 1);
+	assert(e->dragging_state);
+	//assert(e->click_situation == 1);
 	//assert(e->d == 3);
 
 	int k = e->click_index;
@@ -501,6 +504,7 @@ static void event_resize(struct FTR *f, int k, int m, int x, int y)
 static void event_button(struct FTR *f, int k, int m, int x, int y)
 {
 	struct viewer_state *e = f->userdata;
+	fprintf(stderr, "but k=%d m=%d xy=%d %d\n", k, m, x, y);
 
 	// d, g, l, b, c, R, s hitboxes of font height
 	// 0  1  2  3  4  5  6
@@ -549,22 +553,30 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	{
 		int p = hit_basis_vector(e, x, y);
 
-		if (p >= 0 && e->click_situation == 0)
+		//if (p >= 0 && e->click_situation == 0)
+		if (p >= 0 && e->dragging_state == 0)
 		{
 			fprintf(stderr, "hit e_%d at (%d %d)\n", p, x, y);
 			e->click_index = p;
-			e->click_situation = 1;
+			//e->click_situation = 1;
+			e->dragging_state = 1;
 			e->frozen_pq = 1;
 		}
-		else if (e->click_situation == 1)
-		{
-			fprintf(stderr, "other at (%d %d)\n", x, y);
-			e->click_other[0] = x;
-			e->click_other[1] = y;
-			perform_the_trackballing(e);
-			e->click_situation = 0;
-		}
+		//else if (e->click_situation == 1)
+		//{
+		//	fprintf(stderr, "other at (%d %d)\n", x, y);
+		//	e->click_other[0] = x;
+		//	e->click_other[1] = y;
+		//	perform_the_trackballing(e);
+		//	e->click_situation = 0;
+		//}
 
+	}
+
+	// release basis drag
+	if (e->dragging_state && k == -FTR_BUTTON_LEFT)
+	{
+		e->dragging_state = 0;
 	}
 
 	f->changed = 1;
@@ -573,7 +585,15 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 // mouse motion handler
 static void event_motion(struct FTR *f, int b, int m, int x, int y)
 {
-	;
+	struct viewer_state *e = f->userdata;
+
+	if (e->dragging_state && m&FTR_BUTTON_LEFT)
+	{
+		e->click_other[0] = x;
+		e->click_other[1] = y;
+		perform_the_trackballing(e);
+		f->changed = 1;
+	}
 }
 
 // expose handler
