@@ -1,5 +1,12 @@
 // vpoints: visualize a D-dimensional set of N points
 
+// TODO:
+// * avoid gimbal locks in the trackball (ok by now, but still)
+// * show pca coordinates besides the canonical basis
+// * allow to align a rotation with the p,q axes
+// * allow to "jitter" the given p,q to separate axes a bit
+// * colorize/scale dots according to other data (e.g., distance)
+
 
 // SECTION 1. Libraries and data structures                                 {{{1
 

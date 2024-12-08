@@ -1,5 +1,22 @@
 // various operations with point clouds (generation, filtering)
 
+// TODO: complete with more n-dimensional configurations
+// * uniform points on the surface of a sphere
+// * uniform points on the interior of a sphere (hard!)
+// * apply a random element of SO(d)
+// * apply a random element of SL(d)
+// * apply a random element of GL(d)
+// * U*Σ with prescribed diagnonal of Σ
+// * N points uniformly _spaced_ on the edges of
+//   - the d-simplex
+//   - the d-hypercube
+//   - the d-cross-polytope
+//   - the coordinate axes
+//
+// * Possible in-band notation for "edges": a NAN point means that the next 2
+// points are an edge.  A point of the form (NAN, k, ...), means that the next
+// k points form a k-simplex.
+
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
