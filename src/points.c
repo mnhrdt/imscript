@@ -143,6 +143,62 @@ static void build_centered_axes(struct wireframe *w, int d)
 	}
 }
 
+// build a d-1 dimensional simplex at the tips of the d-canonical basis
+static void build_simplex(struct wireframe *w, int d)
+{
+	w->d = d;              // dimension
+	w->n = d;              // one point per dimension
+	w->m = d * (d - 1)/2;  // one edge for each pair of dimensions
+	w->x = xmalloc(w->n * d * sizeof*w->x);
+	w->e = xmalloc(w->m * 2 * sizeof*w->e);
+	for (int i = 0; i < w->n * d; i++) // zero everything
+		w->x[i] = 0;
+	for (int j = 0; j < d; j++)        // jth component of x_j is 1
+		w->x[d*j + j] = 1;
+	int e = 0;
+	for (int j = 0; j < d; j++)        // edges form a complete graph
+	for (int i = 0; i < j; i++)
+	{
+		w->e[2*e+0] = i;
+		w->e[2*e+1] = j;
+		e += 1;
+	}
+	assert(e == w->m);
+}
+
+static float vdist(float *x, float *y, int d)
+{
+	return d?hypot(*x-*y,vdist(x+1,y+1,d-1)):0;
+}
+
+// build a d-dimensional cross-polytope
+static void build_orthoplex(struct wireframe *w, int d)
+{
+	w->d = d;              // dimension
+	w->n = 2*d;            // two points per axis
+	w->m = pow(2,d+2)*d*(d-1);        // ...
+	w->x = xmalloc(w->n * d * sizeof*w->x);
+	w->e = xmalloc(w->m * 2 * sizeof*w->e);
+	for (int i = 0; i < w->n * d; i++)  // zero all
+		w->x[i] = 0;
+	for (int j = 0; j < d; j++)
+	{
+		w->x[d*(2*j+0) + j] = 1;
+		w->x[d*(2*j+1) + j] = -1;
+	}
+	int e = 0;
+	for (int j = 0; j < 2*d; j++)
+	for (int i = 0; i < 2*d; i++)
+	if (i != j && vdist(w->x + d*i, w->x +d*j, d) < 1.9999)
+	{
+		w->e[2*e+0] = i;
+		w->e[2*e+1] = j;
+		e += 1;
+	}
+	assert(e <= w->m);
+	w->m = e;
+}
+
 // TODO: add builders for all regular polytopes in dimensions 4 and above
 
 static void print_points(float *x, int n, int d)
@@ -264,8 +320,10 @@ int main_polytope(int c, char *v[])
 
 	struct wireframe p[1];
 	//build_positive_axes(p, d);
-	build_centered_axes(p, d);
-	//fprint_wireframe(stderr, p);
+	//build_centered_axes(p, d);
+	//build_simplex(p, d);
+	build_orthoplex(p, d);
+	fprint_wireframe(stderr, p);
 	unwireframize(p, s);
 	print_points(p->x, p->n, d);
 
