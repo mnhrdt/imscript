@@ -323,7 +323,7 @@ int main_polytope(int c, char *v[])
 	//build_centered_axes(p, d);
 	//build_simplex(p, d);
 	build_orthoplex(p, d);
-	fprint_wireframe(stderr, p);
+	//fprint_wireframe(stderr, p);
 	unwireframize(p, s);
 	print_points(p->x, p->n, d);
 
