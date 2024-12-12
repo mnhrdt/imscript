@@ -199,6 +199,50 @@ static void build_orthoplex(struct wireframe *w, int d)
 	w->m = e;
 }
 
+// build a d-dimensional hypercube (recursive constructor from a zero-ed array)
+static void fill_hypercube_rec(struct wireframe *w, int k)
+{
+	fprintf(stderr, "fhr k=%d\n", k);
+	if (k == 0) // just initialize the counters
+	{
+		w->n = 1;
+		w->m = 0;
+	} else {
+		fprintf(stderr, "\t case fhr k=%d\n", k);
+
+		// build lower-dim hypercube
+		fill_hypercube_rec(w, k - 1);
+		fprintf(stderr, "\t got w->n=%d\n", w->n);
+
+		// duplicate (k-1)-dimensional vertices with e_k = 1
+		for (int i = 0; i < w->n; i++)
+		{
+			fprintf(stderr, "\t\tloop k=%d i=%d\n", k, i);
+			float *v = w->x   +   (w->n + i) * w->d;
+			for (int j = 0; j < k-1; j++)
+			{
+				v[j] = w->x[i*w->d + j];
+				fprintf(stderr, "\t\t\ti=%d j=%d wx[i*(k-1)+j]=%g\n", i, j, w->x[i*w->d+j]);
+			}
+			v[k-1] = 1;
+		}
+		w->n *= 2;
+	}
+}
+
+// build a d-dimensional hypercube (external interface)
+static void build_hypercube(struct wireframe *w, int d)
+{
+	int n = pow(2, d);
+	int m = pow(2, d-1) * d;
+	fprintf(stderr, "d=%d n=%d m=%d\n", d, n, m);
+	w->x = xmalloc(n * d * sizeof*w->x);
+	w->e = xmalloc(m * 2 * sizeof*w->e);
+	for (int i = 0; i < n*d; i++)
+		w->x[i] = 0;
+	fill_hypercube_rec(w, d);
+}
+
 // TODO: add builders for all regular polytopes in dimensions 4 and above
 
 static void print_points(float *x, int n, int d)
@@ -322,7 +366,8 @@ int main_polytope(int c, char *v[])
 	//build_positive_axes(p, d);
 	//build_centered_axes(p, d);
 	//build_simplex(p, d);
-	build_orthoplex(p, d);
+	//build_orthoplex(p, d);
+	build_hypercube(p, d);
 	fprint_wireframe(stderr, p);
 	unwireframize(p, s);
 	print_points(p->x, p->n, d);
