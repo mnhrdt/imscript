@@ -166,18 +166,18 @@ static void perform_the_trackballing(struct viewer_state *e)
 	float from[2] = { p[k], q[k] };
 	float to[2];
 	map_window_to_view(e, to, e->click_other);
-	fprintf(stderr, "trackball k=%d (%g %g) -> (%g %g)\n",
-			k, from[0], from[1], to[0], to[1]);
+	//fprintf(stderr, "trackball k=%d (%g %g) -> (%g %g)\n",
+	//		k, from[0], from[1], to[0], to[1]);
 
 	p[k] = to[0];
 	q[k] = to[1];
-	if (e->d == 3)
-		fprintf(stderr, "pq before (%g %g %g) (%g %g %g)\n",
-			p[0], p[1], p[2], p[0], p[1], p[2]);
+	//if (e->d == 3)
+	//	fprintf(stderr, "pq before (%g %g %g) (%g %g %g)\n",
+	//		p[0], p[1], p[2], p[0], p[1], p[2]);
 	fix_pq(p, q, e->d);
-	if (e->d == 3)
-		fprintf(stderr, "pq after  (%g %g %g) (%g %g %g)\n",
-			p[0], p[1], p[2], p[0], p[1], p[2]);
+	//if (e->d == 3)
+	//	fprintf(stderr, "pq after  (%g %g %g) (%g %g %g)\n",
+	//		p[0], p[1], p[2], p[0], p[1], p[2]);
 }
 
 // funtion to test whether a point is inside the window
@@ -511,7 +511,7 @@ static void event_resize(struct FTR *f, int k, int m, int x, int y)
 static void event_button(struct FTR *f, int k, int m, int x, int y)
 {
 	struct viewer_state *e = f->userdata;
-	fprintf(stderr, "but k=%d m=%d xy=%d %d\n", k, m, x, y);
+	//fprintf(stderr, "but k=%d m=%d xy=%d %d\n", k, m, x, y);
 
 	// d, g, l, b, c, R, s hitboxes of font height
 	// 0  1  2  3  4  5  6
@@ -563,7 +563,7 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		//if (p >= 0 && e->click_situation == 0)
 		if (p >= 0 && e->dragging_state == 0)
 		{
-			fprintf(stderr, "hit e_%d at (%d %d)\n", p, x, y);
+			//fprintf(stderr, "hit e_%d at (%d %d)\n", p, x, y);
 			e->click_index = p;
 			//e->click_situation = 1;
 			e->dragging_state = 1;
