@@ -202,37 +202,50 @@ static void build_orthoplex(struct wireframe *w, int d)
 // build a d-dimensional hypercube (recursive constructor from a zero-ed array)
 static void fill_hypercube_rec(struct wireframe *w, int k)
 {
-	fprintf(stderr, "fhr k=%d\n", k);
 	if (k == 0) // just initialize the counters
 	{
 		w->n = 1;
 		w->m = 0;
 	} else {
-		fprintf(stderr, "\t case fhr k=%d\n", k);
 
 		// build lower-dim hypercube
 		fill_hypercube_rec(w, k - 1);
-		fprintf(stderr, "\t got w->n=%d\n", w->n);
 
 		// duplicate (k-1)-dimensional vertices with e_k = 1
 		for (int i = 0; i < w->n; i++)
 		{
-			fprintf(stderr, "\t\tloop k=%d i=%d\n", k, i);
 			float *v = w->x   +   (w->n + i) * w->d;
 			for (int j = 0; j < k-1; j++)
-			{
 				v[j] = w->x[i*w->d + j];
-				fprintf(stderr, "\t\t\ti=%d j=%d wx[i*(k-1)+j]=%g\n", i, j, w->x[i*w->d+j]);
-			}
 			v[k-1] = 1;
 		}
 		w->n *= 2;
+
+		// duplicate all the previous edges
+		int o = w->n / 2;  // offset of the vertex indices
+		int O = w->m;      // offset of the edge indices
+		for (int i = 0; i < w->m; i++)
+		{
+			w->e[2*(i+O)+0] = w->e[2*i+0] + o;
+			w->e[2*(i+O)+1] = w->e[2*i+1] + o;
+		}
+		w->m *= 2;
+
+		// connect new vertex pairs
+		for (int i = 0; i < o; i++)
+		{
+			int *e = w->e + 2*w->m++;
+			e[0] = i;
+			e[1] = i + o;
+		}
+
 	}
 }
 
 // build a d-dimensional hypercube (external interface)
 static void build_hypercube(struct wireframe *w, int d)
 {
+	w->d = d;
 	int n = pow(2, d);
 	int m = pow(2, d-1) * d;
 	fprintf(stderr, "d=%d n=%d m=%d\n", d, n, m);
@@ -368,7 +381,7 @@ int main_polytope(int c, char *v[])
 	//build_simplex(p, d);
 	//build_orthoplex(p, d);
 	build_hypercube(p, d);
-	fprint_wireframe(stderr, p);
+	//fprint_wireframe(stderr, p);
 	unwireframize(p, s);
 	print_points(p->x, p->n, d);
 
