@@ -3,6 +3,7 @@
 // TODO:
 // * avoid gimbal locks in the trackball (ok by now, but still)
 // * show pca coordinates besides the canonical basis
+// * number or color the first few coordinates
 // * allow to align a rotation with the p,q axes
 // * allow to "jitter" the given p,q to separate axes a bit
 // * colorize/scale dots according to other data (e.g., distance)
@@ -297,13 +298,20 @@ static void paint_state(struct FTR *f)
 
 	// draw the canonical basis in black
 	uint8_t black[3] = {0, 0, 0};
+	uint8_t pink[3] = {255, 0, 255};
+	uint8_t green[3] = {0, 200, 0};
+	uint8_t blue[3] = {50, 50, 255};
 	for (int i = 0; i < e->d; i++)
 	{
 		float P[2] = { e->p[i], e->q[i]} ;
 
 		float ij[2];
 		map_view_to_window(e, ij, P);
-		splat_disk(f->rgb, f->w, f->h, ij, 2*e->point_radius, black);
+		uint8_t *color = black;
+		if (i == 0) color = pink;
+		if (i == 1) color = green;
+		if (i == 2) color = blue;
+		splat_disk(f->rgb, f->w, f->h, ij, 2*e->point_radius, color);
 
 
 		float Z[2] = {0, 0}, z[2];
