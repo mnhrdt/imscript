@@ -449,6 +449,19 @@ static void shift_random_seed(struct viewer_state *e, float s)
 //	e->s[p][q] += f*s;
 //}
 
+static void action_jitter(struct FTR *f)
+{
+	struct viewer_state *e = f->userdata;
+
+	float σ = 0.01;
+	for (int i = 0; i < e->d; i++) e->p[i] += σ * random_normal();
+	for (int i = 0; i < e->d; i++) e->q[i] += σ * random_normal();
+	fix_pq(e->p, e->q, e->d);
+
+	e->frozen_pq = 1;
+	f->changed = 1;
+}
+
 static void action_screenshot(struct FTR *f)
 {
 	static int c = 0;
@@ -460,6 +473,8 @@ static void action_screenshot(struct FTR *f)
 	fprintf(stderr, "wrote sreenshot on file \"%s\"\n", n);
 	c += 1;
 }
+
+
 
 // test whether (x,y) hits some point
 static int hit_basis_vector(struct viewer_state *e, float x, float y)
@@ -490,6 +505,7 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	struct viewer_state *e = f->userdata;
 
 	if (k == 'z') center_view(f);
+	if (k == 'j') action_jitter(f);
 //	if (k == 'f') scale_strata_frequency(e, 1.3);
 //	if (k == 'F') scale_strata_frequency(e, 1/1.3);
 //	if (k == 'p') scale_fold_parameter(e, 1.3);
