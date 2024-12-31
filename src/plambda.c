@@ -3011,6 +3011,13 @@ static void add_hidden_variables(char *out, int maxplen, int newvars, char *in)
 
 SMART_PARAMETER_SILENT(SRAND,0)
 
+static void setup_random_seed_from_env_SRAND()
+{
+	float s = SRAND();
+	xsrand(100 + s - 17*s*s);
+	//if (SRAND()) fprintf(stderr, "plambda SRAND=%g\n", SRAND());
+}
+
 static int main_calc(int c, char **v)
 {
 	if (c < 2) {
@@ -3040,8 +3047,7 @@ static int main_calc(int c, char **v)
 		fprintf(stderr, "calculator correspondence \"%s\" = \"%s\"\n",
 				p->var->t[i], v[i+1]);
 
-	xsrand(100+SRAND());
-	//if (SRAND()) fprintf(stderr, "plambda SRAND=%g\n", SRAND());
+	setup_random_seed_from_env_SRAND();
 
 	float out[pdmax];
 	int od = run_program_vectorially_at(out, p, x, NULL, NULL, pd, 0, 0);
@@ -3127,7 +3133,7 @@ static int main_images(int c, char **v)
 		fprintf(stderr, "plambda correspondence \"%s\" = \"%s\"\n",
 				p->var->t[i], v[i+1]);
 
-	xsrand(100+SRAND());
+	setup_random_seed_from_env_SRAND();
 	if (verbose) fprintf(stderr, "SRAND=%g\n", SRAND());
 
 	////print_compiled_program(p);

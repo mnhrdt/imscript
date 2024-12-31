@@ -32,6 +32,7 @@ static uint32_t lcg_knuth_rand(void)
 	return lcg_knuth_seed >> 32;
 }
 
+#if 0
 // hacker's delight 32-bit shuffle
 static uint32_t hdshuf(uint32_t x)
 {
@@ -41,19 +42,24 @@ static uint32_t hdshuf(uint32_t x)
 	x = (x & 0x22222222) << 1 | ((x >> 1) & 0x22222222) | (x & 0x99999999);
 	return x;
 }
+#endif
 
 static void xsrand(unsigned long int iseed)
 {
+#if 0
 	// shuffle the seed a bit to avoid visible runs in the common case
 	// of consecutive seeds
-	unsigned long int oseed = iseed;
-	iseed += hdshuf(iseed);
+	if (0) {
+		unsigned long int oseed = 7777 * iseed;
+		iseed += hdshuf(iseed);
+	}
 	//fprintf(stderr, "shuffled seed %ld -> %ld\n", oseed, iseed);
-
 	//uint64_t seed = iseed;
 	//uint64_t f = 2097152 + 17; // cubic root of 2^63
 	//uint64_t g = 549755813888 + 19;
 	//lcg_knuth_srand(g*seed + f);
+#endif
+
 	lcg_knuth_srand(iseed);
 }
 
