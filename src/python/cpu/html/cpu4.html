@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<title>image zoom and pan</title>
+
+<style>
+.cpu {
+	width: 600px;
+	height: 400px;
+	overflow: hidden;
+	border: 1px solid #000;
+	background: #f00;
+}
+
+.cpu > img {
+	image-rendering: crisp-edges;
+}
+</style>
+
+<h1>image zoom and pan</h1>
+
+<p>
+Instructions
+<ul>
+	<li>Click on the image to activate the viewer
+	<li>Mouse drag: pan the image
+	<li>Mouse wheel: zoom in/out
+	<li>SHIFT+drag: change brightness
+	<li>CTRL+drag: change saturation
+	<li>q or ESC: exit the viewer (the scroll wheel loses its efect)
+</ul>
+
+<p>First image:
+<canvas class="cpu" width="800" height="600" id="cpu1">
+<div class="color-cell" id="hovered-color"></div>
+<div class="color-cell" id="selected-color"></div>
+<script>
+const img = new Image();
+img.crossOrigin = "anonymous";
+img.src = "http://gabarro.org/img/lenak.png";
+const canvas = document.getElementById("cpu1");
+const ctx = canvas.getContext("2d");
+img.addEventListener("load", () => {
+	  ctx.drawImage(img, 0, 0);
+	  img.style.display = "none";
+});
+const hoveredColor = document.getElementById("hovered-color");
+const selectedColor = document.getElementById("selected-color");
+
+function pick(event, destination) {
+	  const bounding = canvas.getBoundingClientRect();
+	  const x = event.clientX - bounding.left;
+	  const y = event.clientY - bounding.top;
+	  const pixel = ctx.getImageData(x, y, 1, 1);
+	  const data = pixel.data;
+
+	  const rgbColor = `rgb(${data[0]} ${data[1]} ${data[2]} / ${data[3] / 255})`;
+	  destination.style.background = rgbColor;
+	  destination.textContent = rgbColor;
+
+	  return rgbColor;
+}
+canvas.addEventListener("mousemove", (event) => pick(event, hoveredColor));
+canvas.addEventListener("click", (event) => pick(event, selectedColor))
+</script>
+
+
+
+
+
+<!-- vim: set ts=3 sw=3 ft=javascript: -->
