@@ -11,9 +11,9 @@
 }
 
 .coordinates {
-	width: 7em;
+	width: 6em;
 	height: 1.5em;
-	background: #faa;
+	background: #fff;
 	display: inline;
 	visibility: visible;
 }
@@ -179,14 +179,15 @@
 				for (const i of c.getElementsByClassName("coordinates")) {
 					//console.log(`bla bla bla`);
 					//i.textContent = 'abc';
+					c.style.cursor = "crosshair";
 					i.style.position = "absolute";
 					i.style.visibility = "visible";
+					i.style.top = `${e.clientY+15+window.scrollY}px`;
+					i.style.left = `${e.clientX+15+window.scrollX}px`;
 					const [x,y]= cpu_xy(c, e);
-					t = Math.floor(c.getBoundingClientRect().y)
-					s = e.clientY
-					i.style.top = `${e.clientY+10}px`;
-					i.style.left = `${e.clientX+10}px`;
-					i.textContent = `${Math.floor(x)} / ${Math.floor(y)} [${t}] [${s}]`;
+					X = Math.floor((x - c.dataset.offsetX)/c.dataset.scale);
+					Y = Math.floor((y - c.dataset.offsetY)/c.dataset.scale);
+					i.textContent = `${X} , ${Y}`;
 				}
 			} else {
 				for (const i of c.getElementsByClassName("coordinates")) {
