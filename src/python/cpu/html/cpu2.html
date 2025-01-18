@@ -11,9 +11,9 @@
 }
 
 .coordinates {
-	width: 20em;
-	height: 2em;
-	background: #f00;
+	width: 7em;
+	height: 1.5em;
+	background: #faa;
 	display: inline;
 	visibility: visible;
 }
@@ -37,6 +37,7 @@
 			c.tabIndex = 0;
 			c.dataset.active = "false"; // XXX : these will be strings anyway
 			c.dataset.isPanning = "false";
+			c.dataset.hasHud = "false";
 			viewport_reset(c);
 
 			// this is really fucked up... all members get converted to strings,
@@ -152,6 +153,7 @@
 				c.dataset.active = "true";
 				c.focus();
 				c.dataset.isPanning = "true";
+				c.dataset.hasHud = "false";
 				const [x,y] = cpu_xy(c, e);
 				c.dataset.startX = x;
 				c.dataset.startY = y;
@@ -171,15 +173,25 @@
 				apply_transforms(c);
 				c.dataset.startX = x;
 				c.dataset.startY = y;
-			}
-			for (const i of c.getElementsByClassName("coordinates")) {
-				//console.log(`bla bla bla`);
-				//i.textContent = 'abc';
-				i.style.position = "absolute";
-				i.style.top = `${e.clientY}px`;
-				i.style.left = `${e.clientX}px`;
-				const [x,y]= cpu_xy(c, e);
-				i.textContent = `${Math.floor(x)} / ${Math.floor(y)}`;
+			} else { c.dataset.hasHud = "true"; }
+
+			if (c.dataset.hasHud == "true") {
+				for (const i of c.getElementsByClassName("coordinates")) {
+					//console.log(`bla bla bla`);
+					//i.textContent = 'abc';
+					i.style.position = "absolute";
+					i.style.visibility = "visible";
+					const [x,y]= cpu_xy(c, e);
+					t = Math.floor(c.getBoundingClientRect().y)
+					s = e.clientY
+					i.style.top = `${e.clientY+10}px`;
+					i.style.left = `${e.clientX+10}px`;
+					i.textContent = `${Math.floor(x)} / ${Math.floor(y)} [${t}] [${s}]`;
+				}
+			} else {
+				for (const i of c.getElementsByClassName("coordinates")) {
+					i.style.visibility = "hidden";
+				}
 			}
 		});
 
@@ -195,6 +207,10 @@
 		for (const c of cpus)
 		c.addEventListener("mouseleave", function(e) {
 			c.dataset.isPanning = "false";
+			c.dataset.hasHud = "false";
+			for (const i of c.getElementsByClassName("coordinates")) {
+				i.style.visibility = "hidden";
+			}
 		});
 
 		for (const c of cpus)
@@ -241,11 +257,10 @@ Instructions
 </div>
 
 <p>Second image:
-<!--
 <div class="cpu">
 	<img src="lenak.png">
+	<div class="coordinates">rqp</div>
 </div>
-	-->
 
 <p>Current situation:
 <ol>
