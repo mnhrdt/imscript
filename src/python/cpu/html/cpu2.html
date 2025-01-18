@@ -10,6 +10,14 @@
 	background: #ccc;
 }
 
+.coordinates {
+	width: 20em;
+	height: 2em;
+	background: #f00;
+	display: inline;
+	visibility: visible;
+}
+
 .cpu > img {
 	image-rendering: crisp-edges;
 }
@@ -164,6 +172,15 @@
 				c.dataset.startX = x;
 				c.dataset.startY = y;
 			}
+			for (const i of c.getElementsByClassName("coordinates")) {
+				//console.log(`bla bla bla`);
+				//i.textContent = 'abc';
+				i.style.position = "absolute";
+				i.style.top = `${e.clientY}px`;
+				i.style.left = `${e.clientX}px`;
+				const [x,y]= cpu_xy(c, e);
+				i.textContent = `${Math.floor(x)} / ${Math.floor(y)}`;
+			}
 		});
 
 		for (const c of cpus)
@@ -215,17 +232,20 @@ Instructions
 	<li>SHIFT+drag: change brightness
 	<li>CTRL+drag: change saturation
 	<li>q or ESC: exit the viewer (the scroll wheel loses its efect)
-<\ul>
+</ul>
 
 <p>First image:
 <div class="cpu">
-	<img src="http://gabarro.org/img/barbara.png">
+	<img src="barbara.png">
+	<div class="coordinates">pqr</div>
 </div>
 
 <p>Second image:
+<!--
 <div class="cpu">
-	<img src="http://gabarro.org/img/lenak.png">
+	<img src="lenak.png">
 </div>
+	-->
 
 <p>Current situation:
 <ol>
