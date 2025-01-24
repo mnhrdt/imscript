@@ -59,7 +59,7 @@ static int positive_reflex(int n, int p)
 	return r;
 }
 
-// instance of "extrapolator_t", extrapolate by a nearest neighbor
+// instance of "extrapolator_t", extrapolate by reflexion
 static float getpixel_sym(float *x, int w, int h, int i, int j)
 {
 	i = positive_reflex(i, w);

@@ -3105,6 +3105,9 @@ static int main_images(int c, char **v)
 	}
 	bool verbose = pick_option(&c, &v, "v", NULL);
 	char *filename_out = pick_option(&c, &v, "o", "-");
+	char *boundary = pick_option(&c, &v, "b", "nearest");
+	if (*boundary) setenv("GETPIXEL", boundary, 1);
+
 
 	struct plambda_program p[1];
 
@@ -3112,6 +3115,12 @@ static int main_images(int c, char **v)
 
 	int n = c - 2;
 	//fprintf(stderr, "n = %d\n", n);
+	int off = 1;
+	if (n == 0) {
+		*v = "-";
+		off = 0;
+		n = 1;
+	}
 	if (n > 0 && p->var->n == 0) {
 		//fprintf(stderr, "will add hidden variables! n=%d, vn=%d\n", n, p->var->n);
 		int maxplen = n*10 + strlen(v[c-1]) + 100;
@@ -3124,7 +3133,7 @@ static int main_images(int c, char **v)
 					"were given", p->var->n, n);
 	int w[n], h[n], pd[n];
 	float *x[n];
-	FORI(n) x[i] = iio_read_image_float_vec(v[i+1], w + i, h + i, pd + i);
+	FORI(n) x[i] = iio_read_image_float_vec(v[i+off], w + i, h + i, pd + i);
 	//FORI(n-1)
 	//	if (w[0] != w[i+1] || h[0] != h[i+1])// || pd[0] != pd[i+1])
 	//		fail("input images size mismatch");
@@ -3479,10 +3488,6 @@ int main_plambda(int c, char **v)
 			v[i] = v[i+1];
 		f = main_calc;
 		c -= 1;
-	}
-	if (f == main_images && c == 2) {
-		char *vv[3] = { v[0], "-", v[1] };
-		return f(3, vv);
 	}
 	return f(c,v);
 }
