@@ -3106,7 +3106,7 @@ static int main_images(int c, char **v)
 	bool verbose = pick_option(&c, &v, "v", NULL);
 	char *filename_out = pick_option(&c, &v, "o", "-");
 	char *boundary = pick_option(&c, &v, "b", "nearest");
-	if (*boundary) setenv("GETPIXEL", boundary, 1);
+	if (*boundary) setenv("GETPIXEL", boundary, 0);
 
 
 	struct plambda_program p[1];
