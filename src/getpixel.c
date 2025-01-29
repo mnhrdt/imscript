@@ -127,17 +127,22 @@ static getsample_operator get_sample_operator(getsample_operator o)
 	}
 	if (!option) return o;
 #ifdef NAN
-	if (0 == strcmp(option, "nan"      ))  return getsample_nan;
+	if (0 == strcmp(option, "nan"      )) return getsample_nan;
 #endif//NAN
-	if (0 == strcmp(option, "segfault" ))  return getsample_error;
-	if (0 == strcmp(option, "error"    ))  return getsample_error;
-	if (0 == strcmp(option, "abort"    ))  return getsample_abort;
-	if (0 == strcmp(option, "exit"    ))   return getsample_exit;
-	if (0 == strcmp(option, "periodic" ))  return getsample_per;
-	if (0 == strcmp(option, "constant" ))  return getsample_0;
-	if (0 == strcmp(option, "nearest"   )) return getsample_1;
-	if (0 == strcmp(option, "reflex"   ))  return getsample_2;
-	if (0 == strcmp(option, "symmetric"))  return getsample_2;
+	if (0 == strcmp(option, "segfault" )) return getsample_error;
+	if (0 == strcmp(option, "error"    )) return getsample_error;
+	if (0 == strcmp(option, "abort"    )) return getsample_abort;
+	if (0 == strcmp(option, "exit"     )) return getsample_exit;
+	if (0 == strcmp(option, "periodic" )) return getsample_per;
+	if (0 == strcmp(option, "p"        )) return getsample_per;
+	if (0 == strcmp(option, "constant" )) return getsample_0;
+	if (0 == strcmp(option, "c"        )) return getsample_0;
+	if (0 == strcmp(option, "nearest"  )) return getsample_1;
+	if (0 == strcmp(option, "n"        )) return getsample_1;
+	if (0 == strcmp(option, "reflex"   )) return getsample_2;
+	if (0 == strcmp(option, "r"        )) return getsample_2;
+	if (0 == strcmp(option, "symmetric")) return getsample_2;
+	if (0 == strcmp(option, "s"        )) return getsample_2;
 	char *endptr;
 	float value = strtof(option, &endptr);
 	if (endptr != option) {
