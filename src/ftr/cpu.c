@@ -64,13 +64,18 @@ struct pan_state {
 
 	// 6. topographic mode
 	int topographic_mode;
-	// 0=no, 1=botw, 2=shadow, 3=linear, 4=lambert, 5=specular
+	// 0=no, 1=botw, 2=shadow, 3=linear, 4=lambert, 5=specular, 6=radar
 	float topographic_sun[3];
 	float topographic_scale;
 	float topographic_P;
 	float topographic_spread;
 
-	// 7. actual image data for the whole series
+	// 7. vector field mode
+	int vector_field_mode;
+	// 0=no, 1=xyy, 2=zeroblack, 3=whiteblack (middlebury)
+	float vector_field_scale;
+
+	// 8. actual image data for the whole series
 	int i_idx, i_num;
 	struct fancy_image *i_tab[MAX_IMAGES];
 	char *i_name[MAX_IMAGES];
@@ -266,6 +271,9 @@ static void action_reset_zoom_and_position(struct FTR *f)
 	e->topographic_scale = 1;
 	e->topographic_P = 30;
 
+	e->vector_field_mode = 0;
+	e->vector_field_scale = 1;
+
 	f->changed = 1;
 }
 
@@ -458,7 +466,24 @@ static void action_cycle_hud(struct FTR *f)
 static void action_toggle_topography(struct FTR *f, int dir)
 {
 	struct pan_state *e = f->userdata;
-	e->topographic_mode = (dir + e->topographic_mode) % 7;
+	e->vector_field_mode = 0;
+	e->topographic_mode = (dir + e->topographic_mode) % 3;//7;
+	f->changed = 1;
+}
+
+static void action_toggle_vector_field(struct FTR *f, int dir)
+{
+	struct pan_state *e = f->userdata;
+	e->topographic_mode = 0;
+	e->vector_field_mode = (dir + e->vector_field_mode) % 4;
+	f->changed = 1;
+}
+
+static void action_vector_field_scale(struct FTR *f, float factor)
+{
+	struct pan_state *e = f->userdata;
+	e->vector_field_scale *= factor;
+	fprintf(stderr, "VECTOR FIELD SCALE = %g\n", e->vector_field_scale);
 	f->changed = 1;
 }
 
@@ -1263,14 +1288,81 @@ static void expose_topography(struct FTR *f)
 	}
 }
 
+#include "colorcoordsf.c"
+
+static void expose_vector_field(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+
+	float *X = xmalloc(2 * f->w * f->h * sizeof*X);
+	float S = e->vector_field_scale;
+
+	for (int j = 0; j < f->h; j++)
+	for (int i = 0; i < f->w; i++)
+	for (int k = 0; k < 2; k++)
+		X[2*(j*f->w+i)+k] = fancy_image_getsample(e->i,
+					i + e->offset_x, j + e->offset_y, k);
+
+	if (e->vector_field_mode == 1) // xyy
+	{
+
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < f->w; i++)
+		{
+			float x = X[2*(j*f->w + i) + 0];
+			float y = X[2*(j*f->w + i) + 1];
+			f->rgb[(j*f->w+i)*3+0] = bclamp(127 + S*x);
+			f->rgb[(j*f->w+i)*3+1] = bclamp(127 + S*y);
+			f->rgb[(j*f->w+i)*3+2] = bclamp(127 + S*y);
+		}
+	}
+
+	if (e->vector_field_mode == 2) // zeroblack
+	{
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < f->w; i++)
+		{
+			float x = X[2*(j*f->w + i) + 0];
+			float y = X[2*(j*f->w + i) + 1];
+			unsigned char *o = f->rgb + 3*(j*f->w + i);
+			if (isnan(x) || isnan(y)) {
+				o[0] = o[1] = o[2] = 127;
+				continue;
+			}
+			float r = hypot(x, y);
+			r = r>S ? 1 : r/S;
+			double a = atan2(y, -x);
+			a = (a + M_PI) * (180/M_PI);
+			a = fmod(a, 360);
+			float rgb[3], hsv[3] = {a, r, r};
+			hsv_to_rgb_floats(rgb, hsv);
+			for (int k = 0; k < 3; k++)
+				o[k] = bclamp(255*rgb[k]);
+		}
+	}
+
+	free(X);
+}
+
 // dump the image acording to the state of the viewport
 static void pan_exposer(struct FTR *f, int b, int m, int x, int y)
 {
 	struct pan_state *e = f->userdata;
 
+	// dark blue background
+	for (int i = 0; i < f->w * f->h; i++)
+		f->rgb[3*i+2] = 100;
+
 	if (e->topographic_mode)
 	{
 		expose_topography(f);
+		f->changed = 1;
+		goto cont;
+	}
+
+	if (e->vector_field_mode)
+	{
+		expose_vector_field(f);
 		f->changed = 1;
 		goto cont;
 	}
@@ -1350,6 +1442,8 @@ static void key_handler_print(struct FTR *f, int k, int m, int x, int y)
 
 static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 {
+	struct pan_state *e = f->userdata;
+
 	if (m & FTR_MASK_SHIFT && islower(k)) k = toupper(k);
 	//fprintf(stderr, "PAN_KEY_HANDLER  %d '%c' (%d) at %d %d\n",
 	//		k, isprint(k)?k:' ', m, x, y);
@@ -1373,11 +1467,19 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'r') action_toggle_roi(f, x, y, m&FTR_MASK_SHIFT);
 	if (k == 't') action_toggle_topography(f, 1);
 	if (k == 'T') action_toggle_topography(f, -1);
+	if (k == 'f') action_toggle_vector_field(f, 1);
+	if (k == 'F') action_toggle_vector_field(f, -1);
 	if (k == 'c') action_toggle_p(f);
-	if (k == 's') action_topography_span(f, 1/1.3);
-	if (k == 'S') action_topography_span(f, 1.3);
-	if (k == 'd') action_topography_Pspan(f, 1/1.3);
-	if (k == 'D') action_topography_Pspan(f, 1.3);
+	if (e->topographic_mode) {
+		if (k == 's') action_topography_span(f, 1/1.3);
+		if (k == 'S') action_topography_span(f, 1.3);
+		if (k == 'd') action_topography_Pspan(f, 1/1.3);
+		if (k == 'D') action_topography_Pspan(f, 1.3);
+	}
+	if (e->vector_field_mode) {
+		if (k == 's') action_vector_field_scale(f, 1/1.3);
+		if (k == 'S') action_vector_field_scale(f, 1.3);
+	}
 	if (k == ',') action_screenshot(f);
 	if (k == '.') action_screenshot_float(f);
 
@@ -1414,7 +1516,9 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 }
 
 
+#ifndef BAD_MIN
 #define BAD_MIN(a,b) a<=b?a:b
+#endif
 #include "pickopt.c"
 static char *base_name(char *p)
 {

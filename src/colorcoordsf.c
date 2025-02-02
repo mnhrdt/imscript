@@ -29,7 +29,7 @@ static void hsv_to_rgb_floats(float *out, float *in)
 			case -1:
 			case 5: r = v; g = p; b = q; break;
 			default:
-				fprintf(stderr, "H=%d\n", H);
+				fprintf(stderr,"H=%d, hsv=%g %g %g\n",H,h,s,v);
 				assert(false);
 		}
 	}
