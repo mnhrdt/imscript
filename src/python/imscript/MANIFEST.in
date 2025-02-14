@@ -3,4 +3,10 @@ include src/dep.mk
 include src/*.c
 include src/*.h
 include src/fonts/*.c
+exclude src/python
+exclude src/python/
+exclude python
+exclude */src/python/*
+exclude src/python/*
+exclude */src/python
 prune bin
