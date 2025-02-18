@@ -25,6 +25,30 @@ static double invert_homography(double o[9], double i[9])
     return det;
 }
 
+static void matrix_product(double o[9], double x[9], double y[9])
+{
+	// x0 x1 x2   y0 y1 y2
+	// x3 x4 x5   y3 y4 y5
+	// x6 x7 x8   y6 y7 y8
+
+	double t[9];
+
+	t[0] = x[0]*y[0] + x[1]*y[3] + x[2]*y[6];
+	t[1] = x[0]*y[1] + x[1]*y[4] + x[2]*y[7];
+	t[2] = x[0]*y[2] + x[1]*y[5] + x[2]*y[8];
+
+	t[3] = x[3]*y[0] + x[4]*y[3] + x[5]*y[6];
+	t[4] = x[3]*y[1] + x[4]*y[4] + x[5]*y[7];
+	t[5] = x[3]*y[2] + x[4]*y[5] + x[5]*y[8];
+
+	t[6] = x[6]*y[0] + x[7]*y[3] + x[8]*y[6];
+	t[7] = x[6]*y[1] + x[7]*y[4] + x[8]*y[7];
+	t[8] = x[6]*y[2] + x[7]*y[5] + x[8]*y[8];
+
+	for (int i = 0; i < 9; i++)
+		o[i] = t[i];
+}
+
 
 #include <math.h>
 //#include "extrapolators.c"
@@ -193,6 +217,24 @@ static float bicubic_interpolation_at(float *img, int w, int h, int pd,
 //	return nearest_neighbor_at;
 //}
 
+#include "parsenumbers.c"
+static void read_homography_from_string(double H[9], char *s)
+{
+	H[0] = 1; H[1] = 0; H[2] = 0;
+	H[3] = 0; H[4] = 1; H[5] = 0;
+	H[6] = 0; H[7] = 0; H[8] = 1;
+	double x[2];
+	if (1 == sscanf(s, "r%lg", x)) {
+		double a = M_PI**x/180;
+		fprintf(stderr, "rotation of angle %g (%g)\n", *x, a);
+		H[0] = H[4] = cos(a);
+		H[1] = -sin(a);
+		H[3] = sin(a);
+		return;
+	}
+	read_n_doubles_from_string(H, s, 9);
+}
+
 
 // SECTION 6. Main warping function                                        {{{1
 
@@ -304,13 +346,13 @@ static char *help_string_long     =
 #include <stdlib.h>
 #include "iio.h"
 #include "xmalloc.c"
-#include "parsenumbers.c"
 #include "help_stuff.c"
 #include "pickopt.c"
 int main_homwarp(int c, char *v[])
 {
 	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
 	bool do_invert = pick_option(&c, &v, "i", NULL);
+	bool do_center = pick_option(&c, &v, "c", NULL);
 	int ord = atoi(pick_option(&c, &v, "o", "-3"));
 	int bd = !!pick_option(&c, &v, "p", NULL);
 	if (c != 2 && c != 4 && c != 5 && c != 6)
@@ -321,7 +363,7 @@ int main_homwarp(int c, char *v[])
 		"\t-o\tchose interpolation order (default -3 = bicubic)\n"
 		, *v);
 	double H_direct[9], H_inv[9];
-	read_n_doubles_from_string(H_direct, v[1], 9);
+	read_homography_from_string(H_direct, v[1]);
 	invert_homography(H_inv, H_direct);
 	double *H = do_invert ? H_inv : H_direct;
 	int ow = c > 2 ? atoi(v[2]) : -1;
@@ -334,6 +376,13 @@ int main_homwarp(int c, char *v[])
 	if (ow == -1) ow = w;
 	if (oh == -1) oh = h;
 	float *y = xmalloc(ow * oh * pd * sizeof*y);
+
+	if (do_center) {
+		double P[9] = { 1, 0, -w/2, 0, 1, -h/2, 0, 0, 1};
+		double iP[9] = { 1, 0, w/2, 0, 1, h/2, 0, 0, 1};
+		matrix_product(H, H, P);
+		matrix_product(H, iP, H);
+	}
 
 	int r = 0;
 	for (int i = 0; i < pd; i++)
