@@ -226,10 +226,15 @@ static void read_homography_from_string(double H[9], char *s)
 	double x[2];
 	if (1 == sscanf(s, "r%lg", x)) {
 		double a = M_PI**x/180;
-		fprintf(stderr, "rotation of angle %g (%g)\n", *x, a);
 		H[0] = H[4] = cos(a);
 		H[1] = -sin(a);
 		H[3] = sin(a);
+		return;
+	}
+	if (1 == sscanf(s, "R%lg", x)) {
+		H[0] = H[4] = cos(*x);
+		H[1] = -sin(*x);
+		H[3] = sin(*x);
 		return;
 	}
 	read_n_doubles_from_string(H, s, 9);
