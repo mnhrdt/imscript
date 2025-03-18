@@ -121,6 +121,7 @@ static int gmod(int x, int m)
 }
 
 // evaluate the value a position (p,q) in image coordinates
+// if outside, return a background gray checkerboard of side 256x256
 static void pixel(float *out, struct pan_state *e, double p, double q)
 {
 	//if(p<0||q<0){out[0]=out[1]=out[2]=170;return;}// TODO: kill this
@@ -154,7 +155,7 @@ static void pixel(float *out, struct pan_state *e, double p, double q)
 }
 
 // evaluate the value a position (p,q) in image coordinates
-static float pixel_height(struct pan_state *e, double p, double q)
+static float pixel_scalar(struct pan_state *e, double p, double q)
 {
 	if (p < 0 || q < 0 || p >= e->i->w || q >= e->i->h)
 		return NAN;
@@ -174,6 +175,30 @@ static float pixel_height(struct pan_state *e, double p, double q)
 	return fancy_image_getsample_oct(e->i, oct, p, q, 0);
 }
 
+//// evaluate the value a position (p,q) in image coordinates
+//static void pixel_vec(float *out, struct pan_state *e, double p, double q)
+//{
+//	if (p < 0 || q < 0 || p >= e->i->w || q >= e->i->h)
+//		return NAN;
+//
+//	int oct = 0;
+//	if (e->zoom_factor < 0.9999)
+//	{
+//		int s = round(log2(1/e->zoom_factor));
+//		if (s < 0) s = 0;
+//		if (s >= MAX_PYRAMID_LEVELS) s = MAX_PYRAMID_LEVELS-1;
+//		int sfac = 1<<(s);
+//		oct = s;
+//		p /= sfac;
+//		q /= sfac;
+//	}
+//	for (int i = 0; i < e->i->pd; i++)
+//	{
+//		// TODO, interpolation
+//		out[i] = fancy_image_getsample_oct(e->i, oct, p, q, i);
+//	}
+//}
+
 // fill-in the image y with a dem corresponding to the current window
 // notice that the output size may be smaller than the window due to crops
 //
@@ -188,7 +213,7 @@ static int extract_local_dem(float *y, int *w, int *h, struct FTR *f)
 		{
 			double p[2];
 			window_to_image(p, e, i, j);
-			y[j*f->w+i] = pixel_height(e, p[0], p[1]);
+			y[j*f->w+i] = pixel_scalar(e, p[0], p[1]);
 		}
 		*w = f->w;
 		*h = f->h;
@@ -207,7 +232,7 @@ static int extract_local_dem(float *y, int *w, int *h, struct FTR *f)
 		{
 			double p[2];
 			window_to_image(p, e, F*i, F*j);
-			y[j**w+i] = pixel_height(e, p[0], p[1]);
+			y[j**w+i] = pixel_scalar(e, p[0], p[1]);
 		}
 		return F;
 	}
@@ -216,7 +241,7 @@ static int extract_local_dem(float *y, int *w, int *h, struct FTR *f)
 		//{
 		//	double p[2];
 		//	window_to_image(p, e, i, j);
-		//	x[j*f->w+i] = pixel_height(e, p[0], p[1]);
+		//	x[j*f->w+i] = pixel_scalar(e, p[0], p[1]);
 		//}
 }
 
@@ -1165,7 +1190,7 @@ static void expose_topography(struct FTR *f)
 		//{
 		//	double p[2];
 		//	window_to_image(p, e, i, j);
-		//	x[j*f->w+i] = pixel_height(e, p[0], p[1]);
+		//	x[j*f->w+i] = pixel_scalar(e, p[0], p[1]);
 		//}
 		colorize_botw(y, x, w, h);
 		//for (int i = 0; i < 3*f->w*f->h; i++) f->rgb[i] = 127;
@@ -1658,6 +1683,8 @@ static char *help_string_long     =
 " r      toggle display of local spectrum\n"
 " u      toggle hud\n"
 " t      toggle topographic mode\n"
+" f      toggle vector field mode\n"
+" s,S    (in field-mode) set vector scale\n"
 " s,S    (in topo-mode) set vertical exaggeration\n"
 " d,D    (in topo-mode) set topographic view parameter\n"
 "\n"
