@@ -60,7 +60,9 @@ struct pan_state {
 
 	// 5. user interface
 	struct bitmap_font font[5];
-	int hud;
+	int hud; // head-up display
+	int cuv; // cursor-view
+	int cuv_x, cuv_y;
 
 	// 6. topographic mode
 	int topographic_mode;
@@ -283,6 +285,8 @@ static void action_reset_zoom_and_position(struct FTR *f)
 	e->p = INFINITY;
 	e->auto_qauto = false;
 	e->hud = 0;
+	e->cuv = 0;
+	e->cuv_x = e->cuv_y = 10;
 
 	e->roi = 0;
 	e->roi_x = f->w / 2;
@@ -488,6 +492,15 @@ static void action_cycle_hud(struct FTR *f)
 	f->changed = 1;
 }
 
+static void action_cycle_cuv(struct FTR *f, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+	e->cuv = (e->cuv + 1) % 3;
+	e->cuv_x = x;
+	e->cuv_y = y;
+	f->changed = 1;
+}
+
 static void action_toggle_topography(struct FTR *f, int dir)
 {
 	struct pan_state *e = f->userdata;
@@ -567,6 +580,17 @@ static void action_move_roi(struct FTR *f, int x, int y)
 	{
 		e->roi_x = x - e->roi_w / 2;
 		e->roi_y = y - e->roi_w / 2;
+		f->changed = 1;
+	}
+}
+
+static void action_move_cuv(struct FTR *f, int x, int y)
+{
+	struct pan_state *e = f->userdata;
+	if (e->cuv)
+	{
+		e->cuv_x = x;
+		e->cuv_y = y;
 		f->changed = 1;
 	}
 }
@@ -1017,6 +1041,25 @@ static void expose_hud(struct FTR *f)
 	}
 }
 
+static void expose_cuv(struct FTR *f)
+{
+	struct pan_state *e = f->userdata;
+	int x = e->cuv_x;
+	int y = e->cuv_y;
+	double p[2];
+	window_to_image(p, e, x, y);
+	float v[e->i->pd];
+	pixel(v, e, p[0], p[1]);
+	char buf[0x100];
+	int n = snprintf(buf, 0x100, "%d %d\n", (int)p[0], (int)p[1]);
+	for (int i = 0; i < e->i->pd; i++)
+		n += snprintf(buf + n, 0x100-n, "%s%g", i?" ":"",v[i]);
+	uint8_t bg[3] = {255, 255, 255};
+	uint8_t fg[3] = {0, 0, 0};
+	put_string_in_rgb_image(f->rgb, f->w, f->h, x+20, y+0, fg, bg, 0,
+			e->font+4, buf);
+}
+
 static void expose_roi(struct FTR *f)
 {
 	struct pan_state *e = f->userdata;
@@ -1413,6 +1456,10 @@ cont:
 	if (e->hud)
 		expose_hud(f);
 
+	// if CUV, expose the cuv
+	if (e->cuv)
+		expose_cuv(f);
+
 	// if ROI, expose the roi
 	if (e->roi && !e->topographic_mode)
 		expose_roi(f);
@@ -1435,6 +1482,7 @@ static void pan_motion_handler(struct FTR *f, int b, int m, int x, int y)
 	if (m & FTR_MASK_SHIFT && e->topographic_mode) action_move_sun(f, x, y);
 
 	action_move_roi(f, x, y);
+	action_move_cuv(f, x, y);
 
 	ox = x;
 	oy = y;
@@ -1489,6 +1537,7 @@ static void pan_key_handler(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'n') action_qauto2(f);
 	if (k == 'N') action_toggle_aqauto(f);
 	if (k == 'u') action_cycle_hud(f);
+	if (k == 'U') action_cycle_cuv(f, x, y);
 	if (k == 'r') action_toggle_roi(f, x, y, m&FTR_MASK_SHIFT);
 	if (k == 't') action_toggle_topography(f, 1);
 	if (k == 'T') action_toggle_topography(f, -1);
@@ -1682,6 +1731,7 @@ static char *help_string_long     =
 " BS     previous image\n"
 " r      toggle display of local spectrum\n"
 " u      toggle hud\n"
+" U      toggle cursor info\n"
 " t      toggle topographic mode\n"
 " f      toggle vector field mode\n"
 " s,S    (in field-mode) set vector scale\n"

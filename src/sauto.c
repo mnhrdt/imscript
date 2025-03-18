@@ -7,6 +7,7 @@
 
 #define xmalloc malloc
 static int global_verbose_flag = 0;
+static float global_override_s = 0;
 
 static int compare_floats(const void *a, const void *b)
 {
@@ -47,6 +48,7 @@ static void sauto(uint8_t *y, float *x, int w, int h, float p, int g)
 		fprintf(stderr, "n=%d p=%g i=%d\n", n, p, i);
 		s = t[i];
 	}
+	if (global_override_s) s = global_override_s;
 	if (global_verbose_flag) fprintf(stderr, "sauto: s = %g\n", s);
 	if(g)for(int i=0;i<w*h;i++)*y++=(uint8_t)(255*clip(0.5+x[i]/s,0,1));else
 	for (int j = 0; j < h; j++)
@@ -89,6 +91,7 @@ static char *help_string_long     =
 "\n"
 "Options:\n"
 " -p X\t\tsaturate a percentile of X% (default X=1)\n"
+" -s S\t\tsaturate at values -S,S\n"
 " -g\t\tgray scale palette\n"
 " -v\t\tverbose mode (print details of the transformation)\n"
 " -h\t\tdisplay short help message\n"
@@ -109,6 +112,7 @@ int main_sauto(int c, char *v[])
 
 	// extract named options
 	float p = atof(pick_option(&c, &v, "p", "1"));
+	global_override_s = atof(pick_option(&c, &v, "s", "0"));
 	global_verbose_flag = !!pick_option(&c, &v, "v", 0);
 	int g = !!pick_option(&c, &v, "g", 0); // gray palette
 
