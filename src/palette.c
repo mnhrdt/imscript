@@ -347,6 +347,7 @@ void parse_from_to(float *out_from, float *out_to, float *x, int n,
 	char *mp, *Mp;
 	float m = strtof(from_id, &mp);
 	float M = strtof(to_id,   &Mp);
+	if (!x) return;
 	//fprintf(stderr, "parse m,M = %g %g\n", m, M);
 	if (*mp != '%' && *Mp != '%')  // regular case, no percentiles
 	{
@@ -381,10 +382,12 @@ void parse_from_to(float *out_from, float *out_to, float *x, int n,
 
 void apply_palette(uint8_t *y, float *x, int n, char *s, float m, float M)
 {
+
 	struct palette p[1];
 	fill_palette(p, s, m, M);
 
 	//fprint_palette(stderr, p);
+	if (!x || !y) return;
 
 	for (int i = 0; i < n; i++)
 		get_palette_color(y + 3*i, p, x[i]);
@@ -641,8 +644,17 @@ int main_palette(int c, char *v[])
 	char *filename_out = c > 5 ? v[5] : "-";
 
 	int w, h;
-	float *x = iio_read_image_float(filename_in, &w, &h);
-	uint8_t *y = xmalloc(3*w*h);
+	float *x = NULL;
+	fprintf(stderr, "palette_id = %s\n", palette_id);
+	fprintf(stderr, "filename_in = %s\n", filename_in);
+	fprintf(stderr, "filename_out = %s\n", filename_out);
+	if (0 != strcmp(filename_in, "NONE"))
+	{
+		fprintf(stderr, "strcmp = %d\n", strcmp(filename_in, "NONE"));
+		fprintf(stderr,"going to read from file \"%s\"\n",filename_in);
+		x = iio_read_image_float(filename_in, &w, &h);
+	}
+	uint8_t *y = x?xmalloc(3*w*h):NULL;
 
 	float from, to;
 	parse_from_to(&from, &to, x, w*h, from_id, to_id);
@@ -653,7 +665,7 @@ int main_palette(int c, char *v[])
 		int lw, lh;
 		uint8_t *l = create_legend_rgb(palette_id, from, to, &lw, &lh);
 
-		if (0 == strcmp(filename_legend, "OVERLAY"))
+		if (y && 0 == strcmp(filename_legend, "OVERLAY"))
 			overlay_br(y, w, h, l, lw, lh);
 		else
 			iio_write_image_uint8_vec(filename_legend, l, lw,lh,3);
