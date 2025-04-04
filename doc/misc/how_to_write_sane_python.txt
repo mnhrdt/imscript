@@ -113,9 +113,28 @@ M4. Use dependencies "implicitly": For example, you do not need to import numpy
     code can work with numpy, torch and jax arrays without ever mentioning them.
 
 
+
+CLASSES
+
+K1. in most cases, classes should be avoided if at all possible
+K2. use classes to store related data together
+K3. do not use classes to group related functions
+K4. no singletons: do not write classes that will only have one instance
+K5. When considering whether to write a class to group some data and methods
+    together, ask yourself the following question: will the data inside the
+    class be useful in itself, even if you cannot run the methods on it?  If the
+    answer is yes, then it is OK to write the class.  Otherwise, you are just
+    using the class as a namespace to hold some related functions together
+    (maybe sharing some common parameter), and you should instead free these
+    functions and remove the class.
+K6. Class names are lowercase and to the point, e.g.: graph, polygon, chart
+
+
+
 TYPING
 
 T1. No
+
 
 
 PACKAGING
