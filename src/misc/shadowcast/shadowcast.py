@@ -39,7 +39,7 @@ def shadowcast(
 
 	h = x.shape[0]
 	w = x.shape[1]
-	X = ascontiguousarray(x, dtype='float32')
+	X = ascontiguousarray(x, dtype='float32').copy()
 	__shadowcast(X, w, h, p, q, r)
 	y = as_array(X, (h,w)).copy()
 	return y
