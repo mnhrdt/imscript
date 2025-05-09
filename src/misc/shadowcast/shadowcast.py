@@ -1,19 +1,20 @@
-# globally accessible C functions
-_shadowcast = 0
+__shadowcast = 0  # globally accessible C function
 
 def __setup_functions():
-	global _shadowcast
-	if _shadowcast != 0: return
+	global __shadowcast
+	if __shadowcast != 0: return
 
-	from os.path import abspath, dirname
+	from os.path import dirname
 	from ctypes import CDLL, c_float, c_int, c_char_p, c_void_p
 	from numpy.ctypeslib import ndpointer
+	from sys import platform
 
-	L = CDLL(f"{abspath(dirname(__file__))}/shadowcast.so")
+	e = "so" if platform != "darwin" else "dylib"
+	L = CDLL(f"{dirname(__file__)}/cshadowcast.{e}")
 	S = L.cast_shadows
 	S.argtypes = [ndpointer(c_float), c_int,c_int, c_float,c_float,c_float]
 	S.restype = None
-	_shadowcast = S
+	__shadowcast = S
 
 def shadowcast(
 		x,  # input DEM (numpy array)
@@ -23,6 +24,7 @@ def shadowcast(
 
 	__setup_functions()
 	from numpy import ascontiguousarray
+	from numpy.ctypeslib import as_array
 
 	p = 0
 	q = 0
@@ -38,7 +40,7 @@ def shadowcast(
 	h = x.shape[0]
 	w = x.shape[1]
 	X = ascontiguousarray(x, dtype='float32')
-	_shadowcast(X, h, w, p, q, r)
+	__shadowcast(X, w, h, p, q, r)
 	y = as_array(X, (h,w)).copy()
 	return y
 

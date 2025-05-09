@@ -1,7 +1,8 @@
 #include <assert.h>
 #include <math.h>
 #include <stdbool.h>
-#include <stdlib.h>
+//#include <stdlib.h>
+#include <stdio.h>
 
 
 #ifndef M_PI
@@ -205,7 +206,7 @@ static float getpixel_bilinear(float *x, int w, int h, float p, float q)
 	return r;
 }
 
-static void cast_shadows(
+void cast_shadows(
 		float *D,      // DEM raster data, to be filled-in with NAN
 		int w,         // width of the raster
 		int h,         // height of the raster
@@ -214,6 +215,15 @@ static void cast_shadows(
 		float a        // slope of the sun direction
 		)
 {
+	//{
+	//fprintf(stderr, "cast_shadows w=%d h=%d p,q,a=%g %g %g\n", w,h,p,q,a);
+	//int nfinite = 0;
+	//for (int i = 0; i < w*h; i++)
+	//	if (isfinite(D[i]))
+	//		nfinite += 1;
+	//fprintf(stderr, "nfinite=%d/%d\n", nfinite, w*h);
+	//}
+
 	char *M = xmalloc(w*h*sizeof*M);
 	for (int i = 0; i < w*h; i++) M[i] = 1;
 	if (!p && !q) return;
