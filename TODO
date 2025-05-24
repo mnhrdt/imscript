@@ -40,6 +40,7 @@ Release 6:
 Release 7:
 
 - the great ftr unification: cpu, icrop2, cpuflip... they all become one
+- the great quantizer unification: palette, qauto, viewflow.... become one
 - cpu refactor into pure MVC, headless interface
 - cpu packaging for python + jupyter access
 
