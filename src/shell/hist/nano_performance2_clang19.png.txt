@@ -1,0 +1,3 @@
+this is after upgrading the firmware to solve the throttling problems.
+The relatively bad performances for 9 and 10 procs are due to moving the laptop
+around, that triggered the "lap-detector" that blocks performance mode.
