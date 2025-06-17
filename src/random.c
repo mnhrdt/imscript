@@ -21,7 +21,8 @@ static uint64_t lcg_knuth_seed = 0;
 static void lcg_knuth_srand(uint64_t x)
 {
 //	fprintf(stderr, "setting knuth srand = %lu\n", x);
-	lcg_knuth_seed = x;
+	x += 10;   // avoid the linear run x=0,1,2
+	lcg_knuth_seed = x*x;
 }
 
 // linear congruential generator from "seminumerical algorithms"
