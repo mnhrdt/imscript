@@ -368,8 +368,8 @@ static void accumulate_gradient_at_edge(long double (*o)[2],
 	int B = bin(n, m, M, b);
 	if (A == B) return;
 	assert(A < B);
-	o[A][1] += pow(B - A, 4);
-	o[B][1] -= pow(B - A, 4);
+	o[A][1] += b-a;//pow(b - a, 1);
+	o[B][1] -= b-a;//pow(b - a, 1);
 }
 
 void fill_graph_gradient_histogram(
