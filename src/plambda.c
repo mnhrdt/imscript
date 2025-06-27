@@ -3014,7 +3014,8 @@ SMART_PARAMETER_SILENT(SRAND,0)
 static void setup_random_seed_from_env_SRAND()
 {
 	float s = SRAND();
-	xsrand(100 + s - 17*s*s);
+	//xsrand(100 + s - 17*s*s);
+	xsrand(s);
 	//if (SRAND()) fprintf(stderr, "plambda SRAND=%g\n", SRAND());
 }
 
