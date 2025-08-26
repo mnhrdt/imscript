@@ -1346,6 +1346,7 @@ struct plambda_program {
 	struct plambda_token t[PLAMBDA_MAX_TOKENS];
 	struct collection_of_varnames var[1];
 
+	float colonvar_factor;
 };
 
 
@@ -2132,6 +2133,7 @@ static void plambda_compile_program(struct plambda_program *p, const char *str)
 
 	collection_of_varnames_sort(p->var);
 	update_variable_indices(p);
+	p->colonvar_factor = 1;
 }
 
 static const char *arity(struct predefined_function *f)
@@ -2888,7 +2890,7 @@ static int run_program_vectorially_at(float *out, struct plambda_program *p,
 				break;
 			}
 			float x = eval_colonvar(imw, imh, ai, aj, t->colonvar);
-			vstack_push_scalar(s, x);
+			vstack_push_scalar(s, x * p->colonvar_factor);
 			break;
 				       }
 		case PLAMBDA_SCALAR: {
@@ -3108,11 +3110,12 @@ static int main_images(int c, char **v)
 	char *filename_out = pick_option(&c, &v, "o", "-");
 	char *boundary = pick_option(&c, &v, "b", "nearest");
 	if (*boundary) setenv("GETPIXEL", boundary, 0);
+	float cfactor = atof(pick_option(&c, &v, "f", "1"));
 
 
 	struct plambda_program p[1];
-
 	plambda_compile_program(p, v[c-1]);
+	p->colonvar_factor = cfactor;
 
 	int n = c - 2;
 	//fprintf(stderr, "n = %d\n", n);
@@ -3128,6 +3131,7 @@ static int main_images(int c, char **v)
 		char newprogram[maxplen];
 		add_hidden_variables(newprogram, maxplen, n, v[c-1]);
 		plambda_compile_program(p, newprogram);
+		p->colonvar_factor = cfactor;
 	}
 	if (n != p->var->n && !(n == 1 && p->var->n == 0))
 		fail("the program expects %d variables but %d images "
@@ -3187,6 +3191,7 @@ Usage: plambda a.png b.png c.png ... \"EXPRESSION\" > output\n\
 \n\
 Options:\n\
  -o file\tsave output to named file\n\
+ -f factor\tscale all colonvars by this factor\n\
  -v\t\tverbose (print correspondence between files and variables)\n\
  -c\t\tact as a symbolic calculator\n\
  -h\t\tdisplay short help message\n\
