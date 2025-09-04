@@ -32,6 +32,9 @@ input image), and the input/output files (by default, stdin/stdout).
 \fB\-i\fR
 use the inverse homography
 .TP
+\fB\-p\fR
+use periodic boundary conditions
+.TP
 \fB\-o\fR ORDER
 choose a different interpolation method (default = \fB\-3\fR)
 .TP
@@ -60,12 +63,6 @@ bilinear interpolation
 \fB\-3\fR
 bicubic interpolation
 .TP
-\fB\-2\fR
-cubic faded bilinear interpolation (a la Inigo Quilez)
-.TP
-\fB\-4\fR
-quintic faded bilinear interpolation (a la Inigo Quilez)
-.TP
 3,5,7
 spline of order 3,5 or 7
 .SH EXAMPLES
@@ -82,6 +79,6 @@ non\-numeric chars. are ignored
 homwarp homography.txt < in > out
 read homography from file
 .SH AUTHOR
-Written by eml
+Written by mnhrdt
 .SH "REPORTING BUGS"
 Report bugs to <enric.meinhardt@ens\-paris\-saclay.fr>.
