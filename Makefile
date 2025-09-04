@@ -9,7 +9,7 @@ BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
       fft dct dht flambda fancy_crop fancy_downsa autotrim iion mediator     \
       redim colormatch eucdist nonmaxsup gntiply idump warp heatd imhalve    \
       ppsmooth mdither mdither2 rpctk getbands pixdump bandslice points      \
-      columnize autocorr sauto
+      columnize autocorr sauto antipoisson
       #geomedian carve
 
 BIN := $(addprefix bin/,$(BIN))
@@ -227,3 +227,4 @@ bin/blurd : LDLIBS += -lfftw3
 D = src src/ftr src/misc
 src/dep.mk : ; for i in $D;do $(CC) -MM $$i/*.c|sed "\:^[^ ]:s:^:$$i/:g";done>$@
 -include src/dep.mk
+src/dep0.mk:;for i in src;do $(CC) -MM $$i/*.c|sed "\:^[^ ]:s:^:$$i/:g";done>$@
