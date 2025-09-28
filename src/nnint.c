@@ -279,6 +279,7 @@ static char *help_string_long     =
 "\n"
 "Options:\n"
 " -m mask.png\tuse a separate binary mask instead of inline NANs\n"
+" -z\t\tuse zero values as mask (in addition to inline NANs)\n"
 " -h\t\tdisplay short help message\n"
 " --help\t\tdisplay longer help message\n"
 "\n"
@@ -299,6 +300,7 @@ int main_nnint(int c, char *v[])
 
 	char *filename_mask = pick_option(&c, &v, "m", "");
 	_Bool help_argument = pick_option(&c, &v, "h", 0);
+	_Bool zero_argument = pick_option(&c, &v, "z", 0);
 	if (help_argument || (c != 1 && c != 2 && c != 3)) {
 		fprintf(stderr, "usage:\n\t%s [in.tiff [out.tiff]]\n", *v);
 		//                          0  1        2
@@ -319,6 +321,9 @@ int main_nnint(int c, char *v[])
 				x[l*w*h+i] = NAN;
 		free(m);
 	}
+	if (zero_argument)
+		for (int i = 0; i < w*h*pd; i++)
+			x[i] = x[i] ? x[i] : NAN;
 
 	nnint_split(x, w, h, pd);
 
