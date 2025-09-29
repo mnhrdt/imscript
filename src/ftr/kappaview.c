@@ -15,7 +15,7 @@
 #include "fonts/xfonts_all.c"
 
 // maximum allowed number of kappa points
-#define MAX_KAPPAS 10
+#define MAX_KAPPAS 20
 
 // radius of the points
 #define POINT_RADIUS 5.3
@@ -206,7 +206,7 @@ static void set_random_kappas(struct viewer_state *e)
 static void jitter_kappas(struct viewer_state *e)
 {
 	for (int i = 0; i < e->n; i++)
-		e->k[i] += 0.01 * random_normal();
+		e->k[i] += 0.005 * random_normal();
 	for (int i = 0; i < e->n; i++)
 		e->k[i] = fmax(0, fmin(1, e->k[i]));
 	float k = kappa_sum(e);
@@ -413,6 +413,14 @@ static void splat_disk(uint8_t *rgb, int w, int h, float p[2], float r,
 }
 
 
+static void plot_line_in_plane(struct FTR *f, float *P, float *Q, uint8_t c[3])
+{
+	struct viewer_state *e = f->userdata;
+	float p[2], q[2];
+	get_win_from_xy(e, p, P);
+	get_win_from_xy(e, q, Q);
+	plot_segment_cyan(f, p[0], p[1], q[0], q[1]);
+}
 
 
 
@@ -469,6 +477,38 @@ static void paint_state(struct FTR *f)
 		get_win_from_xy(e, ij, xy);
 		splat_disk(f->rgb, f->w, f->h, ij, r, e->rgb_curv);
 	}
+
+	// diagonal line (accumulated uniform distribution)
+	plot_line_in_plane(f, (float[]){0,0}, (float[]){1,1}, 0);
+
+	// build table of kappa sums
+	float T[2*N];
+	sorted_kappa_sums(T, e);
+
+	// bound lines
+	float M = -INFINITY;
+	for (int i = 0; i < e->n; i++)
+		M = fmax(M, e->k[i]);
+	fprintf(stderr, "M = %g\n", M);
+	plot_line_in_plane(f, (float[]){0,M}, (float[]){1,M+1}, 0);
+	plot_line_in_plane(f, (float[]){M,0}, (float[]){M+1,1}, 0);
+
+	// plot accumulated distribution
+	float P[2] = {e->x0, 0}, *p = P;
+	float Q[2] = {0    , 0}, *q = Q;
+	plot_line_in_plane(f, p, q, e->rgb_curv);
+	for (int i = 1; i < N; i++)
+	{
+		p[0] = q[0];
+		p[1] = q[1] + 1.0 / (1 << e->n);
+		q[0] = T[2*i+0];
+		q[1] = p[1];
+		plot_line_in_plane(f, p, q, e->rgb_curv);
+	}
+	p[0] = 1   ;  p[1] = 1;
+	q[0] = e->xf; q[1] = 1;
+	plot_line_in_plane(f, p, q, e->rgb_curv);
+
 
 	//for (int i = 0; i < e->w; i++)
 	//{
