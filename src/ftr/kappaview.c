@@ -18,8 +18,8 @@
 #define MAX_KAPPAS 10
 
 // radius of the points
-//#define POINT_RADIUS 2.3
-#define POINT_RADIUS 1
+#define POINT_RADIUS 5.3
+//#define POINT_RADIUS 1
 
 // zoom factor for zoom-in and zoom-out
 #define ZOOM_FACTOR 1.43
@@ -38,8 +38,8 @@ struct viewer_state {
 	// visualization parameters
 	int n;                // number of kappas (1,2,...,MAX_KAPPAS)
 	float k[MAX_KAPPAS];  // values of each kappa
-	int mode;             // -1=put_left 0=put_all 1=put_right
-	int preset;           // 0=uniform 1=random
+	int mode;             // LEFT,RIGHT,MIN,MAX,ALL [0..4]
+	int action;           // EQUAL,EXPONENTIAL,RANDOM,JITTER
 
 	// display theme
 	uint8_t rgb_bg[3];
@@ -58,24 +58,21 @@ struct viewer_state {
 static void init_state(struct viewer_state *e)
 {
 	e->n = 2;
-	e->k[0] = e->k[1] = 0.5;
-	e->mode = 1;
-	e->preset = 0;
+	e->k[0] = 0.3;
+	e->k[1] = 0.7;
+	e->mode = 4;
+	//e->action = 1;
 	//e->m = 1;
 	//e->n = 1;
 	//e->q = 3;
 
 
 	e->w = 800;
-	e->h = 600;
-	e->x0 = -1;
-	e->xf = 7;
-	e->y0 = -3;
-	e->yf = 3;
-
-	e->n = 3;
-	e->mode = 1;
-	e->preset = 0;
+	e->h = 800;
+	e->x0 = -0.2;
+	e->xf = 1.2;
+	e->y0 = -0.2;
+	e->yf = 1.2;
 
 	e->rgb_bg[0] = 0;
 	e->rgb_bg[1] = 0;
@@ -85,9 +82,9 @@ static void init_state(struct viewer_state *e)
 	e->rgb_fg[1] = 200;
 	e->rgb_fg[2] = 150;
 
-	e->rgb_axes[0] = 200;
-	e->rgb_axes[1] = 200;
-	e->rgb_axes[2] = 200;
+	e->rgb_axes[0] = 100;
+	e->rgb_axes[1] = 100;
+	e->rgb_axes[2] = 100;
 
 	e->rgb_grid[0] = 40;
 	e->rgb_grid[1] = 40;
@@ -133,7 +130,119 @@ static int insideP(struct FTR *f, int x, int y)
 
 // SECTION 3. algorithms                                                    {{{1
 
+static void get_win_from_xy(struct viewer_state *e, float ij[2], float xy[2])
+{
+	ij[0] =            e->w * (xy[0] - e->x0) / (e->xf - e->x0);
+	ij[1] = e->h - 1 - e->h * (xy[1] - e->y0) / (e->yf - e->y0);
+}
 
+static int compare_points_lexicographically(const void *aa, const void *bb)
+{
+	const float *a = (const float *)aa;
+	const float *b = (const float *)bb;
+	int p = (a[0] > b[0]) - (a[0] < b[0]);
+	if (p)
+		return p;
+	else
+		return ((a[1] > b[1]) - (a[1] < b[1]));
+}
+
+// NOTE: T must hold 2^(n+1) floats
+static void sorted_kappa_sums(float *T, struct viewer_state *e)
+{
+	int N = 1 << e->n;
+	for (int i = 0; i < N; i++)
+	{
+		float k = 0; // accumulator for this kappa sum
+		for (int j = 0; j < e->n; j++)
+			if (i & (1 << j))
+				k += e->k[j];
+		T[2*i+0] = k; // kappa sum
+		T[2*i+1] = i; // kappas to be summed (in the bits of i)
+	}
+	qsort(T, N, 2*sizeof*T, compare_points_lexicographically);
+}
+
+static float kappa_sum(struct viewer_state *e)
+{
+	float k = 0;
+	for (int i = 0; i < e->n; i++)
+		k += e->k[i];
+	return k;
+}
+
+static void assert_kappa_sum(struct viewer_state *e)
+{
+	float k = kappa_sum(e);
+	if (fabs(k - 1) > 1e-5)
+	{
+		fprintf(stderr, "ksum = %g (diff=%g)\n", k, k-1);
+		assert(false);
+	}
+}
+
+static void set_equal_kappas(struct viewer_state *e)
+{
+	for (int i = 0; i < e->n; i++)
+		e->k[i] = 1.0 / e->n;
+	assert_kappa_sum(e);
+}
+
+static void set_exponential_kappas(struct viewer_state *e)
+{
+	for (int i = 0; i < e->n; i++)
+		e->k[i] = (1 << i) / (-1.0 + (1 << e->n));
+	assert_kappa_sum(e);
+}
+
+static void set_random_kappas(struct viewer_state *e)
+{
+	for (int i = 0; i < e->n; i++) e->k[i] = random_uniform();
+	float k = kappa_sum(e);
+	for (int i = 0; i < e->n; i++) e->k[i] /= k;
+	assert_kappa_sum(e);
+}
+
+static void jitter_kappas(struct viewer_state *e)
+{
+	for (int i = 0; i < e->n; i++)
+		e->k[i] += 0.01 * random_normal();
+	for (int i = 0; i < e->n; i++)
+		e->k[i] = fmax(0, fmin(1, e->k[i]));
+	float k = kappa_sum(e);
+	for (int i = 0; i < e->n; i++) e->k[i] /= k;
+	assert_kappa_sum(e);
+}
+
+static void set_new_n(struct viewer_state *e, int n)
+{
+	if (n < 1 || n > MAX_KAPPAS)
+		return;
+	e->n = n;
+	set_exponential_kappas(e);
+}
+
+static void change_one_kappa(struct viewer_state *e, int i, float d)
+{
+	assert(i >= 0 && i < e->n);
+	switch (e->mode) {
+	case 0: // LEFT
+		break;
+	case 1: // RIGHT
+		break;
+	case 2: // MIN
+		break;
+	case 3: // MAX
+		break;
+	case 4: // ALL
+		for (int j = 0; j < e->n; j++)
+			if (j == i)
+				e->k[j] += d;
+			else
+				e->k[j] -= d/(e->n - 1);
+		break;
+	}
+}
 
 
 
@@ -318,7 +427,7 @@ static void paint_state(struct FTR *f)
 		f->rgb[i] = e->rgb_bg[i%3];
 
 	// plot grid: vertical lines
-	for (int x = ceil(e->x0); x < floor(e->xf); x++)
+	for (int x = floor(e->x0); x < ceil(e->xf); x++)
 	for (int j = 0; j < e->h; j++)
 	{
 		int i = e->w * (x - e->x0) / (e->xf - e->x0);
@@ -329,7 +438,7 @@ static void paint_state(struct FTR *f)
 	}
 
 	// plot grid: horizontal lines
-	for (int y = ceil(e->y0); y < floor(e->yf); y++)
+	for (int y = floor(e->y0); y < ceil(e->yf); y++)
 	for (int i = 0; i < e->w; i++)
 	{
 		int j = e->h - 1 - e->h * (y - e->y0) / (e->yf - e->y0);
@@ -337,6 +446,28 @@ static void paint_state(struct FTR *f)
 		if (insideP(f, i, j))
 		for (int k = 0; k < 3; k++)
 			f->rgb[(f->w*j+i)*3+k] = c[k];
+	}
+
+	//// plot kappas
+	//for (int i = 0; i < e->n; i++)
+	//{
+	//	float xy[2] = {e->k[i], 0}, ij[2];
+	//	get_win_from_xy(e, ij, xy);
+	//	splat_disk(f->rgb, f->w, f->h, ij, POINT_RADIUS, e->rgb_curv);
+	//}
+
+	// plot kappa sums
+	int N = 1 << e->n; // number of kappa sums = 2^n
+	for (int i = 0; i < N; i++)
+	{
+		float k = 0; // accumulator for this kappa sum
+		for (int j = 0; j < e->n; j++)
+			if (i & (1 << j))
+				k += e->k[j];
+		float r = (i&&!(i&(i-1))) ? 7.3 : 2.7; // pure kappa big dot
+		float xy[2] = {k, 0}, ij[2];
+		get_win_from_xy(e, ij, xy);
+		splat_disk(f->rgb, f->w, f->h, ij, r, e->rgb_curv);
 	}
 
 	//for (int i = 0; i < e->w; i++)
@@ -355,7 +486,7 @@ static void paint_state(struct FTR *f)
 	b += snprintf(buf+b, 0x400-b, "n = %d\nk = ", e->n);
 	for (int i = 0; i < e->n; i++)
 		b += snprintf(buf+b, 0x400-b, "%g\t", e->k[i]);
-	b += snprintf(buf+b, 0x400-b, "\nmode = LEFT, RIGHT, MIN, MAX, ALL\n");
+	b += snprintf(buf+b, 0x400-b, "\nmode = %d LEFT, RIGHT, MIN, MAX, ALL\n", e->mode);
 	b += snprintf(buf+b, 0x400-b, "action = UNI, EXP, RND, JIT");
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
 			10, 0, e->rgb_fg, e->rgb_bg, 0, e->font, buf);
@@ -365,6 +496,14 @@ static void paint_state(struct FTR *f)
 
 // SECTION 8. User-Interface Actions and Events                             {{{1
 
+// action: change n
+static void change_n(struct viewer_state *e, int d)
+{
+	int n = e->n + d;
+	if (n < 1) n = 1;
+	if (n > MAX_KAPPAS) n = MAX_KAPPAS;
+	set_new_n(e, n);
+}
 
 // action: viewport translation
 static void change_view_offset(struct viewer_state *e, float dx, float dy)
@@ -399,6 +538,8 @@ static void action_screenshot(struct FTR *f)
 // key handler
 static void event_key(struct FTR *f, int k, int m, int x, int y)
 {
+	if (m & FTR_MASK_SHIFT && islower(k)) k = toupper(k);
+
 	if (k == 'q') {
 		ftr_notify_the_desire_to_stop_this_loop(f, 0);
 		return;
@@ -406,17 +547,12 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 
 	struct viewer_state *e = f->userdata;
 
-	if (k == 'j') change_view_offset(e, 0, -10);
-	if (k == 'k') change_view_offset(e, 0, 10);
-	if (k == 'h') change_view_offset(e, 10, 0);
-	if (k == 'l') change_view_offset(e, -10, 0);
-	if (k == FTR_KEY_DOWN ) change_view_offset(e, 0, -100);
-	if (k == FTR_KEY_UP   ) change_view_offset(e, 0, 100);
-	if (k == FTR_KEY_RIGHT) change_view_offset(e, -100, 0);
-	if (k == FTR_KEY_LEFT)  change_view_offset(e, 100, 0);
-	//if (k == '+') change_view_scale(e, f->w/2, f->h/2, ZOOM_FACTOR);
-	//if (k == '-') change_view_scale(e, f->w/2, f->h/2, 1.0/ZOOM_FACTOR);
-	//if (k == 'a') e->restrict_to_affine = !e->restrict_to_affine;
+	if (k == 'n') change_n(e, 1);
+	if (k == 'N') change_n(e, -1);
+	if (k == 'j') jitter_kappas(e);
+	if (k == 'r') set_random_kappas(e);
+	if (k == 'e') set_equal_kappas(e);
+	if (k == 'x') set_exponential_kappas(e);
 	if (k == ',') action_screenshot(f);
 
 	//e->dragging_window_point = e->dragging_image_point = false;
@@ -535,7 +671,6 @@ int main_kappaview(int argc, char *argv[])
 	e->fonts[4] = reformat_font(*xfont_10x20, UNPACKED);
 
 	// open the window
-	//struct FTR f = ftr_new_window(800,600);
 	struct FTR f = ftr_new_window(e->w, e->h);
 	f.userdata = e;
 	f.changed = 1;
