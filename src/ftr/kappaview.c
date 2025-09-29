@@ -15,7 +15,7 @@
 #include "fonts/xfonts_all.c"
 
 // maximum allowed number of kappa points
-#define MAX_KAPPAS
+#define MAX_KAPPAS 10
 
 // radius of the points
 //#define POINT_RADIUS 2.3
@@ -51,18 +51,16 @@ struct viewer_state {
 	struct bitmap_font fonts[5]; // from small to large
 	struct bitmap_font *font;
 
-	// drag state
-	bool dragging_window_point;
-	bool dragging_image_point;
-	bool dragged_point;
-	bool dragging_background;
-	int drag_handle[2];
 };
 
 
 // reset and center the state
 static void init_state(struct viewer_state *e)
 {
+	e->n = 2;
+	e->k[0] = e->k[1] = 0.5;
+	e->mode = 1;
+	e->preset = 0;
 	//e->m = 1;
 	//e->n = 1;
 	//e->q = 3;
@@ -101,11 +99,6 @@ static void init_state(struct viewer_state *e)
 
 	e->font = e->fonts + 3;
 
-	// drag state
-	e->dragging_window_point = false;
-	e->dragging_image_point = false;
-	e->dragged_point = -1;
-	e->dragging_background = false;
 }
 
 
@@ -121,7 +114,7 @@ static uint8_t palette[16][3] = {
 	{192, 192, 192},  //  7  dark white
 	{128, 128, 128},  //  8  gray
 	{255, 0, 0},      //  9  red
-	{0, 255, 0},      // 10  green
+	{0, 255, 0},      // 10  green (go for a "oscilloscope" aesthetic)
 	{255, 255, 0},    // 11  yellow
 	{0, 0, 255},      // 12  blue
 	{255, 0, 255},    // 13  magenta
@@ -346,20 +339,24 @@ static void paint_state(struct FTR *f)
 			f->rgb[(f->w*j+i)*3+k] = c[k];
 	}
 
-	for (int i = 0; i < e->w; i++)
-	{
-		float x = e->x0 + i * (e->xf - e->x0) / e->w;
-		float y = F[e->m](e->n, e->q, x);
-		float j = e->h - 1 - e->h * (y - e->y0) / (e->yf - e->y0);
-		float P[2] = {i, j};
-		//if (0 == i%10)
-		splat_disk(f->rgb, f->w, f->h, P, POINT_RADIUS, e->rgb_curv);
-	}
+	//for (int i = 0; i < e->w; i++)
+	//{
+	//	float x = e->x0 + i * (e->xf - e->x0) / e->w;
+	//	float y = F[e->m](e->n, e->q, x);
+	//	float j = e->h - 1 - e->h * (y - e->y0) / (e->yf - e->y0);
+	//	float P[2] = {i, j};
+	//	//if (0 == i%10)
+	//	splat_disk(f->rgb, f->w, f->h, P, POINT_RADIUS, e->rgb_curv);
+	//}
 
 	// hud
 	char buf[0x400];
-	char *M[6] = {"ce", "se", "Mc1", "Ms1", "Mc2", "Ms2"};
-	snprintf(buf, 0x400, "m = %s\nn = %g\nq = %g\n", M[e->m], e->n, e->q);
+	int b = 0;
+	b += snprintf(buf+b, 0x400-b, "n = %d\nk = ", e->n);
+	for (int i = 0; i < e->n; i++)
+		b += snprintf(buf+b, 0x400-b, "%g\t", e->k[i]);
+	b += snprintf(buf+b, 0x400-b, "\nmode = LEFT, RIGHT, MIN, MAX, ALL\n");
+	b += snprintf(buf+b, 0x400-b, "action = UNI, EXP, RND, JIT");
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
 			10, 0, e->rgb_fg, e->rgb_bg, 0, e->font, buf);
 }
@@ -376,16 +373,16 @@ static void change_view_offset(struct viewer_state *e, float dx, float dy)
 	e->offset[1] += dy;
 }
 
-// action: viewport zoom
-static void change_view_scale(struct viewer_state *e, int x, int y, float fac)
-{
-	float center[2], X[2] = {x, y};
-	map_window_to_view(e, center, X);
-	e->scale *= fac;
-	for (int p = 0; p < 2; p++)
-		e->offset[p] = -center[p]*e->scale + X[p];
-	fprintf(stderr, "zoom changed %g\n", e->scale);
-}
+//// action: viewport zoom
+//static void change_view_scale(struct viewer_state *e, int x, int y, float fac)
+//{
+//	float center[2], X[2] = {x, y};
+//	map_window_to_view(e, center, X);
+//	e->scale *= fac;
+//	for (int p = 0; p < 2; p++)
+//		e->offset[p] = -center[p]*e->scale + X[p];
+//	fprintf(stderr, "zoom changed %g\n", e->scale);
+//}
 
 static void action_screenshot(struct FTR *f)
 {
@@ -417,12 +414,12 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if (k == FTR_KEY_UP   ) change_view_offset(e, 0, 100);
 	if (k == FTR_KEY_RIGHT) change_view_offset(e, -100, 0);
 	if (k == FTR_KEY_LEFT)  change_view_offset(e, 100, 0);
-	if (k == '+') change_view_scale(e, f->w/2, f->h/2, ZOOM_FACTOR);
-	if (k == '-') change_view_scale(e, f->w/2, f->h/2, 1.0/ZOOM_FACTOR);
+	//if (k == '+') change_view_scale(e, f->w/2, f->h/2, ZOOM_FACTOR);
+	//if (k == '-') change_view_scale(e, f->w/2, f->h/2, 1.0/ZOOM_FACTOR);
 	//if (k == 'a') e->restrict_to_affine = !e->restrict_to_affine;
 	if (k == ',') action_screenshot(f);
 
-	e->dragging_window_point = e->dragging_image_point = false;
+	//e->dragging_window_point = e->dragging_image_point = false;
 	f->changed = 1;
 }
 
@@ -432,36 +429,36 @@ static void event_resize(struct FTR *f, int k, int m, int x, int y)
 	f->changed = 1;
 }
 
-static void toggle_mode(struct viewer_state *e, int s)
-{
-	e->m += s;
-	if (e->m < 0) e->m = 0;
-	if (e->m >= 6) e->m = 5;
-	fprintf(stderr, "e->m = %d\n", e->m);
-}
-static void shift_param_n(struct viewer_state *e, float s) { e->n += s; }
-static void shift_param_q(struct viewer_state *e, float s) { e->q += s; }
+//static void toggle_mode(struct viewer_state *e, int s)
+//{
+//	e->m += s;
+//	if (e->m < 0) e->m = 0;
+//	if (e->m >= 6) e->m = 5;
+//	fprintf(stderr, "e->m = %d\n", e->m);
+//}
+//static void shift_param_n(struct viewer_state *e, float s) { e->n += s; }
+//static void shift_param_q(struct viewer_state *e, float s) { e->q += s; }
 
 // mouse button handler
 static void event_button(struct FTR *f, int k, int m, int x, int y)
 {
 	struct viewer_state *e = f->userdata;
 
-	// m, n, q hitboxes of font height
-	// 0  1  2
-	int Y = y / e->font->height;
-	if (k == FTR_BUTTON_DOWN)
-	{
-		if (Y == 0) toggle_mode(e, -1);
-		if (Y == 1) shift_param_n(e, -1);
-		if (Y == 2) shift_param_q(e, -1);
-	}
-	if (k == FTR_BUTTON_UP)
-	{
-		if (Y == 0) toggle_mode(e, +1);
-		if (Y == 1) shift_param_n(e, +1);
-		if (Y == 2) shift_param_q(e, +1);
-	}
+//	// m, n, q hitboxes of font height
+//	// 0  1  2
+//	int Y = y / e->font->height;
+//	if (k == FTR_BUTTON_DOWN)
+//	{
+//		if (Y == 0) toggle_mode(e, -1);
+//		if (Y == 1) shift_param_n(e, -1);
+//		if (Y == 2) shift_param_q(e, -1);
+//	}
+//	if (k == FTR_BUTTON_UP)
+//	{
+//		if (Y == 0) toggle_mode(e, +1);
+//		if (Y == 1) shift_param_n(e, +1);
+//		if (Y == 2) shift_param_q(e, +1);
+//	}
 
 	f->changed = 1;
 }
@@ -479,17 +476,17 @@ static void event_motion(struct FTR *f, int b, int m, int x, int y)
 	//	f->changed = 1;
 	//}
 
-	// drag WINDOW DOMAIN background (realtime feedback)
-	if (e->dragging_background && m & FTR_BUTTON_LEFT)
-	{
-		int dx = x - e->drag_handle[0];
-		int dy = y - e->drag_handle[1];
-		change_view_offset(e, dx, dy);
-		e->drag_handle[0] = x;
-		e->drag_handle[1] = y;
-		f->changed = 1;
-		return;
-	}
+	//// drag WINDOW DOMAIN background (realtime feedback)
+	//if (e->dragging_background && m & FTR_BUTTON_LEFT)
+	//{
+	//	int dx = x - e->drag_handle[0];
+	//	int dy = y - e->drag_handle[1];
+	//	change_view_offset(e, dx, dy);
+	//	e->drag_handle[0] = x;
+	//	e->drag_handle[1] = y;
+	//	f->changed = 1;
+	//	return;
+	//}
 
 //	int p = hit_point(e, x, y);
 //	if (p >= 0)
@@ -534,7 +531,7 @@ int main_kappaview(int argc, char *argv[])
 	e->fonts[0] = reformat_font(*xfont_4x6, UNPACKED);
 	e->fonts[1] = reformat_font(*xfont_6x12, UNPACKED);
 	e->fonts[2] = reformat_font(*xfont_7x13, UNPACKED);
-	e->fonts[3] = reformat_font(*xfont_9x18B, UNPACKED);//used
+	e->fonts[3] = reformat_font(*xfont_9x18B, UNPACKED);//the only one used
 	e->fonts[4] = reformat_font(*xfont_10x20, UNPACKED);
 
 	// open the window
