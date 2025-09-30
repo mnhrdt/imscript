@@ -422,6 +422,33 @@ static void plot_line_in_plane(struct FTR *f, float *P, float *Q, uint8_t c[3])
 	plot_segment_cyan(f, p[0], p[1], q[0], q[1]);
 }
 
+static int count_bits(unsigned int n)
+{
+	int c = 0;
+	for (; n; c++)
+		n &= n - 1;  // clear the least significant bit set
+	return c;
+}
+
+static long binomial(int n, int k)
+{
+	static int T[MAX_KAPPAS+1][MAX_KAPPAS+1] = {0};
+	int N = MAX_KAPPAS;
+	if (!T[0][0])
+	{
+		for (int i = 0; i <= N; i++)
+			T[i][0] = T[i][i] = 1;
+		for (int i = 2; i <= N; i++)
+		for (int j = 1; j < i; j++)
+			T[i][j] = T[i-1][j-1] + T[i-1][j];
+		//for (int i = 0; i <= N; i++)
+		//for (int j = 0; j <= i; j++)
+		//	fprintf(stderr, "T[%d][%d] = %d\n", i, j, T[i][j]);
+	}
+	assert(n > 0 && n < N);
+	assert(k > 0 && k < N);
+	return T[n][k];
+}
 
 
 // Paint the whole scene
@@ -500,7 +527,10 @@ static void paint_state(struct FTR *f)
 	for (int i = 1; i < N; i++)
 	{
 		p[0] = q[0];
-		p[1] = q[1] + 1.0 / (1 << e->n);
+		//p[1] = q[1] + 1.0 / (1 << e->n);
+		int k = count_bits(i);
+		p[1] = q[1] + (1.0 / binomial(e->n, k)) / (e->n + 1.0);
+		// TODO: fix the formula on previous line
 		q[0] = T[2*i+0];
 		q[1] = p[1];
 		plot_line_in_plane(f, p, q, e->rgb_curv);
