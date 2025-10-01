@@ -287,106 +287,26 @@ static void traverse_circle(int cx, int cy, int r,
 	}
 }
 
-// auxiliary function for drawing a red pixel
-static void plot_pixel_red(int x, int y, void *e)
+static void plot_pixel(int x, int y, void *e)
 {
+	static char c[3] = { 0, 255, 255};
 	struct FTR *f = e;
-	if (insideP(f, x, y)) {
-		int idx = f->w * y + x;
-		f->rgb[3*idx+0] = 255;
-		f->rgb[3*idx+1] = 0;
-		f->rgb[3*idx+2] = 0;
-	}
+	if (x == -1 && y == -1)
+		for (int i = 0; i < 3; i++)
+			c[i] = ((char *)e)[i];
+	else
+		if (insideP(f, x, y))
+			for (int i = 0; i < 3; i++)
+				f->rgb[3*(f->w*y+x)+i] = c[i];
 }
 
-// auxiliary function for drawing a blue pixel
-static void plot_pixel_blue(int x, int y, void *e)
+static void plot_segment(struct FTR *f,
+		float x0, float y0, float xf, float yf, uint8_t c[3])
 {
-	struct FTR *f = e;
-	if (insideP(f, x, y)) {
-		int idx = f->w * y + x;
-		f->rgb[3*idx+0] = 0;
-		f->rgb[3*idx+1] = 0;
-		f->rgb[3*idx+2] = 255;
-	}
+	plot_pixel(-1, -1, c);
+	traverse_segment(x0, y0, xf, yf, plot_pixel, f);
 }
 
-// auxiliary function for drawing a cyan pixel
-static void plot_pixel_cyan(int x, int y, void *e)
-{
-	struct FTR *f = e;
-	if (insideP(f, x, y)) {
-		int idx = f->w * y + x;
-		f->rgb[3*idx+0] = 0;
-		f->rgb[3*idx+1] = 255;
-		f->rgb[3*idx+2] = 255;
-	}
-}
-
-// auxiliary function for drawing a green pixel
-static void plot_pixel_green(int x, int y, void *e)
-{
-	struct FTR *f = e;
-	if (insideP(f, x, y)) {
-		int idx = f->w * y + x;
-		f->rgb[3*idx+0] = 0;
-		f->rgb[3*idx+1] = 128;
-		f->rgb[3*idx+2] = 0;
-	}
-}
-
-// auxiliary function for drawing a gray pixel
-static void plot_pixel_gray(int x, int y, void *e)
-{
-	struct FTR *f = e;
-	if (insideP(f, x, y)) {
-		int idx = f->w * y + x;
-		f->rgb[3*idx+0] = 120;
-		f->rgb[3*idx+1] = 120;
-		f->rgb[3*idx+2] = 120;
-	}
-}
-
-// function to draw a red segment
-static void plot_segment_red(struct FTR *f,
-		float x0, float y0, float xf, float yf)
-{
-	traverse_segment(x0, y0, xf, yf, plot_pixel_red, f);
-}
-
-// function to draw a blue segment
-static void plot_segment_blue(struct FTR *f,
-		float x0, float y0, float xf, float yf)
-{
-	traverse_segment(x0, y0, xf, yf, plot_pixel_blue, f);
-}
-
-// function to draw a cyan segment
-static void plot_segment_cyan(struct FTR *f,
-		float x0, float y0, float xf, float yf)
-{
-	traverse_segment(x0, y0, xf, yf, plot_pixel_cyan, f);
-}
-
-// function to draw a gray segment
-static void plot_segment_gray(struct FTR *f,
-		float x0, float y0, float xf, float yf)
-{
-	traverse_segment(x0, y0, xf, yf, plot_pixel_gray, f);
-}
-
-// function to draw a green segment
-static void plot_segment_green(struct FTR *f,
-		float x0, float y0, float xf, float yf)
-{
-	traverse_segment(x0, y0, xf, yf, plot_pixel_green, f);
-}
-
-static void plot_circle_green(struct FTR *f,
-		float x, float y, float r)
-{
-	traverse_circle(x, y, r, plot_pixel_green, f);
-}
 
 
 
@@ -419,11 +339,12 @@ static void plot_line_in_plane(struct FTR *f, float *P, float *Q, uint8_t c[3])
 	float p[2], q[2];
 	get_win_from_xy(e, p, P);
 	get_win_from_xy(e, q, Q);
-	plot_segment_cyan(f, p[0], p[1], q[0], q[1]);
+	plot_segment(f, p[0], p[1], q[0], q[1], c);
 }
 
 static int count_bits(unsigned int n)
 {
+	int o = n;
 	int c = 0;
 	for (; n; c++)
 		n &= n - 1;  // clear the least significant bit set
@@ -445,8 +366,8 @@ static long binomial(int n, int k)
 		//for (int j = 0; j <= i; j++)
 		//	fprintf(stderr, "T[%d][%d] = %d\n", i, j, T[i][j]);
 	}
-	assert(n > 0 && n < N);
-	assert(k > 0 && k < N);
+	assert(n > 0 && n <= N);
+	assert(k >= 0 && k <= N);
 	return T[n][k];
 }
 
@@ -487,8 +408,8 @@ static void paint_state(struct FTR *f)
 	float AB[4][2];
 	for (int i = 0; i < 4; i++)
 		get_win_from_xy(e, AB[i], ab[i]);
-	plot_segment_gray(f, AB[0][0], AB[0][1], AB[1][0], AB[1][1]);
-	plot_segment_gray(f, AB[2][0], AB[2][1], AB[3][0], AB[3][1]);
+	plot_segment(f, AB[0][0], AB[0][1], AB[1][0], AB[1][1], e->rgb_grid);
+	plot_segment(f, AB[2][0], AB[2][1], AB[3][0], AB[3][1], e->rgb_grid);
 
 
 	//// plot kappas
@@ -514,38 +435,39 @@ static void paint_state(struct FTR *f)
 	}
 
 	// diagonal line (accumulated uniform distribution)
-	plot_line_in_plane(f, (float[]){0,0}, (float[]){1,1}, 0);
+	plot_line_in_plane(f, (float[]){0,0}, (float[]){1,1}, palette[3]);
 
-	// build table of kappa sums
-	float T[2*N];
-	sorted_kappa_sums(T, e);
 
 	// bound lines
 	float M = -INFINITY;
 	for (int i = 0; i < e->n; i++)
 		M = fmax(M, e->k[i]);
 	fprintf(stderr, "M = %g\n", M);
-	plot_line_in_plane(f, (float[]){0,M}, (float[]){1,M+1}, 0);
-	plot_line_in_plane(f, (float[]){M,0}, (float[]){M+1,1}, 0);
+	plot_line_in_plane(f, (float[]){M,0}, (float[]){1,1-M}, palette[5]);
+	plot_line_in_plane(f, (float[]){0,M}, (float[]){1-M,1}, palette[5]);
+
+	// build table of kappa sums
+	float T[2*N];
+	sorted_kappa_sums(T, e);
 
 	// plot accumulated distribution
 	float P[2] = {e->x0, 0}, *p = P;
 	float Q[2] = {0    , 0}, *q = Q;
-	plot_line_in_plane(f, p, q, e->rgb_curv);
+	plot_line_in_plane(f, p, q, palette[14]);
 	for (int i = 1; i < N; i++)
 	{
 		p[0] = q[0];
 		//p[1] = q[1] + 1.0 / (1 << e->n);
 		int k = count_bits(i);
-		p[1] = q[1] + (1.0 / binomial(e->n, k)) / (e->n + 1.0);
+		p[1] = q[1] + 1.0 /((e->n + 1.0) * binomial(e->n, k));
 		// TODO: fix the formula on previous line
 		q[0] = T[2*i+0];
 		q[1] = p[1];
-		plot_line_in_plane(f, p, q, e->rgb_curv);
+		plot_line_in_plane(f, p, q, palette[14]);
 	}
 	p[0] = 1   ;  p[1] = 1;
 	q[0] = e->xf; q[1] = 1;
-	plot_line_in_plane(f, p, q, e->rgb_curv);
+	plot_line_in_plane(f, p, q, palette[14]);
 
 
 	//for (int i = 0; i < e->w; i++)
@@ -557,9 +479,6 @@ static void paint_state(struct FTR *f)
 	//	//if (0 == i%10)
 	//	splat_disk(f->rgb, f->w, f->h, P, POINT_RADIUS, e->rgb_curv);
 	//}
-
-	float T[2*N];
-	sorted_kappa_sums(T, e);
 
 
 	// hud
