@@ -448,6 +448,14 @@ static void paint_state(struct FTR *f)
 			f->rgb[(f->w*j+i)*3+k] = c[k];
 	}
 
+	float ab[4][2] = { {0.5, 0}, {0.5, 1}, {0, 0.5}, {1, 0.5} };
+	float AB[4][2];
+	for (int i = 0; i < 4; i++)
+		get_win_from_xy(e, AB[i], ab[i]);
+	plot_segment_gray(f, AB[0][0], AB[0][1], AB[1][0], AB[1][1]);
+	plot_segment_gray(f, AB[2][0], AB[2][1], AB[3][0], AB[3][1]);
+
+
 	//// plot kappas
 	//for (int i = 0; i < e->n; i++)
 	//{
@@ -479,6 +487,10 @@ static void paint_state(struct FTR *f)
 	//	//if (0 == i%10)
 	//	splat_disk(f->rgb, f->w, f->h, P, POINT_RADIUS, e->rgb_curv);
 	//}
+
+	float T[2*N];
+	sorted_kappa_sums(T, e);
+
 
 	// hud
 	char buf[0x400];
