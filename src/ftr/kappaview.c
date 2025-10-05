@@ -67,8 +67,8 @@ static void init_state(struct viewer_state *e)
 	//e->q = 3;
 
 
-	e->w = 800;
-	e->h = 800;
+	e->w = 600;
+	e->h = 600;
 	e->x0 = -0.2;
 	e->xf = 1.2;
 	e->y0 = -0.2;
@@ -134,6 +134,13 @@ static void get_win_from_xy(struct viewer_state *e, float ij[2], float xy[2])
 {
 	ij[0] =            e->w * (xy[0] - e->x0) / (e->xf - e->x0);
 	ij[1] = e->h - 1 - e->h * (xy[1] - e->y0) / (e->yf - e->y0);
+}
+
+int compare_floats(const void *a, const void *b)
+{
+	const float *da = (const float *) a;
+	const float *db = (const float *) b;
+	return (*da > *db) - (*da < *db);
 }
 
 static int compare_points_lexicographically(const void *aa, const void *bb)
@@ -243,8 +250,24 @@ static void change_one_kappa(struct viewer_state *e, int i, float d)
 		break;
 	}
 }
-
 
+static void kappasampling(
+		float *o,  // sorted samples (output array, to be filled-in)
+		int M,     // number of samples
+		float *k,  // array of kappas
+		int N      // number of kappas
+		)
+{
+	double (*R)(void) = random_uniform;
+	for (int m = 0; m < M; m++)
+	{
+		o[m] = 0;
+		float x = R();
+		for (int n = 0; n < N; n++)
+			o[m] += k[n] * (x > R());
+	}
+	qsort(o, M, sizeof*o, compare_floats);
+}
 
 
 // SECTION 7. Drawing                                                       {{{1
@@ -348,6 +371,7 @@ static int count_bits(unsigned int n)
 	int c = 0;
 	for (; n; c++)
 		n &= n - 1;  // clear the least significant bit set
+	//fprintf(stderr, "count_bits(%d) = %d\n", o, c);
 	return c;
 }
 
@@ -362,14 +386,13 @@ static long binomial(int n, int k)
 		for (int i = 2; i <= N; i++)
 		for (int j = 1; j < i; j++)
 			T[i][j] = T[i-1][j-1] + T[i-1][j];
-		//for (int i = 0; i <= N; i++)
-		//for (int j = 0; j <= i; j++)
-		//	fprintf(stderr, "T[%d][%d] = %d\n", i, j, T[i][j]);
 	}
 	assert(n > 0 && n <= N);
 	assert(k >= 0 && k <= N);
+	//fprintf(stderr, "binomial(%d,%d) = %d\n", n, k, T[n][k]);
 	return T[n][k];
 }
+
 
 
 // Paint the whole scene
@@ -435,16 +458,30 @@ static void paint_state(struct FTR *f)
 	}
 
 	// diagonal line (accumulated uniform distribution)
-	plot_line_in_plane(f, (float[]){0,0}, (float[]){1,1}, palette[3]);
+	plot_line_in_plane(f, (float[]){0,0}, (float[]){1,1}, palette[1]);
 
 
 	// bound lines
 	float M = -INFINITY;
 	for (int i = 0; i < e->n; i++)
 		M = fmax(M, e->k[i]);
-	fprintf(stderr, "M = %g\n", M);
+	//fprintf(stderr, "M = %g\n", M);
 	plot_line_in_plane(f, (float[]){M,0}, (float[]){1,1-M}, palette[5]);
 	plot_line_in_plane(f, (float[]){0,M}, (float[]){1-M,1}, palette[5]);
+
+	// plot 10 random samples as faint curves in the background
+	// (we have to plot them first so that they are covered by other stuff)
+	for (int cx = 0; cx < 10; cx++)
+	{
+		int M = 100;
+		float S[M];
+		kappasampling(S, M, e->k, e->n);
+		for (int i = 0; i < M; i++)
+		{
+			float p[2] = { S[i], i * 1.0 / M };
+			plot_line_in_plane(f, p, p, palette[3]);
+		}
+	}
 
 	// build table of kappa sums
 	float T[2*N];
@@ -459,7 +496,9 @@ static void paint_state(struct FTR *f)
 		p[0] = q[0];
 		//p[1] = q[1] + 1.0 / (1 << e->n);
 		int k = count_bits(i);
-		p[1] = q[1] + 1.0 /((e->n + 1.0) * binomial(e->n, k));
+		float dy = 1.0 / ((e->n + 1.0) * binomial(e->n, k));
+		//fprintf(stderr, "pmass[%d] = %g\n", i, dy);
+		p[1] = q[1] + dy;//1.0 /((e->n + 1.0) * binomial(e->n, k));
 		// TODO: fix the formula on previous line
 		q[0] = T[2*i+0];
 		q[1] = p[1];
