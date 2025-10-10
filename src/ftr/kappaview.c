@@ -161,11 +161,15 @@ static void sorted_kappa_sums(float *T, struct viewer_state *e)
 	for (int i = 0; i < N; i++)
 	{
 		float k = 0; // accumulator for this kappa sum
+		int c = 0;   // counter of kappas used
 		for (int j = 0; j < e->n; j++)
 			if (i & (1 << j))
+			{
 				k += e->k[j];
+				c += 1;
+			}
 		T[2*i+0] = k; // kappa sum
-		T[2*i+1] = i; // kappas to be summed (in the bits of i)
+		T[2*i+1] = c; // number of kappas
 	}
 	qsort(T, N, 2*sizeof*T, compare_points_lexicographically);
 }
@@ -213,7 +217,7 @@ static void set_random_kappas(struct viewer_state *e)
 static void jitter_kappas(struct viewer_state *e)
 {
 	for (int i = 0; i < e->n; i++)
-		e->k[i] += 0.005 * random_normal();
+		e->k[i] += 0.001 * random_normal();
 	for (int i = 0; i < e->n; i++)
 		e->k[i] = fmax(0, fmin(1, e->k[i]));
 	float k = kappa_sum(e);
@@ -476,10 +480,16 @@ static void paint_state(struct FTR *f)
 		int M = 100;
 		float S[M];
 		kappasampling(S, M, e->k, e->n);
+		for (int i = 1; i < M; i++)
+		{
+			float p[2] = { S[i-1], i * 1.0 / M };
+			float q[2] = { S[i], i * 1.0 / M };
+			plot_line_in_plane(f, p, q, palette[3]);
+		}
 		for (int i = 0; i < M; i++)
 		{
 			float p[2] = { S[i], i * 1.0 / M };
-			plot_line_in_plane(f, p, p, palette[3]);
+			plot_line_in_plane(f, p, p, palette[10]);
 		}
 	}
 
@@ -491,18 +501,18 @@ static void paint_state(struct FTR *f)
 	float P[2] = {e->x0, 0}, *p = P;
 	float Q[2] = {0    , 0}, *q = Q;
 	plot_line_in_plane(f, p, q, palette[14]);
-	for (int i = 1; i < N; i++)
+	for (int i = 0; i < N; i++)
 	{
 		p[0] = q[0];
+		p[1] = q[1];
+		q[0] = T[2*i+0];
+		plot_line_in_plane(f, p, q, palette[14]);
 		//p[1] = q[1] + 1.0 / (1 << e->n);
-		int k = count_bits(i);
+		//int k = count_bits(i);
+		int k = T[2*i+1];
 		float dy = 1.0 / ((e->n + 1.0) * binomial(e->n, k));
 		//fprintf(stderr, "pmass[%d] = %g\n", i, dy);
-		p[1] = q[1] + dy;//1.0 /((e->n + 1.0) * binomial(e->n, k));
-		// TODO: fix the formula on previous line
-		q[0] = T[2*i+0];
-		q[1] = p[1];
-		plot_line_in_plane(f, p, q, palette[14]);
+		q[1] = q[1] + dy;//1.0 /((e->n + 1.0) * binomial(e->n, k));
 	}
 	p[0] = 1   ;  p[1] = 1;
 	q[0] = e->xf; q[1] = 1;
