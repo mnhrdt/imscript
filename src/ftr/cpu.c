@@ -1672,7 +1672,7 @@ int main_cpu_multi(int c, char *v[])
 	//e->font[0] = reformat_font(*xfont_5x7, UNPACKED);
 
 	// open window
-	struct FTR f = ftr_new_window(BAD_MIN(e->w,1000), BAD_MIN(e->h,800));
+	struct FTR f = ftr_new_window(BAD_MIN(e->w,1000), BAD_MIN(e->h,1000));
 	f.userdata = e;
 	action_reset_zoom_and_position(&f);
 	action_update_window_title(&f);

@@ -210,9 +210,43 @@ static void zoom_out_by_factor_two(float *out, int ow, int oh,
 	}
 }
 
+static void zoom_out_by_factor_two_cplx(float *out, int ow, int oh,
+		float *in, int iw, int ih, int pd)
+{
+	assert(pd == 2);
+	assert(abs(2*ow-iw) < 2);
+	assert(abs(2*oh-ih) < 2);
+	for (int j = 0; j < oh; j++)
+	for (int i = 0; i < ow; i++)
+	{
+		float a[4], b[4], A = 0;
+		a[0] = getsample_zero(in, iw, ih, pd, 2*i  , 2*j  , 0);
+		a[1] = getsample_zero(in, iw, ih, pd, 2*i+1, 2*j  , 0);
+		a[2] = getsample_zero(in, iw, ih, pd, 2*i  , 2*j+1, 0);
+		a[3] = getsample_zero(in, iw, ih, pd, 2*i+1, 2*j+1, 0);
+		b[0] = getsample_zero(in, iw, ih, pd, 2*i  , 2*j  , 1);
+		b[1] = getsample_zero(in, iw, ih, pd, 2*i+1, 2*j  , 1);
+		b[2] = getsample_zero(in, iw, ih, pd, 2*i  , 2*j+1, 1);
+		b[3] = getsample_zero(in, iw, ih, pd, 2*i+1, 2*j+1, 1);
+		int n = 0;
+		for (int k = 0; k < 4; k++)
+			if (!isnan(a[k]))
+			{
+				A += hypot(a[k], b[k]);
+				n += 1;
+			}
+		out[pd*(ow*j + i)+0] = n ? A/n : NAN;
+		out[pd*(ow*j + i)+1] = n ? A/n : NAN;
+	}
+}
+
+// whether to downsample complex-valued images by absolute value
+SMART_PARAMETER_SILENT(PYR_CPLX,0)
+
 static int build_pyramid(struct FI *f, int max_octaves)
 {
 	zoom_out_function_t z = zoom_out_by_factor_two;
+	zoom_out_function_t zc = zoom_out_by_factor_two_cplx;
 	f->pyr_w[0] = f->w;
 	f->pyr_h[0] = f->h;
 	f->pyr_x[0] = f->x;
@@ -225,7 +259,10 @@ static int build_pyramid(struct FI *f, int max_octaves)
 		int      sw   = ceil(lw / 2.0);
 		int      sh   = ceil(lh / 2.0);
 		float   *sx = xmalloc(f->pd * sw * sh * sizeof*sx);
-		z(sx, sw, sh, lx, lw, lh, f->pd);
+		zoom_out_function_t Z = z;
+		if (f->pd == 2 && PYR_CPLX())
+			Z = zc;
+		Z(sx, sw, sh, lx, lw, lh, f->pd);
 		f->pyr_w[s]   = sw;
 		f->pyr_h[s]   = sh;
 		f->pyr_x[s]   = sx;
