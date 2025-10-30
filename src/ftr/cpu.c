@@ -759,6 +759,8 @@ static void action_flip(struct FTR *f, int o)
 	if (i >= e->i_num) i = 0;
 	action_flipn(f, i);
 	action_update_window_title(f);
+	if (e->auto_qauto)
+		action_qauto2(f);
 }
 
 static void action_screenshot(struct FTR *f)
@@ -1645,6 +1647,11 @@ int main_cpu_single(int c, char *v[])
 }
 int main_cpu_multi(int c, char *v[])
 {
+	// read named arguments (only init sizing, so far)
+	int param_w = atoi(pick_option(&c, &v, "w", "0"));
+	int param_h = atoi(pick_option(&c, &v, "h", "0"));
+	int param_o = atoi(pick_option(&c, &v, "o", "0"));
+
 	// each input argument is an image
 	// if no input arguments, read from stdin
 	int n = c - 1;
@@ -1672,9 +1679,17 @@ int main_cpu_multi(int c, char *v[])
 	//e->font[0] = reformat_font(*xfont_5x7, UNPACKED);
 
 	// open window
-	struct FTR f = ftr_new_window(BAD_MIN(e->w,1000), BAD_MIN(e->h,1000));
+	param_w *= pow(2, -param_o);
+	param_h *= pow(2, -param_o);
+	e->w *= pow(2, -param_o);
+	e->h *= pow(2, -param_o);
+	struct FTR f = ftr_new_window(
+			param_w ? param_w : BAD_MIN(e->w,1000),
+			param_h ? param_h : BAD_MIN(e->h,1000)
+			);
 	f.userdata = e;
 	action_reset_zoom_and_position(&f);
+	e->zoom_factor = pow(2, -param_o);
 	action_update_window_title(&f);
 	ftr_set_handler(&f, "expose", pan_exposer);
 	ftr_set_handler(&f, "motion", pan_motion_handler);
