@@ -12,7 +12,7 @@ BIN = plambda vecov veco vecoh morsi downsa upsa ntiply censust dither qauto \
       columnize autocorr sauto antipoisson
       #geomedian carve
 
-BIN := $(addprefix bin/,$(BIN))
+BIN := $(BIN:%=bin/%)
 
 default: $(BIN) bin/cpu_term bin/rpcflip_term
 
@@ -213,6 +213,7 @@ ifdef ENABLE_PGSL
 bin/plambda: LDLIBS += -lgsl
 src/plambda.o: CPPFLAGS += -DPLAMBDA_WITH_GSL
 bin/mathieu: LDLIBS += -lgsl
+bin/kappaview: LDLIBS += -lgsl
 endif
 
 # other target-specific variables
