@@ -52,7 +52,7 @@ static void init_state(struct kanga_state *e, int w, int h)
 	e->N = 100;
 	e->k = 5;
 	//e->a = malloc(w * n * sizeof*e->a);
-	e->P = malloc(2 * e->N * sizeof*e->P);
+	e->P = 0;//malloc(2 * e->N * sizeof*e->P);
 
 	e->s = 1;
 
@@ -163,6 +163,7 @@ static void step(struct FTR *f, int x, int y, int k, int m)
 
 
 	struct kanga_state *e = f->userdata;
+	float P[2*e->N]; e->P = P;
 	throw_particles(e);
 
 	//move_particles(e);
