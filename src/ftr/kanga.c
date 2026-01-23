@@ -49,7 +49,7 @@ static void init_state(struct kanga_state *e, int w, int h)
 {
 	e->w = w;
 	e->h = h;
-	e->N = 100;
+	e->N = 500;
 	e->k = 5;
 	//e->a = malloc(w * n * sizeof*e->a);
 	e->P = 0;//malloc(2 * e->N * sizeof*e->P);
@@ -108,6 +108,12 @@ static void win_from_xy(float *ij, struct kanga_state *e, float *xy)
 {
 	ij[0] = e->w * (xy[0] - e->xmin) / (e->xmax - e->xmin);
 	ij[1] = e->h * (xy[1] - e->ymin) / (e->ymax - e->ymin);
+}
+
+static void xy_from_win(float *xy, struct kanga_state *e, float *ij)
+{
+	xy[0] = e->xmin + (ij[0] / e->w) * (e->xmax - e->xmin);
+	xy[1] = e->ymin + (ij[1] / e->h) * (e->ymax - e->ymin);
 }
 
 static bool insideP(int w, int h, int x, int y)
@@ -178,13 +184,14 @@ static void step(struct FTR *f, int x, int y, int k, int m)
 	uint8_t green[3] = {0, 255, 0};
 	uint8_t dgray[3] = {100,100,100};
 	uint8_t white[3] = {255, 255, 255};
+	uint8_t dblue[3] = {0, 0, 227};
 	uint8_t black[3] = {0, 0, 0};
 	for (int i = 0; i < e->N; i++)
 	{
 		//int x = lrint(e->p[2*i+0]);
 		//int y = lrint(e->p[2*i+1]);
 		float *P = e->P + 2 * i, Pwin[2];
-		uint8_t *color = dgray;
+		uint8_t *color = dblue;
 		if (i < e->k) color = white;
 		win_from_xy(Pwin, e, P);
 		splat_disk(f->rgb, f->w, f->h, Pwin, e->r, color);
@@ -254,6 +261,14 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 {
 	struct kanga_state *e = f->userdata;
 
+	// left-click : move query point
+	if (k == FTR_BUTTON_LEFT)
+	{
+		float ij[2] = {x, y};
+		xy_from_win(e->x, e, ij);
+	}
+
+	// wheel : change written parameters
 	// t, T0, s, F, p, r,   hitboxes of font height
 	// 0  1   2  3  4  5
 	int Y = y / e->font->height;
@@ -274,6 +289,7 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 2 && X >=25) scale_float(e->x+1, 1.2);
 		if (Y == 3) scale_float(&e->r, 1.1);
 	}
+
 
 	f->changed = 1;
 }
