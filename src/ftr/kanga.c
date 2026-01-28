@@ -283,7 +283,8 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	}
 	if (k == FTR_BUTTON_UP && x < 30 * e->font->width)
 	{
-		if (Y == 0) shift_int(&e->N, 1);
+		if (Y == 0 && X > 20) shift_int(&e->N, 1);
+		if (Y == 0 && X <= 20) shift_int(&e->N, 10);
 		if (Y == 1) shift_int(&e->k, 1);
 		if (Y == 2 && X < 25) scale_float(e->x+0, 1.2);
 		if (Y == 2 && X >=25) scale_float(e->x+1, 1.2);
