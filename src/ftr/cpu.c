@@ -35,7 +35,7 @@
 #define WHEEL_FACTOR 2
 #define MAX_PYRAMID_LEVELS 30
 
-#define MAX_IMAGES 1000
+#define MAX_IMAGES 2000
 
 // data structure for the image viewer
 // this data goes into the "userdata" field of the FTR window structure
@@ -53,6 +53,7 @@ struct pan_state {
 	float chan_size[3];
 	float p;
 	bool auto_qauto;
+	int extension;
 
 	// 4. roi
 	int roi; // 0=nothing 1=dftwindow 2=rawfourier 3=ppsmooth 4=circppsm
@@ -128,7 +129,14 @@ static void pixel(float *out, struct pan_state *e, double p, double q)
 {
 	//if(p<0||q<0){out[0]=out[1]=out[2]=170;return;}// TODO: kill this
 	//if(p>=e->i->w||q>=e->i->h){out[0]=out[1]=out[2]=85;return;}
-	if (p < 0 || q < 0 || p >= e->i->w || q >= e->i->h) {
+	if (e->extension == 1 &&
+			(p < 0 || q < 0 || p >= e->i->w || q >= e->i->h)) {
+		if (p < 0) p = 0;
+		if (q < 0) q = 0;
+		if (p >= e->i->w) p = e->i->w -1;
+		if (q >= e->i->h) q = e->i->h -1;
+	}
+	else if (p < 0 || q < 0 || p >= e->i->w || q >= e->i->h) {
 		int ip = p+256;
 		int iq = q+256;
 		int pip = gmod(ip/256, 2);
@@ -1647,70 +1655,6 @@ int main_cpu_single(int c, char *v[])
 	//fancy_image_close(e->i);
 	return r - 1;
 }
-int main_cpu_multi(int c, char *v[])
-{
-	// read named arguments (only init sizing, so far)
-	int param_w = atoi(pick_option(&c, &v, "w", "0")); // width
-	int param_h = atoi(pick_option(&c, &v, "h", "0")); // height
-	int param_o = atoi(pick_option(&c, &v, "o", "0")); // initial octave
-
-	// each input argument is an image
-	// if no input arguments, read from stdin
-	int n = c - 1;
-	if (n > MAX_IMAGES) n = MAX_IMAGES;
-	char *t[1+n];
-	t[0] = "-";
-	for (int i = 0; i < n; i++) t[i] = v[i+1];
-	if (n == 0) n = 1;
-
-	// read images
-	struct pan_state e[1];
-	e->i_num = n;
-	for (int i = 0; i < n; i++) e->i_name[i] = t[i];
-	for (int i = 0; i < n; i++) e->i_tab[i]  = fancy_image_open(t[i], "r");
-	e->i = e->i_tab[0];
-	e->w = e->i->w;
-	e->h = e->i->h;
-
-	// setup fonts (TODO, integrate these calls into fontu's caching stuff)
-	e->font[0] = reformat_font(*xfont_4x6, UNPACKED);
-	e->font[1] = reformat_font(*xfont_6x12, UNPACKED);
-	e->font[2] = reformat_font(*xfont_7x13, UNPACKED);
-	e->font[3] = reformat_font(*xfont_9x15, UNPACKED);
-	e->font[4] = reformat_font(*xfont_10x20, UNPACKED);
-	//e->font[0] = reformat_font(*xfont_5x7, UNPACKED);
-
-	// open window
-	param_w *= pow(2, -param_o);
-	param_h *= pow(2, -param_o);
-	e->w *= pow(2, -param_o);
-	e->h *= pow(2, -param_o);
-	struct FTR f = ftr_new_window(
-			param_w ? param_w : BAD_MIN(e->w,1000),
-			param_h ? param_h : BAD_MIN(e->h,1000)
-			);
-	f.userdata = e;
-	action_reset_zoom_and_position(&f);
-	e->zoom_factor = pow(2, -param_o);
-	action_update_window_title(&f);
-	ftr_set_handler(&f, "expose", pan_exposer);
-	ftr_set_handler(&f, "motion", pan_motion_handler);
-	ftr_set_handler(&f, "button", pan_button_handler);
-	ftr_set_handler(&f, "key"   , pan_key_handler);
-#ifdef CPU_SIGUSR
-	global_f_for_sigusr = &f;
-	signal(SIGUSR1, handle_signal);
-	signal(SIGUSR2, handle_signal);
-#endif//CPU_SIGUSR
-
-	int r = ftr_loop_run(&f);
-
-	// cleanup and exit (optional)
-	//for (int i = 0; i < 5; i++) free(e->font[i].data);
-	ftr_close(&f);
-	//fancy_image_close(e->i);
-	return r - 1;
-}
 int main_cpu_multi_lazy(int c, char *v[])
 {
 	// read named arguments (only init sizing, so far)
@@ -1727,17 +1671,19 @@ int main_cpu_multi_lazy(int c, char *v[])
 	for (int i = 0; i < n; i++) t[i] = v[i+1];
 	if (n == 0) n = 1;
 
-	// read images
+	// state struct initializaton
 	struct pan_state e[1];
 	e->i_num = n;
+	e->i_idx = 0;
+	e->extension = 0;
+
+	// get names of all images, open the first one
 	for (int i = 0; i < n; i++)
 	{
 		e->i_name[i] = t[i];
 		e->i_tab[i] = 0;
-		if (i == 0)
-			e->i_tab[i] = fancy_image_open(t[i], "r");
 	}
-	assert(e->i_tab[0]);
+	e->i_tab[0] = fancy_image_open(e->i_name[0], "r");
 	e->i = e->i_tab[0];
 	e->w = e->i->w;
 	e->h = e->i->h;
