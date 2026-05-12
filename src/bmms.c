@@ -158,9 +158,9 @@ static void median_filter_vec(float *y, float *x, int w, int h, int pd, int rad)
 static void vector_median_filter_inline(float *x, int w, int h, int pd, int rad)
 {
 	fprintf(stderr, "mfilter %d %d\n", w, h);
-	float *tmp = xmalloc(w * h * pd * sizeof*tmp);
+	float *tmp = xmalloc((size_t)w * h * pd * sizeof*tmp);
 	median_filter_vec(tmp, x, w, h, pd, rad);
-	memcpy(x, tmp, w * h * pd * sizeof*tmp);
+	memcpy(x, tmp, (size_t)w * h * pd * sizeof*tmp);
 	free(tmp);
 }
 
@@ -291,9 +291,9 @@ void bmms_rec(float *out, float *a, float *b,
 	if (scale > 1) {
 		int ws = ceil(w/2.0);
 		int hs = ceil(h/2.0);
-		float *As = malloc(ws * hs * pd * sizeof*As);
-		float *Bs = malloc(ws * hs * pd * sizeof*Bs);
-		float *Os = malloc(ws * hs * 2  * sizeof*Os);
+		float *As = xmalloc((size_t)ws * hs * pd * sizeof*As);
+		float *Bs = xmalloc((size_t)ws * hs * pd * sizeof*Bs);
+		float *Os = xmalloc((size_t)ws * hs * 2  * sizeof*Os);
 		zoom_out_by_factor_two(As, ws, hs, a, w, h, pd);
 		zoom_out_by_factor_two(Bs, ws, hs, b, w, h, pd);
 		bmms_rec(Os, As, Bs, ws, hs, pd, wrad, mrad, scale - 1, e);
