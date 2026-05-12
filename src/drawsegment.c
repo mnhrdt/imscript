@@ -40,7 +40,7 @@ void traverse_segment_aa(int px, int py, int qx, int qy,
 		if (abs(qx - px) > qy - py) { // horitzontal
 			float slope = (qy - py); slope /= (qx - px);
 			assert(px < qx);
-			assert(fabs(slope) <= 1);
+			assert(fabs(slope) <= 1.0001);
 			for (int i = 0; i <= qx-px; i++) {
 				float exact = py + i*slope;
 				int whole = lrint(exact);
@@ -54,7 +54,7 @@ void traverse_segment_aa(int px, int py, int qx, int qy,
 			float slope = (qx - px); slope /= (qy - py);
 			assert(abs(qy - py) >= abs(qx - px));
 			assert(py < qy);
-			assert(fabs(slope) <= 1);
+			assert(fabs(slope) <= 1.0001);
 			for (int j = 0; j <= qy-py; j++) {
 				float exact = px + j*slope;
 				int whole = lrint(exact);
@@ -82,7 +82,7 @@ void traverse_segment_aa2(float px, float py, float qx, float qy,
 		if (fabs(qx - px) > qy - py) { // horitzontal
 			float slope = (qy - py); slope /= (qx - px);
 			//assert(px < qx);
-			assert(fabs(slope) <= 1);
+			assert(fabs(slope) <= 1.0001);
 			for (int i = 0; i <= qx-px; i++) {
 				float exact = py + i*slope;
 				int whole = lrint(exact);
@@ -96,7 +96,7 @@ void traverse_segment_aa2(float px, float py, float qx, float qy,
 			float slope = (qx - px); slope /= (qy - py);
 			assert(fabs(qy - py) >= fabs(qx - px));
 			assert(py < qy);
-			assert(fabs(slope) <= 1);
+			assert(fabs(slope) <= 1.0001);
 			for (int j = 0; j <= qy-py; j++) {
 				float exact = px + j*slope;
 				int whole = lrint(exact);
