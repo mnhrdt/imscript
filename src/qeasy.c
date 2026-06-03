@@ -33,10 +33,12 @@ static char *help_string_long     =
 "Report bugs to <enric.meinhardt@ens-paris-saclay.fr>."
 ;
 #include "help_stuff.c" // functions that print the strings named above
+#include "pickopt.c"
 int main_qeasy(int c, char *v[])
 {
 	if (c == 2) if_help_is_requested_print_it_and_exit_the_program(v[1]);
 
+	bool keep_floats = pick_option(&c, &v, "f", 0);
 	if (c != 5 && c != 4 && c != 3) {
 		fprintf(stderr,"usage:\n\t%s black white  [in [out]]\n", *v);
 		//                         0 1     2       3   4
@@ -49,15 +51,23 @@ int main_qeasy(int c, char *v[])
 
 	int w, h, pd;
 	float *x = iio_read_image_float_vec(filename_in, &w, &h, &pd);
-	uint8_t *y = (void*)x;
-	for (int i = 0; i < w*h*pd; i++) {
-		float g = x[i];
-		g = floor(255 * (g - black)/(white - black));
-		if (g < 0) g = 0;
-		if (g > 255) g = 255;
-		y[i] = g;
+
+	for (int i = 0; i < w*h*pd; i++)
+		x[i] = floor(255 * (x[i] - black)/(white - black));
+
+	if (keep_floats)
+		iio_write_image_float_vec(filename_out, x, w, h, pd);
+	else {
+		uint8_t *y = (void*)x;
+		for (int i = 0; i < w*h*pd; i++)
+		{
+			uint8_t g = x[i];
+			if (x[i] < 0) g = 0;
+			if (x[i] > 255) g = 255;
+			y[i] = g;
+		}
+		iio_write_image_uint8_vec(filename_out, y, w, h, pd);
 	}
-	iio_write_image_uint8_vec(filename_out, y, w, h, pd);
 	return 0;
 }
 
