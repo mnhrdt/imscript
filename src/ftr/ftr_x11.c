@@ -200,29 +200,36 @@ void ftr_close(struct FTR *ff)
 // replacement for XKeycodeToKeysym, which is deprecated
 static int x_keycode_to_keysym(struct _FTR *f, int keycode)
 {
+	// TODO: this function should receive the keyboard flags
+	// and act appropriately, calling XLookupKeysym with an index
 	int nothing;
 	KeySym *t = XGetKeyboardMapping(f->display, keycode, 1, &nothing);
 	int r = t[0];
 	XFree(t);
+	fprintf(stderr, "keycode to keysym : %d => %d '%c'\n", keycode, r, r);
 	return r;
 }
 
 static int keycode_to_ftr(struct _FTR *f, int keycode, int keystate)
 {
 	int key = x_keycode_to_keysym(f, keycode);
-	//fprintf(stderr, "keycode to keysym : %d => %d\n", keycode, key);
 
-	if (keycode == 9)   return 27;    // ascii ESC
-	if (keycode == 119) return 127;   // ascii DEL
-	if (keycode == 22)  return '\b';
-	if (keycode == 23)  return '\t';
-	if (keycode == 36 || keycode == 105) return '\n';
-	if (keycode == 111) return FTR_KEY_UP;
-	if (keycode == 113) return FTR_KEY_LEFT;
-	if (keycode == 114) return FTR_KEY_RIGHT;
-	if (keycode == 116) return FTR_KEY_DOWN;
-	if (keycode == 112) return FTR_KEY_PAGE_UP;
-	if (keycode == 117) return FTR_KEY_PAGE_DOWN;
+// special keys: keysyms from X11/keysymdef.h of the form 0xff**
+	if (key == 0xff1b) return FTR_KEY_ESC;
+	if (key == 0xffff) return FTR_KEY_DEL;
+	if (key == 0xff08) return '\b';
+	if (key == 0xff09 || key == 0xff89) return '\t';
+	if (key == 0xff0d || key == 0xff8d) return '\n';
+	if (key == 0xff50) return FTR_KEY_HOME;
+	if (key == 0xff51) return FTR_KEY_LEFT;
+	if (key == 0xff52) return FTR_KEY_UP;
+	if (key == 0xff53) return FTR_KEY_RIGHT;
+	if (key == 0xff54) return FTR_KEY_DOWN;
+	if (key == 0xff55) return FTR_KEY_PAGE_UP;
+	if (key == 0xff56) return FTR_KEY_PAGE_DOWN;
+	if (key == 0xff57) return FTR_KEY_END;
+
+// regular letters: the keysym is the ascii value
 	return key;
 }
 
