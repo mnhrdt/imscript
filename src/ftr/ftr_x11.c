@@ -198,21 +198,19 @@ void ftr_close(struct FTR *ff)
 }
 
 // replacement for XKeycodeToKeysym, which is deprecated
-static int x_keycode_to_keysym(struct _FTR *f, int keycode)
+static int x_keycode_to_keysym(struct _FTR *f, int keycode, int keystate)
 {
-	// TODO: this function should receive the keyboard flags
-	// and act appropriately, calling XLookupKeysym with an index
-	int nothing;
-	KeySym *t = XGetKeyboardMapping(f->display, keycode, 1, &nothing);
-	int r = t[0];
-	XFree(t);
-	fprintf(stderr, "keycode to keysym : %d => %d '%c'\n", keycode, r, r);
-	return r;
+	XKeyEvent e = { 0 };
+	e.display = f->display;
+	e.keycode = keycode;
+	e.state = keystate;
+	return XLookupKeysym(&e, keystate & ShiftMask);
+	//fprintf(stderr, "keycode to keysym : %d => %d '%c'\n", keycode, r, r);
 }
 
 static int keycode_to_ftr(struct _FTR *f, int keycode, int keystate)
 {
-	int key = x_keycode_to_keysym(f, keycode);
+	int key = x_keycode_to_keysym(f, keycode, keystate);
 
 // special keys: keysyms from X11/keysymdef.h of the form 0xff**
 	if (key == 0xff1b) return FTR_KEY_ESC;
