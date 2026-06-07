@@ -151,6 +151,16 @@ static void plot_pixel_black(int x, int y, void *e)
 		f->rgb[3*idx+2] = 0;
 	}
 }
+static void plot_pixel_pink(int x, int y, void *e)
+{
+	struct FTR *f = e;
+	if (insideP(f->w, f->h, x, y)) {
+		int idx = f->w * y + x;
+		f->rgb[3*idx+0] = 255;
+		f->rgb[3*idx+1] = 0;
+		f->rgb[3*idx+2] = 255;
+	}
+}
 
 
 // function to draw a black segment
@@ -158,6 +168,11 @@ static void plot_segment_black(struct FTR *f,
 		float x0, float y0, float xf, float yf)
 {
 	traverse_segment(x0, y0, xf, yf, plot_pixel_black, f);
+}
+static void plot_segment_pink(struct FTR *f,
+		float x0, float y0, float xf, float yf)
+{
+	traverse_segment(x0, y0, xf, yf, plot_pixel_pink, f);
 }
 
 // function to draw a colored blob/disk
@@ -265,6 +280,14 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 	win_from_xy(Pwin, e, P);
 	splat_disk(f->rgb, f->w, f->h, Pwin, 5.3, pink);
 
+	// force vector
+	float F[2], PF[2], PFwin[2];
+	force(F, e->a, P);
+	PF[0] = P[0] + e->m * F[0];
+	PF[1] = P[1] + e->m * F[1];
+	win_from_xy(PFwin, e, PF);
+	plot_segment_pink(f, Pwin[0], Pwin[1], PFwin[0], PFwin[1]);
+
 
 	// hud
 	uint8_t *hud_fg = dgreen;
@@ -355,14 +378,14 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	{
 		if (Y == 0) shift_float(&e->a, -0.125);
 		if (Y == 1) shift_float(&e->E, -0.125);
-		if (Y == 2) shift_float(&e->m, -0.5);
+		if (Y == 2) shift_float(&e->m, -0.125);
 		if (Y == 3) shift_float(&e->bg_A, -0.125);
 	}
 	if (k == FTR_BUTTON_UP && x < 30 * e->font->width)
 	{
 		if (Y == 0) shift_float(&e->a, 0.125);
 		if (Y == 1) shift_float(&e->E, 0.125);
-		if (Y == 2) shift_float(&e->m, 0.5);
+		if (Y == 2) shift_float(&e->m, 0.125);
 		if (Y == 3) shift_float(&e->bg_A, 0.125);
 	}
 
