@@ -7,10 +7,12 @@
 // TODO:
 // - draw tissot's indicators of the metric
 //   Required state variables: tissot_scale, tissot_step
+// - implement solver for geodesic equations (geometric leapfrog?)
+// - add global toggle for mechanics/geometry modes
+// DONE
 // - implement symplectic euler method for trajectories q''=-grad(V)(q)
 //   Required state variables: nsteps, hstep, v0_angle
 // - implement symplectic leapfrog (same variables)
-// - implement solver for geodesic equations (geometric leapfrog?)
 
 #include <math.h>     // fmod, floor
 #include <stdbool.h>  // bool
@@ -43,6 +45,12 @@ struct jmg_state {
 	float x[2];     // point of interest
 	float bg_mode;  // 0=potential, 1=metric
 	float bg_A;     // color scale
+
+	// trajectories and geodesics
+	float j0, v0;   // initial angle and speed (cauchy data)
+	int solver;     // 0,1=euler direct,symplectic 2=vel.verlet 3=yosida
+	float tstep;    // timestep
+	int N;          // number of steps
 
 	// gui
 	struct bitmap_font font[1];
@@ -80,24 +88,98 @@ static void powerlaw_force(float *F, float *p)
 {
 	static float a = NAN;
 	if (!F) a = *p;
-	return force(F, a, p);
+	else force(F, a, p);
 }
 
-static void ode_euler(float *o,  // output points
-		vector_field F,  //
-		float q0[2], float v0[2],
-		int N, float h)
+
+typedef void (*ode_solver)(float*,vector_field,float[2],float[2],int,float);
+
+#define FORK(_n) for(int k=0;k<_n;k++)
+
+static void euler_direct(float *o,         // output points
+		vector_field F,            // force field
+		float q0[2], float v0[2],  // input data
+		int N, float h)            // parameters
 {
-	//float v[2] = {v0[0], v0[1]};
-	//for (int i = 0; i < N; i++)
-	//{
-	//	float a[2]; *q = 
-	//	F(a, q);
-	//	q += h*v;
-	//	v += h*a;
-	//}
+	float q[2] = { q0[0], q0[1] };
+	float v[2] = { v0[0], v0[1] };
+	float a[2];
+	for (int i = 0; i < N; i++)
+	{       // drift then kick
+		F(a, q);
+		FORK(2) q[k] += h * v[k];
+		FORK(2) v[k] += h * a[k];
+		FORK(2) o[2*i+k] = q[k];
+	}
 }
 
+static void euler_symplectic(float *o,     // output points
+		vector_field F,            // force field
+		float q0[2], float v0[2],  // input data
+		int N, float h)            // parameters
+{
+	float q[2] = { q0[0], q0[1] };
+	float v[2] = { v0[0], v0[1] };
+	float a[2];
+	for (int i = 0; i < N; i++)
+	{       // kick then drift
+		F(a, q);
+		FORK(2) v[k] += h * a[k];
+		FORK(2) q[k] += h * v[k];
+		FORK(2) o[2*i+k] = q[k];
+	}
+}
+
+
+// updates q and v in-place according to velocity Verlet half-step rule
+// useful for Verlet leapfrog and for Yosida solvers
+static void one_verlet_step(float q[2], float v[2], vector_field F, float h)
+{
+	// half-kick, drift, half-kick
+	float a[2];
+	F(a, q);
+	FORK(2) v[k] += 0.5 * h * a[k];
+	FORK(2) q[k] += h * v[k];
+	F(a, q);
+	FORK(2) v[k] += 0.5 * h * a[k];
+}
+
+
+// https://en.wikipedia.org/wiki/Leapfrog_integration
+static void verlet_leapfrog(float *o,     // output points
+		vector_field F,            // force field
+		float q0[2], float v0[2],  // input data
+		int N, float h)            // parameters
+{
+	float q[2] = { q0[0], q0[1] };
+	float v[2] = { v0[0], v0[1] };
+	for (int i = 0; i < N; i++)
+	{
+		one_verlet_step(q, v, F, h);
+		FORK(2) o[2*i+k] = q[k];
+	}
+}
+
+// https://en.wikipedia.org/wiki/Leapfrog_integration#Yoshida_algorithms
+static void yosida_4th_order (float *o,    // output points
+		vector_field F,            // force field
+		float q0[2], float v0[2],  // input data
+		int N, float h)            // parameters
+{
+	// the famous Yosida constants
+	float w0 = cbrt(2)/(cbrt(2)-2); // -1.70...
+	float w1 = 1/(2-cbrt(2));       //  1.35...
+
+	float q[2] = { q0[0], q0[1] };
+	float v[2] = { v0[0], v0[1] };
+	for (int i = 0; i < N; i++)
+	{
+		one_verlet_step(q, v, F, w1*h);
+		one_verlet_step(q, v, F, w0*h);
+		one_verlet_step(q, v, F, w1*h);
+		FORK(2) o[2*i+k] = q[k];
+	}
+}
 
 // jacobi-maupertuis conformal metric associated to the potential
 static float jacobi_maupertuis(float a, float E, float r)
@@ -133,6 +215,12 @@ static void init_state(struct jmg_state *e, int w, int h)
 	e->bg_A = 1;
 	e->x[0] = 1;
 	e->x[1] = 0;
+
+	e->j0 = 20;
+	e->v0 = 0.5;
+	e->solver = 0;
+	e->N = 100;
+	e->tstep = 0.015625;
 
 	//e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
 	e->font[0] = reformat_font(*xfont_9x18B, UNPACKED);
@@ -324,6 +412,45 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 	win_from_xy(PFwin, e, PF);
 	plot_segment_pink(f, Pwin[0], Pwin[1], PFwin[0], PFwin[1]);
 
+	// velocity vector
+	if (true) //  if "metric" mode
+	{
+		float r = hypot(e->x[0], e->x[1]);
+		e->v0 = sqrt(2*(e->E - potential(e->a, r))/e->m);
+	}
+	float θ = e->j0 * M_PI / 180;
+	float V[2] = { e->v0 * cos(θ), e->v0 * sin(θ) }, PV[2], PVw[2];
+	PV[0] = P[0] + V[0];
+	PV[1] = P[1] + V[1];
+	win_from_xy(PVw, e, PV);
+	if (isfinite(e->v0))
+		plot_segment_black(f, Pwin[0], Pwin[1], PVw[0], PVw[1]);
+	else
+		put_string_in_rgb_image(f->rgb, f->w, f->h,
+			f->w/2-50, f->h/4,
+			red, black, 0, e->font, " IMPOSSIBLE V0 ");
+
+	// solver
+	ode_solver solvers[4] = {
+		euler_direct,
+		euler_symplectic,
+		verlet_leapfrog,
+		yosida_4th_order
+	};
+	float pp[2*e->N];
+	powerlaw_force(NULL, &e->a);
+	if (isfinite(e->v0))
+	{
+		solvers[e->solver](pp, powerlaw_force, e->x, V, e->N, e->tstep);
+		for (int i = 0; i < e->N; i++)
+		{
+			float ow[2];
+			win_from_xy(ow, e, pp + 2*i);
+			splat_disk(f->rgb, f->w, f->h, ow, 3.3, red);
+		}
+
+	}
+
 
 	// hud
 	uint8_t *hud_fg = dgreen;
@@ -337,8 +464,14 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 			"a (potential)  = %g\n"
 			"E (energy)     = %g\n"
 			"m (mass)       = %g\n"
-			"A (bg scale)   = %g\n",
-			e->a, e->E, e->m, e->bg_A
+			"A (bg scale)   = %g\n"
+			"j0 (angle)     = %g\n"
+			"v0 (speed)     = %g\n"
+			"solver         = %d\n"
+			"N (nsteps)     = %d\n"
+			"h (timestep)   = %g\n",
+			e->a, e->E, e->m, e->bg_A, e->j0, e->v0,
+			e->solver, e->N, e->tstep
 		);
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
 			0, 0+0, hud_fg, hud_bg, 0, e->font, buf);
@@ -392,6 +525,14 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 static void scale_float(float *x, float f)  { *x *= f; }
 static void shift_float(float *x, float f)  { *x += f; }
 static void shift_int(int *x, int d)  { *x += d; }
+static void shift_angle(float *x, float d) { *x = remainder(*x + d, 360); }
+static void cycle_int(int *x, int d, int m)
+{
+	*x += d;
+	if (*x >= m) *x -= m;
+	if (*x < 0) *x += m;
+}
+static void scale_int(int *x, float f)  { *x *= f; }
 
 // CALLBACK : mouse button handler
 static void event_button(struct FTR *f, int k, int m, int x, int y)
@@ -406,8 +547,8 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	}
 
 	// wheel : change written parameters
-	// a, E, m, A   hitboxes of font height
-	// 0  1  2  3
+	// a, E, m, A, j0, v0, solver, N, h   hitboxes of font height
+	// 0  1  2  3  4   5   6       7  8
 	int Y = y / e->font->height;
 	int X = x / e->font->width;
 	if (k == FTR_BUTTON_DOWN && x < 30 * e->font->width)
@@ -416,6 +557,11 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 1) shift_float(&e->E, -0.125);
 		if (Y == 2) shift_float(&e->m, -0.125);
 		if (Y == 3) shift_float(&e->bg_A, -0.125);
+		if (Y == 4) shift_angle(&e->j0, -10);
+		if (Y == 5) scale_float(&e->v0, 1/pow(2,0.25));
+		if (Y == 6) cycle_int(&e->solver, -1, 4);
+		if (Y == 7) scale_int(&e->N, 1.0/1.1);
+		if (Y == 8) scale_float(&e->tstep, 1/pow(2,0.25));
 	}
 	if (k == FTR_BUTTON_UP && x < 30 * e->font->width)
 	{
@@ -423,6 +569,11 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 1) shift_float(&e->E, 0.125);
 		if (Y == 2) shift_float(&e->m, 0.125);
 		if (Y == 3) shift_float(&e->bg_A, 0.125);
+		if (Y == 4) shift_angle(&e->j0, 10);
+		if (Y == 5) scale_float(&e->v0, pow(2,0.25));
+		if (Y == 6) cycle_int(&e->solver, 1, 4);
+		if (Y == 7) scale_int(&e->N, 1.1);
+		if (Y == 8) scale_float(&e->tstep, pow(2,0.25));
 	}
 
 	f->changed = 1;
