@@ -1,6 +1,16 @@
 // Jacobi-Maupertuis geodesics simulator
 //
-// potentials are of the form V(r)=r^a/a
+// potentials are of the form V(r)=(r^a-1)/a
+// NOTE: this means that for the newtonian case a=-1, the critical energy
+// corresponding to parabolic orbits is E=1, not E=0
+//
+// TODO:
+// - draw tissot's indicators of the metric
+//   Required state variables: tissot_scale, tissot_step
+// - implement symplectic euler method for trajectories q''=-grad(V)(q)
+//   Required state variables: nsteps, hstep, v0_angle
+// - implement symplectic leapfrog (same variables)
+// - implement solver for geodesic equations (geometric leapfrog?)
 
 #include <math.h>     // fmod, floor
 #include <stdbool.h>  // bool
@@ -62,6 +72,32 @@ static void force(float F[2], float a, float q[2])
 	F[0] = -(V10 - V00)/e;
 	F[1] = -(V01 - V00)/e;
 }
+
+
+typedef void (*vector_field)(float *, float *);
+
+static void powerlaw_force(float *F, float *p)
+{
+	static float a = NAN;
+	if (!F) a = *p;
+	return force(F, a, p);
+}
+
+static void ode_euler(float *o,  // output points
+		vector_field F,  //
+		float q0[2], float v0[2],
+		int N, float h)
+{
+	//float v[2] = {v0[0], v0[1]};
+	//for (int i = 0; i < N; i++)
+	//{
+	//	float a[2]; *q = 
+	//	F(a, q);
+	//	q += h*v;
+	//	v += h*a;
+	//}
+}
+
 
 // jacobi-maupertuis conformal metric associated to the potential
 static float jacobi_maupertuis(float a, float E, float r)
