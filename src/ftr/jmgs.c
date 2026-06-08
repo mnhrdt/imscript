@@ -6,7 +6,7 @@
 //
 // TODO:
 // - draw tissot's indicators of the metric
-//   Required state variables: tissot_scale, tissot_step
+//   Required state variables: tissot_scale, tissot_n
 // - implement solver for geodesic equations (geometric leapfrog?)
 // - add global toggle for mechanics/geometry modes
 // DONE
@@ -45,6 +45,8 @@ struct jmg_state {
 	float x[2];     // point of interest
 	float bg_mode;  // 0=potential, 1=metric
 	float bg_A;     // color scale
+	int tissot_n;
+	float tissot_scale;
 
 	// trajectories and geodesics
 	float j0, v0;   // initial angle and speed (cauchy data)
@@ -66,9 +68,22 @@ static float potential(float a, float r)
 		return (pow(r,a) - 1)/a;
 }
 
+
+
+#define FORK(_n) for(int k=0;k<_n;k++)
+
+// corresponding force F = -grad(V) = -r^(a-2)*q (for any a)
+static void force(float F[2], float a, float q[2])
+{
+	float r = hypot(q[0], q[1]);
+	F[0] = - pow(r, a-2) * q[0];
+	F[1] = - pow(r, a-2) * q[1];
+}
+
+
 // force associated to the potential
 // (the gradient is computed by finite differences)
-static void force(float F[2], float a, float q[2])
+static void force_finitediff(float F[2], float a, float q[2])
 {
 	float e = 0.00001;
 	float r00 = hypot(q[0], q[1]);
@@ -94,7 +109,6 @@ static void powerlaw_force(float *F, float *p)
 
 typedef void (*ode_solver)(float*,vector_field,float[2],float[2],int,float);
 
-#define FORK(_n) for(int k=0;k<_n;k++)
 
 static void euler_direct(float *o,         // output points
 		vector_field F,            // force field
@@ -222,6 +236,9 @@ static void init_state(struct jmg_state *e, int w, int h)
 	e->N = 100;
 	e->tstep = 0.015625;
 
+	e->tissot_n = 7;
+	e->tissot_scale = 1;
+
 	//e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
 	e->font[0] = reformat_font(*xfont_9x18B, UNPACKED);
 }
@@ -264,6 +281,21 @@ void traverse_segment(int px, int py, int qx, int qy,
 	}
 }
 
+// traverse a circle given center and radius
+static void traverse_circle(int cx, int cy, int r,
+		void (*f)(int,int,void*), void *e)
+{
+	int h = r / sqrt(2);
+	for (int i = -h; i <= h; i++)
+	{
+		int s = sqrt(r*r - i*i);
+		f(cx + i, cy + s, e); // upper quadrant
+		f(cx + i, cy - s, e); // lower quadrant
+		f(cx + s, cy + i, e); // right quadrant
+		f(cx - s, cy + i, e); // left quadrant
+	}
+}
+
 // auxiliary function for drawing a black pixel
 static void plot_pixel_black(int x, int y, void *e)
 {
@@ -287,6 +319,7 @@ static void plot_pixel_pink(int x, int y, void *e)
 }
 
 
+
 // function to draw a black segment
 static void plot_segment_black(struct FTR *f,
 		float x0, float y0, float xf, float yf)
@@ -297,6 +330,11 @@ static void plot_segment_pink(struct FTR *f,
 		float x0, float y0, float xf, float yf)
 {
 	traverse_segment(x0, y0, xf, yf, plot_pixel_pink, f);
+}
+
+static void plot_circle_pink(struct FTR *f, float x, float y, float r)
+{
+	traverse_circle(x, y, r, plot_pixel_pink, f);
 }
 
 // function to draw a colored blob/disk
@@ -380,6 +418,21 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 		float S = jacobi_maupertuis(e->a, e->E, hypot(p[0], p[1]));
 		uint8_t *rgb = f->rgb + 3*(j * f->w + i);
 		palette_jm(rgb, e->bg_A, S);
+	}
+
+	// tissots
+	for (int j = 0; j < e->tissot_n; j++)
+	for (int i = 0; i < e->tissot_n; i++)
+	{
+		float pw[2] = {i*e->w*1.0/e->tissot_n, j*e->h*1.0/e->tissot_n};
+		float p[2];
+		xy_from_win(p, e, pw);
+		float S = jacobi_maupertuis(e->a, e->E, hypot(p[0], p[1]));
+		float R = e->tissot_scale/S;
+		if (!isfinite(S)) continue;
+		if (!isfinite(R)) continue;
+		plot_circle_pink(f, pw[0], pw[1], R);
+		//fprintf(stderr, "circle tissot %g %g R=%g\n", pw[0],pw[1],R);
 	}
 
 	// axes
@@ -547,8 +600,9 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	}
 
 	// wheel : change written parameters
-	// a, E, m, A, j0, v0, solver, N, h   hitboxes of font height
-	// 0  1  2  3  4   5   6       7  8
+	// a, E, m, A, j0, v0, solver, N, h, Tn, Ts
+	// 0  1  2  3  4   5   6       7  8  9   10
+	// (hitboxes of font height)
 	int Y = y / e->font->height;
 	int X = x / e->font->width;
 	if (k == FTR_BUTTON_DOWN && x < 30 * e->font->width)
@@ -562,6 +616,8 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 6) cycle_int(&e->solver, -1, 4);
 		if (Y == 7) scale_int(&e->N, 1.0/1.1);
 		if (Y == 8) scale_float(&e->tstep, 1/pow(2,0.25));
+		if (Y == 9) shift_int(&e->tissot_n, -1);
+		if (Y ==10) scale_float(&e->tissot_scale, 1/1.1);
 	}
 	if (k == FTR_BUTTON_UP && x < 30 * e->font->width)
 	{
@@ -574,6 +630,8 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 6) cycle_int(&e->solver, 1, 4);
 		if (Y == 7) scale_int(&e->N, 1.1);
 		if (Y == 8) scale_float(&e->tstep, pow(2,0.25));
+		if (Y == 9) shift_int(&e->tissot_n, 1);
+		if (Y ==10) scale_float(&e->tissot_scale, 1.1);
 	}
 
 	f->changed = 1;
