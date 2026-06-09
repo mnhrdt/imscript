@@ -107,6 +107,29 @@ static void powerlaw_force(float *F, float *p)
 }
 
 
+// jacobi-maupertuis conformal metric associated to the potential
+// NOTE: hill region is defined by jacobi_maupertuis being NaN
+static float jacobi_maupertuis(float a, float E, float r)
+{
+	float V = potential(a, r);
+	return sqrt(2*(E - V));
+}
+
+// cutoff radius (for an embedding as a surface of revolution
+static float cutoff_radius(float a, float E)
+{
+	if (a < -4) return 0;
+	if (a == -4 && E >= 0.25) return INFINITY;
+	if (a == -4 && E < 0.25) return 0;
+	if (a > -4 && a < 0 && 1+a*E > 0) return pow(4*(1+a*E)/(a+4),1/a);
+	if (a > -4 && a < 0 && 1+a*E <= 0) return INFINITY;
+	if (a == 0) return exp(E-0.25);
+	if (a > 0) return pow(4*(a*E+1)/(a+4),1/a);
+	return NAN;
+}
+
+
+
 typedef void (*ode_solver)(float*,vector_field,float[2],float[2],int,float);
 
 
@@ -195,12 +218,6 @@ static void yosida_4th_order (float *o,    // output points
 	}
 }
 
-// jacobi-maupertuis conformal metric associated to the potential
-static float jacobi_maupertuis(float a, float E, float r)
-{
-	float V = potential(a, r);
-	return sqrt(2*(E - V));
-}
 
 static void action_screenshot(struct FTR *f)
 {
@@ -317,6 +334,16 @@ static void plot_pixel_pink(int x, int y, void *e)
 		f->rgb[3*idx+2] = 255;
 	}
 }
+static void plot_pixel_cyan(int x, int y, void *e)
+{
+	struct FTR *f = e;
+	if (insideP(f->w, f->h, x, y)) {
+		int idx = f->w * y + x;
+		f->rgb[3*idx+0] = 0;
+		f->rgb[3*idx+1] = 255;
+		f->rgb[3*idx+2] = 255;
+	}
+}
 
 
 
@@ -335,6 +362,10 @@ static void plot_segment_pink(struct FTR *f,
 static void plot_circle_pink(struct FTR *f, float x, float y, float r)
 {
 	traverse_circle(x, y, r, plot_pixel_pink, f);
+}
+static void plot_circle_cyan(struct FTR *f, float x, float y, float r)
+{
+	traverse_circle(x, y, r, plot_pixel_cyan, f);
 }
 
 // function to draw a colored blob/disk
@@ -451,19 +482,30 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 	uint8_t dgray[3] = {100,100,100};
 	uint8_t white[3] = {255, 255, 255};
 	uint8_t dblue[3] = {0, 0, 227};
+	uint8_t cyan[3] = {0, 255, 255};
 	uint8_t black[3] = {0, 0, 0};
 	uint8_t pink[3] = {255, 0, 255};
 	float *P = e->x, Pwin[2];
 	win_from_xy(Pwin, e, P);
 	splat_disk(f->rgb, f->w, f->h, Pwin, 5.3, pink);
 
-	// force vector
-	float F[2], PF[2], PFwin[2];
-	force(F, e->a, P);
-	PF[0] = P[0] + e->m * F[0];
-	PF[1] = P[1] + e->m * F[1];
-	win_from_xy(PFwin, e, PF);
-	plot_segment_pink(f, Pwin[0], Pwin[1], PFwin[0], PFwin[1]);
+	//// force vector
+	//float F[2], PF[2], PFwin[2];
+	//force(F, e->a, P);
+	//PF[0] = P[0] + e->m * F[0];
+	//PF[1] = P[1] + e->m * F[1];
+	//win_from_xy(PFwin, e, PF);
+	//plot_segment_pink(f, Pwin[0], Pwin[1], PFwin[0], PFwin[1]);
+
+	// admissibility region
+	float rtop = cutoff_radius(e->a, e->E);
+	if (isfinite(rtop)) {
+		float p[2][2] = { {0,0}, {rtop, 0} }, P[2][2];
+		win_from_xy(P[0], e, p[0]);
+		win_from_xy(P[1], e, p[1]);
+		float R = hypot(P[1][0]-P[0][0], P[1][1]-P[0][1]);
+		plot_circle_cyan(f, P[0][0], P[0][1], R);
+	}
 
 	// velocity vector
 	if (true) //  if "metric" mode
