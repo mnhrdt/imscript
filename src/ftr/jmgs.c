@@ -43,7 +43,7 @@ struct jmg_state {
 
 	// visualisation status
 	float x[2];     // point of interest
-	float bg_mode;  // 0=potential, 1=metric
+	int bg_mode;  // 0=potential, 1=metric, 2=curvature
 	float bg_A;     // color scale
 	int tissot_n;
 	float tissot_scale;
@@ -81,23 +81,20 @@ static void force(float F[2], float a, float q[2])
 }
 
 
-// force associated to the potential
-// (the gradient is computed by finite differences)
-static void force_finitediff(float F[2], float a, float q[2])
-{
-	float e = 0.00001;
-	float r00 = hypot(q[0], q[1]);
-	float r10 = hypot(q[0]+e, q[1]);
-	float r01 = hypot(q[0], q[1]+e);
-	float V00 = potential(a, r00);
-	float V10 = potential(a, r10);
-	float V01 = potential(a, r01);
-	F[0] = -(V10 - V00)/e;
-	F[1] = -(V01 - V00)/e;
-}
-
-
-typedef void (*vector_field)(float *, float *);
+//// force associated to the potential
+//// (the gradient is computed by finite differences)
+//static void force_finitediff(float F[2], float a, float q[2])
+//{
+//	float e = 0.00001;
+//	float r00 = hypot(q[0], q[1]);
+//	float r10 = hypot(q[0]+e, q[1]);
+//	float r01 = hypot(q[0], q[1]+e);
+//	float V00 = potential(a, r00);
+//	float V10 = potential(a, r10);
+//	float V01 = potential(a, r01);
+//	F[0] = -(V10 - V00)/e;
+//	F[1] = -(V01 - V00)/e;
+//}
 
 static void powerlaw_force(float *F, float *p)
 {
@@ -114,6 +111,27 @@ static float jacobi_maupertuis(float a, float E, float r)
 	float V = potential(a, r);
 	return sqrt(2*(E - V));
 }
+
+// curvature of the jacobi-maupertuis metric above
+static float curvature(float a, float E, float r)
+{
+	float V = potential(a, r);
+	if (E < V) return NAN;
+	float K = a*pow(r, a-2)/pow(E-V,2) + pow(r,2*a-2)/pow(E-V,3);
+	return K/4;
+}
+
+// gradient of the jacobi maupertuis metric field
+static void jacobi_maupertuis_grad(float o[2], float a, float E, float q[2])
+{
+	float r = hypot(q[0], q[1]);
+	float c = -2 * pow(r, a-2);
+	o[0] = c * q[0];
+	o[1] = c * q[1];
+}
+
+typedef void (*vector_field)(float *, float *);
+
 
 // cutoff radius (for an embedding as a surface of revolution
 static float cutoff_radius(float a, float E)
@@ -431,6 +449,28 @@ static void palette_jm(uint8_t *rgb, float A, float S)
 	}
 }
 
+static void palette_curv(uint8_t *rgb, float A, float K)
+{
+	uint8_t red[3] = {255, 0, 0};
+	uint8_t white[3] = {255, 255, 255};
+	uint8_t blue[3] = {0, 0, 255};
+	if (isfinite(K))
+	{
+		float r = fmin(1, A*fabs(K));
+		if (K >= 0) // interpolate from white to blue
+			for (int k = 0; k < 3; k++)
+				rgb[k] = (1-r)*white[k] + r*blue[k];
+		else // interpolate from white towards red
+			for (int k = 0; k < 3; k++)
+				rgb[k] = (1-r)*white[k] + r*red[k];
+	} else
+	{
+		rgb[0] = 150;
+		rgb[1] = 200;
+		rgb[2] = 150;
+	}
+}
+
 // CALLBACK : expose
 static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 {
@@ -440,15 +480,30 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 	for (int i = 0; i < 3 * f->w * f->h; i++)
 		f->rgb[i] = 0;//127;
 
-	// metric field
-	for (int j = 0; j < f->h; j++)
-	for (int i = 0; i < f->w; i++)
+	if (e->bg_mode == 2) // curvature
 	{
-		float p[2], wp[2] = {i, j};
-		xy_from_win(p, e, wp);
-		float S = jacobi_maupertuis(e->a, e->E, hypot(p[0], p[1]));
-		uint8_t *rgb = f->rgb + 3*(j * f->w + i);
-		palette_jm(rgb, e->bg_A, S);
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < f->w; i++)
+		{
+			float p[2], wp[2] = {i, j};
+			xy_from_win(p, e, wp);
+			float r = hypot(p[0], p[1]);
+			float K = curvature(e->a, e->E, r);
+			uint8_t *rgb = f->rgb + 3*(j * f->w + i);
+			palette_curv(rgb, e->bg_A, K);
+		}
+	} else {
+		// metric field
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < f->w; i++)
+		{
+			float p[2], wp[2] = {i, j};
+			xy_from_win(p, e, wp);
+			float r = hypot(p[0], p[1]);
+			float S = jacobi_maupertuis(e->a, e->E, r);
+			uint8_t *rgb = f->rgb + 3*(j * f->w + i);
+			palette_jm(rgb, e->bg_A, S);
+		}
 	}
 
 	// tissots
@@ -606,16 +661,6 @@ static void event_resize(struct FTR *f, int b, int m, int x, int y)
 	fprintf(stderr, "resize %d %d\n", x, y);
 }
 
-// CALLBACK : key
-static void event_key(struct FTR *f, int k, int m, int x, int y)
-{
-	if  (k == '\033' || k=='q' || k=='Q')
-		ftr_notify_the_desire_to_stop_this_loop(f, 0);
-
-	struct jmg_state *e = f->userdata;
-	if (k == ',') action_screenshot(f);
-	////if (k == 'p') action_toggle_pause(f);
-}
 
 static void scale_float(float *x, float f)  { *x *= f; }
 static void shift_float(float *x, float f)  { *x += f; }
@@ -628,6 +673,26 @@ static void cycle_int(int *x, int d, int m)
 	if (*x < 0) *x += m;
 }
 static void scale_int(int *x, float f)  { *x *= f; }
+
+// CALLBACK : key
+static void event_key(struct FTR *f, int k, int m, int x, int y)
+{
+	if  (k == '\033' || k=='q' || k=='Q')
+		ftr_notify_the_desire_to_stop_this_loop(f, 0);
+
+	fprintf(stderr, "\tevent KEY='%c' (%d)\n", k, k);
+
+	struct jmg_state *e = f->userdata;
+	if (k == ',') action_screenshot(f);
+	if (k == 'm')
+	{
+		cycle_int(&e->bg_mode, 1, 3);
+		fprintf(stderr, "bg_mode = %d\n", e->bg_mode);
+	}
+	////if (k == 'p') action_toggle_pause(f);
+
+	f->changed = 1;
+}
 
 // CALLBACK : mouse button handler
 static void event_button(struct FTR *f, int k, int m, int x, int y)
