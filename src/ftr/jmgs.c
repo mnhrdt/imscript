@@ -5,25 +5,20 @@
 // corresponding to parabolic orbits is E=1, not E=0
 //
 // TODO:
-// - draw tissot's indicators of the metric
-//   Required state variables: tissot_scale, tissot_n
 // - implement solver for geodesic equations (geometric leapfrog?)
-// - add global toggle for mechanics/geometry modes
+// - allow pan and zoom of the domain
 // DONE
+// - add global toggle for mechanics/geometry modes
 // - implement symplectic euler method for trajectories q''=-grad(V)(q)
 //   Required state variables: nsteps, hstep, v0_angle
 // - implement symplectic leapfrog (same variables)
+// - draw tissot's indicators of the metric
+//   Required state variables: tissot_scale, tissot_n
 
 #include <math.h>     // fmod, floor
 #include <stdbool.h>  // bool
 #include <stdio.h>    // fprintf, stdout, stderr
-#include <stdlib.h>   // malloc, free, rand, RAND_MAX
 #include "ftr.h"      // ftr
-#include "seconds.c"  // seconds
-#include "random.c"   // random_uniform, random_laplace
-
-
-#include "bilinear_interpolation.c"
 
 // bitmap fonts
 #define OMIT_MAIN_FONTU
@@ -53,10 +48,42 @@ struct jmg_state {
 	int solver;     // 0,1=euler direct,symplectic 2=vel.verlet 3=yosida
 	float tstep;    // timestep
 	int N;          // number of steps
+	float nskip;      // number of points to skip (just for visualization)
 
 	// gui
 	struct bitmap_font font[1];
 };
+
+static void init_state(struct jmg_state *e, int w, int h)
+{
+	e->a = -1;
+	e->E = 0;
+	e->m = 1;
+
+	e->w = w;
+	e->h = h;
+	e->xmin = e->ymin = -2;
+	e->xmax = e->ymax = 2;
+
+	e->bg_mode = 1;
+	e->bg_A = 1;
+	e->x[0] = 1;
+	e->x[1] = 0;
+
+	e->j0 = 20;
+	e->v0 = 0.5;
+	e->solver = 0;
+	e->N = 100;
+	e->tstep = 0.015625;
+	e->nskip = 1;
+
+	e->tissot_n = 27;
+	e->tissot_scale = 5;
+
+	//e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
+	e->font[0] = reformat_font(*xfont_9x18B, UNPACKED);
+}
+
 
 // homogeneous power-law potentials of the form (r^a-1)/a
 // for a=0 it is log(r)
@@ -128,6 +155,35 @@ static void jacobi_maupertuis_grad(float o[2], float a, float E, float q[2])
 	float c = -2 * pow(r, a-2);
 	o[0] = c * q[0];
 	o[1] = c * q[1];
+}
+
+// return the function "g", feedable to a geodesic integrator
+// initialize a,E by calling with {NAN, a, E}
+static float metric_field(float *q)
+{
+	static float a = NAN;
+	static float E = NAN;
+	if (isnan(q[0])) {
+		a = q[1];
+		E = q[2];
+		return NAN;
+	}
+	float S = jacobi_maupertuis(a, E, hypot(q[0], q[1]));
+	return S*S;
+}
+
+// return the gradient of the metric, feedable to the geodesic integrator
+// initialize a,E by calling with {NAN, a, E}
+static void metric_gradient(float *gg, float *q)
+{
+	static float a = NAN;
+	static float E = NAN;
+	if (isfinite(q[0]))
+		jacobi_maupertuis_grad(gg, a, E, q);
+	else {
+		a = q[1];
+		E = q[2];
+	}
 }
 
 typedef void (*vector_field)(float *, float *);
@@ -237,6 +293,79 @@ static void yosida_4th_order (float *o,    // output points
 }
 
 
+
+// geodesic integrators for arbitrary conformal metrics
+// solve q'' = F(q,q'), the function F is named "geodesic acceleration"
+// and it's computed using the metric field and its gradient
+
+// auxiliary function for all geodesic integrators
+static void geodesic_acceleration(float F[2], float q[2], float v[2])
+{
+	// the conformal christoffel symbols are easy:
+	// F(q,v) = -((v.G)/g)v + (|v|^2/(2g))G
+	float g = metric_field(q);          // g = metric at q
+	float G[2]; metric_gradient(G, q);  // G = gradient of g at q
+	float vGg = (v[0]*G[0] + v[1]*G[1])/g;
+	float v2g = (v[0]*v[0] + v[1]*v[1])/(2*g);
+	F[0] = -vGg * v[0] + v2g * G[0];
+	F[1] = -vGg * v[1] + v2g * G[1];
+}
+
+// naive geodesic integrator
+static void geodesic_euler(float *o,       // output points
+		float q0[2], float v0[2],  // input data
+		int N, float h)            // parameters
+{
+	float q[2] = { q0[0], q0[1] };
+	float v[2] = { v0[0], v0[1] };
+	float a[2];
+	for (int i = 0; i < N; i++)
+	{
+		geodesic_acceleration(a, q, v);
+		FORK(2) q[k] += h * v[k];
+		FORK(2) v[k] += h * a[k];
+		FORK(2) o[2*i+k] = q[k];
+	}
+}
+
+// useless variant
+static void geodesic_euler2(float *o,       // output points
+		float q0[2], float v0[2],  // input data
+		int N, float h)            // parameters
+{
+	float q[2] = { q0[0], q0[1] };
+	float v[2] = { v0[0], v0[1] };
+	float a[2];
+	for (int i = 0; i < N; i++)
+	{
+		geodesic_acceleration(a, q, v);
+		FORK(2) v[k] += h * a[k];
+		FORK(2) q[k] += h * v[k];
+		FORK(2) o[2*i+k] = q[k];
+	}
+}
+
+// symplectic euler
+static void geodesic_euler_sym(float *o,   // output points
+		float q0[2], float v0[2],  // input data
+		int N, float h)            // parameters
+{
+	float q[2] = { q0[0], q0[1] };
+	float v[2] = { v0[0], v0[1] };
+	for (int i = 0; i < N; i++)
+	{
+		float G[2]; metric_gradient(G, q);
+		float g = metric_field(q);
+		float p[2] = {g*v[0], g*v[1]};  // momentum p = gv
+		float p2g = 0.5*(p[0]*p[0] + p[1]*p[1])/(g*g);
+		FORK(2) p[k] += h * p2g * G[k];
+		FORK(2) q[k] += h * p[k]/g;
+		g = metric_field(q);
+		FORK(2) v[k] = p[k]/g;
+		FORK(2) o[2*i+k] = q[k];
+	}
+}
+
 static void action_screenshot(struct FTR *f)
 {
 	static int c = 0;
@@ -247,35 +376,6 @@ static void action_screenshot(struct FTR *f)
 	iio_write_image_uint8_vec(n, f->rgb, f->w, f->h, 3);
 	fprintf(stderr, "wrote sreenshot on file \"%s\"\n", n);
 	c += 1;
-}
-
-static void init_state(struct jmg_state *e, int w, int h)
-{
-	e->a = -1;
-	e->E = 0;
-	e->m = 1;
-
-	e->w = w;
-	e->h = h;
-	e->xmin = e->ymin = -2;
-	e->xmax = e->ymax = 2;
-
-	e->bg_mode = 1;
-	e->bg_A = 1;
-	e->x[0] = 1;
-	e->x[1] = 0;
-
-	e->j0 = 20;
-	e->v0 = 0.5;
-	e->solver = 0;
-	e->N = 100;
-	e->tstep = 0.015625;
-
-	e->tissot_n = 7;
-	e->tissot_scale = 1;
-
-	//e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
-	e->font[0] = reformat_font(*xfont_9x18B, UNPACKED);
 }
 
 static void win_from_xy(float *ij, struct jmg_state *e, float *xy)
@@ -507,6 +607,7 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 	}
 
 	// tissots
+	if (e->bg_mode > 0) // metric
 	for (int j = 0; j < e->tissot_n; j++)
 	for (int i = 0; i < e->tissot_n; i++)
 	{
@@ -542,7 +643,7 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 	uint8_t pink[3] = {255, 0, 255};
 	float *P = e->x, Pwin[2];
 	win_from_xy(Pwin, e, P);
-	splat_disk(f->rgb, f->w, f->h, Pwin, 5.3, pink);
+	splat_disk(f->rgb, f->w, f->h, Pwin, 6.3, dblue);
 
 	//// force vector
 	//float F[2], PF[2], PFwin[2];
@@ -581,6 +682,8 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 			red, black, 0, e->font, " IMPOSSIBLE V0 ");
 
 	// solver
+
+	if (e->bg_mode == 0) {
 	ode_solver solvers[4] = {
 		euler_direct,
 		euler_symplectic,
@@ -592,7 +695,25 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 	if (isfinite(e->v0))
 	{
 		solvers[e->solver](pp, powerlaw_force, e->x, V, e->N, e->tstep);
-		for (int i = 0; i < e->N; i++)
+		for (int i = 0; i < e->N; i += e->nskip)
+		{
+			float ow[2];
+			win_from_xy(ow, e, pp + 2*i);
+			splat_disk(f->rgb, f->w, f->h, ow, 3.3, red);
+		}
+
+	}
+	}
+	if (e->bg_mode == 1) {
+		float qqq[3] = {NAN, e->a, e->E};
+		metric_field(qqq);
+		metric_gradient(0, qqq);
+		float pp[2*e->N];
+		if (e->solver == 0)
+			geodesic_euler(pp, e->x, V, e->N, e->tstep);
+		else
+			geodesic_euler_sym(pp, e->x, V, e->N, e->tstep);
+		for (int i = 0; i < e->N; i += e->nskip)
 		{
 			float ow[2];
 			win_from_xy(ow, e, pp + 2*i);
@@ -680,16 +801,14 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if  (k == '\033' || k=='q' || k=='Q')
 		ftr_notify_the_desire_to_stop_this_loop(f, 0);
 
-	fprintf(stderr, "\tevent KEY='%c' (%d)\n", k, k);
+	//fprintf(stderr, "\tevent KEY='%c' (%d)\n", k, k);
 
 	struct jmg_state *e = f->userdata;
 	if (k == ',') action_screenshot(f);
-	if (k == 'm')
-	{
-		cycle_int(&e->bg_mode, 1, 3);
-		fprintf(stderr, "bg_mode = %d\n", e->bg_mode);
-	}
-	////if (k == 'p') action_toggle_pause(f);
+	if (k == 'm') cycle_int(&e->bg_mode, 1, 3);
+	if (k == 'h') scale_float(&e->nskip, 2);
+	if (k == 'H') scale_float(&e->nskip, 0.5);
+	if (e->nskip < 1) e->nskip = 1;
 
 	f->changed = 1;
 }
