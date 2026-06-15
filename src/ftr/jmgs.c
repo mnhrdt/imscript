@@ -15,6 +15,7 @@
 // - draw tissot's indicators of the metric
 //   Required state variables: tissot_scale, tissot_n
 
+
 #include <math.h>     // fmod, floor
 #include <stdbool.h>  // bool
 #include <stdio.h>    // fprintf, stdout, stderr
@@ -537,10 +538,29 @@ static void palette_jm(uint8_t *rgb, float A, float S)
 		float r = S<A ? 2-S/A : A/S;
 		if (r > 1) // interpolate from black to beige
 			for (int k = 0; k < 3; k++)
-				rgb[k] = (r-1)*white[k] + (2-r)*beige[k];
+				rgb[k] = (r-1)*black[k] + (2-r)*beige[k];
 		else // interpolate from beige to white
 			for (int k = 0; k < 3; k++)
-				rgb[k] = r*beige[k] + (1-r)*black[k];
+				rgb[k] = r*beige[k] + (1-r)*white[k];
+	} else
+	{
+		rgb[0] = 150;
+		rgb[1] = 200;
+		rgb[2] = 150;
+	}
+}
+
+static void palette_potential(uint8_t *rgb, float A, float V)
+{
+	uint8_t black[3] = {0, 0, 0};
+	uint8_t white[3] = {255, 255, 255};
+	if (isfinite(V))
+	{
+		float r = 0.5 + A*V/2;
+		if (r < 0) r = 0;
+		if (r > 1) r = 1;
+		for (int k = 0; k < 3; k++)
+			rgb[k] = (r-1)*black[k] + r*white[k];
 	} else
 	{
 		rgb[0] = 150;
@@ -592,8 +612,9 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 			uint8_t *rgb = f->rgb + 3*(j * f->w + i);
 			palette_curv(rgb, e->bg_A, K);
 		}
-	} else {
-		// metric field
+	}
+	if (e->bg_mode == 1) // metric
+	{
 		for (int j = 0; j < f->h; j++)
 		for (int i = 0; i < f->w; i++)
 		{
@@ -603,6 +624,19 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 			float S = jacobi_maupertuis(e->a, e->E, r);
 			uint8_t *rgb = f->rgb + 3*(j * f->w + i);
 			palette_jm(rgb, e->bg_A, S);
+		}
+	}
+	if (e->bg_mode == 0) // potential
+	{
+		for (int j = 0; j < f->h; j++)
+		for (int i = 0; i < f->w; i++)
+		{
+			float p[2], wp[2] = {i, j};
+			xy_from_win(p, e, wp);
+			float r = hypot(p[0], p[1]);
+			float V = potential(e->a, r);
+			uint8_t *rgb = f->rgb + 3*(j * f->w + i);
+			palette_potential(rgb, e->bg_A, V);
 		}
 	}
 
@@ -655,7 +689,7 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 
 	// admissibility region
 	float rtop = cutoff_radius(e->a, e->E);
-	if (isfinite(rtop)) {
+	if (isfinite(rtop) && e->bg_mode != 0) {
 		float p[2][2] = { {0,0}, {rtop, 0} }, P[2][2];
 		win_from_xy(P[0], e, p[0]);
 		win_from_xy(P[1], e, p[1]);
@@ -806,6 +840,7 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	struct jmg_state *e = f->userdata;
 	if (k == ',') action_screenshot(f);
 	if (k == 'm') cycle_int(&e->bg_mode, 1, 3);
+	if (k == 'M') cycle_int(&e->bg_mode, -1, 3);
 	if (k == 'h') scale_float(&e->nskip, 2);
 	if (k == 'H') scale_float(&e->nskip, 0.5);
 	if (e->nskip < 1) e->nskip = 1;
