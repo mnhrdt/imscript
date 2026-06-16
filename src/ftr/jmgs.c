@@ -16,15 +16,19 @@
 //   Required state variables: tissot_scale, tissot_n
 
 
-#include <math.h>     // fmod, floor
+#include <math.h>     // exp, pow
 #include <stdbool.h>  // bool
 #include <stdio.h>    // fprintf, stdout, stderr
+#include <unistd.h>   // getpid
 #include "ftr.h"      // ftr
 
 // bitmap fonts
 #define OMIT_MAIN_FONTU
 #include "fontu.c"
 #include "fonts/xfonts_all.c"
+
+// zoom factor for zoom-in and zoom-out
+#define ZOOM_FACTOR 1.259921
 
 
 struct jmg_state {
@@ -35,7 +39,8 @@ struct jmg_state {
 
 	// domain parameters
 	int w, h;  // window dimensions
-	float xmin, xmax, ymin, ymax;
+	//float xmin, xmax, ymin, ymax;
+	float offset[2], scale;
 
 	// visualisation status
 	float x[2];     // point of interest
@@ -45,14 +50,20 @@ struct jmg_state {
 	float tissot_scale;
 
 	// trajectories and geodesics
-	float j0, v0;   // initial angle and speed (cauchy data)
-	int solver;     // 0,1=euler direct,symplectic 2=vel.verlet 3=yosida
-	float tstep;    // timestep
-	int N;          // number of steps
-	float nskip;      // number of points to skip (just for visualization)
+	float j0, v0;  // initial angle and speed (cauchy data)
+	int solver;    // 0,1=euler direct,symplectic 2=vel.verlet 3=yosida
+	float tstep;   // timestep
+	int N;         // number of steps
+	float nskip;   // number of points to skip (just for visualization)
+	float gstep;   // separation of departing geodesics in "curvature mode"
 
 	// gui
 	struct bitmap_font font[1];
+
+	// dragging state
+	bool dragging_background;
+	int dragged_point;
+	int drag_handle[2];
 };
 
 static void init_state(struct jmg_state *e, int w, int h)
@@ -63,26 +74,34 @@ static void init_state(struct jmg_state *e, int w, int h)
 
 	e->w = w;
 	e->h = h;
-	e->xmin = e->ymin = -2;
-	e->xmax = e->ymax = 2;
+
+	// viewport
+	//e->xmin = e->ymin = -2;
+	//e->xmax = e->ymax = 2;
+	e->offset[0] = 0.5 * w;
+	e->offset[1] = 0.5 * h;
+	e->scale = 0.25 * w;
 
 	e->bg_mode = 1;
 	e->bg_A = 1;
-	e->x[0] = 1;
+	e->x[0] = 0.7;
 	e->x[1] = 0;
 
-	e->j0 = 20;
+	e->j0 = 120;
 	e->v0 = 0.5;
 	e->solver = 0;
-	e->N = 100;
-	e->tstep = 0.015625;
+	e->N = 500;
+	e->tstep = pow(2,-7);
 	e->nskip = 1;
+	e->gstep = 0.1;
 
 	e->tissot_n = 27;
 	e->tissot_scale = 5;
 
 	//e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
 	e->font[0] = reformat_font(*xfont_9x18B, UNPACKED);
+
+	e->dragging_background = false;
 }
 
 
@@ -367,6 +386,9 @@ static void geodesic_euler_sym(float *o,   // output points
 	}
 }
 
+// geometry is implicit in global "metric_field" and "metric_gradient"
+typedef void (*geodesic_solver)(float*,float[2],float[2],int,float);
+
 static void action_screenshot(struct FTR *f)
 {
 	static int c = 0;
@@ -379,17 +401,42 @@ static void action_screenshot(struct FTR *f)
 	c += 1;
 }
 
+
 static void win_from_xy(float *ij, struct jmg_state *e, float *xy)
 {
-	ij[0] = e->w * (xy[0] - e->xmin) / (e->xmax - e->xmin);
-	ij[1] = e->h * (-xy[1] - e->ymin) / (e->ymax - e->ymin);
+	//ij[0] = e->w * (xy[0] - e->xmin) / (e->xmax - e->xmin);
+	//ij[1] = e->h * (-xy[1] - e->ymin) / (e->ymax - e->ymin);
+	for (int k = 0; k < 2; k++)
+		ij[k] = e->offset[k] + e->scale * xy[k];
 }
 
 static void xy_from_win(float *xy, struct jmg_state *e, float *ij)
 {
-	xy[0] = e->xmin + (ij[0] / e->w) * (e->xmax - e->xmin);
-	xy[1] = -(e->ymin + (ij[1] / e->h) * (e->ymax - e->ymin));
+	//xy[0] = e->xmin + (ij[0] / e->w) * (e->xmax - e->xmin);
+	//xy[1] = -(e->ymin + (ij[1] / e->h) * (e->ymax - e->ymin));
+	for (int k = 0; k < 2; k++)
+		xy[k] = ( ij[k] - e->offset[k] ) / e->scale;
 }
+
+
+// action: viewport translation
+static void change_view_offset(struct jmg_state *e, float dx, float dy)
+{
+	e->offset[0] += dx;
+	e->offset[1] += dy;
+}
+
+//// action: viewport zoom
+static void change_view_scale(struct jmg_state *e, int x, int y, float fac)
+{
+	float center[2], X[2] = {x, y};
+	xy_from_win(center, e, X);
+	e->scale *= fac;
+	for (int p = 0; p < 2; p++)
+		e->offset[p] = -center[p]*e->scale + X[p];
+	fprintf(stderr, "zoom changed %g\n", e->scale);
+}
+
 
 static bool insideP(int w, int h, int x, int y)
 {
@@ -642,8 +689,8 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 
 	// tissots
 	if (e->bg_mode > 0) // metric
-	for (int j = 0; j < e->tissot_n; j++)
-	for (int i = 0; i < e->tissot_n; i++)
+	for (int j = 0; j <= e->tissot_n; j++)
+	for (int i = 0; i <= e->tissot_n; i++)
 	{
 		float pw[2] = {i*e->w*1.0/e->tissot_n, j*e->h*1.0/e->tissot_n};
 		float p[2];
@@ -703,7 +750,7 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 		float r = hypot(e->x[0], e->x[1]);
 		e->v0 = sqrt(2*(e->E - potential(e->a, r))/e->m);
 	}
-	float θ = e->j0 * M_PI / 180;
+	float θ = -e->j0 * M_PI / 180;
 	float V[2] = { e->v0 * cos(θ), e->v0 * sin(θ) }, PV[2], PVw[2];
 	PV[0] = P[0] + V[0];
 	PV[1] = P[1] + V[1];
@@ -716,6 +763,16 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 			red, black, 0, e->font, " IMPOSSIBLE V0 ");
 
 	// solver
+	int N = e->N;
+	float tstep = e->tstep;
+	float nskip = e->nskip;
+	// when dragging, use fast settings for solver
+	if (e->dragging_background)
+	{
+		N = 1000;
+		tstep = pow(2,-9);
+		nskip = 1;
+	}
 
 	if (e->bg_mode == 0) {
 	ode_solver solvers[4] = {
@@ -724,12 +781,12 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 		verlet_leapfrog,
 		yosida_4th_order
 	};
-	float pp[2*e->N];
+	float pp[2*N];
 	powerlaw_force(NULL, &e->a);
 	if (isfinite(e->v0))
 	{
-		solvers[e->solver](pp, powerlaw_force, e->x, V, e->N, e->tstep);
-		for (int i = 0; i < e->N; i += e->nskip)
+		solvers[e->solver](pp, powerlaw_force, e->x, V, N, tstep);
+		for (int i = 0; i < N; i += nskip)
 		{
 			float ow[2];
 			win_from_xy(ow, e, pp + 2*i);
@@ -742,19 +799,46 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 		float qqq[3] = {NAN, e->a, e->E};
 		metric_field(qqq);
 		metric_gradient(0, qqq);
-		float pp[2*e->N];
-		if (e->solver == 0)
-			geodesic_euler(pp, e->x, V, e->N, e->tstep);
-		else
-			geodesic_euler_sym(pp, e->x, V, e->N, e->tstep);
-		for (int i = 0; i < e->N; i += e->nskip)
+		float pp[2*N];
+		geodesic_solver s = e->solver == 0 ?
+			geodesic_euler : geodesic_euler_sym;
+		s(pp, e->x, V, N, tstep);
+		uint8_t *kolor = red;//e->bg_mode > 1 ? black : red;
+		for (int i = 0; i < N; i += nskip)
 		{
 			float ow[2];
 			win_from_xy(ow, e, pp + 2*i);
-			splat_disk(f->rgb, f->w, f->h, ow, 3.3, red);
+			splat_disk(f->rgb, f->w, f->h, ow, 3.3, kolor);
 		}
 
 	}
+	if (e->bg_mode == 2) {
+		float qqq[3] = {NAN, e->a, e->E};
+		metric_field(qqq);
+		metric_gradient(0, qqq);
+		float n[2] = {-V[1]/hypot(V[0],V[1]), V[0]/hypot(V[0],V[1])};
+		float p[3][2*N];
+		float x0[3][2] = {
+			{e->x[0] + 0, e->x[1] + 0},
+			{e->x[0] + e->gstep * n[0], e->x[1] + e->gstep * n[1]},
+			{e->x[0] - e->gstep * n[0], e->x[1] - e->gstep * n[1]}
+		};
+		geodesic_solver s = e->solver?geodesic_euler_sym:geodesic_euler;
+		s(p[0], x0[0], V, N, tstep);
+		s(p[1], x0[1], V, N, tstep);
+		s(p[2], x0[2], V, N, tstep);
+		for (int i = 0; i < N; i += nskip)
+		{
+			float ow[2];
+			win_from_xy(ow, e, p[0] + 2*i);
+			splat_disk(f->rgb, f->w, f->h, ow, 1.7, black);
+			win_from_xy(ow, e, p[1] + 2*i);
+			splat_disk(f->rgb, f->w, f->h, ow, 1.7, red);
+			win_from_xy(ow, e, p[2] + 2*i);
+			splat_disk(f->rgb, f->w, f->h, ow, 1.7, dgreen);
+		}
+	}
+
 
 
 	// hud
@@ -809,6 +893,25 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 }
 
 
+// CALLBACK: mouse motion handler
+static void event_motion(struct FTR *f, int b, int m, int x, int y)
+{
+	struct jmg_state *e = f->userdata;
+
+
+	// drag WINDOW DOMAIN background (realtime feedback)
+	if (e->dragging_background && m & FTR_BUTTON_LEFT)
+	{
+		int dx = x - e->drag_handle[0];
+		int dy = y - e->drag_handle[1];
+		change_view_offset(e, dx, dy);
+		e->drag_handle[0] = x;
+		e->drag_handle[1] = y;
+		f->changed = 1;
+		return;
+	}
+}
+
 
 // CALLBACK : resize
 static void event_resize(struct FTR *f, int b, int m, int x, int y)
@@ -839,10 +942,12 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 
 	struct jmg_state *e = f->userdata;
 	if (k == ',') action_screenshot(f);
-	if (k == 'm') cycle_int(&e->bg_mode, 1, 3);
-	if (k == 'M') cycle_int(&e->bg_mode, -1, 3);
+	if (k == 'm' || k == ' ') cycle_int(&e->bg_mode, 1, 3);
+	if (k == 'M' || k == '\b') cycle_int(&e->bg_mode, -1, 3);
 	if (k == 'h') scale_float(&e->nskip, 2);
 	if (k == 'H') scale_float(&e->nskip, 0.5);
+	if (k == 'd') scale_float(&e->gstep, cbrt(2));
+	if (k == 'D') scale_float(&e->gstep, 1/cbrt(2));
 	if (e->nskip < 1) e->nskip = 1;
 
 	f->changed = 1;
@@ -853,12 +958,13 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 {
 	struct jmg_state *e = f->userdata;
 
-	// left-click : move query point
-	if (k == FTR_BUTTON_LEFT)
+	// right-click : move query point
+	if (k == FTR_BUTTON_RIGHT)
 	{
 		float ij[2] = {x, y};
 		xy_from_win(e->x, e, ij);
 	}
+
 
 	// wheel : change written parameters
 	// a, E, m, A, j0, v0, solver, N, h, Tn, Ts
@@ -879,6 +985,8 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 8) scale_float(&e->tstep, 1/pow(2,0.25));
 		if (Y == 9) shift_int(&e->tissot_n, -1);
 		if (Y ==10) scale_float(&e->tissot_scale, 1/1.1);
+		f->changed = 1;
+		return;
 	}
 	if (k == FTR_BUTTON_UP && x < 30 * e->font->width)
 	{
@@ -893,7 +1001,34 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		if (Y == 8) scale_float(&e->tstep, pow(2,0.25));
 		if (Y == 9) shift_int(&e->tissot_n, 1);
 		if (Y ==10) scale_float(&e->tissot_scale, 1.1);
+		f->changed = 1;
+		return;
 	}
+
+
+	// begin dragging a the WINDOW BACKGROUND
+	if (k == FTR_BUTTON_LEFT)// && hit_point(e, x, y) < 0)
+	{
+		e->drag_handle[0] = x;
+		e->drag_handle[1] = y;
+		e->dragging_background = true;
+	}
+
+	// end dragging the WINDOW BACLGROUND
+	if (e->dragging_background && k == -FTR_BUTTON_LEFT)
+	{
+		int dx = x - e->drag_handle[0];
+		int dy = y - e->drag_handle[1];
+		change_view_offset(e, dx, dy);
+		e->dragging_background = false;
+	}
+
+
+	// radius in/out (if hit), zoom in/out (if no hit)
+	if (k == FTR_BUTTON_DOWN)
+		change_view_scale(e, x, y, ZOOM_FACTOR);
+	if (k == FTR_BUTTON_UP)
+		change_view_scale(e, x, y, 1.0/ZOOM_FACTOR);
 
 	f->changed = 1;
 }
@@ -911,9 +1046,10 @@ int main_jmgs(int c, char *v[])
 	f.userdata = e;
 	f.changed = 1;
 	ftr_set_handler(&f, "expose", event_expose);
-	ftr_set_handler(&f, "key", event_key);
 	ftr_set_handler(&f, "button", event_button);
+	ftr_set_handler(&f, "motion", event_motion);
 	//ftr_set_handler(&f, "resize", resize);
+	ftr_set_handler(&f, "key", event_key);
 	ftr_loop_run(&f);
 	ftr_close(&f);
 	return 0;
