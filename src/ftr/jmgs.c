@@ -59,6 +59,7 @@ struct jmg_state {
 
 	// gui
 	struct bitmap_font font[1];
+	int hud;
 
 	// dragging state
 	bool dragging_background;
@@ -100,6 +101,7 @@ static void init_state(struct jmg_state *e, int w, int h)
 
 	//e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
 	e->font[0] = reformat_font(*xfont_9x18B, UNPACKED);
+	e->hud = 1;
 
 	e->dragging_background = false;
 }
@@ -840,6 +842,7 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 	}
 
 
+	if (!e->hud) goto end_expose;
 
 	// hud
 	uint8_t *hud_fg = dgreen;
@@ -889,6 +892,7 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 	//for (int i = 0; i < f->w * f->h * 3; i++)
 	//	f->rgb[i] = 255 - f->rgb[i];
 
+	end_expose:
 	f->changed = 1;
 }
 
@@ -948,6 +952,7 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'H') scale_float(&e->nskip, 0.5);
 	if (k == 'd') scale_float(&e->gstep, cbrt(2));
 	if (k == 'D') scale_float(&e->gstep, 1/cbrt(2));
+	if (k == 'u') cycle_int(&e->hud, 1, 2);
 	if (e->nskip < 1) e->nskip = 1;
 
 	f->changed = 1;
@@ -972,7 +977,7 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	// (hitboxes of font height)
 	int Y = y / e->font->height;
 	int X = x / e->font->width;
-	if (k == FTR_BUTTON_DOWN && x < 30 * e->font->width)
+	if (k == FTR_BUTTON_DOWN && x < 30 * e->font->width && e->hud)
 	{
 		if (Y == 0) shift_float(&e->a, -0.125);
 		if (Y == 1) shift_float(&e->E, -0.125);
@@ -988,7 +993,7 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		f->changed = 1;
 		return;
 	}
-	if (k == FTR_BUTTON_UP && x < 30 * e->font->width)
+	if (k == FTR_BUTTON_UP && x < 30 * e->font->width && e->hud)
 	{
 		if (Y == 0) shift_float(&e->a, 0.125);
 		if (Y == 1) shift_float(&e->E, 0.125);
