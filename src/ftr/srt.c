@@ -289,11 +289,11 @@ static void term_key_handler(struct FTR *f, int k, int m, int x, int y)
 		term_action_run_dummy(f->userdata);
 		return;
 	}
-	if (k == ' ') {
-		term_action_getchar(f->userdata);
-		f->changed = 1;
-		return;
-	}
+	//if (k == ' ') {
+	//	term_action_getchar(f->userdata);
+	//	f->changed = 1;
+	//	return;
+	//}
 
 
 	if (k >= 0x2000) {
@@ -374,3 +374,4 @@ int main() { return main_srt(); }
 // 6. NATIVE VECTOR PRIMITIVES: for simple in-band plotting (segment, polygon)
 // 7. MOCK XTERM: built silently on top of TERM=xterm-256color, no terminfo
 // 8. LIMITED ENVELOPE: can run bash, vim, tmux, bpython and that's it
+// 9. FONTS ARE IMAGES: to change the font, edit its png file
