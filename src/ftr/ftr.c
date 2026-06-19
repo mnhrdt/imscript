@@ -1,9 +1,10 @@
-#define FTR_BACKEND_X11      'x'
-#define FTR_BACKEND_WINDOWS  'w'
-#define FTR_BACKEND_COCOA    'c'
-#define FTR_BACKEND_GLUT     'g'
-#define FTR_BACKEND_FREEGLUT 'f'
-#define FTR_BACKEND_TEXT     't'
+#define FTR_BACKEND_X11         'x'
+#define FTR_BACKEND_WINDOWS     'w'
+#define FTR_BACKEND_COCOA       'c'
+#define FTR_BACKEND_GLUT        'g'
+#define FTR_BACKEND_FREEGLUT    'f'
+#define FTR_BACKEND_TEXT        't'
+#define FTR_BACKEND_EMSCRIPTEN  'e'
 
 
 #ifndef FTR_BACKEND

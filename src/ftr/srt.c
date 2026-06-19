@@ -22,8 +22,9 @@
 // dependences like libfreetype and obnoxious concepts such as pty.
 //
 
-#include <stdio.h> // fprintf, popen
-#include <ctype.h> // isalpha, isprint
+#include <stdio.h>  // fprintf, popen
+#include <ctype.h>  // isalpha, isprint
+#include <unistd.h> // pipe, dup, etc
 
 #include "ftr.h"
 #define OMIT_MAIN_FONTU

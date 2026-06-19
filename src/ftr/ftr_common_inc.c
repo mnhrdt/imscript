@@ -3,6 +3,7 @@ struct FTR ftr_new_window(int w, int h)
 	return ftr_new_window_with_image_uint8_rgb(NULL, w, h);
 }
 
+#ifndef FTR_NO_FORK
 void ftr_fork_window_with_image_uint8_rgb(unsigned char *x, int w, int h)
 {
 	if (!fork())
@@ -18,6 +19,7 @@ void ftr_loop_fork(struct FTR *f)
 	if (!fork())
 		exit(ftr_loop_run(f));
 }
+#endif
 
 void ftr_handler_exit_on_ESC(struct FTR *f, int k, int m, int x, int y)
 {
