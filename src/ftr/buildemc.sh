@@ -1,3 +1,5 @@
-emcc -c miniev.c
+BIN=miniev
+BIN=jmgs
+emcc -c $BIN.c
 emcc -c ftr_emscripten.c
-emcc miniev.o ftr_emscripten.o -o miniev.html -s SINGLE_FILE=1
+emcc $BIN.o ftr_emscripten.o -o $BIN.html -s SINGLE_FILE=1

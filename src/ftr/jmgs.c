@@ -397,9 +397,11 @@ static void action_screenshot(struct FTR *f)
 	int p = getpid();
 	char n[FILENAME_MAX];
 	snprintf(n, FILENAME_MAX, "screenshot_jmgs_%d_%d.png", p, c);
+#ifndef __EMSCRIPTEN__
 	void iio_write_image_uint8_vec(char*,uint8_t*,int,int,int);
 	iio_write_image_uint8_vec(n, f->rgb, f->w, f->h, 3);
 	fprintf(stderr, "wrote sreenshot on file \"%s\"\n", n);
+#endif
 	c += 1;
 }
 
@@ -962,6 +964,7 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 static void event_button(struct FTR *f, int k, int m, int x, int y)
 {
 	struct jmg_state *e = f->userdata;
+	printf("event button k=%d m=%d x=%d y=%d\n", k, m, x, y);
 
 	// right-click : move query point
 	if (k == FTR_BUTTON_RIGHT)
@@ -1041,8 +1044,8 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 #include "pickopt.c"
 int main_jmgs(int c, char *v[])
 {
-	int w = atoi(pick_option(&c, &v, "w", "800"));
-	int h = atoi(pick_option(&c, &v, "h", "800"));
+	int w = 600;//atoi(pick_option(&c, &v, "w", "800"));
+	int h = 600;//atoi(pick_option(&c, &v, "h", "800"));
 
 	struct jmg_state e[1];
 	init_state(e, w, h);
@@ -1060,7 +1063,14 @@ int main_jmgs(int c, char *v[])
 	return 0;
 }
 
+#ifdef __EMSCRIPTEN__
+int main(void)
+{
+	int c = 1;
+	char *v[2] = {"jmgs", NULL};
+#else
 int main(int c, char *v[])
 {
+#endif
 	return main_jmgs(c, v);
 }
