@@ -218,7 +218,7 @@ EM_BOOL em_wheel(int type, const EmscriptenWheelEvent *e, void *usr)
 	if (f->handle_button && type==EMSCRIPTEN_EVENT_WHEEL)
 	{
 		int b = e->deltaY > 0 ? FTR_BUTTON_DOWN : FTR_BUTTON_UP;
-		f->handle_motion((void*)f, b, f->last_m, f->last_x, f->last_y);
+		f->handle_button((void*)f, b, f->last_m, f->last_x, f->last_y);
 	}
 	return 1;
 }
