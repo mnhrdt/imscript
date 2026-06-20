@@ -5,9 +5,14 @@
 // corresponding to parabolic orbits is E=1, not E=0
 //
 // TODO:
+// - write small doc
+// - emscripten total feature parity
+// - enable key controls for all parameters
+// - allow to set all parameters from command line
+// - enable headless mode, to write an output file without opening a window
+// DONE
 // - implement solver for geodesic equations (geometric leapfrog?)
 // - allow pan and zoom of the domain
-// DONE
 // - add global toggle for mechanics/geometry modes
 // - implement symplectic euler method for trajectories q''=-grad(V)(q)
 //   Required state variables: nsteps, hstep, v0_angle

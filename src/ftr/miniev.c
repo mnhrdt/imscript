@@ -74,7 +74,7 @@ int main(void)//int c, char *v[])
 
 	font[0] = reformat_font(*xfont_9x18B, UNPACKED);
 
-	struct FTR f = ftr_new_window(600,600);
+	struct FTR f = ftr_new_window(320,200);
 	for (int i = 0; i < 3 * f.w * f.h; i++)
 		f.rgb[i] = 127;//0xa0*!(i%3);
 	f.changed = 1;

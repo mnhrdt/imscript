@@ -67,7 +67,7 @@ void em_render(void)
 
 	if (f->handle_expose)
 	{
-		printf("recompute expose\n");
+		//printf("recompute expose\n");
 		f->handle_expose((void*)f, 0, 0, 0, 0);
 	}
 
@@ -173,12 +173,11 @@ static int button_from_emev(const EmscriptenMouseEvent *e)
 // mouse callback
 EM_BOOL em_mouse(int type, const EmscriptenMouseEvent *e, void *usr)
 {
-	//printf("EM mouse event : type=%d x=%ld y=%ld button=%d",
-	//		type, e->clientX, e->clientY, e->button);
-	//printf("\tmovementX=%d movementY=%d targetX=%d targetY=%d",
-	//		e->movementX, e->movementY, e->targetX, e->targetY);
-	//printf("\tcanvasX=%d canvasY=%d\n", e->canvasX, e->canvasY);
-	//fflush(stdout);
+	printf("EM mouse event : type=%d x=%ld y=%ld button=%d buttons=%d",
+			type, e->clientX, e->clientY, e->button, e->buttons);
+	printf("\tmovementXY=%ld %ld targetXY=%ld %ld\n",
+			e->movementX, e->movementY, e->targetX, e->targetY);
+	fflush(stdout);
 
 	struct _FTR *f = ftr_emscripten_global_state;
 
@@ -199,8 +198,13 @@ EM_BOOL em_mouse(int type, const EmscriptenMouseEvent *e, void *usr)
 
 	if (f->handle_motion && type==EMSCRIPTEN_EVENT_MOUSEMOVE)
 	{
-		int m = mod_combine(e->shiftKey, e->ctrlKey, e->altKey);
-		f->last_m = m;
+		//int m = mod_combine(e->shiftKey, e->ctrlKey, e->altKey);
+		//f->last_m = m;
+		// for motion events, the modifier encodes buttons position
+		int m = 0;
+		if (e->buttons & 1) m |= FTR_BUTTON_LEFT;
+		if (e->buttons & 2) m |= FTR_BUTTON_RIGHT;
+		if (e->buttons & 4) m |= FTR_BUTTON_MIDDLE;
 		f->handle_motion((void*)f, 0, m, e->targetX, e->targetY);
 	}
 

@@ -88,11 +88,15 @@ LDLIBS_FTR = $(LDLIBS)
 LDLIBS_MSC = $(LDLIBS) -lgsl -lgslcblas
 
 OBJ_ALL = $(OBJ) $(OBJ_FTR)
-BIN_ALL = $(BIN) $(BIN_FTR) $(BIN_MSC)
+BIN_ALL = $(BIN) $(BIN_FTR) $(BIN_MSC) $(BIN_EMS)
 
 full  : default ftr misc
 ftr   : $(BIN_FTR)
 misc  : $(BIN_MSC)
+
+EMSOPT = -s SINGLE_FILE=1 #-s MINIMAL_RUNTIME=1
+BIN_EMS = bin/miniev.html bin/jmgs.html
+ems : $(BIN_EMS)
 
 
 bin/% : src/ftr/%.o $(OBJ_FTR)
@@ -145,6 +149,11 @@ bin/%_term : src/ftr/%.o $(OBJ_FTR_TERM)
 OBJ_FTR_SIX = src/ftr/ftr_sixel.o $(filter-out src/ftr/ftr.o,$(OBJ_FTR))
 bin/%_six : src/ftr/%.o $(OBJ_FTR_SIX)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+
+
+# emscripten (self-contained wasm executables with extension .html)
+bin/%.html : src/ftr/%.c src/ftr/ftr_emscripten.c
+	emcc $(EMSOPT) $^ -o $@
 
 
 
