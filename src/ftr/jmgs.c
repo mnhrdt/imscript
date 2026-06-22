@@ -862,15 +862,17 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 	snprintf(buf, 0x200,
 			"a (potential)  = %g\n"
 			"E (energy)     = %g\n"
-			"m (mass)       = %g\n"
-			"A (bg scale)   = %g\n"
+			"b (bg scale)   = %g\n"
 			"j0 (angle)     = %g\n"
 			"v0 (speed)     = %g\n"
-			"solver         = %d\n"
+			"s (solver)     = %d\n"
 			"N (nsteps)     = %d\n"
-			"h (timestep)   = %g\n",
-			e->a, e->E, e->m, e->bg_A, e->j0, e->v0,
-			e->solver, e->N, e->tstep
+			"t (timestep)   = %g\n"
+			"tissot step    = %d\n"
+			"tissot scale   = %g\n",
+			e->a, e->E, e->bg_A, e->j0, e->v0,
+			e->solver, e->N, e->tstep,
+			e->tissot_n, e->tissot_scale
 		);
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
 			0, 0+0, hud_fg, hud_bg, 0, e->font, buf);
@@ -887,6 +889,14 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 		);
 	put_string_in_rgb_image(f->rgb, f->w, f->h, 0, 0+f->h-3*e->font->height,
 			pink, hud_bg, 0, e->font, buf);
+
+	// top-right hud with mode
+	if (e->bg_mode == 0) snprintf(buf, 0x200, " POTENTIAL ");
+	if (e->bg_mode == 1) snprintf(buf, 0x200, " METRIC ");
+	if (e->bg_mode == 2) snprintf(buf, 0x200, " CURVATURE ");
+	put_string_in_rgb_image(f->rgb, f->w, f->h, f->w/2, 0,
+			cyan, hud_bg, 0, e->font, buf);
+
 
 
 
@@ -952,6 +962,8 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	//fprintf(stderr, "\tevent KEY='%c' (%d)\n", k, k);
 
 	struct jmg_state *e = f->userdata;
+
+	// "hidden" keys (not visible directly in the hud)
 	if (k == ',') action_screenshot(f);
 	if (k == 'm' || k == ' ') cycle_int(&e->bg_mode, 1, 3);
 	if (k == 'M' || k == '\b') cycle_int(&e->bg_mode, -1, 3);
@@ -961,6 +973,23 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'D') scale_float(&e->gstep, 1/cbrt(2));
 	if (k == 'u') cycle_int(&e->hud, 1, 2);
 	if (e->nskip < 1) e->nskip = 1;
+
+	// same letter as they appear on the hud
+	if (k == 'a') shift_float(&e->a, -0.125);
+	if (k == 'A') shift_float(&e->a, +0.125);
+	if (k == 'e') shift_float(&e->a, -0.125);
+	if (k == 'E') shift_float(&e->a, +0.125);
+	if (k == 'b') shift_float(&e->bg_A, -0.125);
+	if (k == 'B') shift_float(&e->bg_A, +0.125);
+	if (k == 'j') shift_angle(&e->j0, +10);
+	if (k == 'J') shift_angle(&e->j0, -10);
+	if (k == 'n') scale_int(&e->N, 1.0/1.1);
+	if (k == 'N') scale_int(&e->N, 1.1/1.0);
+	if (k == 't') scale_float(&e->tstep, pow(2,-0.25));
+	if (k == 'T') scale_float(&e->tstep, pow(2,+0.25));
+	if (k == 's') cycle_int(&e->solver, +1, 4);
+	if (k == 'S') cycle_int(&e->solver, -1, 4);
+
 
 	f->changed = 1;
 }
@@ -989,15 +1018,14 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	{
 		if (Y == 0) shift_float(&e->a, -0.125);
 		if (Y == 1) shift_float(&e->E, -0.125);
-		if (Y == 2) shift_float(&e->m, -0.125);
-		if (Y == 3) shift_float(&e->bg_A, -0.125);
-		if (Y == 4) shift_angle(&e->j0, -10);
-		if (Y == 5) scale_float(&e->v0, 1/pow(2,0.25));
-		if (Y == 6) cycle_int(&e->solver, -1, 4);
-		if (Y == 7) scale_int(&e->N, 1.0/1.1);
-		if (Y == 8) scale_float(&e->tstep, 1/pow(2,0.25));
-		if (Y == 9) shift_int(&e->tissot_n, -1);
-		if (Y ==10) scale_float(&e->tissot_scale, 1/1.1);
+		if (Y == 2) shift_float(&e->bg_A, -0.125);
+		if (Y == 3) shift_angle(&e->j0, -10);
+		if (Y == 4) scale_float(&e->v0, 1/pow(2,0.25));
+		if (Y == 5) cycle_int(&e->solver, -1, 4);
+		if (Y == 6) scale_int(&e->N, 1.0/1.1);
+		if (Y == 7) scale_float(&e->tstep, 1/pow(2,0.25));
+		if (Y == 8) shift_int(&e->tissot_n, -1);
+		if (Y == 9) scale_float(&e->tissot_scale, 1/1.1);
 		f->changed = 1;
 		return;
 	}
@@ -1005,15 +1033,14 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	{
 		if (Y == 0) shift_float(&e->a, 0.125);
 		if (Y == 1) shift_float(&e->E, 0.125);
-		if (Y == 2) shift_float(&e->m, 0.125);
-		if (Y == 3) shift_float(&e->bg_A, 0.125);
-		if (Y == 4) shift_angle(&e->j0, 10);
-		if (Y == 5) scale_float(&e->v0, pow(2,0.25));
-		if (Y == 6) cycle_int(&e->solver, 1, 4);
-		if (Y == 7) scale_int(&e->N, 1.1);
-		if (Y == 8) scale_float(&e->tstep, pow(2,0.25));
-		if (Y == 9) shift_int(&e->tissot_n, 1);
-		if (Y ==10) scale_float(&e->tissot_scale, 1.1);
+		if (Y == 2) shift_float(&e->bg_A, 0.125);
+		if (Y == 3) shift_angle(&e->j0, 10);
+		if (Y == 4) scale_float(&e->v0, pow(2,0.25));
+		if (Y == 5) cycle_int(&e->solver, 1, 4);
+		if (Y == 6) scale_int(&e->N, 1.1);
+		if (Y == 7) scale_float(&e->tstep, pow(2,0.25));
+		if (Y == 8) shift_int(&e->tissot_n, 1);
+		if (Y == 9) scale_float(&e->tissot_scale, 1.1);
 		f->changed = 1;
 		return;
 	}
