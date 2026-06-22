@@ -63,13 +63,15 @@ struct _FTR *ftr_emscripten_global_state = NULL;
 void em_render(void)
 {
 	struct _FTR *f = ftr_emscripten_global_state;
-	if (!f->changed) return;
+
+	if (f->handle_idle)
+		f->handle_idle((void*)f, 0, 0, 0, 0);
+
+	if (!f->changed)
+		return;
 
 	if (f->handle_expose)
-	{
-		//printf("recompute expose\n");
 		f->handle_expose((void*)f, 0, 0, 0, 0);
-	}
 
 	for (int i = 0; i < f->w * f->h; i++)
 	{
@@ -173,11 +175,11 @@ static int button_from_emev(const EmscriptenMouseEvent *e)
 // mouse callback
 EM_BOOL em_mouse(int type, const EmscriptenMouseEvent *e, void *usr)
 {
-	printf("EM mouse event : type=%d x=%ld y=%ld button=%d buttons=%d",
-			type, e->clientX, e->clientY, e->button, e->buttons);
-	printf("\tmovementXY=%ld %ld targetXY=%ld %ld\n",
-			e->movementX, e->movementY, e->targetX, e->targetY);
-	fflush(stdout);
+	//printf("EM mouse event : type=%d x=%ld y=%ld button=%d buttons=%d",
+	//		type, e->clientX, e->clientY, e->button, e->buttons);
+	//printf("\tmovementXY=%ld %ld targetXY=%ld %ld\n",
+	//		e->movementX, e->movementY, e->targetX, e->targetY);
+	//fflush(stdout);
 
 	struct _FTR *f = ftr_emscripten_global_state;
 

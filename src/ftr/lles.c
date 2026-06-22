@@ -39,6 +39,7 @@ struct les_state {
 	float Oh;  // relative height of the obstacle
 	float Ox;  // relative x-pos of the obstacle
 	float Oy;  // relative y-pos of the obstacle
+	float Oa;  // angle of obstacle
 
 
 	// 3. numeric parameters
@@ -56,9 +57,11 @@ static void action_screenshot(struct FTR *f)
 	int p = getpid();
 	char n[FILENAME_MAX];
 	snprintf(n, FILENAME_MAX, "screenshot_lles_%d_%d.png", p, c);
+#ifndef __EMSCRIPTEN__
 	void iio_write_image_uint8_vec(char*,uint8_t*,int,int,int);
 	iio_write_image_uint8_vec(n, f->rgb, f->w, f->h, 3);
 	fprintf(stderr, "wrote sreenshot on file \"%s\"\n", n);
+#endif
 	c += 1;
 }
 
@@ -99,9 +102,10 @@ static void init_state(struct les_state *e, int w, int h, int n)
 	e->B = NULL;
 
 	e->o = 1;
-	e->Oh = 0.07;
+	e->Oh = 0.17;
 	e->Ox = 0.35;
 	e->Oy = 0.5;
+	e->Oa = 0;
 
 	e->r = 3.9;  // dot radius
 	//e->font[0] = reformat_font(*xfont_10x20, UNPACKED);
@@ -143,8 +147,17 @@ static int ori(float A[2], float B[2], float C[2])
 // whether the segment joining two points crosses the obstacle
 static bool traversed_obstacleP(struct les_state *e, float *P, float *Q)
 {
-	float A[2] = {e->w * e->Ox, e->h * (e->Oy - e->Oh) };
-	float B[2] = {e->w * e->Ox, e->h * (e->Oy + e->Oh) };
+	//float A[2] = {e->w * e->Ox, e->h * (e->Oy - e->Oh) };
+	//float B[2] = {e->w * e->Ox, e->h * (e->Oy + e->Oh) };
+	float c = cos(M_PI*e->Oa/180);
+	float s = sin(M_PI*e->Oa/180);
+	float r = e->h * e->Oh;  // radius of obstacle
+	float K[2] = {e->w * e->Ox, e->h * e->Oy };  // center of obstacle
+	// ( c -s ) . ( 0 )
+	// ( s  c )   ( r )
+	float R[2] = { -s*r, c*r };
+	float A[2] = { K[0] + R[0], K[1] + R[1] };
+	float B[2] = { K[0] - R[0], K[1] - R[1] };
 
 	int ABP = ori(A, B, P);
 	int ABQ = ori(A, B, Q);
@@ -155,13 +168,24 @@ static bool traversed_obstacleP(struct les_state *e, float *P, float *Q)
 }
 
 // update Q as the rebound of P-->Q against the obstacle
-static void reflect_against_obstacle(struct les_state *e, float *Q, float *V)
+static void reflect_against_obstacle_v(struct les_state *e, float *Q, float *V)
 {
 	// we assume that the obstacle is a vertical segment
 	// thus, only the horizontal position of Q needs to be changed
 	Q[0] = 2 * e->w * e->Ox - Q[0];
-	V[0] = -V[0]/4;
-	V[1] = V[1]/4;
+	V[0] = -V[0]/2;
+	V[1] = V[1]/2;
+}
+
+// update Q as the rebound of P-->Q against the obstacle
+static void reflect_against_obstacle(struct les_state *e, float *Q, float *V)
+{
+	// just stop the particle
+	V[0] = 0;
+	V[1] = 0;
+	//Q[0] = 2 * e->w * e->Ox - Q[0];
+	//V[0] = -V[0]/4;
+	//V[1] = V[1]/4;
 }
 
 static void move_particles(struct les_state *e)
@@ -225,14 +249,14 @@ static void move_particles(struct les_state *e)
 		// periodic boundary conditions
 		// (disabled in favor of pipe re-entry)
 		//P[0] = fmod2(P[0], e->w);
-		//P[1] = fmod2(P[1], e->h);
+		P[1] = fmod2(P[1], e->h);
 	}
 
 	// obstacle:
 	// particles that tried to traverse the obstacle are reversed
 	for (int i = 0; i < e->N; i++)
 		if (e->o && traversed_obstacleP(e, P0[i], e->P + 2*i))
-			reflect_against_obstacle(e, e->P + 2*i, e->V + 2*i);
+			reflect_against_obstacle_v(e, e->P + 2*i, e->V + 2*i);
 
 	// pipe re-entry:
 	// particles that fell outside the domain get put back in the pipe
@@ -446,12 +470,13 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 int main_lles(int c, char *v[])
 {
 	int n = atoi(pick_option(&c, &v, "n", "1000"));
-	int w = atoi(pick_option(&c, &v, "w", "1200"));
+	int w = atoi(pick_option(&c, &v, "w", "2000"));
 	int h = atoi(pick_option(&c, &v, "h", "600"));
 	float r = atof(pick_option(&c, &v, "r", "3.9"));
 	char *b = pick_option(&c, &v, "b", "");
 
 	float *B = NULL;
+#ifndef __EMSCRIPTEN__
 	if (*b)
 	{
 		float *iio_read_image_float_vec(char*,int*,int*,int*);
@@ -459,6 +484,7 @@ int main_lles(int c, char *v[])
 		B = iio_read_image_float_vec(b, &w, &h, &pd);
 		if (pd != 2) return fprintf(stderr, "bad pd=%d\n", pd);
 	}
+#endif
 
 	struct les_state e[1];
 	init_state(e, w, h, n);
@@ -477,7 +503,14 @@ int main_lles(int c, char *v[])
 	return 0;
 }
 
+#ifdef __EMSCRIPTEN__
+int main(void)
+{
+	int c = 1;
+	char *v[2] = {"jmgs", NULL};
+#else
 int main(int c, char *v[])
 {
+#endif
 	return main_lles(c, v);
 }

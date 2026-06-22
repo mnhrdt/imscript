@@ -238,12 +238,38 @@ static void change_one_kappa(struct viewer_state *e, int i, float d)
 	assert(i >= 0 && i < e->n);
 	switch (e->mode) {
 	case 0: // LEFT
+		{
+		int j = (i ? i : e->n) - 1;
+		e->k[i] += d;
+		e->k[j] -= d;
+		}
 		break;
 	case 1: // RIGHT
+		{
+		int j = i==e->n-1 ? 0 : i+1;
+		e->k[i] += d;
+		e->k[j] -= d;
+		}
 		break;
 	case 2: // MIN
+		{
+		int m = 0;
+		for (int j = 0; j < e->n; j++)
+			if (e->k[j] < e->k[m])
+				m = j;
+		e->k[i] += d;
+		e->k[m] -= d;
+		}
 		break;
 	case 3: // MAX
+		{
+		int m = 0;
+		for (int j = 0; j < e->n; j++)
+			if (e->k[j] > e->k[m])
+				m = j;
+		e->k[i] += d;
+		e->k[m] -= d;
+		}
 		break;
 	case 4: // ALL
 		for (int j = 0; j < e->n; j++)
@@ -251,6 +277,14 @@ static void change_one_kappa(struct viewer_state *e, int i, float d)
 				e->k[j] += d;
 			else
 				e->k[j] -= d/(e->n - 1);
+		break;
+	case 6: // ALLNORM
+		e->k[i] += d;
+		double s = 0;
+		for (int j = 0; j < e->n; j++)
+			s += e->k[j];
+		for (int j = 0; j < e->n; j++)
+			e->k[j] /= s;
 		break;
 	}
 }
@@ -484,12 +518,12 @@ static void paint_state(struct FTR *f)
 		{
 			float p[2] = { S[i-1], i * 1.0 / M };
 			float q[2] = { S[i], i * 1.0 / M };
-			plot_line_in_plane(f, p, q, palette[3]);
+			plot_line_in_plane(f, p, q, palette[4]);
 		}
 		for (int i = 0; i < M; i++)
 		{
 			float p[2] = { S[i], i * 1.0 / M };
-			plot_line_in_plane(f, p, p, palette[10]);
+			plot_line_in_plane(f, p, p, palette[1]);
 		}
 	}
 
@@ -536,7 +570,7 @@ static void paint_state(struct FTR *f)
 	b += snprintf(buf+b, 0x400-b, "n = %d\nk = ", e->n);
 	for (int i = 0; i < e->n; i++)
 		b += snprintf(buf+b, 0x400-b, "%g\t", e->k[i]);
-	b += snprintf(buf+b, 0x400-b, "\nmode = %d LEFT, RIGHT, MIN, MAX, ALL\n", e->mode);
+	b += snprintf(buf+b, 0x400-b, "\nmode = %d LEFT, RIGHT, MIN  , MAX  , ALL  , NORM\n", e->mode);
 	b += snprintf(buf+b, 0x400-b, "action = UNI, EXP, RND, JIT");
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
 			10, 0, e->rgb_fg, e->rgb_bg, 0, e->font, buf);
@@ -578,9 +612,11 @@ static void action_screenshot(struct FTR *f)
 	static int c = 0;
 	char n[FILENAME_MAX];
 	snprintf(n, FILENAME_MAX, "screenshot_cloudette_%d.png", c);
+#ifndef __EMSCRIPTEN__
 	void iio_write_image_uint8_vec(char*,uint8_t*,int,int,int);
 	iio_write_image_uint8_vec(n, f->rgb, f->w, f->h, 3);
 	fprintf(stderr, "wrote sreenshot on file \"%s\"\n", n);
+#endif
 	c += 1;
 }
 
@@ -735,6 +771,16 @@ int main_kappaview(int argc, char *argv[])
 	return ftr_loop_run(&f);
 }
 
-int main(int c, char *v[]) { return main_kappaview(c, v); }
+#ifdef __EMSCRIPTEN__
+int main(void)
+{
+	int c = 1;
+	char *v[2] = {"jmgs", NULL};
+#else
+int main(int c, char *v[])
+{
+#endif
+	return main_kappaview(c, v);
+}
 
 // vim:set foldmethod=marker:
