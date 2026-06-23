@@ -1048,7 +1048,10 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	// (hitboxes of font height)
 	int Y = y / e->font->height;
 	int X = x / e->font->width;
-	if (k == FTR_BUTTON_DOWN && x < 30 * e->font->width && e->hud)
+	if (k == FTR_BUTTON_DOWN && e->hud
+			&& x < 30*e->font->width
+			&& y < 10*e->font->height
+	   )
 	{
 		if (Y == 0) shift_float(&e->a, -0.125);
 		if (Y == 1) shift_float(&e->E, -0.125);
@@ -1063,7 +1066,10 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 		f->changed = 1;
 		return;
 	}
-	if (k == FTR_BUTTON_UP && x < 30 * e->font->width && e->hud)
+	if (k == FTR_BUTTON_UP && e->hud
+			&& x < 30 * e->font->width
+			&& y < 10*e->font->height
+			)
 	{
 		if (Y == 0) shift_float(&e->a, 0.125);
 		if (Y == 1) shift_float(&e->E, 0.125);
