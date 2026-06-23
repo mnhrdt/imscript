@@ -2,7 +2,7 @@
 
 BASIC HYGIENE
 
-H0. use C11 (or newer)
+H0. use C11 or newer
 H1. do not use deprecated features (old-style declarations, trigraphs, gets,...)
 H2. never use the following keywords: const inline register short "long long"
 H3. never use the following includes: wchar.h wctype.h
@@ -28,7 +28,7 @@ N4. exposed function names are long, self-documenting and lowercase
 N5. static functions may have shorter names and, if short enough, be uppercase
 N6. struct tags are lowercase
 N7. macros are uppercase
-N8. struct members are lowercase
+N8. struct members are lowercase except when single letters
 
 
 
@@ -134,8 +134,8 @@ X0. The following construction should be avoided:
 
 Use instead:
 
-	int n; // number of edges in the graph
-	int m; // number of vertices in the graph
+	int n; // number of vertices in the graph
+	int m; // number of edges in the graph
 
 
 X1. The following construction should be avoided:
@@ -206,7 +206,7 @@ Use instead:
 where "do_all_stuff" is a static function declared nearby.
 
 
-X3. The following type of construction should be avoiced:
+X3. The following type of construction should be avoided:
 
 	// structure to store a graph as a list of vertex pairs
 	struct graph {
