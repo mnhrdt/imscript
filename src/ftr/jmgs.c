@@ -6,10 +6,14 @@
 //
 // TODO:
 // - write small doc
-// - emscripten total feature parity
-// - enable key controls for all parameters
 // - allow to set all parameters from command line
 // - enable headless mode, to write an output file without opening a window
+// - generalize to arbitrary, non-radial potentials
+// - allow config of all visible colors (esp.command line, to produce figures)
+// - add palette for colors
+// - fix mass handling (disabled, for now)
+// - rationalize choice of visible parameters in the HUD
+// - enable GUI resize
 // DONE
 // - implement solver for geodesic equations (geometric leapfrog?)
 // - allow pan and zoom of the domain
@@ -19,6 +23,9 @@
 // - implement symplectic leapfrog (same variables)
 // - draw tissot's indicators of the metric
 //   Required state variables: tissot_scale, tissot_n
+// - emscripten total feature parity
+// - enable key controls for all parameters
+// - enable key controls for point position
 
 
 #include <math.h>     // exp, pow
@@ -937,7 +944,11 @@ static void event_motion(struct FTR *f, int b, int m, int x, int y)
 // CALLBACK : resize
 static void event_resize(struct FTR *f, int b, int m, int x, int y)
 {
+	struct jmg_state *e = f->userdata;
 	fprintf(stderr, "resize %d %d\n", x, y);
+	e->w = f->w;
+	e->h = f->h;
+	f->changed = 1;
 }
 
 
@@ -952,6 +963,20 @@ static void cycle_int(int *x, int d, int m)
 	if (*x < 0) *x += m;
 }
 static void scale_int(int *x, float f)  { *x *= f; }
+
+static void action_offset_q0(struct jmg_state *e, float d[2])
+{
+	// get ij of current point
+	float ij[2];
+	win_from_xy(ij, e, e->x);
+
+	// shift ij by the required amount
+	ij[0] += d[0] * e->w / 2;
+	ij[1] += d[1] * e->h / 2;
+
+	// back to plane domain
+	xy_from_win(e->x, e, ij);
+}
 
 // CALLBACK : key
 static void event_key(struct FTR *f, int k, int m, int x, int y)
@@ -990,6 +1015,15 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if (k == 's') cycle_int(&e->solver, +1, 4);
 	if (k == 'S') cycle_int(&e->solver, -1, 4);
 
+	// arrows to move the starting point
+	float d[2] = {0, 0}, inc = 0.02;
+	if (m & FTR_MASK_SHIFT  ) inc /= 10;
+	if (m & FTR_MASK_CONTROL) inc *= 10;
+	if (k == FTR_KEY_LEFT   ) d[0] -= inc;
+	if (k == FTR_KEY_RIGHT  ) d[0] += inc;
+	if (k == FTR_KEY_UP     ) d[1] -= inc;
+	if (k == FTR_KEY_DOWN   ) d[1] += inc;
+	action_offset_q0(e, d);
 
 	f->changed = 1;
 }
@@ -998,7 +1032,7 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 static void event_button(struct FTR *f, int k, int m, int x, int y)
 {
 	struct jmg_state *e = f->userdata;
-	printf("event button k=%d m=%d x=%d y=%d\n", k, m, x, y);
+	//printf("event button k=%d m=%d x=%d y=%d\n", k, m, x, y);
 
 	// right-click : move query point
 	if (k == FTR_BUTTON_RIGHT)
@@ -1088,7 +1122,7 @@ int main_jmgs(int c, char *v[])
 	ftr_set_handler(&f, "expose", event_expose);
 	ftr_set_handler(&f, "button", event_button);
 	ftr_set_handler(&f, "motion", event_motion);
-	//ftr_set_handler(&f, "resize", resize);
+	ftr_set_handler(&f, "resize", event_resize);
 	ftr_set_handler(&f, "key", event_key);
 	ftr_loop_run(&f);
 	ftr_close(&f);
