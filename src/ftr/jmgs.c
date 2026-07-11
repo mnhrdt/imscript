@@ -56,7 +56,7 @@ struct jmg_state {
 
 	// visualisation status
 	float x[2];     // point of interest
-	int bg_mode;  // 0=potential, 1=metric, 2=curvature
+	int bg_mode;  // 0=potential, 1=metric, 2=curvature, 3=surface
 	float bg_A;     // color scale
 	int tissot_n;
 	float tissot_scale;
@@ -126,12 +126,14 @@ static float potential(float a, float r)
 	if (a == 0)
 		return log(r);
 	else
-		return (pow(r,a) - 1)/a;
+		//return (pow(r,a) - 1)/a;
+		return (pow(r,a))/a;
 }
 
 
 
 #define FORK(_n) for(int k=0;k<_n;k++)
+#define FORI(_n) for(int i=0;i<_n;i++)
 
 // corresponding force F = -grad(V) = -r^(a-2)*q (for any a)
 static void force(float F[2], float a, float q[2])
@@ -422,16 +424,20 @@ static void win_from_xy(float *ij, struct jmg_state *e, float *xy)
 {
 	//ij[0] = e->w * (xy[0] - e->xmin) / (e->xmax - e->xmin);
 	//ij[1] = e->h * (-xy[1] - e->ymin) / (e->ymax - e->ymin);
-	for (int k = 0; k < 2; k++)
-		ij[k] = e->offset[k] + e->scale * xy[k];
+	//for (int k = 0; k < 2; k++)
+	//	ij[k] = e->offset[k] + e->scale * xy[k];
+	ij[0] = e->offset[0] + e->scale * xy[0];
+	ij[1] = e->offset[1] - e->scale * xy[1];
 }
 
 static void xy_from_win(float *xy, struct jmg_state *e, float *ij)
 {
 	//xy[0] = e->xmin + (ij[0] / e->w) * (e->xmax - e->xmin);
 	//xy[1] = -(e->ymin + (ij[1] / e->h) * (e->ymax - e->ymin));
-	for (int k = 0; k < 2; k++)
-		xy[k] = ( ij[k] - e->offset[k] ) / e->scale;
+	//for (int k = 0; k < 2; k++)
+	//	xy[k] = ( ij[k] - e->offset[k] ) / e->scale;
+	xy[0] = ( ij[0] - e->offset[0] ) / e->scale;
+	xy[1] =-( ij[1] - e->offset[1] ) / e->scale;
 }
 
 
@@ -448,8 +454,10 @@ static void change_view_scale(struct jmg_state *e, int x, int y, float fac)
 	float center[2], X[2] = {x, y};
 	xy_from_win(center, e, X);
 	e->scale *= fac;
-	for (int p = 0; p < 2; p++)
-		e->offset[p] = -center[p]*e->scale + X[p];
+	//for (int p = 0; p < 2; p++)
+	//	e->offset[p] = -center[p]*e->scale + X[p];
+	e->offset[0] = -center[0]*e->scale + X[0];
+	e->offset[1] = +center[1]*e->scale + X[1];
 	fprintf(stderr, "zoom changed %g\n", e->scale);
 }
 
@@ -661,7 +669,7 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 
 	// gray background
 	for (int i = 0; i < 3 * f->w * f->h; i++)
-		f->rgb[i] = 0;//127;
+		f->rgb[i] = 227;
 
 	if (e->bg_mode == 2) // curvature
 	{
@@ -704,7 +712,7 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 	}
 
 	// tissots
-	if (e->bg_mode > 0) // metric
+	if (e->bg_mode == 1 || e->bg_mode == 2) // metric
 	for (int j = 0; j <= e->tissot_n; j++)
 	for (int i = 0; i <= e->tissot_n; i++)
 	{
@@ -740,7 +748,8 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 	uint8_t pink[3] = {255, 0, 255};
 	float *P = e->x, Pwin[2];
 	win_from_xy(Pwin, e, P);
-	splat_disk(f->rgb, f->w, f->h, Pwin, 6.3, dblue);
+	if (e->bg_mode != 3)
+		splat_disk(f->rgb, f->w, f->h, Pwin, 6.3, dblue);
 
 	//// force vector
 	//float F[2], PF[2], PFwin[2];
@@ -752,7 +761,7 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 
 	// admissibility region
 	float rtop = cutoff_radius(e->a, e->E);
-	if (isfinite(rtop) && e->bg_mode != 0) {
+	if (isfinite(rtop) && e->bg_mode != 0 && e->bg_mode != 3) {
 		float p[2][2] = { {0,0}, {rtop, 0} }, P[2][2];
 		win_from_xy(P[0], e, p[0]);
 		win_from_xy(P[1], e, p[1]);
@@ -760,12 +769,11 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 		plot_circle_cyan(f, P[0][0], P[0][1], R);
 	}
 
-	// velocity vector
-	if (true) //  if "metric" mode
-	{
+	if (e->bg_mode != 3)
+	{ // notice bad indentation in the following blocks
 		float r = hypot(e->x[0], e->x[1]);
 		e->v0 = sqrt(2*(e->E - potential(e->a, r))/e->m);
-	}
+	// velocity vector
 	float θ = -e->j0 * M_PI / 180;
 	float V[2] = { e->v0 * cos(θ), e->v0 * sin(θ) }, PV[2], PVw[2];
 	PV[0] = P[0] + V[0];
@@ -854,6 +862,38 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 			splat_disk(f->rgb, f->w, f->h, ow, 1.7, dgreen);
 		}
 	}
+	} else {//if (e->bg_mode != 3)
+		assert(3 == e->bg_mode); // draw the embedded surface
+		int N = e->N;        // number of samples in r
+		float h = e->tstep;  // sampling step
+		float r[N];          // sample positions
+		float R[N], z[N];    // embedding profile
+		float rup[N];//, Rp[N]; // auxiliary derivatives
+		float zp[N];
+		for (int i = 0; i < N; i++)
+		{
+			r[i] = h*i;
+			float S = jacobi_maupertuis(e->a, e->E, r[i]);
+			R[i] = r[i]*S;
+			rup[i] = pow(r[i],e->a)/(2*pow(r[i],e->a)/e->a -2*e->E);
+			//Rp[i] = S*(1+rup[i]);
+			zp[i] = S*sqrt(1 - pow(1+rup[i], 2));
+		}
+		z[0] = 0;
+		for (int i = 1; i < N; i++)
+			z[i] = z[i-1] + zp[i]*h;
+
+		// now draw the (R,z) curve
+		for (int i = 0; i < N; i++)
+		{
+			float xy[2][2] = {{R[i], z[i]}, {-R[i], z[i]}};
+			float ij[2][2];
+			win_from_xy(ij[0], e, xy[0]);
+			win_from_xy(ij[1], e, xy[1]);
+			splat_disk(f->rgb, f->w, f->h, ij[0], 1.7, red);
+			splat_disk(f->rgb, f->w, f->h, ij[1], 1.7, red);
+		}
+	}
 
 
 	if (!e->hud) goto end_expose;
@@ -901,6 +941,7 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 	if (e->bg_mode == 0) snprintf(buf, 0x200, " POTENTIAL ");
 	if (e->bg_mode == 1) snprintf(buf, 0x200, " METRIC ");
 	if (e->bg_mode == 2) snprintf(buf, 0x200, " CURVATURE ");
+	if (e->bg_mode == 3) snprintf(buf, 0x200, " SURFACE ");
 	put_string_in_rgb_image(f->rgb, f->w, f->h, f->w/2, 0,
 			cyan, hud_bg, 0, e->font, buf);
 
@@ -990,8 +1031,8 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 
 	// "hidden" keys (not visible directly in the hud)
 	if (k == ',') action_screenshot(f);
-	if (k == 'm' || k == ' ') cycle_int(&e->bg_mode, 1, 3);
-	if (k == 'M' || k == '\b') cycle_int(&e->bg_mode, -1, 3);
+	if (k == 'm' || k == ' ') cycle_int(&e->bg_mode, 1, 4);
+	if (k == 'M' || k == '\b') cycle_int(&e->bg_mode, -1, 4);
 	if (k == 'h') scale_float(&e->nskip, 2);
 	if (k == 'H') scale_float(&e->nskip, 0.5);
 	if (k == 'd') scale_float(&e->gstep, cbrt(2));
@@ -1116,8 +1157,8 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 #include "pickopt.c"
 int main_jmgs(int c, char *v[])
 {
-	int w = 600;//atoi(pick_option(&c, &v, "w", "800"));
-	int h = 600;//atoi(pick_option(&c, &v, "h", "800"));
+	int w = atoi(pick_option(&c, &v, "w", "800"));
+	int h = atoi(pick_option(&c, &v, "h", "800"));
 
 	struct jmg_state e[1];
 	init_state(e, w, h);
