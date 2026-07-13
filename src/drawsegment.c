@@ -110,7 +110,7 @@ void traverse_segment_aa2(float px, float py, float qx, float qy,
 	}
 }
 
-// draw a segment between two points
+// draw a circle given its center and radius
 static
 void traverse_circle(int cx, int cy, int r,
 		void (*f)(int,int,void*), void *e)
@@ -124,6 +124,17 @@ void traverse_circle(int cx, int cy, int r,
 		f(cx + s, cy + i, e); // right quadrant
 		f(cx - s, cy + i, e); // left quadrant
 	}
+}
+
+static
+void traverse_disk(int cx, int cy, int r,
+		void (*f)(int,int,void*), void *e)
+{
+	int h = r / sqrt(2);
+	for (int j = -r; j <= r; j++)
+	for (int i = -r; i <= r; i++)
+	if (hypot(i - cx, j - cy) < r)
+		f(cx + i, cy + j, e);
 }
 
 #endif//_DRAWSEGMENT_C
