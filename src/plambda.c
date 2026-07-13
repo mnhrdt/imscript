@@ -41,7 +41,7 @@
 //		:h	heigth of the image
 //		:n	number of pixels in the image
 //		:x	relative horizontal coordinate of the pixel
-//		:y	relative horizontal coordinate of the pixel
+//		:y	relative vertical coordinate of the pixel
 //		:r	relative distance to the center of the image
 //		:t	relative angle from the center of the image
 //		:I	horizontal coordinate of the pixel (centered)
@@ -3240,7 +3240,7 @@ Predefined variables (always preceeded by a colon):\n\
  :h\theigth of the image\n\
  :n\tnumber of pixels in the image\n\
  :x\trelative horizontal coordinate of the pixel\n\
- :y\trelative horizontal coordinate of the pixel\n\
+ :y\trelative vertical coordinate of the pixel\n\
  :r\trelative distance to the center of the image\n\
  :t\trelative angle from the center of the image\n\
  :I\thorizontal coordinate of the pixel (centered)\n\
