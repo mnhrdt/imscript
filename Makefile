@@ -94,7 +94,7 @@ full  : default ftr misc
 ftr   : $(BIN_FTR)
 misc  : $(BIN_MSC)
 
-EMSOPT = -s SINGLE_FILE=1 -s ALLOW_MEMORY_GROWTH=1 #-s MINIMAL_RUNTIME=1
+EMSOPT = -s SINGLE_FILE=1 -s ALLOW_MEMORY_GROWTH=1 --shell-file src/ftr/s.html
 BIN_EMS = bin/miniev.html bin/jmgs.html bin/kappaview.html bin/lles.html
 ems : $(BIN_EMS)
 
