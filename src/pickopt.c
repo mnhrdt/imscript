@@ -28,7 +28,8 @@ static char *pick_variable(int *C, char ***V, char *o, char *d)
 	for (int i = 0; i < c; i++)
 	{
 		char *e = strchr(v[i], '=');
-		if (e && e!=v[i] && e[1] && !strncmp(o, v[i], strlen(o)))
+		int n = strlen(o);
+		if (e && e!=v[i] && e[1] && !strncmp(o,v[i],n) && e==v[i]+n)
 		{
 			*C -= 1;
 			for (int j = i; j < c; j++)

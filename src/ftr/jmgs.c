@@ -1155,11 +1155,17 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 	f->changed = 1;
 }
 
+//static void print_args(int c, char **v, char *s)
+//{
+//	for (int i = 0; i <= c; i++)
+//		printf("%s\t: ARG[%d/%d] = \"%s\"\n", s, i, c, v[i]);
+//	printf("\n");
+//}
+
 #include "pickopt.c"
 int main_jmgs(int c, char *v[])
 {
 	char *output_file = pick_option(&c, &v, "o", "");
-	bool script = *output_file;
 
 	int w      = atoi(pick_variable(&c, &v, "w", "800"));
 	int h      = atoi(pick_variable(&c, &v, "h", "800"));
@@ -1182,7 +1188,7 @@ int main_jmgs(int c, char *v[])
 	e->tissot_n = atoi(pick_variable(&c, &v, "tissot_n", "27"));
 	e->tissot_scale = atof(pick_variable(&c, &v, "tissot_scale", "7"));
 
-	if (script)
+	if (*output_file) // non-interactive mode
 	{
 		struct FTR f = {.w = w, .h = h, .userdata = e};
 		f.rgb = malloc(3*w*h);
@@ -1191,7 +1197,6 @@ int main_jmgs(int c, char *v[])
 		void iio_write_image_uint8_vec(char*,uint8_t*,int,int,int);
 		iio_write_image_uint8_vec(output_file, f.rgb, w, h, 3);
 #endif
-		free(f.rgb);
 		return 0;
 	}
 
