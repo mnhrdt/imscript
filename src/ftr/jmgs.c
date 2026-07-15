@@ -228,6 +228,7 @@ typedef void (*vector_field)(float *, float *);
 // cutoff radius (for an embedding as a surface of revolution
 static float cutoff_radius(float a, float E)
 {
+	E -= 1/a;
 	if (a < -4) return 0;
 	if (a == -4 && E >= 0.25) return INFINITY;
 	if (a == -4 && E < 0.25) return 0;
@@ -774,7 +775,7 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 		float r = hypot(e->x[0], e->x[1]);
 		e->v0 = sqrt(2*(e->E - potential(e->a, r))/e->m);
 	// velocity vector
-	float θ = -e->j0 * M_PI / 180;
+	float θ = e->j0 * M_PI / 180;
 	float V[2] = { e->v0 * cos(θ), e->v0 * sin(θ) }, PV[2], PVw[2];
 	PV[0] = P[0] + V[0];
 	PV[1] = P[1] + V[1];
@@ -1157,11 +1158,43 @@ static void event_button(struct FTR *f, int k, int m, int x, int y)
 #include "pickopt.c"
 int main_jmgs(int c, char *v[])
 {
-	int w = atoi(pick_option(&c, &v, "w", "800"));
-	int h = atoi(pick_option(&c, &v, "h", "800"));
+	char *output_file = pick_option(&c, &v, "o", "");
+	bool script = *output_file;
+
+	int w      = atoi(pick_variable(&c, &v, "w", "800"));
+	int h      = atoi(pick_variable(&c, &v, "h", "800"));
 
 	struct jmg_state e[1];
 	init_state(e, w, h);
+	e->a       = atof(pick_variable(&c, &v, "a", "-1"));
+	e->E       = atof(pick_variable(&c, &v, "E", "-1"));
+	e->bg_mode = atoi(pick_variable(&c, &v, "mode", "1"));
+	e->bg_A    = atof(pick_variable(&c, &v, "bg_A", "1"));
+	e->x[0]    = atof(pick_variable(&c, &v, "x", "0.7"));
+	e->x[1]    = atof(pick_variable(&c, &v, "y", "0.0"));
+	e->j0      = atof(pick_variable(&c, &v, "j", "120"));
+	e->solver  = atoi(pick_variable(&c, &v, "solver", "1"));
+	e->N       = atoi(pick_variable(&c, &v, "N", "500"));
+	e->tstep   = atof(pick_variable(&c, &v, "tstep", "0.0078125"));
+	e->nskip   = atoi(pick_variable(&c, &v, "nskip", "1"));
+	e->gstep   = atof(pick_variable(&c, &v, "gstep", "0.05"));
+	e->hud     = atoi(pick_variable(&c, &v, "hud", "1"));
+	e->tissot_n = atoi(pick_variable(&c, &v, "tissot_n", "27"));
+	e->tissot_scale = atof(pick_variable(&c, &v, "tissot_scale", "7"));
+
+	if (script)
+	{
+		struct FTR f = {.w = w, .h = h, .userdata = e};
+		f.rgb = malloc(3*w*h);
+		event_expose(&f, 0,0,0,0);
+#ifndef __EMSCRIPTEN__
+		void iio_write_image_uint8_vec(char*,uint8_t*,int,int,int);
+		iio_write_image_uint8_vec(output_file, f.rgb, w, h, 3);
+#endif
+		free(f.rgb);
+		return 0;
+	}
+
 
 	struct FTR f = ftr_new_window(e->w, e->h);
 	f.userdata = e;
