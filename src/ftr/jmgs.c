@@ -879,6 +879,8 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 			rup[i] = pow(r[i],e->a)/(2*pow(r[i],e->a)/e->a -2*e->E);
 			//Rp[i] = S*(1+rup[i]);
 			zp[i] = S*sqrt(1 - pow(1+rup[i], 2));
+			//if (!isfinite(zp[i]))
+			//	fprintf(stderr, "zp[%d] not finite\n", i);
 		}
 		z[0] = 0;
 		for (int i = 1; i < N; i++)
@@ -1044,8 +1046,8 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	// same letter as they appear on the hud
 	if (k == 'a') shift_float(&e->a, -0.125);
 	if (k == 'A') shift_float(&e->a, +0.125);
-	if (k == 'e') shift_float(&e->a, -0.125);
-	if (k == 'E') shift_float(&e->a, +0.125);
+	if (k == 'e') shift_float(&e->E, -0.125);
+	if (k == 'E') shift_float(&e->E, +0.125);
 	if (k == 'b') shift_float(&e->bg_A, -0.125);
 	if (k == 'B') shift_float(&e->bg_A, +0.125);
 	if (k == 'j') shift_angle(&e->j0, +10);
