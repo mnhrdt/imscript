@@ -879,6 +879,8 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 			rup[i] = pow(r[i],e->a)/(2*pow(r[i],e->a)/e->a -2*e->E);
 			//Rp[i] = S*(1+rup[i]);
 			zp[i] = S*sqrt(1 - pow(1+rup[i], 2));
+			//if (!isfinite(zp[i]))
+			//	fprintf(stderr, "zp[%d] not finite\n", i);
 		}
 		z[0] = 0;
 		for (int i = 1; i < N; i++)
