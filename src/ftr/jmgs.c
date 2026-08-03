@@ -873,7 +873,7 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 		float zp[N];
 		for (int i = 0; i < N; i++)
 		{
-			r[i] = h*i;
+			r[i] = h*i + e->gstep;
 			float S = jacobi_maupertuis(e->a, e->E, r[i]);
 			R[i] = r[i]*S;
 			rup[i] = pow(r[i],e->a)/(2*pow(r[i],e->a)/e->a -2*e->E);
@@ -891,8 +891,11 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 			float ij[2][2];
 			win_from_xy(ij[0], e, xy[0]);
 			win_from_xy(ij[1], e, xy[1]);
-			splat_disk(f->rgb, f->w, f->h, ij[0], 1.7, red);
-			splat_disk(f->rgb, f->w, f->h, ij[1], 1.7, red);
+			uint8_t *color = i ? red : dblue;
+			if (i < N-1 && !isfinite(zp[i+1]))
+				color = dblue;
+			splat_disk(f->rgb, f->w, f->h, ij[0], 1.7, color);
+			splat_disk(f->rgb, f->w, f->h, ij[1], 1.7, color);
 		}
 	}
 
@@ -1040,12 +1043,13 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'D') scale_float(&e->gstep, 1/cbrt(2));
 	if (k == 'u') cycle_int(&e->hud, 1, 2);
 	if (e->nskip < 1) e->nskip = 1;
+	if (tolower(k)=='d')fprintf(stderr,"gstep=%g\n", e->gstep);
 
 	// same letter as they appear on the hud
 	if (k == 'a') shift_float(&e->a, -0.125);
 	if (k == 'A') shift_float(&e->a, +0.125);
-	if (k == 'e') shift_float(&e->a, -0.125);
-	if (k == 'E') shift_float(&e->a, +0.125);
+	if (k == 'e') shift_float(&e->E, -0.125);
+	if (k == 'E') shift_float(&e->E, +0.125);
 	if (k == 'b') shift_float(&e->bg_A, -0.125);
 	if (k == 'B') shift_float(&e->bg_A, +0.125);
 	if (k == 'j') shift_angle(&e->j0, +10);
