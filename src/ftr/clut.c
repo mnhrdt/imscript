@@ -15,6 +15,11 @@
 #include "ftr.h"      // ftr
 
 
+// bitmap fonts
+#define OMIT_MAIN_FONTU
+#include "fontu.c"
+#include "fonts/xfonts_all.c"
+
 struct clut_state {
 	float M[4][4];  // view matrix
 	float (*v)[3];  // vertex coordinates
@@ -26,6 +31,14 @@ struct clut_state {
 
 	float w;        // viewport width in pixels
 	float h;        // viewport height in pixels
+
+	// controls
+	float O[3];     // global offset (used to compute the view matrix)
+	float a,b,c;    // euler angles (used to compute the view matrix)
+
+	// gui
+	struct bitmap_font font[1];
+	int hud;
 };
 
 static void clut_emtpy(struct clut_state *e)
@@ -36,13 +49,24 @@ static void clut_emtpy(struct clut_state *e)
 	e->nv = e->nt = 0;
 
 	// starting position = identity matrix
-	e->M[0][0]=1; e->M[0][1]=0; e->M[0][2]=0.1; e->M[0][3]=0;
-	e->M[1][0]=0; e->M[1][1]=1; e->M[1][2]=0.1; e->M[1][3]=0;
+	e->M[0][0]=1; e->M[0][1]=0; e->M[0][2]=0; e->M[0][3]=0;
+	e->M[1][0]=0; e->M[1][1]=1; e->M[1][2]=0; e->M[1][3]=0;
 	e->M[2][0]=0; e->M[2][1]=0; e->M[2][2]=1; e->M[2][3]=0;
-	e->M[3][0]=0; e->M[3][1]=0; e->M[3][2]=0; e->M[3][3]=1.51;
+	e->M[3][0]=0; e->M[3][1]=0; e->M[3][2]=0; e->M[3][3]=1;
 
 	// light at zenith
 	e->light[0] = 0; e->light[1] = 0; e->light[2] = 0; e->light[3] = 1;
+
+	// controls (offset + euler angles)
+	e->O[0] = 0;
+	e->O[1] = 0;
+	e->O[2] = 0;
+	e->a = 10;
+	e->b = 20;
+	e->c = 30;
+
+	e->font[0] = reformat_font(*xfont_9x18B, UNPACKED);
+	e->hud = 1;
 }
 
 static void clut_free(struct clut_state *e)
@@ -50,6 +74,9 @@ static void clut_free(struct clut_state *e)
 	free(e->t);
 	free(e->v);
 }
+
+//static const float simplex_v[4][3] = { {0,0,0}, {1,0,0}, {0,1,0}, {0,0,1} };
+//static const int simplex_T[4][3]   = { {1,2,3}, {0,1,2}, {0,2,3}, {0,3,1} };
 
 static void clut_fill_simplex(struct clut_state *e)
 {
@@ -68,8 +95,62 @@ static void clut_fill_simplex(struct clut_state *e)
 
 }
 
+static void sqmp3(float Z[3][3], float X[3][3], float Y[3][3])
+{
+	float T[3][3];
+	for (int i = 0; i < 3; i++)
+	for (int j = 0; j < 3; j++)
+		T[i][j] = 0;
+	for (int i = 0; i < 3; i++)
+	for (int j = 0; j < 3; j++)
+	for (int k = 0; k < 3; k++)
+		T[i][j] += X[i][k] * Y[k][j];
+	for (int i = 0; i < 3; i++)
+	for (int j = 0; j < 3; j++)
+		Z[i][j] = T[i][j];
+}
+
+static void fill_matrix_from_controls(struct clut_state *e)
+{
+	float α = e->a * M_PI / 180;
+	float β = e->b * M_PI / 180;
+	float γ = e->c * M_PI / 180;
+	float Ma[3][3] = {
+		{cos(α), -sin(α), 0},
+		{sin(α), cos(α), 0},
+		{0, 0, 1} };
+	float Mb[3][3] = {
+		{cos(β), 0, sin(β)},
+		{0, 1, 0},
+		{-sin(β), 0, cos(β)} };
+	float Mc[3][3] = {
+		{1, 0, 0},
+		{0, cos(γ), -sin(γ)},
+		{0, sin(γ), cos(γ)} };
+	float R[3][3];
+	sqmp3(R, Ma, Mb);
+	sqmp3(R, R, Mc);
+
+	// TODO: build the matrix here from the viewpoint
+	float (*M)[4] = e->M;
+	for (int i = 0; i < 3; i++)
+	for (int j = 0; j < 3; j++)
+		M[i][j] = R[i][j];
+	for (int i = 0; i < 3; i++)
+		M[3][i] = M[i][3] = 0;
+	M[3][3] = 1;
+
+	//fprintf(stderr, "abc = %g %g %g\n", e->a, e->b, e->c);
+	//fprintf(stderr, "αβγ = %g %g %g\n", α, β, γ);
+	//fprintf(stderr, "M =\n");
+	//for (int i = 0; i < 4; i++)
+	//for (int j = 0; j < 4; j++)
+	//	fprintf(stderr, "%g%c", M[i][j], j==3?'\n':' ');
+}
+
 static bool project(float *ij, struct clut_state *e, float *xyz)
 {
+	fill_matrix_from_controls(e);
 	float (*M)[4] = e->M;
 
 	// clip coordinates (cx,cy,cz,cw)
@@ -154,6 +235,15 @@ static void plot_segment(struct FTR *f, float a[2], float b[2], uint8_t *c)
 	traverse_segment(a[0], a[1], b[0], b[1], plot_pixel, f);
 }
 
+static void plot_triangle_wireframe(struct FTR *f,
+		float a[2], float b[2], float c[2], uint8_t *k)
+{
+	plot_pixel(INT_MIN, INT_MAX, k);
+	traverse_segment(a[0], a[1], b[0], b[1], plot_pixel, f);
+	traverse_segment(b[0], b[1], c[0], c[1], plot_pixel, f);
+	traverse_segment(c[0], c[1], a[0], a[1], plot_pixel, f);
+}
+
 
 // CALLBACK : expose
 static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
@@ -169,7 +259,17 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 	}
 
 	// expose triangles
-	// (TBD)
+	//
+	// 1st version: transparent wireframe
+	for (int i = 0; i < e->nt; i++)
+	{
+		int *t = e->t[i];
+		float *v[3] = { e->v[t[0]], e->v[t[1]], e->v[t[2]] };
+		float V[3][2];
+		for (int j = 0; j < 3; j++)
+			project(V[j], e, v[j]);
+		plot_triangle_wireframe(f, V[0], V[1], V[2], rgb_black);
+	}
 
 	// expoes axes
 	float ax[3][2][3] = {
@@ -184,6 +284,17 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 	plot_segment(f, A[0][0], A[0][1], rgb_red);
 	plot_segment(f, A[1][0], A[1][1], rgb_dgreen);
 	plot_segment(f, A[2][0], A[2][1], rgb_blue);
+
+
+	// expose HUD
+	char buf[0x200] = {0};
+	snprintf(buf, 0x200,
+			"a = %g\n"
+			"b = %g\n"
+			"c = %g\n"
+			, e->a, e->b, e->c);
+	put_string_in_rgb_image(f->rgb, f->w, f->h,
+			0, 0+0, rgb_dgreen, rgb_black, 0, e->font, buf);
 
 
 	f->changed = 1;
@@ -270,8 +381,12 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 //	if (tolower(k)=='d')fprintf(stderr,"gstep=%g\n", e->gstep);
 //
 //	// same letter as they appear on the hud
-//	if (k == 'a') shift_float(&e->a, -0.125);
-//	if (k == 'A') shift_float(&e->a, +0.125);
+	if (k == 'a') shift_float(&e->a, -5);
+	if (k == 'A') shift_float(&e->a, +5);
+	if (k == 'b') shift_float(&e->b, -5);
+	if (k == 'B') shift_float(&e->b, +5);
+	if (k == 'c') shift_float(&e->c, -5);
+	if (k == 'C') shift_float(&e->c, +5);
 //	if (k == 'e') shift_float(&e->E, -0.125);
 //	if (k == 'E') shift_float(&e->E, +0.125);
 //	if (k == 'b') shift_float(&e->bg_A, -0.125);
