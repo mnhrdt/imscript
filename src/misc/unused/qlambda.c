@@ -35,7 +35,7 @@
 //		:h	heigth of the image
 //		:n	number of pixels in the image
 //		:x	relative horizontal coordinate of the pixel
-//		:y	relative horizontal coordinate of the pixel
+//		:y	relative vertical coordinate of the pixel
 //		:r	relative distance to the center of the image
 //		:t	relative angle from the center of the image
 //
