@@ -406,17 +406,64 @@ static void geodesic_euler_sym(float *o,   // output points
 // geometry is implicit in global "metric_field" and "metric_gradient"
 typedef void (*geodesic_solver)(float*,float[2],float[2],int,float);
 
+
+
+static void fill_Rz(float *R, float *z, float *zp, struct jmg_state *e)
+{
+	// implementation of eggenspieler algorithm
+	int N = e->N;
+	float h = e->tstep;  // sampling step
+	float r[N];          // sample positions
+	//float R[N], z[N];    // embedding profile
+	float rup[N];//, Rp[N]; // auxiliary derivatives
+	//float zp[N];
+	for (int i = 0; i < N; i++)
+	{
+		r[i] = h*i + e->gstep;
+		float S = jacobi_maupertuis(e->a, e->E, r[i]);
+		R[i] = r[i]*S;
+		rup[i] = pow(r[i],e->a)/(2*pow(r[i],e->a)/e->a -2*e->E);
+		//Rp[i] = S*(1+rup[i]);
+		zp[i] = S*sqrt(1 - pow(1+rup[i], 2));
+		//if (!isfinite(zp[i]))
+		//	fprintf(stderr, "zp[%d] not finite\n", i);
+	}
+	z[0] = 0;
+	for (int i = 1; i < N; i++)
+		z[i] = z[i-1] + zp[i]*h;
+}
+
 static void action_screenshot(struct FTR *f)
 {
 	static int c = 0;
 	int p = getpid();
 	char n[FILENAME_MAX];
-	snprintf(n, FILENAME_MAX, "screenshot_jmgs_%d_%d.png", p, c);
+	snprintf(n, FILENAME_MAX, "jmgs_screenshot_%d_%d.png", p, c);
 #ifndef __EMSCRIPTEN__
 	void iio_write_image_uint8_vec(char*,uint8_t*,int,int,int);
 	iio_write_image_uint8_vec(n, f->rgb, f->w, f->h, 3);
 	fprintf(stderr, "wrote sreenshot on file \"%s\"\n", n);
 #endif
+	c += 1;
+}
+
+static void action_surface(struct FTR *f)
+{
+	static int c = 0;
+	int p = getpid();
+	char n[FILENAME_MAX];
+	snprintf(n, FILENAME_MAX, "jmgs_surface_%d_%d.xyz", p, c);
+	{
+		struct jmg_state *e = f->userdata;
+		int N = e->N;
+		float R[N], z[N], zp[N];
+		fill_Rz(R, z, zp, e);
+	}
+//#ifndef __EMSCRIPTEN__
+//	void iio_write_image_uint8_vec(char*,uint8_t*,int,int,int);
+//	iio_write_image_uint8_vec(n, f->rgb, f->w, f->h, 3);
+//	fprintf(stderr, "wrote sreenshot on file \"%s\"\n", n);
+//#endif
 	c += 1;
 }
 
@@ -865,26 +912,32 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 	}
 	} else {//if (e->bg_mode != 3)
 		assert(3 == e->bg_mode); // draw the embedded surface
+		// The following code fills in the R[], z[] and zp[] arrays
 		int N = e->N;        // number of samples in r
-		float h = e->tstep;  // sampling step
-		float r[N];          // sample positions
 		float R[N], z[N];    // embedding profile
-		float rup[N];//, Rp[N]; // auxiliary derivatives
-		float zp[N];
-		for (int i = 0; i < N; i++)
-		{
-			r[i] = h*i + e->gstep;
-			float S = jacobi_maupertuis(e->a, e->E, r[i]);
-			R[i] = r[i]*S;
-			rup[i] = pow(r[i],e->a)/(2*pow(r[i],e->a)/e->a -2*e->E);
-			//Rp[i] = S*(1+rup[i]);
-			zp[i] = S*sqrt(1 - pow(1+rup[i], 2));
-			//if (!isfinite(zp[i]))
-			//	fprintf(stderr, "zp[%d] not finite\n", i);
-		}
-		z[0] = 0;
-		for (int i = 1; i < N; i++)
-			z[i] = z[i-1] + zp[i]*h;
+		float zp[N];         // derivative of z
+		fill_Rz(R, z, zp, e);
+
+
+		//float h = e->tstep;  // sampling step
+		//float r[N];          // sample positions
+		//float R[N], z[N];    // embedding profile
+		//float rup[N];//, Rp[N]; // auxiliary derivatives
+		//float zp[N];
+		//for (int i = 0; i < N; i++)
+		//{
+		//	r[i] = h*i + e->gstep;
+		//	float S = jacobi_maupertuis(e->a, e->E, r[i]);
+		//	R[i] = r[i]*S;
+		//	rup[i] = pow(r[i],e->a)/(2*pow(r[i],e->a)/e->a -2*e->E);
+		//	//Rp[i] = S*(1+rup[i]);
+		//	zp[i] = S*sqrt(1 - pow(1+rup[i], 2));
+		//	//if (!isfinite(zp[i]))
+		//	//	fprintf(stderr, "zp[%d] not finite\n", i);
+		//}
+		//z[0] = 0;
+		//for (int i = 1; i < N; i++)
+		//	z[i] = z[i-1] + zp[i]*h;
 
 		// now draw the (R,z) curve
 		for (int i = 0; i < N; i++)
@@ -1037,6 +1090,7 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 
 	// "hidden" keys (not visible directly in the hud)
 	if (k == ',') action_screenshot(f);
+	if (k == ';') action_surface(f);
 	if (k == 'm' || k == ' ') cycle_int(&e->bg_mode, 1, 4);
 	if (k == 'M' || k == '\b') cycle_int(&e->bg_mode, -1, 4);
 	if (k == 'h') scale_float(&e->nskip, 2);
