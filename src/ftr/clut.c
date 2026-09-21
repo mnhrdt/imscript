@@ -27,6 +27,10 @@ struct clut_state {
 	int (*t)[3];    // triangle indices
 	int nt;         // number of triangles
 
+	// just for play
+	int (*e)[2];
+	int ne;
+
 	float light[4]; // light position (projective)
 
 	float w;        // viewport width in pixels
@@ -35,6 +39,7 @@ struct clut_state {
 	// controls
 	float O[3];     // global offset (used to compute the view matrix)
 	float a,b,c;    // euler angles (used to compute the view matrix)
+	float p,q,r;    // debug shit
 
 	// gui
 	struct bitmap_font font[1];
@@ -64,6 +69,7 @@ static void clut_emtpy(struct clut_state *e)
 	e->a = 10;
 	e->b = 20;
 	e->c = 30;
+	e->p = e->q = e->r = 0;
 
 	e->font[0] = reformat_font(*xfont_9x18B, UNPACKED);
 	e->hud = 1;
@@ -94,6 +100,8 @@ static void clut_fill_simplex(struct clut_state *e)
 		e->t[i][k] = T[i][k];
 
 }
+
+
 
 static void sqmp3(float Z[3][3], float X[3][3], float Y[3][3])
 {
@@ -138,6 +146,9 @@ static void fill_matrix_from_controls(struct clut_state *e)
 		M[i][j] = R[i][j];
 	for (int i = 0; i < 3; i++)
 		M[3][i] = M[i][3] = 0;
+	M[0][3] = e->p;
+	M[1][3] = e->q;
+	M[2][3] = e->r;
 	M[3][3] = 1;
 
 	//fprintf(stderr, "abc = %g %g %g\n", e->a, e->b, e->c);
@@ -292,7 +303,10 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 			"a = %g\n"
 			"b = %g\n"
 			"c = %g\n"
-			, e->a, e->b, e->c);
+			"p = %g\n"
+			"q = %g\n"
+			"r = %g\n"
+			, e->a, e->b, e->c, e->p, e->q, e->r);
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
 			0, 0+0, rgb_dgreen, rgb_black, 0, e->font, buf);
 
@@ -387,6 +401,12 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'B') shift_float(&e->b, +5);
 	if (k == 'c') shift_float(&e->c, -5);
 	if (k == 'C') shift_float(&e->c, +5);
+	if (k == 'p') shift_float(&e->p, -0.001);
+	if (k == 'P') shift_float(&e->p, +0.001);
+	if (k == 's') shift_float(&e->q, -0.001);
+	if (k == 'S') shift_float(&e->q, +0.001);
+	if (k == 'r') shift_float(&e->r, -0.001);
+	if (k == 'R') shift_float(&e->r, +0.001);
 //	if (k == 'e') shift_float(&e->E, -0.125);
 //	if (k == 'E') shift_float(&e->E, +0.125);
 //	if (k == 'b') shift_float(&e->bg_A, -0.125);
