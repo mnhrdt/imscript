@@ -458,6 +458,13 @@ static void action_surface(struct FTR *f)
 		int N = e->N;
 		float R[N], z[N], zp[N];
 		fill_Rz(R, z, zp, e);
+		FILE *F = xfopen(n, "w");
+		if (F) {
+			for (int i = 0; i < N; i++)
+				fprintf(F, "%g %g\n", R[i], z[i]);
+			fclose(F);
+			fprintf(stderr, "wrote \"surface\" on file \"%s\"\n",n);
+		}
 	}
 //#ifndef __EMSCRIPTEN__
 //	void iio_write_image_uint8_vec(char*,uint8_t*,int,int,int);
