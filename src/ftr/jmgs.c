@@ -452,7 +452,7 @@ static void action_surface(struct FTR *f)
 	static int c = 0;
 	int p = getpid();
 	char n[FILENAME_MAX];
-	snprintf(n, FILENAME_MAX, "jmgs_surface_%d_%d.xyz", p, c);
+	snprintf(n, FILENAME_MAX, "jmgs_surface_%d_%d.scad", p, c);
 	{
 		struct jmg_state *e = f->userdata;
 		int N = e->N;
@@ -460,8 +460,15 @@ static void action_surface(struct FTR *f)
 		fill_Rz(R, z, zp, e);
 		FILE *F = xfopen(n, "w");
 		if (F) {
+			fprintf(F, "rotate_extrude(angle=180,$fn=360){\n");
 			for (int i = 0; i < N; i++)
-				fprintf(F, "%g %g\n", R[i], z[i]);
+			{
+				if (!isfinite(z[i])) continue;
+				fprintf(F,
+			"translate([%g,%g,0]){circle(r=0.01,$fn=36);}\n",
+				R[i], z[i]);
+			}
+			fprintf(F, "}\n");
 			fclose(F);
 			fprintf(stderr, "wrote \"surface\" on file \"%s\"\n",n);
 		}
@@ -1255,6 +1262,8 @@ int main_jmgs(int c, char *v[])
 	e->tissot_n = atoi(pick_variable(&c, &v, "tissot_n", "27"));
 	e->tissot_scale = atof(pick_variable(&c, &v, "tissot_scale", "7"));
 
+	char *dump_surface = pick_option(&c, &v, "-surf", "");
+
 	if (*output_file) // non-interactive mode
 	{
 		struct FTR f = {.w = w, .h = h, .userdata = e};
@@ -1277,6 +1286,7 @@ int main_jmgs(int c, char *v[])
 	ftr_set_handler(&f, "resize", event_resize);
 	ftr_set_handler(&f, "key", event_key);
 	ftr_loop_run(&f);
+	if (*dump_surface) action_surface(&f);
 	ftr_close(&f);
 	return 0;
 }
