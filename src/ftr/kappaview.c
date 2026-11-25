@@ -38,8 +38,9 @@ struct viewer_state {
 	// visualization parameters
 	int n;                // number of kappas (1,2,...,MAX_KAPPAS)
 	float k[MAX_KAPPAS];  // values of each kappa
-	int mode;             // LEFT,RIGHT,MIN,MAX,ALL [0..4]
+	int mode;             // LEFT,RIGHT,MIN,MAX,ALL,NORM [0..5]
 	int action;           // EQUAL,EXPONENTIAL,RANDOM,JITTER
+	int i;                // "current" node
 
 	// display theme
 	uint8_t rgb_bg[3];
@@ -47,6 +48,7 @@ struct viewer_state {
 	uint8_t rgb_axes[3];
 	uint8_t rgb_grid[3];
 	uint8_t rgb_curv[3];
+	uint8_t rgb_high[3];
 	uint8_t rgb_nan[3];
 	struct bitmap_font fonts[5]; // from small to large
 	struct bitmap_font *font;
@@ -60,15 +62,15 @@ static void init_state(struct viewer_state *e)
 	e->n = 2;
 	e->k[0] = 0.3;
 	e->k[1] = 0.7;
-	e->mode = 4;
+	e->mode = 1;
 	//e->action = 1;
 	//e->m = 1;
 	//e->n = 1;
 	//e->q = 3;
 
 
-	e->w = 600;
-	e->h = 600;
+	e->w = 800;
+	e->h = 800;
 	e->x0 = -0.2;
 	e->xf = 1.2;
 	e->y0 = -0.2;
@@ -94,7 +96,13 @@ static void init_state(struct viewer_state *e)
 	e->rgb_curv[1] = 100;
 	e->rgb_curv[2] = 0;
 
+	e->rgb_high[0] = 255;
+	e->rgb_high[1] = 150;
+	e->rgb_high[2] = 50;
+
 	e->font = e->fonts + 3;
+
+	e->i = 0;
 
 }
 
@@ -199,6 +207,15 @@ static void set_equal_kappas(struct viewer_state *e)
 	assert_kappa_sum(e);
 }
 
+static void set_rafa_kappas(struct viewer_state *e)
+{
+	float δ = 1.0/(10*e->n);
+	for (int i = 0; i < e->n - 1; i++)
+		e->k[i] = (1 - δ) / e->n;
+	e->k[e->n-1] = e->k[0] + δ;
+	assert_kappa_sum(e);
+}
+
 static void set_exponential_kappas(struct viewer_state *e)
 {
 	for (int i = 0; i < e->n; i++)
@@ -278,7 +295,7 @@ static void change_one_kappa(struct viewer_state *e, int i, float d)
 			else
 				e->k[j] -= d/(e->n - 1);
 		break;
-	case 6: // ALLNORM
+	case 5: // ALLNORM
 		e->k[i] += d;
 		double s = 0;
 		for (int j = 0; j < e->n; j++)
@@ -481,7 +498,7 @@ static void paint_state(struct FTR *f)
 	//	splat_disk(f->rgb, f->w, f->h, ij, POINT_RADIUS, e->rgb_curv);
 	//}
 
-	// plot kappa sums
+	// plot kappas and their sums
 	int N = 1 << e->n; // number of kappa sums = 2^n
 	for (int i = 0; i < N; i++)
 	{
@@ -490,9 +507,11 @@ static void paint_state(struct FTR *f)
 			if (i & (1 << j))
 				k += e->k[j];
 		float r = (i&&!(i&(i-1))) ? 7.3 : 2.7; // pure kappa big dot
+		uint8_t *c = e->rgb_curv;
+		if (i == 1<<e->i) { r = 9.4; c = e->rgb_high; }
 		float xy[2] = {k, 0}, ij[2];
 		get_win_from_xy(e, ij, xy);
-		splat_disk(f->rgb, f->w, f->h, ij, r, e->rgb_curv);
+		splat_disk(f->rgb, f->w, f->h, ij, r, c);
 	}
 
 	// diagonal line (accumulated uniform distribution)
@@ -509,23 +528,23 @@ static void paint_state(struct FTR *f)
 
 	// plot 10 random samples as faint curves in the background
 	// (we have to plot them first so that they are covered by other stuff)
-	for (int cx = 0; cx < 10; cx++)
-	{
-		int M = 100;
-		float S[M];
-		kappasampling(S, M, e->k, e->n);
-		for (int i = 1; i < M; i++)
-		{
-			float p[2] = { S[i-1], i * 1.0 / M };
-			float q[2] = { S[i], i * 1.0 / M };
-			plot_line_in_plane(f, p, q, palette[4]);
-		}
-		for (int i = 0; i < M; i++)
-		{
-			float p[2] = { S[i], i * 1.0 / M };
-			plot_line_in_plane(f, p, p, palette[1]);
-		}
-	}
+	//for (int cx = 0; cx < 10; cx++)
+	//{
+	//	int M = 100;
+	//	float S[M];
+	//	kappasampling(S, M, e->k, e->n);
+	//	for (int i = 1; i < M; i++)
+	//	{
+	//		float p[2] = { S[i-1], i * 1.0 / M };
+	//		float q[2] = { S[i], i * 1.0 / M };
+	//		plot_line_in_plane(f, p, q, palette[4]);
+	//	}
+	//	for (int i = 0; i < M; i++)
+	//	{
+	//		float p[2] = { S[i], i * 1.0 / M };
+	//		plot_line_in_plane(f, p, p, palette[1]);
+	//	}
+	//}
 
 	// build table of kappa sums
 	float T[2*N];
@@ -571,7 +590,8 @@ static void paint_state(struct FTR *f)
 	for (int i = 0; i < e->n; i++)
 		b += snprintf(buf+b, 0x400-b, "%g\t", e->k[i]);
 	b += snprintf(buf+b, 0x400-b, "\nmode = %d LEFT, RIGHT, MIN  , MAX  , ALL  , NORM\n", e->mode);
-	b += snprintf(buf+b, 0x400-b, "action = UNI, EXP, RND, JIT");
+	b += snprintf(buf+b, 0x400-b, "i = %d", e->i);
+	//b += snprintf(buf+b, 0x400-b, "action = UNI, EXP, RND, JIT");
 	put_string_in_rgb_image(f->rgb, f->w, f->h,
 			10, 0, e->rgb_fg, e->rgb_bg, 0, e->font, buf);
 }
@@ -621,6 +641,14 @@ static void action_screenshot(struct FTR *f)
 }
 
 
+static void cycle_int(int *x, int d, int m)
+{
+	*x += d;
+	if (*x >= m) *x -= m;
+	if (*x < 0) *x += m;
+}
+
+
 // key handler
 static void event_key(struct FTR *f, int k, int m, int x, int y)
 {
@@ -638,8 +666,23 @@ static void event_key(struct FTR *f, int k, int m, int x, int y)
 	if (k == 'j') jitter_kappas(e);
 	if (k == 'r') set_random_kappas(e);
 	if (k == 'e') set_equal_kappas(e);
+	if (k == 'R') set_rafa_kappas(e);
 	if (k == 'x') set_exponential_kappas(e);
 	if (k == ',') action_screenshot(f);
+
+	if (k == 'i') cycle_int(&e->i, +1, e->n);
+	if (k == 'I') cycle_int(&e->i, -1, e->n);
+
+	if (k == 'm') cycle_int(&e->mode, +1, 6);
+	if (k == 'M') cycle_int(&e->mode, -1, 6);
+
+	if (m&FTR_MASK_SHIFT) {
+	if (k == FTR_KEY_RIGHT) change_one_kappa(e, e->i, +0.001);
+	if (k == FTR_KEY_LEFT)  change_one_kappa(e, e->i, -0.001);
+	} else {
+	if (k == FTR_KEY_RIGHT) change_one_kappa(e, e->i, +0.01);
+	if (k == FTR_KEY_LEFT)  change_one_kappa(e, e->i, -0.01);
+	}
 
 	//e->dragging_window_point = e->dragging_image_point = false;
 	f->changed = 1;
