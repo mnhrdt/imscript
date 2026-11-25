@@ -27,7 +27,7 @@ struct clut_state {
 	int (*t)[3];    // triangle indices
 	int nt;         // number of triangles
 
-	// just for play
+	// just for play (wireframe models)
 	int (*e)[2];
 	int ne;
 
@@ -84,6 +84,26 @@ static void clut_free(struct clut_state *e)
 //static const float simplex_v[4][3] = { {0,0,0}, {1,0,0}, {0,1,0}, {0,0,1} };
 //static const int simplex_T[4][3]   = { {1,2,3}, {0,1,2}, {0,2,3}, {0,3,1} };
 
+static float cube_v[8][3] = {
+	{-1,-1,-1}, { 1,-1,-1}, { 1, 1,-1}, {-1, 1,-1},
+	{-1,-1, 1}, { 1,-1, 1}, { 1, 1, 1}, {-1, 1, 1}
+};
+static int cube_e[12][2] = {
+	{0,1}, {1,2}, {2,3}, {3,0},
+	{4,5}, {5,6}, {6,7}, {7,4},
+	{0,4}, {1,5}, {2,6}, {3,7}
+};
+
+static const float octahedron_v[6][3] = {
+	{-1,0,0}, {0,-1,0}, {1,0,0}, {0,1,0}, {0,0,-1}, {0,0,1}
+};
+static int  octahedron_e[12][2] = {
+	{0,1}, {1,2}, {2,3}, {3,0},
+	{4,0}, {4,1}, {4,2}, {4,3},
+	{5,0}, {5,1}, {5,2}, {5,3}
+};
+
+
 static void clut_fill_simplex(struct clut_state *e)
 {
 	float V[4][3] = { {0,0,0}, {1,0,0}, {0,1,0}, {0,0,1} };
@@ -101,8 +121,20 @@ static void clut_fill_simplex(struct clut_state *e)
 
 }
 
+static void clut_fill_cube(struct clut_state *e)
+{
+	e->nv = 8;
+	e->v = cube_v;
+	e->ne = 12;
+	e->e = cube_e;
+	e->nt = 0;
+	e->t = NULL;
+}
 
 
+
+// Z = XY
+// note: you can do sqmp3(B,B,A) to accumulate on B
 static void sqmp3(float Z[3][3], float X[3][3], float Y[3][3])
 {
 	float T[3][3];
@@ -149,7 +181,7 @@ static void fill_matrix_from_controls(struct clut_state *e)
 	M[0][3] = e->p;
 	M[1][3] = e->q;
 	M[2][3] = e->r;
-	M[3][3] = 1;
+	M[3][3] = 2;
 
 	//fprintf(stderr, "abc = %g %g %g\n", e->a, e->b, e->c);
 	//fprintf(stderr, "αβγ = %g %g %g\n", α, β, γ);
@@ -161,8 +193,12 @@ static void fill_matrix_from_controls(struct clut_state *e)
 
 static bool project(float *ij, struct clut_state *e, float *xyz)
 {
+	//fprintf(stderr, "project point %g %g %g\n", xyz[0], xyz[1], xyz[2]);
 	fill_matrix_from_controls(e);
 	float (*M)[4] = e->M;
+	//for (int j = 0; j < 4; j++)
+	//for (int i = 0; i < 4; i++)
+	//	fprintf(stderr, "M[%d][%d] = %g\n", j, i, M[j][i]);
 
 	// clip coordinates (cx,cy,cz,cw)
 	float c[4] = {
@@ -269,20 +305,31 @@ static void event_expose(struct FTR *f, int ev_b, int ev_m, int ev_x, int ev_y)
 		f->rgb[3*i+2] = 200;
 	}
 
-	// expose triangles
-	//
-	// 1st version: transparent wireframe
-	for (int i = 0; i < e->nt; i++)
+	// expose edges (wireframe)
+	for (int i = 0; i < e->ne; i++)
 	{
-		int *t = e->t[i];
-		float *v[3] = { e->v[t[0]], e->v[t[1]], e->v[t[2]] };
-		float V[3][2];
-		for (int j = 0; j < 3; j++)
-			project(V[j], e, v[j]);
-		plot_triangle_wireframe(f, V[0], V[1], V[2], rgb_black);
+		int *E = e->e[i];
+		float *v[2] = { e->v[E[0]], e->v[E[1]] };
+		float V[2][2];
+		project(V[0], e, v[0]);
+		project(V[1], e, v[1]);
+		plot_segment(f, V[0], V[1], rgb_black);
 	}
 
-	// expoes axes
+	//// expose triangles
+	////
+	//// 1st version: transparent wireframe
+	//for (int i = 0; i < e->nt; i++)
+	//{
+	//	int *t = e->t[i];
+	//	float *v[3] = { e->v[t[0]], e->v[t[1]], e->v[t[2]] };
+	//	float V[3][2];
+	//	for (int j = 0; j < 3; j++)
+	//		project(V[j], e, v[j]);
+	//	plot_triangle_wireframe(f, V[0], V[1], V[2], rgb_black);
+	//}
+
+	// expose axes
 	float ax[3][2][3] = {
 		{ {0,0,0}, {1,0,0} },
 		{ {0,0,0}, {0,1,0} },
@@ -537,7 +584,8 @@ int main_clut(int c, char *v[])
 	clut_emtpy(e);
 	e->w = w;
 	e->h = h;
-	clut_fill_simplex(e);
+	//clut_fill_simplex(e);
+	clut_fill_cube(e);
 	//e->a       = atof(pick_variable(&c, &v, "a", "-1"));
 	//e->E       = atof(pick_variable(&c, &v, "E", "-1"));
 	//e->bg_mode = atoi(pick_variable(&c, &v, "mode", "1"));
